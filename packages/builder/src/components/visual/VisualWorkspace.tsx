@@ -3,6 +3,7 @@
  * Unified visual editor with all controls in one left panel
  */
 
+import { beatSnapshot } from '../../utils/beatSnapshot';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeDialogTreeLayout, type DialogTreeLayoutTheme, DEFAULT_DIALOG_TREE_THEME, calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions, DIALOG_CHAT_RESPONSE_DELAY } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
@@ -315,7 +316,8 @@ const PanoramaPreviewSection: React.FC<{
   livePanoCamRef: React.MutableRefObject<{ yaw: number; pitch: number; hfov: number }>;
   previewDragRef: React.MutableRefObject<any>;
   setHasChanges: (v: boolean) => void;
-  onBeatUpdate?: (beatId: string, updates: Partial<Beat>) => void;
+  /** `before` (beatSnapshot) when the beat was changed before the call, so Undo can go back to it. */
+  onBeatUpdate?: (beatId: string, updates: Partial<Beat>, before?: Record<string, any>) => void;
   setSelectedElementIds: (ids: string[]) => void;
   handlePreviewPointerDown: (e: React.PointerEvent, elementId: string) => void;
   handlePreviewPointerMove: (e: React.PointerEvent) => void;
@@ -878,7 +880,8 @@ interface VisualWorkspaceProps {
   onAssetRemove?: (assetId: string) => void;
   onAssetUpdate?: (assetId: string, updates: Partial<Asset>) => void;
   onOpenCharacterManager?: (callback?: (character: any) => void) => void;
-  onBeatUpdate?: (beatId: string, updates: Partial<Beat>) => void;
+  /** `before` (beatSnapshot) when the beat was changed before the call, so Undo can go back to it. */
+  onBeatUpdate?: (beatId: string, updates: Partial<Beat>, before?: Record<string, any>) => void;
   projectSettings?: {
     width: number;
     height: number;
@@ -5919,20 +5922,23 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 } : undefined}
                 presentationMode={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).presentationMode || 'positioned') : undefined}
                 onPresentationModeChange={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') && onBeatUpdate ? (mode) => {
+                  const before = beatSnapshot(beat);
                   (beat as any).presentationMode = mode;
-                  onBeatUpdate(beat.id, { presentationMode: mode } as any);
+                  onBeatUpdate(beat.id, { presentationMode: mode } as any, before);
                   setHasChanges(true);
                 } : undefined}
                 showAvatars={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).showAvatars ?? true) : undefined}
                 onShowAvatarsChange={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') && onBeatUpdate ? (show) => {
+                  const before = beatSnapshot(beat);
                   (beat as any).showAvatars = show;
-                  onBeatUpdate(beat.id, { showAvatars: show } as any);
+                  onBeatUpdate(beat.id, { showAvatars: show } as any, before);
                   setHasChanges(true);
                 } : undefined}
                 responseDelay={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).responseDelay ?? DIALOG_CHAT_RESPONSE_DELAY) : undefined}
                 onResponseDelayChange={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') && onBeatUpdate ? (delay) => {
+                  const before = beatSnapshot(beat);
                   (beat as any).responseDelay = delay;
-                  onBeatUpdate(beat.id, { responseDelay: delay } as any);
+                  onBeatUpdate(beat.id, { responseDelay: delay } as any, before);
                   setHasChanges(true);
                 } : undefined}
                 presentation={beat.type === 'aiConversation' ? (((beat.getParameters?.() ?? {}).presentation) || 'chat') : undefined}
@@ -5971,6 +5977,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 onLayoutTemplateChange={(() => {
                   if (!onBeatUpdate) return undefined;
                   const handler = (template: string) => {
+                    // Written onto the beat at once (later reads in the same
+                    // moment need it); `before` lets Undo go back.
+                    const before = beatSnapshot(beat);
                     (beat as any).layoutTemplate = template;
                     // Keep legacy presentationMode synced for one release so
                     // any reader that still consumes it sees the right value
@@ -5980,9 +5989,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                         ? template
                         : 'positioned';
                       (beat as any).presentationMode = legacy;
-                      onBeatUpdate(beat.id, { layoutTemplate: template, presentationMode: legacy } as any);
+                      onBeatUpdate(beat.id, { layoutTemplate: template, presentationMode: legacy } as any, before);
                     } else {
-                      onBeatUpdate(beat.id, { layoutTemplate: template } as any);
+                      onBeatUpdate(beat.id, { layoutTemplate: template } as any, before);
                     }
                     setHasChanges(true);
                   };
@@ -6009,8 +6018,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 onSlotIntentChange={(() => {
                   if (!onBeatUpdate) return undefined;
                   const handler = (nextIntent: Record<string, any>) => {
+                    const before = beatSnapshot(beat);
                     (beat as any).slotIntent = nextIntent;
-                    onBeatUpdate(beat.id, { slotIntent: nextIntent } as any);
+                    onBeatUpdate(beat.id, { slotIntent: nextIntent } as any, before);
                     setHasChanges(true);
                   };
                   if (isMultiChoiceLike(beat.type) && projectIsResponsive) return handler;
@@ -6033,6 +6043,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   // stretch semantics and stays excluded.
                   beat.type !== 'panorama'
                     ? ((beat as any).spatialFit as 'contain' | 'cover' | undefined)
+                    : undefined
+                }
+                beatParameters={beat.getParameters ? beat.getParameters() : {}}
+                onBeatParameterChange={
+                  onBeatUpdate
+                    ? (param, value) => {
+                        // Through the beat update (not onto the beat first), so Undo takes it back.
+                        const params = beat.getParameters ? beat.getParameters() : {};
+                        onBeatUpdate(beat.id, { parameters: { ...params, [param]: value } } as any);
+                        setHasChanges(true);
+                      }
                     : undefined
                 }
                 beatLook={{ look: (beat as any).look, textBoxBorder: (beat as any).textBoxBorder }}

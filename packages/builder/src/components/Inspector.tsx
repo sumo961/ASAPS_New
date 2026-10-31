@@ -1,3 +1,4 @@
+import { supportsVisualEditor } from '../utils/visualBeatTypes';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Beat, synthesizeEffectsFromLegacyParams, suggestDurationSeconds, DEFAULT_TARGET_TIMEOUT_TYPES, isMultiChoiceLike, normalizeRoles, linesMoveOnByThemselves, normalizeDialogTreeLayoutTemplate } from '@asaps/core';
 import { VariableValueInput } from '../editors/VariableValueInput';
@@ -7,7 +8,6 @@ import { DialogTreeEditor } from '../editors/DialogTreeEditor';
 import { HyperTextEditor } from '../editors/HyperTextEditor';
 import { VisualBeatEditor, VisualElement } from './visual/VisualBeatEditor';
 import { AssetSelectionModal } from './assets/AssetSelectionModal';
-import { ImageAssetField } from './assets/ImageAssetField';
 import { SchemaFormGenerator } from './SchemaFormGenerator';
 import { TimeDisplaySetting } from './inspector/TimeDisplaySetting';
 import { offersTimeDisplayOnItsOwn } from '../utils/timeDisplay';
@@ -191,7 +191,6 @@ import { incomingLinks } from '../utils/storyLinks';
 import { useBeatSuggestions } from '../utils/aiFeatures';
 import { usePersistedState } from '../utils/persistedState';
 import { changeableTypes, beatTypeLabel } from '../utils/changeBeatType';
-import { dialogChatMode, presentationModePatch, DIALOG_CHAT_RESPONSE_DELAY } from '../utils/dialogPresentation';
 import { beatSnapshot } from '../utils/beatSnapshot';
 
 const MIN_INSPECTOR_WIDTH = 280;
@@ -566,28 +565,8 @@ export const Inspector: React.FC<InspectorProps> = ({
     return ['Narrator', 'NPC'];
   };
 
-  // Check if beat type supports visual editor
-  const supportsVisualEditor = (beatType: string) => {
-    const visualBeatTypes = [
-      'titleScreen',
-      'infoText',
-      'durScreen',
-      'pickProp',
-      'movementChoice',
-      'dialogTree',
-      'endScreen',
-      'videoBeat',
-      'inputText',
-      'hyperText',
-      'onlineContent',
-      'aiDialogTree',
-      'aiSummary',
-      'aiInfoText',
-      'aiDurScreen',
-      'keypad'
-    ];
-    return visualBeatTypes.includes(beatType);
-  };
+  // Which beats have a Visual Editor: the shared list (utils/visualBeatTypes);
+  // a private copy here had fallen behind (no Multi Choice, Free Layout…).
 
 
   // Handle asset selection with callback
@@ -2091,6 +2070,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                   <SchemaFormGenerator
                     uiTier={showAdvanced ? 'advanced' : 'basic'}
                     beatType={beat.type}
+                    veOwnsVisualFields={supportsVisualEditor(beat.type)}
                     beatDefinition={getBeatDefinition(beat.type)}
                     parameters={localBeat.parameters}
                     onParameterChange={beat.type === 'durScreen' ? handleDurScreenParameterChange : handleParameterChange}
@@ -3991,76 +3971,9 @@ export const Inspector: React.FC<InspectorProps> = ({
 
                     {showAdvanced && (
                       <div className="border-t pt-3 space-y-3">
-                        {/* Bug 20 — presentation mode picker. Schema-declared
-                            but the dialogTree section bypasses the full
-                            SchemaFormGenerator, so we hand-render it here. */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Presentation Mode
-                            <span className="text-xs text-gray-500 block font-normal">
-                              How the dialog is laid out at runtime
-                            </span>
-                          </label>
-                          <select
-                            data-testid="dialog-presentation-mode"
-                            value={dialogChatMode(localBeat.parameters) ?? 'positioned'}
-                            onChange={(e) => handleParametersChange(presentationModePatch(localBeat.parameters, e.target.value))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          >
-                            <option value="positioned">Positioned (traditional elements / spatial)</option>
-                            <option value="chat-scroll">Chat — scrolling history</option>
-                            <option value="chat-bubble">Chat — single bubble</option>
-                          </select>
-                        </div>
-                        {dialogChatMode(localBeat.parameters) && (
-                          <>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                id="showAvatars-dialog"
-                                checked={localBeat.parameters?.showAvatars ?? true}
-                                onChange={(e) => handleParameterChange('showAvatars', e.target.checked)}
-                                className="rounded border-gray-300"
-                              />
-                              <label htmlFor="showAvatars-dialog" className="text-sm text-gray-700">
-                                Show character avatars
-                              </label>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Chat frame picture
-                                <span className="text-xs text-gray-500 block font-normal">
-                                  A picture behind the chat, like a phone or messenger screen. Move and resize the Chat window in the Visual Editor so it sits inside the picture's screen.
-                                </span>
-                              </label>
-                              <ImageAssetField
-                                value={typeof localBeat.parameters?.chatFrameImage === 'string' && localBeat.parameters.chatFrameImage ? localBeat.parameters.chatFrameImage : undefined}
-                                onChange={(assetId) => handleParameterChange('chatFrameImage', assetId ?? '')}
-                                modalTitle="Chat frame picture"
-                                testId="dialog-chat-frame-image"
-                                assetSubType={null}
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                NPC Response Delay (seconds)
-                                <span className="text-xs text-gray-500 block font-normal">
-                                  Typing-indicator delay before NPC replies
-                                </span>
-                              </label>
-                              <input
-                                type="number"
-                                data-testid="dialog-response-delay"
-                                value={localBeat.parameters?.responseDelay ?? DIALOG_CHAT_RESPONSE_DELAY}
-                                onChange={(e) => handleParameterChange('responseDelay', parseFloat(e.target.value))}
-                                min="0"
-                                max="10"
-                                step="0.5"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                              />
-                            </div>
-                          </>
-                        )}
+                        {/* The layout (positioned or chat), avatars, chat frame
+                            picture and reply delay are set in the Visual
+                            Editor's Dialog Settings: visual settings live there. */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Choice Delay (seconds)

@@ -1,3 +1,6 @@
+import beatDefinitions from '../../../../../beat-definitions/core-beats.json';
+import { SchemaFormGenerator } from '../SchemaFormGenerator';
+import type { BeatDefinition } from '../SchemaFormGenerator';
 import { BeatLookSection, type BeatLookValue } from './BeatLookSection';
 import React, { useState } from 'react';
 import { duplicateHudCounterOwner } from '../../utils/duplicateHudCounter';
@@ -24,6 +27,7 @@ import {
   ArrowRight,
   Info,
   DoorOpen,
+  Monitor,
 } from 'lucide-react';
 import { getAllPresetSounds, isPresetSound, getPresetSound, type PresetSound } from '@asaps/core';
 import { getSlotSpec, getSpatialSpec } from '@asaps/renderer';
@@ -41,6 +45,9 @@ type TransitionDirection = 'left' | 'right' | 'top' | 'bottom';
 type TransitionEasing = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
 // Wire type = core's Transition (direction union includes legacy 'in'/'out').
 type BeatTransition = import('@asaps/core').Transition;
+
+/** Visual Editor fields with controls of their own in this panel (Layout, Dialog and Conversation Settings). */
+const OWN_VE_CONTROLS: readonly string[] = ['layoutTemplate', 'presentationMode', 'presentation', 'showAvatars', 'responseDelay'];
 
 interface VisualPropertiesPanelProps {
   /** Dialog-tree choice buttons form a stack: where each is drawn (by
@@ -174,6 +181,9 @@ interface VisualPropertiesPanelProps {
   /** This beat's look over the project's ("This beat's look"). */
   beatLook?: BeatLookValue;
   onBeatLookChange?: (next: BeatLookValue) => void;
+  /** The beat's parameters, for the schema's Visual Editor fields ("Display"). */
+  beatParameters?: Record<string, any>;
+  onBeatParameterChange?: (param: string, value: any) => void;
 }
 
 // Helper to format beat type for display (camelCase -> Title Case)
@@ -250,6 +260,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   onSpatialFitChange,
   beatLook,
   onBeatLookChange,
+  beatParameters,
+  onBeatParameterChange,
 }) => {
   // Get available fonts (built-in + custom from assets)
   const { fonts } = useFonts(assets);
@@ -1453,6 +1465,42 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
             )}
           </div>
         )}
+
+        {/* Display: the schema's other Visual Editor fields (ui.scope 've-left')
+            — Keep shape on phones, Show options as, Chat frame picture… —
+            drawn from the schema; the ones with their own controls above
+            are left out. */}
+        {onBeatParameterChange && beatType && (() => {
+          const def = (beatDefinitions as any).beatTypes?.[beatType] as BeatDefinition | undefined;
+          const shown = Object.entries(def?.parameters ?? {}).filter(([name, p]: [string, any]) =>
+            p?.ui?.scope === 've-left' && !p?.ui?.hidden && !OWN_VE_CONTROLS.includes(name));
+          if (!def || shown.length === 0) return null;
+          return (
+            <div className="border-b border-gray-200" data-testid="ve-display-section">
+              <button
+                onClick={() => toggleSection('display')}
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+              >
+                <div className="flex items-center gap-2">
+                  <Monitor className="w-4 h-4" />
+                  <span className="font-medium text-sm">Display</span>
+                </div>
+              </button>
+              {expandedSections.display && (
+                <div className="px-4 pb-4 space-y-3">
+                  <SchemaFormGenerator
+                    scope="ve-left"
+                    exclude={OWN_VE_CONTROLS}
+                    beatType={beatType}
+                    beatDefinition={def}
+                    parameters={beatParameters ?? {}}
+                    onParameterChange={onBeatParameterChange}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Video Section — only for videoBeat */}
         {beatType === 'videoBeat' && onSelectVideo && (

@@ -552,7 +552,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -680,7 +681,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -826,7 +828,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -906,7 +909,10 @@
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Show character avatars in chat mode"
+          "description": "Show character avatars in chat mode",
+          "ui": {
+            "scope": "ve-left"
+          }
         },
         "chatFrameImage": {
           "type": "string",
@@ -923,7 +929,8 @@
                 "chat-scroll",
                 "chat-bubble"
               ]
-            }
+            },
+            "scope": "ve-left"
           }
         },
         "chatWindow": {
@@ -943,7 +950,8 @@
             "min": 0,
             "max": 10,
             "step": 0.5,
-            "label": "NPC Response Delay (seconds)"
+            "label": "NPC Response Delay (seconds)",
+            "scope": "ve-left"
           }
         },
         "lineAdvance": {
@@ -1014,7 +1022,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -1170,7 +1179,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -1261,7 +1271,9 @@
                 "value": "picturesOnly",
                 "label": "Pictures only"
               }
-            ]
+            ],
+            "scope": "ve-left",
+            "help": "Buttons with each character's name, picture cards with names, or pictures only. The picture is the character's portrait, or the option's own image."
           }
         },
         "choiceDelay": {
@@ -1355,7 +1367,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -1579,7 +1592,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -1703,7 +1717,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -1883,7 +1898,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -2157,7 +2173,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -2399,7 +2416,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -2883,7 +2901,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -3556,7 +3575,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -3733,7 +3753,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -3907,7 +3928,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -4073,7 +4095,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -4315,7 +4338,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -4476,7 +4500,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -4605,7 +4630,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -4761,7 +4787,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -5023,7 +5050,10 @@
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Show character avatars beside the lines in the chat layouts (chat-scroll, chat-bubble)"
+          "description": "Show character avatars beside the lines in the chat layouts (chat-scroll, chat-bubble)",
+          "ui": {
+            "scope": "ve-left"
+          }
         },
         "exitTargets": {
           "type": "array<object>",
@@ -5102,7 +5132,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -5438,7 +5469,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -5625,7 +5657,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -5809,7 +5842,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },
@@ -6287,7 +6321,8 @@
           "ui": {
             "tier": "advanced",
             "label": "Keep shape on phones",
-            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen.",
+            "scope": "ve-left"
           }
         }
       },

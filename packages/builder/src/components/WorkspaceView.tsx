@@ -24,7 +24,8 @@ interface WorkspaceViewProps {
   selectedCluster: Cluster | null;
   onBeatSelect: (beat: Beat) => void;
   onBeatMove: (beatId: string, position: { x: number; y: number }) => void;
-  onBeatUpdate?: (beatId: string, updates: Partial<Beat>) => void;
+  /** `before` (beatSnapshot) when the beat was changed before the call, so Undo can go back to it. */
+  onBeatUpdate?: (beatId: string, updates: Partial<Beat>, before?: Record<string, any>) => void;
   /** Several beats at once, one undo step (Script ▸ Update from Markdown). */
   onBeatsUpdate?: (edits: Array<{ beatId: string; updates: Partial<Beat> }>, description: string) => void;
   /** For the Script view's Markdown export. */

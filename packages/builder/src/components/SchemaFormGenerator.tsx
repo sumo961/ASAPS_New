@@ -128,6 +128,16 @@ interface SchemaFormGeneratorProps {
   onDevelopCharacter?: (
     session: import('./characters/CharacterDevelopmentDialog').CharacterDevelopmentSession,
   ) => void;
+  /**
+   * Which fields this form shows. 'beat' (default): everything except the
+   * fields scoped to the Visual Editor ('ve-left'), when the beat has one.
+   * 've-left': only those fields — the Visual Editor's own form.
+   */
+  scope?: 'beat' | 've-left';
+  /** With scope 'beat': whether this beat type has a Visual Editor to own its 've-left' fields (default true). */
+  veOwnsVisualFields?: boolean;
+  /** Fields to leave out (shown by a dedicated control elsewhere). */
+  exclude?: readonly string[];
 }
 
 // Map alias beat types to their canonical schema types
@@ -274,6 +284,9 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   usedNames = [],
   onDefineAsCharacter,
   onDevelopCharacter,
+  scope = 'beat',
+  veOwnsVisualFields = true,
+  exclude = [],
 }) => {
   const projectRoles = useProjectRoles();
   // Map alias types to canonical types for schema lookup
@@ -288,6 +301,15 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   // Note: 'operation' is handled inside the 'value' case for setVariable beats
   const skipParameters = ['connection', 'defaultConnection', 'trueConnection', 'falseConnection',
     'dialogTree', 'choices', 'props', 'hyperlinks', 'restartConnection', 'operation'];
+
+  // Visual settings live in the Visual Editor (CLAUDE.md): fields scoped
+  // 've-left' are drawn by its left panel (this form with scope 've-left'),
+  // and only there — unless the beat type has no Visual Editor.
+  const inThisForm = (paramName: string, paramDef: ParameterDefinition): boolean => {
+    if (exclude.includes(paramName)) return false;
+    const visualField = paramDef.ui?.scope === 've-left';
+    return scope === 've-left' ? visualField : !(visualField && veOwnsVisualFields);
+  };
 
   const renderField = (paramName: string, paramDef: ParameterDefinition): React.ReactNode => {
     // Check for custom renderer first
@@ -310,11 +332,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
       return null;
     }
 
-    // Skip fields scoped to the Visual Editor's left sidebar — they live
-    // in VisualPropertiesPanel, not here.
-    if (paramDef.ui?.scope === 've-left') {
-      return null;
-    }
+    if (!inThisForm(paramName, paramDef)) return null;
 
     // For scope: 'beat' fields, read from beatProperties and use onBeatPropertyChange
     const isBeatScope = paramDef.ui?.scope === 'beat';
@@ -1753,14 +1771,18 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
       groupsRendered.add(groupKey);
 
       // Collect all visible fields in this group
-      const groupFields = entries.filter(([, def]) => {
+      const groupFields = entries.filter(([name, def]) => {
         if (def.ui?.group !== groupKey) return false;
+        if (!inThisForm(name, def) || def.ui?.hidden) return false;
         if (def.ui?.dependsOn) {
           const { field, value } = def.ui.dependsOn;
           if (parameters[field] !== value) return false;
         }
         return true;
       });
+
+      // A group with nothing to show in this form gets no box.
+      if (groupFields.length === 0) continue;
 
       // Render group label from the group key
       const groupLabel = groupKey.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
