@@ -1,5 +1,39 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.149, 2026-10-31)
+
+### Overview
+The debug tools (Reachability, Path Analysis, the Debug window's path tree, Story Logic) and the Preview's "Start as if…" presets now play a story the way the engine does. Prompted by a Free Layout story whose Path Analysis stopped at the Free Layout every time; an audit of the analyzers against everything added since mid-October found a dozen more gaps.
+
+### Debug tools follow the engine (user report: "debug functions and path analysis did not fully understand" Free Layout)
+- **One shared walk.** `analysis/analysisLinks.ts` (new) says which links the analyzers follow out of a beat (its own links plus auto-advance, requirement fallbacks, a Set Timer's "time runs out" target and a QR scan's codes) and which beat types branch (`CHOICE_BEAT_TYPES` / `SINGLE_LINK_BEAT_TYPES`). Reachability, the simulator, StoryWarnings, the constraint and backward analyzers, PathTree and the Debug window's tree view all use it. Before, each kept its own copy of the choice-beat list. **Free Layout** was on none of them, so Path Analysis followed only its first button. Set Timer's "time runs out" link and QR codes weren't followed at all.
+- **Tripwires:** `tests/analysis/choiceBeatTypes.test.ts` makes every beat type in `core-beats.json` say whether it branches. `storyLinksParity.test.ts` now also checks the other way: every link the graph draws is one the debug tools follow (Free Layout, Choose Your Character samples added).
+- **Path simulation** (`StateSimulationAnalyzer`), each with a test in `tests/analysis/StateSimulationCoverage.test.ts`:
+  - Free Layout: every live button, with its effects.
+  - A choice beat with only one way out still applies that choice's effects.
+  - Each way through a Dialog Tree is its own route, including a line's own exit and continue steps. Before, two replies ending at the same exit merged and only the first one's effects counted.
+  - Choices that stay on the beat (`__self__`) still change state.
+  - Choices hidden by their conditions aren't taken; when none is on screen, the path is a dead end.
+  - Unmet requirements jump to their fallback before the beat shows, honouring `requiresMode: 'any'`. Before, the gated beat always played.
+  - Condition Check's extra conditions (AND/OR).
+  - Item quantities: two coins less one is still a coin. Quantity checks and transfers between characters work; `addInventory`/`removeInventory` effects go to the player's bag.
+  - Other characters' starting items stay theirs.
+  - Two characters' counters of one name are kept apart (`@Name:counter`), and characters' counters start at their authored values.
+  - Choose Your Character options without their own link, or with none authored, still cast someone.
+  - A hub where every choice was already tried is labelled a cycle, not a red "Dead End".
+- **Link walk:** `__self__` is no longer reported as a link to a beat that doesn't exist, which had made the AI review offer to "fix" it.
+- **Preview presets:** the player gets only the player's items, with quantities (`inventoryQuantities`). Other characters' items go to them (`characterInventories`), and `@Name:counter` counters go to that character. `StoryContext.loadSimulationState` routes them the same way.
+- **Debug window, path tree:** "Does Not Have Item" is no longer shown inverted, extra AND/OR conditions count and are shown, and every choice beat stops a straight chain.
+- **Story Logic:** a choice shown only under conditions, or a requirement, counts as a gate before text that assumes state.
+- Checked:
+  - On the reporter's story "Free Layout New": before their fix, Reachability rightly reported the two beats that only linked to each other. Path Analysis now reaches The End through the Free Layout (42 variations); before, every path stopped at the Free Layout. After their fix nothing is unreachable.
+  - The Debug window, headless: Reachability, Path Analysis (Forward and Tree) and Story Logic all render.
+  - Suites: core 3067, builder 3126.
+
+**Files modified:** packages/core/src/analysis/analysisLinks.ts (new), analysis/StateSimulationAnalyzer.ts, analysis/ReachabilityAnalyzer.ts, analysis/StoryWarnings.ts, analysis/ConstraintPathAnalyzer.ts, analysis/BackwardAnalyzer.ts, analysis/PathTree.ts, analysis/index.ts, engine/StoryContext.ts, types/index.ts, utils/storyLinks.ts, tests/analysis/StateSimulationCoverage.test.ts (new), tests/analysis/choiceBeatTypes.test.ts (new), tests/analysis/StateSimulationRoles.test.ts, tests/utils/storyLinksParity.test.ts; packages/builder/src/services/PathBasedPresetGenerator.ts, pages/PreviewWindow.tsx, components/debug/PathTreeView.tsx, utils/storyLogicValidator.ts, services/__tests__/presetInventory.test.ts (new), utils/__tests__/storyLogicValidator.test.ts
+
+---
+
 ## 2026-10-30: The easier-reading release (v0.9.149)
 
 ### Overview

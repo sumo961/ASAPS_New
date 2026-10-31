@@ -2,6 +2,7 @@ import type { Story } from '../engine/Story';
 import { normalizeRoles } from '../engine/roles';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
+import { analysisLinks } from './analysisLinks';
 import { StoryContext, PLAYTHROUGH_VARIABLE } from '../engine/StoryContext';
 
 /**
@@ -210,10 +211,9 @@ export class ReachabilityAnalyzer {
 
       if (!beat) continue;
 
-      // Get all outgoing connections
-      const connections = beat.getConnections();
-
-      for (const connection of connections) {
+      // Every link out: choices, auto-advance, requirement fallbacks, timer
+      // and QR targets (analysisLinks — the walk every analyzer shares).
+      for (const connection of analysisLinks(beat)) {
         // First, verify the target beat actually exists
         const targetBeat = this.story.getBeat(connection.targetId);
         if (!targetBeat) {
@@ -238,48 +238,6 @@ export class ReachabilityAnalyzer {
             reachable.add(connection.targetId);
             queue.push(connection.targetId);
           }
-        }
-      }
-
-      // Check defaultTarget
-      if (beat.defaultTarget && !reachable.has(beat.defaultTarget)) {
-        // Verify the default target beat actually exists
-        const defaultTargetBeat = this.story.getBeat(beat.defaultTarget);
-        if (!defaultTargetBeat) {
-          // Record broken default target connection
-          this.brokenConnections.push({
-            sourceBeatId: beatId,
-            sourceBeatName: beat.name,
-            targetId: beat.defaultTarget,
-            label: 'default'
-          });
-        } else {
-          reachable.add(beat.defaultTarget);
-          queue.push(beat.defaultTarget);
-        }
-      }
-
-      // Requirement redirects: if this beat declares any `requires` with a
-      // fallbackTarget, the engine may redirect there when the requirement is
-      // unmet. Those targets are genuinely reachable — without this, a beat
-      // whose ONLY incoming edge is a requires-redirect shows as unreachable.
-      const requires = (beat as any).requires as any[] | undefined;
-      if (Array.isArray(requires)) {
-        for (const req of requires) {
-          const fb = req?.fallbackTarget;
-          if (!fb || reachable.has(fb)) continue;
-          const fbBeat = this.story.getBeat(fb);
-          if (!fbBeat) {
-            this.brokenConnections.push({
-              sourceBeatId: beatId,
-              sourceBeatName: beat.name,
-              targetId: fb,
-              label: 'requires-fallback'
-            });
-            continue;
-          }
-          reachable.add(fb);
-          queue.push(fb);
         }
       }
     }
@@ -500,7 +458,9 @@ export class ReachabilityAnalyzer {
   /**
    * Check if a condition is theoretically possible
    */
-  private isConditionPossible(condition: Condition): boolean {
+  private isConditionPossible(condition: Condition | Condition[]): boolean {
+    // A choice's conditions (Multi Choice, Free Layout buttons) all have to hold.
+    if (Array.isArray(condition)) return condition.every((c) => !c || this.isConditionPossible(c));
     const analysis = this.analyzeCondition(condition);
     return analysis.isSatisfiable;
   }
@@ -816,46 +776,19 @@ export class ReachabilityAnalyzer {
     }> = [];
 
     for (const beat of allBeats) {
-      const connections = beat.getConnections();
-
-      for (const connection of connections) {
-        if (connection.targetId === targetBeatId) {
-          incoming.push({
-            sourceBeatId: beat.id,
-            sourceBeatName: beat.name,
-            connection
-          });
-        }
-      }
-
-      // Check defaultTarget
-      if (beat.defaultTarget === targetBeatId) {
+      for (const connection of analysisLinks(beat)) {
+        if (connection.targetId !== targetBeatId) continue;
+        // Requirement redirects name their explanation.
+        const req = connection.label === 'requires-fallback'
+          ? ((beat as any).requires as any[] | undefined)?.find((r) => r?.fallbackTarget === targetBeatId)
+          : undefined;
         incoming.push({
           sourceBeatId: beat.id,
           sourceBeatName: beat.name,
-          connection: {
-            targetId: targetBeatId,
-            label: 'default'
-          }
+          connection: req
+            ? { targetId: targetBeatId, label: `requires: ${req.explanation ? String(req.explanation).slice(0, 40) : 'fallback'}` }
+            : connection
         });
-      }
-
-      // Check requirement fallbackTargets — requirement redirects are a real
-      // inbound edge even though they're not in the connections array.
-      const requires = (beat as any).requires as any[] | undefined;
-      if (Array.isArray(requires)) {
-        for (const req of requires) {
-          if (req?.fallbackTarget === targetBeatId) {
-            incoming.push({
-              sourceBeatId: beat.id,
-              sourceBeatName: beat.name,
-              connection: {
-                targetId: targetBeatId,
-                label: `requires: ${req.explanation ? String(req.explanation).slice(0, 40) : 'fallback'}`
-              }
-            });
-          }
-        }
       }
     }
 

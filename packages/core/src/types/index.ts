@@ -605,7 +605,11 @@ export interface StatePreset {
   state: {
     variables: Record<string, any>;
     counters: Record<string, number>;
+    /** The player's items. */
     inventory: string[];
+    /** How many of a player's item, where more than one. */
+    inventoryQuantities?: Record<string, number>;
+    /** Other characters' items, by character id. */
     characterInventories?: Record<string, string[]>;
     visitedBeats: string[];
     timers?: Record<string, { value: number; target?: string }>;

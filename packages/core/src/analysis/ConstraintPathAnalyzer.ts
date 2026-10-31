@@ -15,6 +15,7 @@
 import type { Story } from '../engine/Story';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
+import { analysisLinks, isChoiceBeatType } from './analysisLinks';
 import {
   ConstraintSet,
   OutcomeGroup,
@@ -292,7 +293,8 @@ export class ConstraintPathAnalyzer {
    */
   private exploreChoiceBeat(beat: Beat, connections: Connection[], state: ExplorationState): void {
     const params = beat.getParameters();
-    const choices = params.choices || params.options || [];
+    // A Free Layout's buttons whose picture was deleted are not on screen.
+    const choices = (beat as any).liveChoices || params.choices || params.options || [];
 
     // If no choices defined, treat as automatic
     if (choices.length === 0 && connections.length > 0) {
@@ -490,26 +492,9 @@ export class ConstraintPathAnalyzer {
    * Get connections from a beat
    */
   private getConnections(beat: Beat): Connection[] {
-    // Use the Beat's built-in getConnections() method which handles
-    // all beat types correctly (including derived connections from choices)
-    const connections = beat.getConnections();
-
-    // Also check for defaultTarget (property on Beat class) if not covered by connections
-    // Note: beat.defaultTarget is a public property, not in parameters
-    if (beat.defaultTarget && !connections.some(c => c.targetId === beat.defaultTarget)) {
-      connections.push({ targetId: beat.defaultTarget });
-    }
-
-    // Requirement redirects (requires[].fallbackTarget) — engine-visible edges.
-    const requires = (beat as any).requires as any[] | undefined;
-    if (Array.isArray(requires)) {
-      for (const req of requires) {
-        const fb = req?.fallbackTarget;
-        if (fb && !connections.some(c => c.targetId === fb)) {
-          connections.push({ targetId: fb, label: 'requires-fallback' });
-        }
-      }
-    }
+    // The links every analyzer follows (choices, auto-advance, requirement
+    // fallbacks, timer and QR targets).
+    const connections = analysisLinks(beat);
 
     // For condition beats, ensure true/false targets are included
     if (beat.type === 'conditionBeat') {
@@ -568,13 +553,7 @@ export class ConstraintPathAnalyzer {
    * Check if beat type is a choice beat
    */
   private isChoiceBeat(beatType: string): boolean {
-    return [
-      'dialogTree',
-      'movementChoice',
-      'pickProp',
-      'conversationChoice',
-      'hyperText',
-    ].includes(beatType);
+    return isChoiceBeatType(beatType);
   }
 
   /**

@@ -11,6 +11,7 @@
 import type { Story } from '../engine/Story';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
+import { analysisLinks, isChoiceBeatType } from './analysisLinks';
 import {
   ConstraintSet,
   PathStep,
@@ -332,30 +333,12 @@ export class BackwardAnalyzer {
       }
     }
 
-    // Use beat's getConnections() to get all connections (including derived ones from choices)
-    const connections = beat.getConnections();
+    // The links every analyzer follows (analysisLinks).
+    const connections = analysisLinks(beat);
     for (const conn of connections) {
       if (conn.targetId && !addedTargets.has(conn.targetId)) {
         results.push({ targetId: conn.targetId, connection: conn });
         addedTargets.add(conn.targetId);
-      }
-    }
-
-    // Default target (property on Beat class, not in parameters)
-    if (beat.defaultTarget && !addedTargets.has(beat.defaultTarget)) {
-      results.push({ targetId: beat.defaultTarget, connection: null });
-    }
-
-    // Requirement fallback redirects (the engine jumps here when a requires[]
-    // entry is unmet). Count them as outgoing so backward analysis finds them.
-    const requires = (beat as any).requires as any[] | undefined;
-    if (Array.isArray(requires)) {
-      for (const req of requires) {
-        const fb = req?.fallbackTarget;
-        if (fb && !addedTargets.has(fb)) {
-          results.push({ targetId: fb, connection: null });
-          addedTargets.add(fb);
-        }
       }
     }
 
@@ -631,13 +614,7 @@ export class BackwardAnalyzer {
    * Check if beat type is a choice beat
    */
   private isChoiceBeat(beatType: string): boolean {
-    return [
-      'dialogTree',
-      'movementChoice',
-      'pickProp',
-      'conversationChoice',
-      'hyperText',
-    ].includes(beatType);
+    return isChoiceBeatType(beatType);
   }
 
   /**

@@ -10,6 +10,7 @@ import { rolesReferencedIn } from '../utils/rolePreview';
 import { StoryContext, type Story, type StatePreset } from '@asaps/core';
 import {
   StateSimulationAnalyzer,
+  itemQuantity,
   type SimulationState,
   type SimulatedPath,
   type SimulatedStep,
@@ -361,14 +362,17 @@ function convertToPreset(
     counters[key] = value;
   });
 
-  // Flatten inventory (combine all characters' items)
-  const inventory: string[] = [];
-  state.inventory.forEach((items) => {
-    items.forEach((item) => {
-      if (!inventory.includes(item)) {
-        inventory.push(item);
-      }
-    });
+  // The player's bag is the player's; other characters keep their own
+  // (a shopkeeper's Lantern is not the player's).
+  const inventory = [...(state.inventory.get('player') ?? [])];
+  const inventoryQuantities: Record<string, number> = {};
+  for (const item of inventory) {
+    const n = itemQuantity(state, 'player', item);
+    if (n > 1) inventoryQuantities[item] = n;
+  }
+  const characterInventories: Record<string, string[]> = {};
+  state.inventory.forEach((items, bag) => {
+    if (bag !== 'player' && items.size > 0) characterInventories[bag] = [...items];
   });
 
   return {
@@ -379,6 +383,8 @@ function convertToPreset(
       variables,
       counters,
       inventory,
+      ...(Object.keys(inventoryQuantities).length > 0 ? { inventoryQuantities } : {}),
+      ...(Object.keys(characterInventories).length > 0 ? { characterInventories } : {}),
       visitedBeats: visitedBeatIds,
     },
   };
@@ -455,9 +461,10 @@ export function relevantState(story: Story, targetBeatId: string): { conditions:
 function condenseByRelevance(presets: GeneratedPreset[], relevant: { conditions: any[]; placeholders: Set<string>; roles: Set<string>; context: StoryContext }): GeneratedPreset[] {
   const seen = new Map<string, GeneratedPreset>();
   for (const p of presets) {
-    const { variables, counters, inventory, affect } = p.preset.state;
+    const { variables, counters, inventory, inventoryQuantities, affect } = p.preset.state;
     const ctx = relevant.context;
-    ctx.loadSimulationState((affect ?? {}) as any, variables, counters, inventory);
+    ctx.loadSimulationState((affect ?? {}) as any, variables, counters,
+      inventory.map((name) => ({ name, quantity: inventoryQuantities?.[name] ?? 1 })));
     const outcomes = relevant.conditions.map((c) => { try { return ctx.checkCondition(c) ? 1 : 0; } catch { return -1; } });
     const texts = [...relevant.placeholders].map((n) => variables[n] ?? counters[n] ?? null);
     const holders = [...relevant.roles].map((r) => (ctx as any).getRoleHolder?.(r) ?? null);
@@ -483,6 +490,8 @@ function deduplicatePresets(presets: GeneratedPreset[]): GeneratedPreset[] {
       vars: preset.preset.state.variables,
       counters: preset.preset.state.counters,
       inv: preset.preset.state.inventory.sort(),
+      qty: preset.preset.state.inventoryQuantities ?? null,
+      others: preset.preset.state.characterInventories ?? null,
       affect: preset.preset.state.affect ?? null, // feelings are state too
     });
 

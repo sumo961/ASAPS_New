@@ -1947,9 +1947,22 @@ export const PreviewWindow: React.FC = () => {
       const presetToApply = overridePreset !== undefined ? overridePreset : selectedPreset;
       if (presetToApply) {
         Object.entries(presetToApply.state.variables).forEach(([key, value]) => context.setVariable(key, value));
-        Object.entries(presetToApply.state.counters).forEach(([key, value]) => context.setCounter(key, value));
-        // Presets list item names; starting items are already handed out.
-        presetToApply.state.inventory.forEach(item => { if (!context.hasInInventory(item)) context.addToInventory(item); });
+        Object.entries(presetToApply.state.counters).forEach(([key, value]) => {
+          // Path analysis names another character's counter of a shared name `@Name:counter`.
+          const scoped = /^@([^:]+):(.+)$/.exec(key);
+          if (scoped) context.setCharacterCounter(scoped[1], scoped[2], value);
+          else context.setCounter(key, value);
+        });
+        // Presets list the player's items (and how many); starting items are
+        // already handed out, so only the difference is added.
+        const quantities = presetToApply.state.inventoryQuantities ?? {};
+        presetToApply.state.inventory.forEach(item => {
+          const more = (quantities[item] ?? 1) - context.getInventoryQuantity(item);
+          if (more > 0) context.addToInventory(item, more);
+        });
+        for (const [character, items] of Object.entries(presetToApply.state.characterInventories ?? {})) {
+          for (const item of items) if (context.getCharacterInventoryQuantity(character, item) === 0) context.addInventoryItem(character, item);
+        }
         presetToApply.state.visitedBeats.forEach(beatId => context.markBeatVisited(beatId));
         // The characters' feelings at this point of the story (path analysis).
         if (presetToApply.state.affect) (context as any).restoreAffectSnapshot?.(presetToApply.state.affect);

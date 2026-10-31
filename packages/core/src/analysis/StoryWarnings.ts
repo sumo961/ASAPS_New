@@ -13,6 +13,7 @@ import type { Beat } from '../beats/Beat';
 import type { SimulatedPath, SimulatedStep, SimulationState } from './StateSimulationAnalyzer';
 import type { StateRequirement, Condition } from '../types';
 import { analyzeRoleFindings } from './roleFindings';
+import { analysisLinks } from './analysisLinks';
 
 export type StoryWarningCode =
   | 'keypad-softlock-loop'            // failTarget eventually leads back to the keypad with no state change
@@ -184,7 +185,7 @@ function traceReachesSelf(
   const thisMutates = beatMutatesInspectedState(beat, story);
 
   // A restart resets state — it is not a way round a loop.
-  const conns = beat.getConnections().filter((c) => c.role !== 'restart');
+  const conns = analysisLinks(beat).filter((c) => c.role !== 'restart');
   let cycles = false;
   let mutates = thisMutates;
   for (const conn of conns) {
@@ -319,25 +320,11 @@ function collectAncestorBeatIds(targetId: string, story: Story): Set<string> {
   // Build an index of inbound edges once.
   const inbound = new Map<string, Set<string>>();
   for (const b of story.getAllBeats()) {
-    for (const c of b.getConnections()) {
+    // Choices, auto-advance, requirement fallbacks, timer and QR targets.
+    for (const c of analysisLinks(b)) {
       if (c.role === 'restart') continue; // state is reset: not an ancestor
       if (!inbound.has(c.targetId)) inbound.set(c.targetId, new Set());
       inbound.get(c.targetId)!.add(b.id);
-    }
-    // Default target and requires-fallback are also real inbound edges.
-    if (b.defaultTarget) {
-      if (!inbound.has(b.defaultTarget)) inbound.set(b.defaultTarget, new Set());
-      inbound.get(b.defaultTarget)!.add(b.id);
-    }
-    const requires = (b as any).requires as any[] | undefined;
-    if (Array.isArray(requires)) {
-      for (const req of requires) {
-        const fb = req?.fallbackTarget;
-        if (fb) {
-          if (!inbound.has(fb)) inbound.set(fb, new Set());
-          inbound.get(fb)!.add(b.id);
-        }
-      }
     }
   }
 

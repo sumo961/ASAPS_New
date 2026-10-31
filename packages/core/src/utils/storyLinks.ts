@@ -83,7 +83,9 @@ const push = (
   outOfBand?: boolean,
   path?: string,
 ): void => {
-  if (typeof target !== 'string' || !target) return;
+  // '__self__' stays on the beat (search the desk, buy one more): not a link
+  // to another beat — reported as one, the review asked to "fix" it.
+  if (typeof target !== 'string' || !target || target === '__self__') return;
   const link: StoryLink = { source, target, via };
   if (typeof label === 'string' && label) link.label = label;
   if (outOfBand) link.outOfBand = true;

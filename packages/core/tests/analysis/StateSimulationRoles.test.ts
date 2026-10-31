@@ -47,6 +47,21 @@ describe('path analysis and roles', () => {
     }
   });
 
+  it('Choose Your Character options without their own link, or none authored, still cast (2026-10-31)', () => {
+    for (const choices of [
+      [{ id: 'm', character: 'char_mara', text: 'Mara', target: 'gate' }, { id: 'j', character: 'char_jonas', text: 'Jonas' }],
+      [],
+    ]) {
+      const story = new Story({ title: 'Roles', author: 'T', firstBeatId: 'pick' });
+      story.setCharacters(chars as any);
+      story.setSettings({ roles: [{ id: 'player', candidates: ['char_mara', 'char_jonas'], selection: 'cast' }] });
+      story.addBeat(createTestBeat({ id: 'pick', name: 'Pick', type: 'chooseCharacter', parameters: { role: 'player', question: 'q', choices },
+        connections: [{ targetId: 'gate' }] } as any));
+      for (const b of build('cast', false).getAllBeats()) story.addBeat(b);
+      expect([...endings(story)].sort()).toEqual(['jonas_end', 'mara_end']);
+    }
+  });
+
   it('a random role is explored once per candidate', () => {
     expect([...endings(build('random', false))].sort()).toEqual(['jonas_end', 'mara_end']);
   });

@@ -5,8 +5,11 @@ export { ConstraintPathAnalyzer } from './ConstraintPathAnalyzer';
 export { BackwardAnalyzer } from './BackwardAnalyzer';
 export { PathQueryEngine } from './PathQuery';
 
+// The links the debug tools follow, and which beats branch
+export { analysisLinks, isChoiceBeatType, CHOICE_BEAT_TYPES, SINGLE_LINK_BEAT_TYPES } from './analysisLinks';
+
 // State-based simulation analysis (improved path finding)
-export { StateSimulationAnalyzer } from './StateSimulationAnalyzer';
+export { StateSimulationAnalyzer, itemQuantity } from './StateSimulationAnalyzer';
 export type {
   SimulationState,
   SimulatedStep,

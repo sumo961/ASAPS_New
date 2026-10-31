@@ -18,6 +18,7 @@ import type { Story } from '../engine/Story';
 import { alignForComparison } from '../engine/variableValues';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
+import { analysisLinks, isChoiceBeatType } from './analysisLinks';
 import { StoryContext, PLAYTHROUGH_VARIABLE, type SerializedStoryState } from '../engine/StoryContext';
 import {
   ConstraintSet,
@@ -40,6 +41,11 @@ export interface SimulationState {
   variables: Map<string, string | number | boolean>;
   counters: Map<string, number>;
   inventory: Map<string, Set<string>>; // character -> items
+  /**
+   * How many of an item a bag holds, keyed `bag\u0001item`, when more than
+   * one (the runtime counts items). Absent = 1 while the item is in its bag.
+   */
+  itemCounts?: Map<string, number>;
   visitedBeats: Set<string>;
   /**
    * The characters' inner life — moods, sentiments, emotions, goals,
@@ -140,9 +146,33 @@ function cloneState(state: SimulationState): SimulationState {
       Array.from(state.inventory.entries()).map(([k, v]) => [k, new Set(v)])
     ),
     visitedBeats: new Set(state.visitedBeats),
+    ...(state.itemCounts ? { itemCounts: new Map(state.itemCounts) } : {}),
     runtime: state.runtime,
     pendingRuntime: state.pendingRuntime ? [...state.pendingRuntime] : undefined,
   };
+}
+
+/** How many of `item` a bag holds (the player's bag is 'player'). */
+export function itemQuantity(state: SimulationState, bag: string, item: string): number {
+  if (!state.inventory.get(bag)?.has(item)) return 0;
+  return state.itemCounts?.get(`${bag}\u0001${item}`) ?? 1;
+}
+
+function addItem(state: SimulationState, bag: string, item: string, quantity: number): void {
+  const total = itemQuantity(state, bag, item) + Math.max(1, quantity);
+  if (!state.inventory.has(bag)) state.inventory.set(bag, new Set());
+  state.inventory.get(bag)!.add(item);
+  if (total > 1) (state.itemCounts ??= new Map()).set(`${bag}\u0001${item}`, total);
+}
+
+/** Take some away; at none the item leaves the bag (as StoryContext.removeFromInventory). */
+function removeItem(state: SimulationState, bag: string, item: string, quantity: number): void {
+  const left = itemQuantity(state, bag, item) - Math.max(1, quantity);
+  if (left <= 0) {
+    state.inventory.get(bag)?.delete(item);
+    state.itemCounts?.delete(`${bag}\u0001${item}`);
+  } else if (left === 1) state.itemCounts?.delete(`${bag}\u0001${item}`);
+  else (state.itemCounts ??= new Map()).set(`${bag}\u0001${item}`, left);
 }
 
 /**
@@ -165,7 +195,10 @@ function hashState(state: SimulationState): string {
 
   const sortedInventory = Array.from(state.inventory.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   for (const [char, items] of sortedInventory) {
-    const sortedItems = Array.from(items).sort();
+    const sortedItems = Array.from(items).sort().map((it) => {
+      const n = state.itemCounts?.get(`${char}\u0001${it}`);
+      return n && n > 1 ? `${it}x${n}` : it;
+    });
     parts.push(`i:${char}=[${sortedItems.join(',')}]`);
   }
 
@@ -229,6 +262,38 @@ export class StateSimulationAnalyzer {
     return this.scratch;
   }
 
+  private characters(): any[] {
+    return ((this.story as any).getCharacters?.() ?? []) as any[];
+  }
+
+  /** The character a reference names (id, name or display name). */
+  private characterOf(ref: string | undefined): any | undefined {
+    if (!ref) return undefined;
+    const r = String(ref).replace(/^@/, '');
+    return this.characters().find((c) => c?.id === r || c?.name === r || c?.displayName === r);
+  }
+
+  /** The bag an item goes to: the player's ('player'), or a character's by id — as StoryContext.addInventoryItem. */
+  private bagOf(ref: string | undefined): string {
+    if (!ref || ref === 'player' || ref === '@player') return 'player';
+    return this.characterOf(ref)?.id ?? ref;
+  }
+
+  /**
+   * Where a counter lives, as StoryContext does it. A bare name — or the one
+   * character that declares it — is the plain name; another character's
+   * counter of that name is `@Name:counter` (it would otherwise add into
+   * the same number).
+   */
+  private counterKey(ref: string | undefined, name: string): string {
+    if (!ref) return name;
+    const owner = this.characterOf(ref);
+    if (!owner) return name;
+    const declaring = this.characters().filter((c) => Array.isArray(c?.counters) && c.counters.some((d: any) => d?.name === name));
+    if (declaring.length === 1 && declaring[0].id === owner.id) return name;
+    return `@${owner.name || owner.id}:${name}`;
+  }
+
   /**
    * Starting states: the runtime's own story-start seeding (moods, variants,
    * counters). A character with variantSelectionPolicy 'random' starts once
@@ -242,18 +307,17 @@ export class StateSimulationAnalyzer {
     for (const def of Array.isArray(defs) ? defs : []) {
       if (def?.name && def.defaultValue !== undefined && def.defaultValue !== '') state.variables.set(def.name, def.defaultValue);
     }
-    // Characters start with the items listed on them (the runtime hands
-    // them out too): the player's under 'player', others under id and name.
-    for (const char of ((this.story as any).getCharacters?.() || []) as any[]) {
-      const names = (Array.isArray(char?.inventory) ? char.inventory : [])
-        .map((it: any) => (typeof it?.name === 'string' ? it.name.trim() : ''))
-        .filter(Boolean);
-      if (names.length === 0) continue;
-      const keys = char.role === 'player' ? ['player'] : [char.id, char.name].filter(Boolean);
-      for (const key of keys) {
-        const inv = state.inventory.get(key) ?? new Set<string>();
-        names.forEach((n: string) => inv.add(n));
-        state.inventory.set(key, inv);
+    for (const char of this.characters()) {
+      // Characters start with the items listed on them (the runtime hands
+      // them out too): the player's in the player's bag, others in their own.
+      const bag = char?.role === 'player' ? 'player' : char?.id;
+      for (const it of Array.isArray(char?.inventory) ? char.inventory : []) {
+        const name = typeof it?.name === 'string' ? it.name.trim() : '';
+        if (name && bag) addItem(state, bag, name, Number(it.quantity) > 0 ? Number(it.quantity) : 1);
+      }
+      // Their counters start at their authored values (StoryContext.seedCharacterCountersFromStory).
+      for (const def of Array.isArray(char?.counters) ? char.counters : []) {
+        if (def?.name && typeof def.value === 'number' && def.value !== 0) state.counters.set(this.counterKey(char.id, def.name), def.value);
       }
     }
     return state;
@@ -331,8 +395,8 @@ export class StateSimulationAnalyzer {
     const quiet = console.log;
     console.log = () => {};
     try {
-      const items: string[] = [];
-      state.inventory.forEach((set) => set.forEach((name) => { if (!items.includes(name)) items.push(name); }));
+      // The runtime's own bag is the player's.
+      const items = [...(state.inventory.get('player') ?? [])].map((name) => ({ name, quantity: itemQuantity(state, 'player', name) }));
       ctx.loadSimulationState(state.runtime, Object.fromEntries(state.variables), Object.fromEntries(state.counters), items);
       // Deferred feeling effects first, in the order they were taken.
       const pending = state.pendingRuntime;
@@ -514,15 +578,9 @@ export class StateSimulationAnalyzer {
         continue;
       }
 
-      // Also include beats with no outgoing connections (implicit endings).
-      // A requirement redirect (requires[].fallbackTarget) is an outgoing edge
-      // too — if only that exists, the beat isn't an implicit ending.
-      const connections = beat.getConnections();
-      const hasDefaultTarget = beat.defaultTarget && beat.defaultTarget.trim() !== '';
-      const requires = (beat as any).requires as any[] | undefined;
-      const hasRequiresFallback = Array.isArray(requires)
-        && requires.some(r => typeof r?.fallbackTarget === 'string' && r.fallbackTarget.trim() !== '');
-      if (connections.length === 0 && !hasDefaultTarget && !hasRequiresFallback) {
+      // Also include beats with no way on at all (implicit endings) — a
+      // requirement redirect, auto-advance or timer counts as a way on.
+      if (analysisLinks(beat).length === 0) {
         endings.push({ beatId: beat.id, beatName: beat.name });
       }
     }
@@ -639,6 +697,21 @@ export class StateSimulationAnalyzer {
         continue;
       }
 
+      // Requirements are checked before anything else (Beat.execute): unmet,
+      // the story jumps to the fallback without showing this beat.
+      const redirect = this.requirementRedirect(beat, frame.state);
+      if (redirect) {
+        enqueue({
+          beatId: redirect,
+          state: frame.state,
+          path: frame.path,
+          decisions: frame.decisions,
+          visitedStates: frame.visitedStates,
+          takenChoicesPerBeat: frame.takenChoicesPerBeat,
+        });
+        continue;
+      }
+
       // Apply beat effects to state
       const newState = this.applyBeatEffects(beat, frame.state);
 
@@ -672,8 +745,7 @@ export class StateSimulationAnalyzer {
 
       if (beat.type === 'conditionBeat') {
         // Evaluate condition and take appropriate branch (deterministic, no branching)
-        const condition = this.getCondition(beat);
-        const result = condition ? this.evaluateCondition(condition, newState) : true;
+        const result = this.conditionBeatResult(beat, newState);
 
         // Update the last step with condition result
         newPath[newPath.length - 1].conditionResult = result;
@@ -701,14 +773,19 @@ export class StateSimulationAnalyzer {
 
         const takenHere = frame.takenChoicesPerBeat.get(beat.id) ?? new Set<number>();
 
-        // DEBUG: Log choice beat branching
-        // Find options we haven't taken yet on THIS path
-        const availableOptions: number[] = [];
+        // Only the choices on screen in this state: a choice whose conditions
+        // fail is hidden from the player. None on screen = the player is stuck.
+        const offered: number[] = [];
         for (let i = 0; i < connections.length; i++) {
-          if (!takenHere.has(i)) {
-            availableOptions.push(i);
-          }
+          if (this.choiceOffered(beat, connections[i], newState)) offered.push(i);
         }
+        if (offered.length === 0) {
+          paths.push(this.buildPath(newPath, frame.decisions, newState, 'deadEnd'));
+          continue;
+        }
+
+        // Find options we haven't taken yet on THIS path
+        const availableOptions = offered.filter((i) => !takenHere.has(i));
 
         // If all options have been taken at this beat on this path,
         // we need to check if any option NOW leads somewhere different
@@ -722,15 +799,17 @@ export class StateSimulationAnalyzer {
         // choice → intro text → condition / gated beat.
         if (availableOptions.length === 0) {
           const conditionGatedOptions: number[] = [];
-          for (let i = 0; i < connections.length; i++) {
+          for (const i of offered) {
             if (this.branchHasStateDependence(connections[i].targetId, 6)) {
               conditionGatedOptions.push(i);
             }
           }
 
-          // If no condition-gated options, this is a dead end
+          // Every choice was tried on this path and none can now lead
+          // anywhere new: a loop the player can leave by the same choices
+          // (a cycle — not a dead end, the choices are still on screen).
           if (conditionGatedOptions.length === 0) {
-            paths.push(this.buildPath(newPath, frame.decisions, newState, 'deadEnd'));
+            paths.push(this.buildPath(newPath, frame.decisions, newState, 'cycle'));
             continue;
           }
 
@@ -738,8 +817,8 @@ export class StateSimulationAnalyzer {
           const stateHash = hashState(newState);
           const reexploreKey = `reexplore:${beat.id}:${stateHash}`;
           if (frame.visitedStates.has(reexploreKey)) {
-            // Already re-explored with this exact state - dead end
-            paths.push(this.buildPath(newPath, frame.decisions, newState, 'deadEnd'));
+            // Already re-explored with this exact state: a cycle
+            paths.push(this.buildPath(newPath, frame.decisions, newState, 'cycle'));
             continue;
           }
           newVisitedStates.add(reexploreKey);
@@ -762,9 +841,9 @@ export class StateSimulationAnalyzer {
               beatId: beat.id,
               beatName: beat.name,
               choiceMade: conn.label || conn.targetId,
-              alternatives: connections
-                .filter((_, cidx) => cidx !== i)
-                .map(c => c.label || c.targetId),
+              alternatives: offered
+                .filter((cidx) => cidx !== i)
+                .map((cidx) => connections[cidx].label || connections[cidx].targetId),
             }];
 
             enqueue({
@@ -803,9 +882,9 @@ export class StateSimulationAnalyzer {
             beatId: beat.id,
             beatName: beat.name,
             choiceMade: conn.label || conn.targetId,
-            alternatives: connections
-              .filter((_, cidx) => cidx !== i)
-              .map(c => c.label || c.targetId),
+            alternatives: offered
+              .filter((cidx) => cidx !== i)
+              .map((cidx) => connections[cidx].label || connections[cidx].targetId),
           }];
 
           // Apply per-choice effects (e.g., pickProp adds inventory item per choice)
@@ -828,8 +907,18 @@ export class StateSimulationAnalyzer {
           });
         }
       } else {
-        // Automatic beat - follow first/only connection (and run its link effects)
-        const linkState = this.followLink(connections[0], newState, newPath);
+        // Automatic beat - follow first/only connection (and run its link effects).
+        // A choice beat with a single choice: it is offered only when its
+        // conditions hold, and picking it applies its effects.
+        let lone = newState;
+        if (this.isChoiceBeat(beat)) {
+          if (!this.choiceOffered(beat, connections[0], newState)) {
+            paths.push(this.buildPath(newPath, frame.decisions, newState, 'deadEnd'));
+            continue;
+          }
+          lone = this.applyChoiceEffects(beat, cloneState(newState), 0, connections[0]);
+        }
+        const linkState = this.followLink(connections[0], lone, newPath);
         enqueue({
           beatId: connections[0].targetId,
           state: linkState,
@@ -872,26 +961,25 @@ export class StateSimulationAnalyzer {
    * even when all choices lead to the same target beat.
    */
   private getConnections(beat: Beat): Connection[] {
-    const connections = beat.getConnections();
-
-    // Also check for defaultTarget
-    if (beat.defaultTarget && !connections.some(c => c.targetId === beat.defaultTarget)) {
-      connections.push({ targetId: beat.defaultTarget });
-    }
-
-    // Requirement redirects: if this beat declares `requires` with a
-    // fallbackTarget, the engine may jump there when the requirement is
-    // unmet. The simulator surfaces those as additional reachable branches
-    // so path analysis sees the redirect (and the target beat isn't
-    // reported as unreachable when requires-redirect is the only way in).
-    const requires = (beat as any).requires as any[] | undefined;
-    if (Array.isArray(requires)) {
-      for (const req of requires) {
-        const fb = req?.fallbackTarget;
-        if (fb && !connections.some(c => c.targetId === fb)) {
-          connections.push({ targetId: fb, label: 'requires-fallback' } as Connection);
-        }
-      }
+    // Every way on, including auto-advance and timer / QR targets — the
+    // walk every analyzer shares. Requirement redirects are not a way on
+    // here: they are taken before the beat shows (requirementRedirect).
+    let connections = analysisLinks(beat).filter((c) => c.label !== 'requires-fallback');
+    const routes = beat.type === 'dialogTree' ? this.dialogRoutes(beat) : [];
+    if (routes.length > 0) {
+      // Each way through the tree is its own route: two replies whose lines
+      // end at the same exit set different things (the beat's own list
+      // merges them). The tree's links are all in the routes.
+      const own = new Set(beat.getConnections().map((c) => `${c.targetId}\u0000${c.label ?? ''}`));
+      connections = [...routes, ...connections.filter((c) => !own.has(`${c.targetId}\u0000${c.label ?? ''}`))];
+    } else if (beat.type === 'chooseCharacter') {
+      // Every option casts someone, linked or not (ChooseCharacterBeat).
+      const extras = connections.filter((c) => !beat.getConnections().some((o) => o.targetId === c.targetId && o.label === c.label));
+      connections = [...this.characterOptions(beat), ...extras];
+    } else {
+      // Choices that stay on this beat ('__self__': search the desk, buy one
+      // more) change state too — the player can take them before going on.
+      connections.push(...this.loopBackChoices(beat));
     }
 
     // Skip deduplication for beats where each choice has different state effects
@@ -912,6 +1000,124 @@ export class StateSimulationAnalyzer {
     }
 
     return uniqueConnections;
+  }
+
+  /**
+   * Every way through a Dialog Tree, as links that carry their `route` (the
+   * replies taken and lines shown): out to a reply's or line's exit, or back
+   * to the first line ('__self__', only when something on the way has
+   * effects). Capped, so a very bushy tree stays tractable.
+   */
+  private dialogRoutes(beat: Beat): Connection[] {
+    const out: Connection[] = [];
+    const tree = beat.getParameters().dialogTree;
+    const changes = (steps: Array<{ choice?: any; node?: any }>) => steps.some((st) => {
+      const o = st.choice ?? st.node;
+      return (Array.isArray(o?.effects) && o.effects.length > 0) || !!o?.counter || !!o?.variable;
+    });
+    const exit = (target: string, label: string, route: Array<{ choice?: any; node?: any }>) => {
+      if (out.length >= 200) return;
+      if (target === '__self__') {
+        if (changes(route)) out.push({ targetId: beat.id, label, route } as any);
+      } else out.push({ targetId: target, label, route } as any);
+    };
+    const walk = (node: any, route: Array<{ choice?: any; node?: any }>, depth: number): void => {
+      if (!node || typeof node !== 'object' || depth > 20 || out.length >= 200) return;
+      // A line with its own exit ends the conversation there (its replies are never shown).
+      if (typeof node.target === 'string' && node.target) { exit(node.target, `[NPC exit] ${node.speaker || 'NPC'}`, route); return; }
+      for (const choice of Array.isArray(node.choices) ? node.choices : []) {
+        if (!choice) continue;
+        const taken = [...route, { choice }];
+        if (typeof choice.target === 'string' && choice.target) exit(choice.target, choice.text || 'Choice', taken);
+        else if (choice.dialogNode) walk(choice.dialogNode, [...taken, { node: choice.dialogNode }], depth + 1);
+      }
+    };
+    walk(tree, [], 0);
+    return out;
+  }
+
+  /**
+   * A Choose Your Character beat's options as the player sees them
+   * (ChooseCharacterBeat.choicesFor / targetFor): with no options authored,
+   * one per candidate of the role; an option without its own link goes where
+   * the first linked one does. Each link carries its option.
+   */
+  private characterOptions(beat: Beat): Connection[] {
+    const params = beat.getParameters();
+    const authored: any[] = Array.isArray(params.choices) ? params.choices.filter(Boolean) : [];
+    const role = String(params.role || 'player').replace(/^@/, '');
+    const options = authored.length > 0
+      ? authored
+      : (this.getScratch()?.getRole(role)?.candidates ?? []).map((id: string) => ({ id: `cast_${id}`, character: id }));
+    const fallback = authored.find((c) => c.target && c.target !== '__self__')?.target
+      || beat.getConnections()[0]?.targetId || beat.defaultTarget;
+    const out: Connection[] = [];
+    for (const o of options) {
+      const target = o.target === '__self__' ? beat.id : (o.target || fallback);
+      if (!target) continue;
+      out.push({ targetId: target, label: o.text || o.character || o.id, condition: o.conditions, option: o } as any);
+    }
+    return out;
+  }
+
+  /**
+   * A beat's choices that stay on it ('__self__'), as links back to the beat
+   * itself — only the ones with effects (a plain one changes nothing).
+   */
+  private loopBackChoices(beat: Beat): Connection[] {
+    const out: Connection[] = [];
+    const params = beat.getParameters();
+    const hasEffects = (c: any) => (Array.isArray(c?.effects) && c.effects.length > 0) || !!c?.counter || !!c?.variable;
+    const choices: any[] = (beat as any).liveChoices ?? (Array.isArray(params.choices) ? params.choices : []);
+    for (const c of choices) {
+      if (c?.target === '__self__' && hasEffects(c)) out.push({ targetId: beat.id, label: c.text || c.locationName || c.id, condition: c.conditions } as Connection);
+    }
+    return out;
+  }
+
+  /** Where an unmet requirement sends the story, if it does (Beat.checkRequirementsGate). */
+  private requirementRedirect(beat: Beat, state: SimulationState): string | null {
+    const requires = (beat as any).requires as any[] | undefined;
+    if (!Array.isArray(requires) || requires.length === 0) return null;
+    const evals = requires.map((req) => ({ req, ok: !req?.condition || this.evaluateCondition(req.condition, state) }));
+    if ((beat as any).requiresMode === 'any') {
+      if (evals.some((e) => e.ok)) return null;
+      return evals.find((e) => e.req?.fallbackTarget)?.req.fallbackTarget ?? null;
+    }
+    // All (the default): the first unmet requirement decides — with no
+    // fallback it is only a note and the beat shows.
+    const first = evals.find((e) => !e.ok);
+    return first?.req?.fallbackTarget || null;
+  }
+
+  /** A Condition Check's answer: its first condition and any more, matched all (AND) or any (OR) — as ConditionBeat. */
+  private conditionBeatResult(beat: Beat, state: SimulationState): boolean {
+    const condition = this.getCondition(beat);
+    const first = condition ? this.evaluateCondition(condition, state) : true;
+    const params = beat.getParameters();
+    const more = params.moreConditions;
+    if (!Array.isArray(more) || more.length === 0) return first;
+    const rest = more.map((c: Condition) => this.evaluateCondition(c, state));
+    return params.conditionsMatch === 'any' ? first || rest.some(Boolean) : first && rest.every(Boolean);
+  }
+
+  /**
+   * Is this choice on screen in this state? Its conditions (one or a list)
+   * must all hold, as the beats filter them. In a Dialog Tree that is every
+   * reply on the way to the exit.
+   */
+  private choiceOffered(beat: Beat, connection: Connection, state: SimulationState): boolean {
+    const conds: any[] = [];
+    const own: any = connection.condition;
+    if (Array.isArray(own)) conds.push(...own); else if (own) conds.push(own);
+    if (beat.type === 'dialogTree') {
+      const tree = beat.getParameters().dialogTree;
+      const target = connection.targetId === beat.id ? '__self__' : connection.targetId;
+      for (const step of (connection as any).route ?? this.dialogPathTo(tree, target, connection.label)) {
+        if (Array.isArray(step.choice?.conditions)) conds.push(...step.choice.conditions);
+      }
+    }
+    return conds.every((c) => !c || this.evaluateCondition(c, state));
   }
 
   /**
@@ -942,7 +1148,7 @@ export class StateSimulationAnalyzer {
       if (beat.type === 'conditionBeat' || hasRequires) return true;
       // Don't traverse into choice-style branching beats — those are separate
       // decision points with their own retry behaviour.
-      if (['dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'keypad'].includes(beat.type)) {
+      if (isChoiceBeatType(beat.type)) {
         return false;
       }
       const conns = beat.getConnections();
@@ -989,7 +1195,7 @@ export class StateSimulationAnalyzer {
       return false;
     }
 
-    if (beat.type === 'movementChoice' || isMultiChoiceLike(beat.type)) {
+    if (beat.type === 'movementChoice' || beat.type === 'freeLayout' || isMultiChoiceLike(beat.type)) {
       return anyHasEffects(params.choices);
     }
 
@@ -1028,13 +1234,15 @@ export class StateSimulationAnalyzer {
         if (!name) break;
 
         if (varType === 'counter') {
-          const current = newState.counters.get(name) || 0;
+          // A character's own counter when the beat names one (SetVariableBeat.character).
+          const key = this.counterKey(params.character, name);
+          const current = newState.counters.get(key) || 0;
           if (operation === 'set') {
-            newState.counters.set(name, Number(value) || 0);
+            newState.counters.set(key, Number(value) || 0);
           } else if (operation === 'change' || operation === 'add' || operation === 'increment') {
-            newState.counters.set(name, current + (Number(value) || 1));
+            newState.counters.set(key, current + (Number(value) || 1));
           } else if (operation === 'decrement' || operation === 'subtract') {
-            newState.counters.set(name, current - (Number(value) || 1));
+            newState.counters.set(key, current - (Number(value) || 1));
           }
         } else {
           if (operation === 'set') {
@@ -1045,25 +1253,22 @@ export class StateSimulationAnalyzer {
       }
 
       case 'addRemoveInventory': {
-        const character = params.character || 'player';
+        // As AddRemoveInventoryBeat: quantities, and transfers between bags.
         const item = params.item || params.prop;
         // The beat stores 'action'; 'operation' was read before, so removes
         // were never simulated.
         const operation = params.action || params.operation || 'add';
-        const quantity = params.quantity || 1;
-
         if (!item) break;
-
-        if (!newState.inventory.has(character)) {
-          newState.inventory.set(character, new Set());
-        }
-
-        const inv = newState.inventory.get(character)!;
-        if (operation === 'add') {
-          // For quantities > 1, we could track count, but for simplicity just add the item
-          inv.add(item);
-        } else if (operation === 'remove') {
-          inv.delete(item);
+        const raw = params.quantity;
+        const quantity = typeof raw === 'number' ? Math.max(1, raw)
+          : typeof raw === 'string' && raw.startsWith('$')
+            ? Math.max(1, Number(newState.variables.get(raw.slice(1)) ?? newState.counters.get(raw.slice(1))) || 1)
+            : Math.max(1, parseInt(raw, 10) || 1);
+        if (operation === 'add') addItem(newState, this.bagOf(params.character), item, quantity);
+        else if (operation === 'remove') removeItem(newState, this.bagOf(params.character), item, quantity);
+        else if (operation === 'transfer' && params.fromChar && params.toChar) {
+          removeItem(newState, this.bagOf(params.fromChar), item, quantity);
+          addItem(newState, this.bagOf(params.toChar), item, quantity);
         }
         break;
       }
@@ -1176,78 +1381,42 @@ export class StateSimulationAnalyzer {
 
     switch (beat.type) {
       case 'pickProp': {
-        // Each prop choice adds its item to inventory
-        const props = params.props || [];
-        if (choiceIndex < props.length) {
-          const prop = props[choiceIndex];
+        // The picked prop goes into the player's bag, then its effects.
+        const prop = this.choiceFor(params.props, beat, choiceIndex, connection);
+        if (prop) {
           const itemName = prop.inventoryName || prop.locationName || prop.name || prop.id;
-          if (itemName) {
-            const character = 'player';
-            if (!state.inventory.has(character)) {
-              state.inventory.set(character, new Set());
-            }
-            state.inventory.get(character)!.add(itemName);
-          }
+          if (itemName) addItem(state, 'player', itemName, 1);
           this.applyEffectsList(prop.effects, state);
           this.applyInlineChoiceFields(prop, state);
         }
         break;
       }
 
-      case 'movementChoice': {
-        // Per-choice counter/variable effects. MovementChoiceBeat.constructor
-        // calls migrateChoiceEffects which converts inline counter fields into
-        // the canonical effects[] array, but keep the inline-field fallback
-        // in case a story is loaded through a path that skips migration.
-        const mcChoices = params.choices || [];
-        if (choiceIndex < mcChoices.length) {
-          const choice = mcChoices[choiceIndex];
-          this.applyEffectsList(choice.effects, state);
-          this.applyInlineChoiceFields(choice, state);
-        }
-        break;
-      }
-
       case 'dialogTree': {
-        // DialogTree connections come from recursive tree traversal,
-        // so choiceIndex does NOT map to root choices directly.
-        // We walk the tree to find the path to the exit choice matching
-        // this connection, collecting effects along the way.
-        const dialogTree = params.dialogTree;
-        if (dialogTree && connection) {
-          const effectsAlongPath = this.collectDialogTreeEffects(
-            dialogTree,
-            connection.targetId,
-            connection.label
-          );
-          for (const effects of effectsAlongPath) {
-            this.applyEffectsList(effects, state);
-          }
-          // Also collect and apply inline counter/variable fields along the same path
-          // (fallback for unmigrated data)
-          const inlineAlongPath = this.collectDialogTreeInlineFields(
-            dialogTree,
-            connection.targetId,
-            connection.label
-          );
-          for (const fields of inlineAlongPath) {
-            this.applyInlineChoiceFields(fields, state);
-          }
+        // Every reply on the way to this exit, and the lines it leads to
+        // (their effects fire when shown) — continue steps and NPC exits
+        // included (dialogPathTo).
+        const steps: Array<{ choice?: any; node?: any }> = (connection as any)?.route
+          ?? (connection ? this.dialogPathTo(params.dialogTree, connection.targetId === beat.id ? '__self__' : connection.targetId, connection.label) : []);
+        for (const step of steps) {
+          if (step.choice) {
+            this.applyEffectsList(step.choice.effects, state);
+            this.applyInlineChoiceFields(step.choice, state);
+          } else this.applyEffectsList(step.node?.effects, state);
         }
         break;
       }
 
+      case 'movementChoice':
       case 'multiChoice':
-      case 'chooseCharacter': {
-        // Links skip '__self__' choices, so match the choice by its link.
-        const mc: any[] = params.choices || [];
-        const choice = connection
-          ? mc.find((c) => c?.target === connection.targetId && (c.text || c.id) === connection.label) ?? mc.find((c) => c?.target === connection.targetId)
-          : mc[choiceIndex];
+      case 'chooseCharacter':
+      case 'freeLayout': {
+        // A Free Layout's buttons whose picture was deleted are not on screen.
+        const choice = this.choiceFor((beat as any).liveChoices ?? params.choices, beat, choiceIndex, connection);
         if (choice) {
           // Choose Your Character casts before the option's own effects.
           if (beat.type === 'chooseCharacter' && choice.character) {
-            this.applyEffectsList([{ type: 'castRole', target: params.role || 'player', character: choice.character }], state);
+            this.applyEffectsList([{ type: 'castRole', target: String(params.role || 'player').replace(/^@/, ''), character: choice.character }], state);
           }
           this.applyEffectsList(choice.effects, state);
           this.applyInlineChoiceFields(choice, state);
@@ -1266,6 +1435,46 @@ export class StateSimulationAnalyzer {
     }
 
     return state;
+  }
+
+  /**
+   * The choice (or prop) a link was made from: same target (a link back to
+   * the beat itself is a '__self__' choice) and, when several share it, the
+   * same label. Falls back to the link's position.
+   */
+  private choiceFor(list: any[] | undefined, beat: Beat, index: number, connection?: Connection): any {
+    if ((connection as any)?.option) return (connection as any).option;
+    if (!Array.isArray(list)) return undefined;
+    if (!connection) return list[index];
+    const target = connection.targetId === beat.id ? '__self__' : connection.targetId;
+    const same = list.filter((c) => c && (c.target ?? c.targetId) === target);
+    const labelled = same.find((c) => [c.text, c.name, c.location, c.locationName, c.id].includes(connection.label));
+    return labelled ?? same[0] ?? (connection.targetId === beat.id ? undefined : list[index]);
+  }
+
+  /**
+   * The way through a dialog tree to one of its exits: each reply taken
+   * ({choice}) and each line it leads to ({node}), in order. An exit is a
+   * reply's (or continue step's) target, or a line's own NPC exit — the
+   * label tells same-target exits apart ('[NPC exit] …' for a line's).
+   * Empty when the exit is not in the tree.
+   */
+  private dialogPathTo(tree: any, target: string, label?: string): Array<{ choice?: any; node?: any }> {
+    const npcExit = typeof label === 'string' && label.startsWith('[NPC exit]');
+    const find = (node: any, depth: number, strict: boolean): Array<{ choice?: any; node?: any }> | null => {
+      if (!node || typeof node !== 'object' || depth > 20) return null;
+      if (node.target === target && (!strict || npcExit)) return [];
+      for (const choice of Array.isArray(node.choices) ? node.choices : []) {
+        if (!choice) continue;
+        if (choice.target === target && (!strict || !label || label === 'Choice' || choice.text === label || choice.label === label)) return [{ choice }];
+        if (choice.dialogNode) {
+          const rest = find(choice.dialogNode, depth + 1, strict);
+          if (rest) return [{ choice }, { node: choice.dialogNode }, ...rest];
+        }
+      }
+      return null;
+    };
+    return find(tree, 0, true) ?? find(tree, 0, false) ?? [];
   }
 
   /**
@@ -1317,32 +1526,6 @@ export class StateSimulationAnalyzer {
     }
   }
 
-  /**
-   * Walk a dialogTree and collect inline-field objects (counter/variable
-   * per-choice fields, not the canonical effects[] list) along the path
-   * from the root to a choice whose target matches targetId/label.
-   */
-  private collectDialogTreeInlineFields(node: any, targetId: string, label?: string): any[] {
-    const results: any[] = [];
-    const walk = (n: any, path: any[]): boolean => {
-      if (!n || !Array.isArray(n.choices)) return false;
-      for (const choice of n.choices) {
-        const newPath = [...path, choice];
-        // Direct exit target match
-        if (choice.target === targetId && (!label || choice.text === label || choice.label === label)) {
-          for (const step of newPath) results.push(step);
-          return true;
-        }
-        // Recurse into nested dialogNode
-        if (choice.dialogNode && walk(choice.dialogNode, newPath)) {
-          return true;
-        }
-      }
-      return false;
-    };
-    walk(node, []);
-    return results;
-  }
 
   /**
    * Apply a list of canonical Effects to simulation state.
@@ -1359,15 +1542,15 @@ export class StateSimulationAnalyzer {
         case 'incrementCounter': {
           const name = effect.target || effect.counter;
           if (name) {
-            const current = state.counters.get(name) || 0;
-            state.counters.set(name, current + (effect.value ?? 1));
+            const key = this.counterKey(effect.character, name);
+            state.counters.set(key, (state.counters.get(key) || 0) + (Number(effect.value) || 1));
           }
           break;
         }
         case 'setCounter': {
           const name = effect.target || effect.counter;
           if (name) {
-            state.counters.set(name, effect.value ?? 0);
+            state.counters.set(this.counterKey(effect.character, name), Number(effect.value) || 0);
           }
           break;
         }
@@ -1378,23 +1561,16 @@ export class StateSimulationAnalyzer {
           }
           break;
         }
+        // The runtime's addInventory / removeInventory effects work on the
+        // player's bag (StoryContext.applyEffect), one at a time.
         case 'addInventory': {
           const item = effect.target || effect.item;
-          if (item) {
-            const character = effect.character || 'player';
-            if (!state.inventory.has(character)) {
-              state.inventory.set(character, new Set());
-            }
-            state.inventory.get(character)!.add(item);
-          }
+          if (item) addItem(state, 'player', item, 1);
           break;
         }
         case 'removeInventory': {
           const item = effect.target || effect.item;
-          if (item) {
-            const character = effect.character || 'player';
-            state.inventory.get(character)?.delete(item);
-          }
+          if (item) removeItem(state, 'player', item, 1);
           break;
         }
         // Legacy format (from pickProp or unmigrated data)
@@ -1431,48 +1607,6 @@ export class StateSimulationAnalyzer {
     if (runtimeEffects.length > 0) state.pendingRuntime = [...(state.pendingRuntime ?? []), ...runtimeEffects];
   }
 
-  /**
-   * Walk a dialog tree to find the path to an exit choice matching a target,
-   * collecting effects from all choices along the way.
-   * Returns an array of effect arrays (one per choice on the path).
-   */
-  private collectDialogTreeEffects(
-    node: any,
-    targetId: string,
-    targetLabel?: string,
-    depth: number = 0
-  ): any[][] {
-    if (!node || depth > 20) return [];
-
-    const choices = node.choices || [];
-    for (const choice of choices) {
-      // Check if this choice exits to the target
-      if (choice.target && choice.target === targetId && choice.target !== '__self__') {
-        // If we have a label, also match on it for disambiguation
-        if (!targetLabel || choice.text === targetLabel || targetLabel === 'Choice') {
-          // Found the exit - return this choice's effects
-          return [choice.effects || []];
-        }
-      }
-
-      // Check nested dialog node
-      if (choice.dialogNode) {
-        const nestedEffects = this.collectDialogTreeEffects(
-          choice.dialogNode,
-          targetId,
-          targetLabel,
-          depth + 1
-        );
-        if (nestedEffects.length > 0) {
-          // Found exit in nested node - prepend this choice's effects and
-          // the nested node's own (they fire when the node is shown)
-          return [choice.effects || [], choice.dialogNode.effects || [], ...nestedEffects];
-        }
-      }
-    }
-
-    return []; // Not found in this subtree
-  }
 
   /**
    * Get condition from a condition beat
@@ -1501,24 +1635,32 @@ export class StateSimulationAnalyzer {
         if (!varName) return false;
 
         const currentValue = type === 'counter'
-          ? (state.counters.get(varName) ?? 0)
+          ? (state.counters.get(this.counterKey((condition as any).character, varName)) ?? 0)
           : (state.variables.get(varName) ?? 0);
 
         return this.compareValues(currentValue, operator, compareValue);
       }
 
       case 'inventory': {
-        const character = condition.variableName || 'player';
-        const item = condition.item || condition.value;
-        const inv = state.inventory.get(character);
-        const hasItem = inv?.has(item as string) ?? false;
-
-        if ((condition as any).checkType === 'notHas' || operator === 'not' || operator === '!=') {
-          return !hasItem;
-        } else if (operator === 'contains' || operator === '==') {
-          return hasItem;
+        // The player's bag, as StoryContext.checkCondition — with quantity
+        // checks ("at least 3 coins") and "Does Not Have Item".
+        const item = String((condition as any).item || condition.value || condition.right || '');
+        if (!item) return false;
+        const quantity = itemQuantity(state, 'player', item);
+        const c: any = condition;
+        if ((c.quantityCheck || c.checkType === 'quantity') && c.quantityOperator) {
+          const read = (ref: any) => {
+            const name = String(ref).replace(/^\$/, '');
+            const v = state.variables.get(name) ?? state.counters.get(name) ?? 0;
+            return typeof v === 'number' ? v : parseInt(String(v), 10) || 0;
+          };
+          const left = (c.compareSource || 'inventory') === 'variable' ? read(c.compareVariable || '') : quantity;
+          const threshold = typeof c.quantityValue === 'string' ? read(c.quantityValue) : (c.quantityValue ?? 0);
+          return this.compareValues(left, c.quantityOperator, threshold);
         }
-        return false;
+        const hasItem = quantity > 0;
+        if (c.checkType === 'notHas' || operator === 'not' || operator === '!=') return !hasItem;
+        return hasItem;
       }
 
       case 'visitedBeat': {
@@ -1534,8 +1676,9 @@ export class StateSimulationAnalyzer {
       }
 
       case 'counterCompare': {
-        const counter1Value = state.counters.get(condition.counter1 || '') ?? 0;
-        const counter2Value = state.counters.get(condition.counter2 || '') ?? 0;
+        const owner = (condition as any).character;
+        const counter1Value = state.counters.get(this.counterKey(owner, condition.counter1 || '')) ?? 0;
+        const counter2Value = state.counters.get(this.counterKey(owner, condition.counter2 || '')) ?? 0;
         return this.compareValues(counter1Value, operator, counter2Value);
       }
 
@@ -1569,28 +1712,9 @@ export class StateSimulationAnalyzer {
    * Check if a beat is a choice beat (player makes a decision)
    */
   private isChoiceBeat(beat: Beat): boolean {
-    return [
-      'dialogTree',
-      'movementChoice',
-      'pickProp',
-      'hyperText',
-      'aiDialogTree',
-      'keypad',
-      // Every drawable branch is a possible playthrough (each can carry its
-      // own effects); following only the first hid the others from analysis.
-      'randomTarget',
-      // Likewise every link these beats offer: the player's choice / tap /
-      // place, or the AI's classification. They were followed first-link-
-      // only, so everything behind their other links read as unreachable.
-      'multiChoice',
-      'chooseCharacter',
-      'aiCondition',
-      'aiConversation',
-      'arBeat',
-      'gpsLocation',
-      'indoorLocation',
-      'panorama',
-    ].includes(beat.type);
+    // Every link a choice beat offers is a possible playthrough (the
+    // player's pick, the AI's classification, a random draw, a timer).
+    return isChoiceBeatType(beat.type);
   }
 
   /**

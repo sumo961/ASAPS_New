@@ -11,6 +11,7 @@
 
 import type { SimulatedPath, SimulatedStep, SimulationState } from './StateSimulationAnalyzer';
 import type { Story } from '../engine/Story';
+import { CHOICE_BEAT_TYPES } from './analysisLinks';
 
 // ============================================================================
 // Types
@@ -286,9 +287,8 @@ function detectHubs(paths: SimulatedPath[]): Set<string> {
 // Phase 3: Trie → PathTreeNode with collapsing
 // ============================================================================
 
-const CHOICE_TYPES = new Set([
-  'dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'conditionBeat',
-]);
+// Where paths split: every choice beat, and Condition Checks.
+const CHOICE_TYPES = new Set([...CHOICE_BEAT_TYPES, 'conditionBeat']);
 
 function collapseTrieNode(
   trie: TrieNode,

@@ -94,6 +94,21 @@ describe('state-assumption text', () => {
     expect(r.issues.some((i) => i.beatId === 'gated')).toBe(false);
   });
 
+  it('a choice shown only under conditions, or a requirement, gates the beat too', () => {
+    const choiceGate = validateStoryLogic(story([
+      { id: 'mc', name: 'mc', type: 'multiChoice', parameters: { question: '?', choices: [
+        { id: 'c', text: 'Unlock', target: 'gated', conditions: [{ type: 'inventory', item: 'key', operator: '==' }] },
+      ] } },
+      info('gated', 'You have the key now.'),
+    ]));
+    expect(choiceGate.issues.some((i) => i.beatId === 'gated')).toBe(false);
+    const requirement = validateStoryLogic(story([
+      info('a', 'Open the chest.', 'gated'),
+      { ...info('gated', 'You have the key now.'), requires: [{ condition: { type: 'inventory', item: 'key' }, fallbackTarget: 'a' }] },
+    ]));
+    expect(requirement.issues.some((i) => i.beatId === 'gated')).toBe(false);
+  });
+
   it('does not flag plain text with no state assumptions', () => {
     const r = validateStoryLogic(story([info('a', 'The rain taps the window.', 'b'), info('b', 'He says nothing.')]));
     expect(r.issues).toEqual([]);

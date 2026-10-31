@@ -158,7 +158,8 @@ function pathHasConditionGate(
   sourceBeatId: string,
   beats: any[],
   incomingPaths: Map<string, string[]>,
-  depth: number = 3
+  depth: number = 3,
+  intoBeatId?: string
 ): boolean {
   if (depth <= 0) return false;
 
@@ -170,13 +171,40 @@ function pathHasConditionGate(
     return true;
   }
 
+  // A choice shown only under conditions gates where it leads, as does a
+  // beat's own requirement (the engine redirects when it is unmet).
+  if (intoBeatId && choicesInto(sourceBeat, intoBeatId).every(hasConditions) && choicesInto(sourceBeat, intoBeatId).length > 0) {
+    return true;
+  }
+  if (Array.isArray(sourceBeat.requires) && sourceBeat.requires.some((r: any) => r?.condition)) {
+    return true;
+  }
+
   // Recursively check predecessors (but only for single-path beats)
   const sourceIncoming = incomingPaths.get(sourceBeatId) || [];
   if (sourceIncoming.length === 1) {
-    return pathHasConditionGate(sourceIncoming[0], beats, incomingPaths, depth - 1);
+    return pathHasConditionGate(sourceIncoming[0], beats, incomingPaths, depth - 1, sourceBeatId);
   }
 
   return false;
+}
+
+const hasConditions = (choice: any): boolean => Array.isArray(choice?.conditions) && choice.conditions.length > 0;
+
+/** The choices (Multi Choice, Movement, Free Layout buttons, dialog replies) on `beat` leading to `targetId`. */
+function choicesInto(beat: any, targetId: string): any[] {
+  const out: any[] = [];
+  const p = beat?.parameters || {};
+  for (const c of Array.isArray(p.choices) ? p.choices : []) if (c && (c.target ?? c.targetId) === targetId) out.push(c);
+  const walk = (node: any, depth: number): void => {
+    if (!node || depth > 20) return;
+    for (const c of Array.isArray(node.choices) ? node.choices : []) {
+      if (c?.target === targetId) out.push(c);
+      if (c?.dialogNode) walk(c.dialogNode, depth + 1);
+    }
+  };
+  walk(p.dialogTree, 0);
+  return out;
 }
 
 /**
@@ -192,17 +220,21 @@ function isPrecededByConditionCheck(
 ): boolean {
   const incoming = incomingPaths.get(beatId) || [];
 
+  // The beat's own requirement gates it whichever way it is reached.
+  const self = beats.find(b => b.id === beatId);
+  if (Array.isArray(self?.requires) && self.requires.some((r: any) => r?.condition)) return true;
+
   if (incoming.length === 0) return false;
 
   if (isHubBeat) {
     // For hub beats: ALL incoming paths must be gated
     return incoming.every(sourceBeatId =>
-      pathHasConditionGate(sourceBeatId, beats, incomingPaths)
+      pathHasConditionGate(sourceBeatId, beats, incomingPaths, 3, beatId)
     );
   } else {
     // For non-hub beats: ANY incoming path with a gate is sufficient
     return incoming.some(sourceBeatId =>
-      pathHasConditionGate(sourceBeatId, beats, incomingPaths)
+      pathHasConditionGate(sourceBeatId, beats, incomingPaths, 3, beatId)
     );
   }
 }

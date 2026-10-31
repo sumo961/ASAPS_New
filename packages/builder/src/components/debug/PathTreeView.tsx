@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { ChevronRight, ChevronDown, GitBranch, RotateCw, MapPin, Flag, AlertTriangle, Layers, Activity, Check } from 'lucide-react';
 import type { PathTreeNode, PathTreeBranch, PathTreeResult, HubOption, ConditionAnnotation, StateSummary, ChoiceVariant, StoryWarning, Story, Condition, BeatRef } from '@asaps/core';
+import { isChoiceBeatType } from '@asaps/core';
 import { storyWarningLabel } from './storyWarningLabels';
 
 interface PathTreeViewProps {
@@ -128,10 +129,7 @@ function chainReturnsToHub(
 
     if (beat.type === 'conditionBeat') {
       const params = beat.getParameters() as any;
-      const condition: Condition | undefined = params.condition;
-      const result = condition && state
-        ? evaluateConditionAgainstSummary(condition, state)
-        : undefined;
+      const result = state ? evaluateConditionBeatAgainstSummary(params, state) : undefined;
       const target = result === true
         ? ((typeof params.trueConnection === 'string' ? params.trueConnection : params.trueConnection?.target) || params.trueTarget)
         : ((typeof params.falseConnection === 'string' ? params.falseConnection : params.falseConnection?.target) || params.falseTarget);
@@ -162,17 +160,14 @@ function chainReturnsToHub(
     // Another conditionBeat: evaluate again
     if (beat.type === 'conditionBeat') {
       const params = beat.getParameters() as any;
-      const condition: Condition | undefined = params.condition;
-      const result = condition && state
-        ? evaluateConditionAgainstSummary(condition, state)
-        : undefined;
+      const result = state ? evaluateConditionBeatAgainstSummary(params, state) : undefined;
       cursor = result === true
         ? ((typeof params.trueConnection === 'string' ? params.trueConnection : params.trueConnection?.target) || params.trueTarget)
         : ((typeof params.falseConnection === 'string' ? params.falseConnection : params.falseConnection?.target) || params.falseTarget);
       continue;
     }
     // Any other branching beat (keypad, choice) — assume exit, not return-to-hub
-    if (['dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'keypad'].includes(beat.type)) {
+    if (isChoiceBeatType(beat.type)) {
       return false;
     }
     const conns = beat.getConnections();
@@ -1433,10 +1428,12 @@ const VisitBeatChain: React.FC<{
       // otherwise we fall back to a label-only rendering.
       const params = beatInStory ? (beatInStory.getParameters() as any) : {};
       const condition: Condition | undefined = params.condition;
-      const result = condition && stateDuringVisit
-        ? evaluateConditionAgainstSummary(condition, stateDuringVisit)
-        : undefined;
-      const condText = condition ? formatCondition(condition) : b.beatName;
+      const result = stateDuringVisit ? evaluateConditionBeatAgainstSummary(params, stateDuringVisit) : undefined;
+      // More conditions (AND / OR) are part of the check.
+      const more: Condition[] = Array.isArray(params.moreConditions) ? params.moreConditions : [];
+      const condText = condition
+        ? [condition, ...more].map(formatCondition).join(params.conditionsMatch === 'any' ? ' OR ' : ' AND ')
+        : b.beatName;
 
       const trueTarget = (typeof params.trueConnection === 'string' ? params.trueConnection : params.trueConnection?.target) || params.trueTarget;
       const falseTarget = (typeof params.falseConnection === 'string' ? params.falseConnection : params.falseConnection?.target) || params.falseTarget;
@@ -1527,7 +1524,7 @@ function walkChain(startBeatId: string, story: Story, visited: Set<string>): Wal
     }
 
     // Branching beat (condition/choice/keypad) — stop before, surface as terminator
-    if (['conditionBeat', 'dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'keypad'].includes(beat.type)) {
+    if (beat.type === 'conditionBeat' || isChoiceBeatType(beat.type)) {
       return {
         beats,
         terminator: { kind: 'branch', beatId: beat.id, beatName: beat.name, beatType: beat.type },
@@ -1624,6 +1621,23 @@ function formatCondition(c: Condition): string {
   }
 }
 
+/**
+ * A Condition Check's answer against a state summary: its first condition
+ * and any more, matched all (AND) or any (OR) — as ConditionBeat. Unknown
+ * (undefined) when a condition that decides it can't be read from the summary.
+ */
+function evaluateConditionBeatAgainstSummary(params: any, state: StateSummary): boolean | undefined {
+  const all: Condition[] = [params?.condition, ...(Array.isArray(params?.moreConditions) ? params.moreConditions : [])].filter(Boolean);
+  if (all.length === 0) return undefined;
+  const results = all.map((c) => evaluateConditionAgainstSummary(c, state));
+  if (params?.conditionsMatch === 'any') {
+    if (results.some((r) => r === true)) return true;
+    return results.every((r) => r === false) ? false : undefined;
+  }
+  if (results.some((r) => r === false)) return false;
+  return results.every((r) => r === true) ? true : undefined;
+}
+
 function evaluateConditionAgainstSummary(c: Condition, state: StateSummary): boolean | undefined {
   const type = (c as any).type;
   const op = (c as any).operator;
@@ -1636,7 +1650,8 @@ function evaluateConditionAgainstSummary(c: Condition, state: StateSummary): boo
       const name = item || val || v;
       if (!name) return undefined;
       const has = state.inventory.includes(name);
-      return op === '!=' || op === 'not' ? !has : has;
+      // "Does Not Have Item" keeps operator '==' and says checkType 'notHas'.
+      return op === '!=' || op === 'not' || (c as any).checkType === 'notHas' ? !has : has;
     }
     case 'counter': {
       if (!v) return undefined;

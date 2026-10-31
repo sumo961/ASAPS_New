@@ -3505,12 +3505,23 @@ export class StoryContext extends EventEmitter {
    * Path analysis: load a simulated state — its affect snapshot plus plain
    * variables, counters and items — without the full deserializer.
    */
-  loadSimulationState(affect: Partial<SerializedStoryState>, variables: Record<string, any>, counters: Record<string, number>, items: string[]): void {
+  loadSimulationState(affect: Partial<SerializedStoryState>, variables: Record<string, any>, counters: Record<string, number>, items: Array<string | { name: string; quantity: number }>): void {
     this.restoreAffectSnapshot(affect);
     const st = this.state as any;
     st.variables = { ...variables };
-    st.counters = { ...counters };
-    st.inventory = items.map((name) => ({ name, quantity: 1 }));
+    // Path analysis keeps another character's counter of a shared name as
+    // `@Name:counter` (StateSimulationAnalyzer.counterKey).
+    st.counters = {};
+    st.characterCounters = {};
+    for (const [key, value] of Object.entries(counters)) {
+      const scoped = /^@([^:]+):(.+)$/.exec(key);
+      // A bare name declared on one character is that character's (getCounter).
+      const owner = scoped ? this.resolveCharRef(scoped[1]) : this.resolveImplicitCounterOwner(key);
+      const ownerKey = owner ? this.resolveCharRef(owner) : null;
+      if (ownerKey) (st.characterCounters[ownerKey] ??= {})[scoped ? scoped[2] : key] = value;
+      else st.counters[key] = value;
+    }
+    st.inventory = items.map((it) => (typeof it === 'string' ? { name: it, quantity: 1 } : { ...it }));
   }
 
   serialize(): SerializedStoryState {
