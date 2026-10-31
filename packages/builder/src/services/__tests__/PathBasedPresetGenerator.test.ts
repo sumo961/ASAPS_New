@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { generatePathPresets, type PresetGenerationResult } from '../PathBasedPresetGenerator';
-import { Story, BeatTypeRegistry } from '@asaps/core';
+import { Story, BeatTypeRegistry, StateSimulationAnalyzer } from '@asaps/core';
 
 // Helper to create test beats
 function createTestBeat(config: {
@@ -475,5 +475,20 @@ describe('PathBasedPresetGenerator', () => {
       // they may be deduplicated (depends on implementation)
       expect(result.presets).toBeDefined();
     });
+  });
+
+  it('simulates a story once, however many beats it is asked about', () => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'start' });
+    story.addBeat(createTestBeat({ id: 'start', name: 'Start', type: 'titleScreen', parameters: { title: 'T' }, connections: [{ targetId: 'middle' }] }));
+    story.addBeat(createTestBeat({ id: 'middle', name: 'Middle', type: 'infoText', parameters: { text: 'M' }, connections: [{ targetId: 'end' }] }));
+    story.addBeat(createTestBeat({ id: 'end', name: 'End', type: 'endScreen', parameters: { message: 'E' } }));
+    const spy = vi.spyOn(StateSimulationAnalyzer.prototype, 'analyze');
+    try {
+      expect(generatePathPresets(story, 'middle').presets.length).toBeGreaterThan(0);
+      expect(generatePathPresets(story, 'end').presets.length).toBeGreaterThan(0);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

@@ -10,6 +10,10 @@ export { analysisLinks, isChoiceBeatType, CHOICE_BEAT_TYPES, SINGLE_LINK_BEAT_TY
 
 // State-based simulation analysis (improved path finding)
 export { StateSimulationAnalyzer, itemQuantity } from './StateSimulationAnalyzer';
+
+// The states players arrive in at each beat (Story Logic, presets)
+export { arrivalStates, arrivalStateAt, arrivalKey, arrivesDifferently, describeArrivalDifferences, stateMentions } from './arrivalStates';
+export type { BeatArrival, ArrivalOptions, DescribeOptions } from './arrivalStates';
 export type {
   SimulationState,
   SimulatedStep,

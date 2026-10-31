@@ -7,6 +7,7 @@
  * - Path analysis to detect convergence points that may have inconsistent narratives
  */
 
+import { stateMentions, type SimulationState } from '@asaps/core';
 import { beatTargetIds } from './storyLinks';
 
 export interface LogicIssue {
@@ -19,6 +20,9 @@ export interface LogicIssue {
   problematicText?: string;
   suggestedFix?: string;
   incomingPaths?: number;
+  /** Distinct states players arrive in, and how many of them lack what the text assumes. */
+  arrivalStates?: number;
+  arrivalsLacking?: number;
   itemName?: string;
   targetBeatType?: string;
 }
@@ -26,7 +30,9 @@ export interface LogicIssue {
 export interface LogicValidationResult {
   valid: boolean;
   issues: LogicIssue[];
-  hubBeats: string[];  // Beats reachable from multiple paths
+  /** Beats reached in different states (from arrival states), or — without
+   *  them — from more than one beat. */
+  hubBeats: string[];
   pathAnalysis: Map<string, string[]>;  // Beat ID -> array of beats that lead to it
 }
 
@@ -59,6 +65,23 @@ const STATE_ASSUMPTION_PATTERNS = [
   { pattern: /(your|the) ([a-z]+\s)?(score|count|points?) (is|are|reach)/i, category: 'counter' },
   { pattern: /you('ve| have) (earned|accumulated|gained) (enough|sufficient)/i, category: 'counter' },
 ];
+
+/**
+ * What a matched phrase assumes, as names to look for in a state: "the key"
+ * → key; "the evidence you gathered" → evidence, clue, proof.
+ */
+function assumedNames(match: string, category: string): string[] {
+  const nouns: Record<string, string[]> = {
+    evidence: ['evidence', 'clue', 'proof', 'information', 'info'],
+    knowledge: ['secret', 'truth', 'know', 'learn', 'discover', 'found'],
+    progress: ['done', 'complete', 'finish', 'solved', 'investigat', 'quest'],
+  };
+  if (category === 'item' || category === 'counter') {
+    const noun = match.match(/(key|sword|lantern|map|item|tool|score|count|points?)\b/i)?.[1];
+    if (noun) return [noun.replace(/s$/i, '')];
+  }
+  return nouns[category] ?? [];
+}
 
 /**
  * Extract text content from a beat for analysis
@@ -341,10 +364,25 @@ export function describeLineWithoutExit(l: LineWithoutExit): string {
   return `In "${l.beatName || l.beatId}", the line "${lineSnippet(l.text)}" has no replies and no exit link: ${where}.`;
 }
 
+/** The states players arrive in at one beat (path simulation: arrivalStates). */
+export interface BeatArrivalStates {
+  states: SimulationState[];
+  /** The way taken decides the state (arrivesDifferently): a hub. */
+  differs: boolean;
+}
+
+export interface StoryLogicOptions {
+  /** With these, a hub is a beat the way taken reaches in different states,
+   *  and text that assumes the key is flagged only when some of them lack
+   *  anything named like a key. Beats missing here (never reached, or no
+   *  simulation) fall back to the links. */
+  arrivals?: Map<string, BeatArrivalStates>;
+}
+
 /**
  * Validate story logic for narrative consistency
  */
-export function validateStoryLogic(story: any): LogicValidationResult {
+export function validateStoryLogic(story: any, options: StoryLogicOptions = {}): LogicValidationResult {
   const issues: LogicIssue[] = [];
   const hubBeats: string[] = [];
 
@@ -379,9 +417,12 @@ export function validateStoryLogic(story: any): LogicValidationResult {
     });
   }
 
-  // Identify hub beats (beats with multiple incoming connections)
+  // Hub beats: reached in different states — or, where the simulation
+  // says nothing about a beat, reached from more than one beat.
+  const arrivals = options.arrivals;
   for (const [beatId, sources] of incomingPaths.entries()) {
-    if (sources.length > 1) {
+    const at = arrivals?.get(beatId);
+    if (at ? at.differs : sources.length > 1) {
       hubBeats.push(beatId);
     }
   }
@@ -394,8 +435,40 @@ export function validateStoryLogic(story: any): LogicValidationResult {
     const incomingCount = (incomingPaths.get(beat.id) || []).length;
     const isHubBeat = incomingCount > 1;
 
+    const states = arrivals?.get(beat.id)?.states;
     for (const text of texts) {
       const { found, matches } = detectStateAssumptions(text);
+
+      if (found && states && states.length > 0) {
+        // The states say whether the assumption holds: flagged only where
+        // some way in arrives without anything of that name.
+        const lacking = matches.filter((m) => {
+          const names = assumedNames(m.pattern, m.category);
+          return names.length > 0 && states.some((st) => !stateMentions(st, names));
+        });
+        if (lacking.length === 0) continue;
+        const names = [...new Set(lacking.flatMap((m) => assumedNames(m.pattern, m.category).slice(0, 1)))];
+        const lackingCount = states.filter((st) => lacking.some((m) => !stateMentions(st, assumedNames(m.pattern, m.category)))).length;
+        const what = names.map((n) => `"${n}"`).join(' or ');
+        const all = lackingCount === states.length;
+        issues.push({
+          type: all ? 'info' : 'warning',
+          category: all ? 'ungated_state_reference' : 'hub_state_assumption',
+          message: all
+            ? `Beat '${beat.name || beat.id}' assumes the player has something (${lacking.map((m) => m.category).join(', ')}), but no way in holds anything named like ${what}. If the story tracks it under another name, this is fine; otherwise the text may promise something the player never got.`
+            : `Beat '${beat.name || beat.id}' assumes the player has something (${lacking.map((m) => m.category).join(', ')}), but ${lackingCount} of the ${states.length} states players arrive in hold nothing named like ${what}.`,
+          beatId: beat.id,
+          beatName: beat.name,
+          beatType: beat.type,
+          problematicText: lacking.map((m) => `"${m.pattern}" (${m.category})`).join(', '),
+          suggestedFix: all
+            ? 'Check the text, or give the item or variable the name the text uses.'
+            : `Either: 1) Word the text so it holds for every way in, 2) Gate the ways in that arrive without it (a Condition beat, a choice condition, or a requirement with a fallback), or 3) Split the beat by state`,
+          arrivalStates: states.length,
+          arrivalsLacking: lackingCount,
+        });
+        continue;
+      }
 
       if (found) {
         // Check if this beat is properly gated by a conditionBeat

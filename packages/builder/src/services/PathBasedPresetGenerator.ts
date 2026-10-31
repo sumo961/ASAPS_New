@@ -89,9 +89,21 @@ export function generatePathPresets(
     };
   }
 
+  const cached = analyses.get(story);
+  if (cached) return presetsFromAnalysis(story, targetBeat, cached.analyzer, cached.result, startTime);
   const analyzer = presetAnalyzer(story);
-  return presetsFromAnalysis(story, targetBeat, analyzer, analyzer.analyze(), startTime);
+  const result = analyzer.analyze();
+  analyses.set(story, { analyzer, result });
+  return presetsFromAnalysis(story, targetBeat, analyzer, result, startTime);
 }
+
+/**
+ * One simulation per story: choosing another start beat (or the editor's
+ * "Show as" for another dialog) reads the same paths instead of simulating
+ * the whole story again. Keyed by the Story object — callers build a new
+ * one when the story changes.
+ */
+const analyses = new WeakMap<Story, { analyzer: StateSimulationAnalyzer; result: ReturnType<StateSimulationAnalyzer['analyze']> }>();
 
 /**
  * generatePathPresets without freezing the UI: the path simulation runs in
@@ -108,8 +120,11 @@ export async function generatePathPresetsAsync(
   if (!targetBeat) {
     return { targetBeatId, targetBeatName: 'Unknown', presets: [], totalPaths: 0, analysisTime: performance.now() - startTime };
   }
+  const cached = analyses.get(story);
+  if (cached) return presetsFromAnalysis(story, targetBeat, cached.analyzer, cached.result, startTime);
   const analyzer = presetAnalyzer(story);
   const analysisResult = await analyzer.analyzeAsync(onProgress, signal);
+  analyses.set(story, { analyzer, result: analysisResult });
   return presetsFromAnalysis(story, targetBeat, analyzer, analysisResult, startTime);
 }
 

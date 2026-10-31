@@ -200,3 +200,47 @@ describe('Dialog Tree lines nothing follows', () => {
     expect(findDialogLinesWithoutExit([tree({ next: 'reflection' }), reflection])).toEqual([]);
   });
 });
+
+describe('with the states players arrive in', () => {
+  const at = (...states: any[]) => ({ states, differs: states.length > 1 });
+  const st = (items: string[] = [], vars: Record<string, any> = {}) => ({
+    variables: new Map(Object.entries(vars)), counters: new Map<string, number>(),
+    inventory: new Map([['player', new Set(items)]]), visitedBeats: new Set<string>(),
+  });
+  // Two beats lead to the door; the text assumes the key.
+  const beats = () => [
+    info('a', 'You search the desk.', 'door'),
+    info('b', 'You walk on.', 'door'),
+    info('door', 'With the key you open the door.'),
+  ];
+
+  it('a hub is a beat reached in different states, not from several beats', () => {
+    const same = validateStoryLogic(story(beats()), { arrivals: new Map([['door', at(st(['key']))]]) });
+    expect(same.hubBeats).not.toContain('door');
+    const differ = validateStoryLogic(story(beats()), { arrivals: new Map([['door', at(st(['key']), st())]]) });
+    expect(differ.hubBeats).toContain('door');
+  });
+
+  it('no warning when every way in holds what the text assumes', () => {
+    const r = validateStoryLogic(story(beats()), { arrivals: new Map([['door', at(st(['Brass key']), st(['Brass key', 'map']))]]) });
+    expect(r.issues.filter((i) => i.beatId === 'door')).toEqual([]);
+  });
+
+  it('warns when some ways in arrive without it, and says how many', () => {
+    const r = validateStoryLogic(story(beats()), { arrivals: new Map([['door', at(st(['key']), st([], { hasKey: false }))]]) });
+    const issue = r.issues.find((i) => i.beatId === 'door');
+    expect(issue).toMatchObject({ type: 'warning', category: 'hub_state_assumption', arrivalStates: 2, arrivalsLacking: 1 });
+    expect(issue?.message).toMatch(/1 of the 2 states players arrive in hold nothing named like "key"/);
+  });
+
+  it('a variable named like the thing counts too (hasKey)', () => {
+    const r = validateStoryLogic(story(beats()), { arrivals: new Map([['door', at(st([], { hasKey: true }))]]) });
+    expect(r.issues.filter((i) => i.beatId === 'door')).toEqual([]);
+  });
+
+  it('a beat the simulation never reached keeps the link-based check', () => {
+    const r = validateStoryLogic(story(beats()), { arrivals: new Map() });
+    expect(r.hubBeats).toContain('door');
+    expect(r.issues.some((i) => i.beatId === 'door' && i.category === 'hub_state_assumption')).toBe(true);
+  });
+});

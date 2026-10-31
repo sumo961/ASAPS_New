@@ -4,7 +4,6 @@ import {
   Story,
   ConstraintPathAnalyzer,
   BackwardAnalyzer,
-  StateSimulationAnalyzer,
   PathQueryEngine,
   constraintSetToStrings,
   buildPathTree,
@@ -23,6 +22,7 @@ import type {
 import { PathTreeView } from './PathTreeView';
 import { storyWarningLabel } from './storyWarningLabels';
 import { usePersistedState } from '../../utils/persistedState';
+import { simulateStory } from '../../services/storySimulation';
 
 interface PathVisualizationProps {
   story: Story;
@@ -39,30 +39,33 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
   const [selectedBackwardBeat, setSelectedBackwardBeat] = useState<string | null>(null);
   const [expandedBackwardPath, setExpandedBackwardPath] = useState<number | null>(null);
 
-  // Use state-based simulation analyzer for more accurate path analysis.
-  // Default maxPaths (50k) is needed for real AI stories with wide hub-and-spoke
-  // structures — narrow condition-gated endings sit deep in the BFS queue and a
-  // small budget exhausts before they are dequeued.
-  const simulationAnalyzer = useMemo(() => {
-    return new StateSimulationAnalyzer(story, {
-      maxDepth: 300,
-    });
-  }, [story]);
-
-  // Run state-based path analysis (forward)
-  const analysisResult = useMemo<ConstraintPathResult | null>(() => {
+  // One simulation of the story, shared with Story Logic (storySimulation):
+  // the outcomes, the tree and the warnings all read its paths.
+  const simulation = useMemo(() => {
     try {
-      return simulationAnalyzer.analyze();
+      return simulateStory(story);
     } catch (error) {
       console.error('[PathVisualization] Simulation analysis error:', error);
       return null;
     }
-  }, [simulationAnalyzer]);
+  }, [story]);
+  const simulationAnalyzer = simulation?.analyzer ?? null;
+
+  // Run state-based path analysis (forward)
+  const analysisResult = useMemo<ConstraintPathResult | null>(() => {
+    try {
+      return simulation ? simulation.result() : null;
+    } catch (error) {
+      console.error('[PathVisualization] Simulation analysis error:', error);
+      return null;
+    }
+  }, [simulation]);
 
   // Build collapsed path tree + detect story warnings (shares the raw paths)
   const { pathTreeResult, storyWarnings } = useMemo(() => {
     try {
-      const rawPaths = simulationAnalyzer.analyzeRaw();
+      if (!simulation) throw new Error('no simulation');
+      const rawPaths = simulation.paths;
       const tree = buildPathTree(rawPaths, story);
       const warnings = detectStoryWarnings({ paths: rawPaths, story });
       return { pathTreeResult: tree, storyWarnings: warnings };
@@ -70,7 +73,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
       console.error('[PathVisualization] Path tree / warnings error:', error);
       return { pathTreeResult: null as PathTreeResult | null, storyWarnings: [] as StoryWarning[] };
     }
-  }, [simulationAnalyzer, story]);
+  }, [simulation, story]);
 
   // Group warnings by beat for fast UI lookup
   const warningsByBeatId = useMemo(() => {
@@ -84,12 +87,12 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
 
   // Get endings for backward analysis
   const endings = useMemo(() => {
-    return simulationAnalyzer.getEndings();
+    return simulationAnalyzer ? simulationAnalyzer.getEndings() : [];
   }, [simulationAnalyzer]);
 
   // Run backward analysis when a beat is selected
   const backwardResult = useMemo<BackwardAnalysisResult | null>(() => {
-    if (!selectedBackwardBeat) return null;
+    if (!selectedBackwardBeat || !simulationAnalyzer) return null;
     try {
       return simulationAnalyzer.analyzeBackward(selectedBackwardBeat);
     } catch (error) {

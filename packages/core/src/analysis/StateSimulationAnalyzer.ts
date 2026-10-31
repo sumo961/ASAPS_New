@@ -69,6 +69,9 @@ export interface SimulatedStep {
   beatName: string;
   beatType: string;
   stateAfter: SimulationState;
+  /** The state the path starts in — on its first step only (every later
+   *  step arrives with the previous step's stateAfter; arrivalStateAt). */
+  stateBefore?: SimulationState;
   connectionTaken?: string; // Label of connection taken
   decisionMade?: string;    // For choice beats
   conditionResult?: boolean; // For condition beats
@@ -180,7 +183,8 @@ function removeItem(state: SimulationState, bag: string, item: string, quantity:
  * Create a hash of the simulation state for cycle detection
  * Only includes variables/counters/inventory, not visitedBeats (which changes every step)
  */
-function hashState(state: SimulationState): string {
+/** Variables, counters, items (with how many) and casting, as one string. */
+export function hashState(state: SimulationState): string {
   const parts: string[] = [];
 
   // Sort variables by name for consistent hashing
@@ -493,6 +497,14 @@ export class StateSimulationAnalyzer {
   }
 
   /**
+   * analyze()'s grouped result from paths already simulated (analyzeRaw), so
+   * one simulation serves the outcome list, the tree and arrival states.
+   */
+  public resultFromPaths(paths: SimulatedPath[], startTime: number = performance.now()): ConstraintPathResult {
+    return this.buildResult(paths, startTime);
+  }
+
+  /**
    * Return the raw SimulatedPath[] without grouping into outcome groups.
    * Used by PathTree builder which needs the flat path data directly.
    */
@@ -725,6 +737,7 @@ export class StateSimulationAnalyzer {
         beatName: beat.name,
         beatType: beat.type,
         stateAfter: cloneState(newState),
+        ...(frame.path.length === 0 ? { stateBefore: frame.state } : {}),
       };
       const newPath = [...frame.path, step];
 

@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, Info, CheckCircle, FileText, Package, GitMerge, ChevronDown, ChevronRight, Sparkles, ArrowRight } from 'lucide-react';
+import { AlertTriangle, Info, CheckCircle, FileText, Package, GitMerge, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react';
 import type { Story } from '@asaps/core';
 import { validateStoryLogic, type LogicIssue, type LogicValidationResult } from '../../utils/storyLogicValidator';
-import { useAIFeatures } from '../../utils/aiFeatures';
+import { arrivalKey, arrivesDifferently, describeArrivalDifferences, type BeatArrival, type SimulationState } from '@asaps/core';
+import { simulateStory } from '../../services/storySimulation';
 
 interface LogicValidationReportProps {
   story: Story;
@@ -14,11 +15,12 @@ interface HubAnalysis {
   beatName: string;
   beatType: string;
   beatText: string;
-  incomingPaths: {
-    fromBeatId: string;
-    fromBeatName: string;
-    stateChanges: string[];
-  }[];
+  /** Distinct states players arrive in (0 when the simulation never reached it). */
+  arrivalCount: number;
+  /** What differs between them, in words. */
+  differences: string[];
+  /** The beats that lead here. */
+  waysIn: { fromBeatId: string; fromBeatName: string }[];
 }
 
 /**
@@ -32,101 +34,25 @@ function extractBeatText(params: any): string {
   return '';
 }
 
-/**
- * Analyze what state changes happen on a path from source to target
- */
-function analyzePathStateChanges(
-  sourceBeatId: string,
-  allBeatsMap: Map<string, any>,
-  visited: Set<string> = new Set()
-): string[] {
-  const changes: string[] = [];
-  const beat = allBeatsMap.get(sourceBeatId);
-  if (!beat || visited.has(sourceBeatId)) return changes;
-
-  visited.add(sourceBeatId);
-  const params = beat.parameters || {};
-
-  // Check for counter changes in setVariable beats
-  if (beat.type === 'setVariable' && params.type === 'counter') {
-    const op = params.operation === 'add' ? '+' : params.operation === 'set' ? '=' : params.operation;
-    changes.push(`${params.name} ${op}${params.value}`);
-  }
-
-  // Check for inventory changes
-  if (beat.type === 'addRemoveInventory') {
-    if (params.action === 'add') {
-      changes.push(`+📦 ${params.item}`);
-    } else if (params.action === 'remove') {
-      changes.push(`-📦 ${params.item}`);
-    }
-  }
-
-  // Check for pickProp (auto-adds to inventory)
-  if (beat.type === 'pickProp') {
-    changes.push(`📦 (pick item)`);
-  }
-
-  // Check for counter effects on choices
-  const choices = params.choices || params.props || [];
-  for (const choice of choices) {
-    if (choice.counter) {
-      const op = choice.counterOperation === 'set' ? '=' : '+';
-      changes.push(`${choice.counter} ${op}${choice.counterValue || 1} (via choice)`);
-    }
-  }
-
-  // Check dialogTree choices
-  if (params.dialogTree?.choices) {
-    for (const choice of params.dialogTree.choices) {
-      if (choice.counter) {
-        const op = choice.counterOperation === 'set' ? '=' : '+';
-        changes.push(`${choice.counter} ${op}${choice.counterValue || 1} (via dialog)`);
-      }
-    }
-  }
-
-  return changes;
-}
-
-/**
- * Build detailed hub analysis
- */
-function buildHubAnalysis(
-  hubBeatIds: string[],
-  pathAnalysis: Map<string, string[]>,
-  allBeats: any[]
-): HubAnalysis[] {
-  const beatsMap = new Map(allBeats.map(b => [b.id, { ...b, parameters: b.getParameters ? b.getParameters() : b.parameters }]));
-
-  return hubBeatIds.map(hubId => {
-    const beat = beatsMap.get(hubId);
-    const incomingSources = pathAnalysis.get(hubId) || [];
-
-    return {
-      beatId: hubId,
-      beatName: beat?.name || hubId,
-      beatType: beat?.type || 'unknown',
-      beatText: beat ? extractBeatText(beat.parameters) : '',
-      incomingPaths: incomingSources.map(sourceId => {
-        const sourceBeat = beatsMap.get(sourceId);
-        return {
-          fromBeatId: sourceId,
-          fromBeatName: sourceBeat?.name || sourceId,
-          stateChanges: analyzePathStateChanges(sourceId, beatsMap)
-        };
-      })
-    };
-  });
-}
-
 export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
   story,
   onHighlightBeat
 }) => {
-  const aiOn = useAIFeatures();
   const [expandedHubs, setExpandedHubs] = useState<Set<string>>(new Set());
   const allBeats = useMemo(() => story.getAllBeats(), [story]);
+
+  // The states players arrive in at each beat — the same simulation Path
+  // Analysis shows. Without it (a story the simulation can't play), the
+  // checks fall back to the links.
+  const simulation = useMemo(() => {
+    try {
+      return simulateStory(story);
+    } catch (error) {
+      console.error('[LogicValidationReport] Path simulation failed:', error);
+      return null;
+    }
+  }, [story]);
+  const arrivals = useMemo<Map<string, BeatArrival[]> | null>(() => simulation?.arrivals() ?? null, [simulation]);
 
   const validation = useMemo(() => {
     const storyData = {
@@ -138,12 +64,42 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
         connections: beat.getConnections()  // Include connections for hub detection
       }))
     };
-    return validateStoryLogic(storyData);
-  }, [allBeats]);
+    const states = arrivals
+      ? new Map([...arrivals].map(([id, list]) => {
+          // Each state once (the same state can come from different starts).
+          const unique = new Map(list.map((a) => [arrivalKey(a.state), a.state]));
+          return [id, { states: [...unique.values()], differs: arrivesDifferently(list) }];
+        }))
+      : undefined;
+    return validateStoryLogic(storyData, { arrivals: states });
+  }, [allBeats, arrivals]);
 
-  const hubAnalysis = useMemo(() => {
-    return buildHubAnalysis(validation.hubBeats, validation.pathAnalysis, allBeats);
-  }, [validation.hubBeats, validation.pathAnalysis, allBeats]);
+  const hubAnalysis = useMemo<HubAnalysis[]>(() => {
+    const names = new Map<string, string>(
+      (((story as any).getCharacters?.() ?? []) as any[])
+        .filter((c) => c?.id)
+        .flatMap((c) => [[c.id, c.displayName || c.name || c.id], [c.name, c.displayName || c.name]] as [string, string][]),
+    );
+    const nameOf = (ref: string) => names.get(ref) ?? ref;
+    const affectOf = simulation ? (st: SimulationState) => simulation.analyzer.affectAt(st) : undefined;
+    const beatsMap = new Map(allBeats.map(b => [b.id, b]));
+    return validation.hubBeats.map((hubId) => {
+      const beat = beatsMap.get(hubId);
+      const list = arrivals?.get(hubId) ?? [];
+      return {
+        beatId: hubId,
+        beatName: beat?.name || hubId,
+        beatType: beat?.type || 'unknown',
+        beatText: beat ? extractBeatText(beat.getParameters()) : '',
+        arrivalCount: new Set(list.map((a) => arrivalKey(a.state))).size,
+        differences: describeArrivalDifferences(list, { affectOf, nameOf }),
+        waysIn: (validation.pathAnalysis.get(hubId) || []).filter((fromBeatId) => fromBeatId !== hubId).map((fromBeatId) => ({
+          fromBeatId,
+          fromBeatName: beatsMap.get(fromBeatId)?.name || fromBeatId,
+        })),
+      };
+    });
+  }, [validation.hubBeats, validation.pathAnalysis, allBeats, arrivals, simulation, story]);
 
   const warnings = validation.issues.filter(i => i.type === 'warning');
   const infos = validation.issues.filter(i => i.type === 'info');
@@ -195,19 +151,6 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* AI Notice */}
-      {aiOn && <div className="flex items-start gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm">
-        <Sparkles className="w-5 h-5 text-purple-500 mt-0.5 flex-shrink-0" />
-        <div>
-          <strong className="text-purple-700">Pattern-based analysis</strong>
-          <p className="text-purple-600 mt-1">
-            This validation uses keyword pattern matching. For deeper semantic analysis of narrative consistency,
-            AI-powered validation could better understand context and nuance. Configure an AI provider in Settings
-            to enable enhanced story analysis features.
-          </p>
-        </div>
-      </div>}
-
       {/* Summary */}
       <div className="bg-gray-50 rounded-lg p-4">
         <h3 className="text-lg font-semibold mb-3">Story Logic Summary</h3>
@@ -235,7 +178,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
             Hub Beat Analysis ({hubAnalysis.length})
           </h4>
           <p className="text-sm text-gray-600 mb-3">
-            Hub beats can be reached from multiple paths. Review each to ensure text doesn't assume specific player state.
+            Hub beats are reached in different states: with or without an item, a variable set or not, someone's trust higher or lower. Check that each one's text holds for every way in.
           </p>
 
           <div className="space-y-2">
@@ -261,7 +204,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
                     <span className="font-medium">{hub.beatName}</span>
                     <span className="text-xs text-gray-500">({hub.beatType})</span>
                     <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded ml-auto">
-                      {hub.incomingPaths.length} incoming paths
+                      {hub.arrivalCount > 0 ? `${hub.arrivalCount} states` : `${hub.waysIn.length} ways in`}
                     </span>
                     {hasWarning && (
                       <AlertTriangle className="w-4 h-4 text-yellow-500" />
@@ -281,10 +224,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
                                 <AlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
                                 <div className="text-sm">
                                   <div className="text-yellow-800 font-medium mb-1">Text assumes player state</div>
-                                  <p className="text-yellow-700 mb-2">
-                                    This beat can be reached from {hub.incomingPaths.length} paths without condition checks,
-                                    but the text assumes the player has made progress.
-                                  </p>
+                                  <p className="text-yellow-700 mb-2">{hubWarning.message}</p>
                                   {hubWarning.problematicText && (
                                     <p className="text-xs text-yellow-600 mb-2">
                                       <strong>Detected:</strong> {hubWarning.problematicText}
@@ -313,20 +253,30 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
                         </div>
                       )}
 
-                      {/* Incoming Paths */}
+                      {/* What differs between the states players arrive in */}
+                      {hub.differences.length > 0 && (
+                        <div>
+                          <div className="text-xs font-medium text-gray-500 mb-1">Players arrive:</div>
+                          <ul className="text-sm space-y-0.5 list-disc list-inside text-gray-700">
+                            {hub.differences.map((d) => <li key={d}>{d}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {hub.arrivalCount === 0 && (
+                        <p className="text-xs text-gray-500">Path Analysis never reaches this beat, so its ways in are listed by link.</p>
+                      )}
+
+                      {/* Ways in */}
                       <div>
-                        <div className="text-xs font-medium text-gray-500 mb-2">Incoming Paths:</div>
+                        <div className="text-xs font-medium text-gray-500 mb-2">Ways in:</div>
                         <div className="space-y-2">
-                          {hub.incomingPaths.map((path, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center gap-2 text-sm bg-gray-50 p-2 rounded"
-                            >
+                          {hub.waysIn.map((way) => (
+                            <div key={way.fromBeatId} className="flex items-center gap-2 text-sm bg-gray-50 p-2 rounded">
                               <button
-                                onClick={() => onHighlightBeat?.(path.fromBeatId)}
+                                onClick={() => onHighlightBeat?.(way.fromBeatId)}
                                 className="text-blue-600 hover:underline font-medium"
                               >
-                                {path.fromBeatName}
+                                {way.fromBeatName}
                               </button>
                               <ArrowRight className="w-3 h-3 text-gray-400" />
                               <button
@@ -335,44 +285,10 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
                               >
                                 {hub.beatName}
                               </button>
-                              {path.stateChanges.length > 0 && (
-                                <span className="ml-auto text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
-                                  {path.stateChanges.join(', ')}
-                                </span>
-                              )}
-                              {path.stateChanges.length === 0 && (
-                                <span className="ml-auto text-xs text-gray-400">
-                                  (no state changes)
-                                </span>
-                              )}
                             </div>
                           ))}
                         </div>
                       </div>
-
-                      {/* Path analysis notes - only show if NO hub_state_assumption warning */}
-                      {!hasWarning && (
-                        <>
-                          {hub.incomingPaths.some(p => p.stateChanges.length === 0) &&
-                           hub.incomingPaths.some(p => p.stateChanges.length > 0) && (
-                            <div className="text-xs text-yellow-700 bg-yellow-100 p-2 rounded border border-yellow-300">
-                              <strong>⚠️ Note:</strong> Some paths modify state while others don't.
-                              If this beat's text assumes the player has collected items or increased counters,
-                              players arriving via paths without state changes may be confused.
-                            </div>
-                          )}
-                          {hub.incomingPaths.every(p => p.stateChanges.length > 0) && (
-                            <div className="text-xs text-green-700 bg-green-50 p-2 rounded border border-green-200">
-                              ✓ All incoming paths modify state. No text pattern issues detected.
-                            </div>
-                          )}
-                          {hub.incomingPaths.every(p => p.stateChanges.length === 0) && (
-                            <div className="text-xs text-gray-600 bg-gray-100 p-2 rounded">
-                              ℹ️ No incoming paths modify state. Ensure beat text doesn't assume player has gathered anything.
-                            </div>
-                          )}
-                        </>
-                      )}
                     </div>
                   )}
                 </div>
@@ -477,9 +393,9 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
       <div className="text-xs text-gray-500 p-3 bg-gray-50 rounded-lg">
         <strong>About Story Logic Validation:</strong>
         <ul className="mt-1 space-y-1 list-disc list-inside">
-          <li><strong>Hub State Assumption:</strong> Hub beats (reachable from multiple paths) shouldn't assume player has gathered specific items/clues</li>
+          <li><strong>Hub State Assumption:</strong> Text that assumes the player has something (a key, the evidence) where some of the states players arrive in hold nothing by that name</li>
           <li><strong>Undescribed Item:</strong> Items picked up via pickProp should be described in the following beat (what does the letter say? what does the photo show?)</li>
-          <li><strong>Ungated State Reference:</strong> Text referencing player state without a conditionBeat checking it first</li>
+          <li><strong>Ungated State Reference:</strong> Text that assumes something no way in holds by that name (or, for a beat Path Analysis never reaches, that no condition checks first)</li>
           <li><strong>Line Without Exit:</strong> A Dialog Tree line with no replies and no exit link ends the scene the moment it appears, so players never read it: give it an exit link or replies</li>
         </ul>
       </div>

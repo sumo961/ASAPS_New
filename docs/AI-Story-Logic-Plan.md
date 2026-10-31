@@ -68,26 +68,25 @@ These are kept from the old plan.
 
 ## Phases
 
-### Phase 0: groundwork (no AI; it improves the tab on its own)
+### Phase 0: groundwork (no AI; it improves the tab on its own) — DONE 2026-10-31 (unreleased)
 
-- **Arrival states in one pass.** Add `arrivalStates(paths)` to core. For each
-  beat it returns the distinct arriving states (deduplicated by what can
-  matter there, using `relevantState`), each with a sample path. Path
-  Analysis, Story Logic and the presets then share one simulation. Today
-  `PathVisualization` simulates twice, and the presets simulate once per beat.
-- **Hubs by state, not by link count.** A beat counts as a hub when it is
-  reached in *different* states, not just from more than one beat. The hub
-  cards show what differs ("arrives with or without the notebook; Tomas's
-  trust 0.2 to 0.8"). Today they only look at the previous beat's own
-  effects (`LogicValidationReport.buildHubAnalysis`).
-- **The keyword check uses the states.** "With the evidence you gathered" is
-  flagged only when some arriving state lacks evidence-like items or
-  variables. Fewer false alarms.
-- **Gate on a configured provider.** `useAIFeatures()` only reads the "Show
-  AI features" preference. The button needs a provider that is actually set
-  up.
-- Done 2026-10-31 (unreleased): the Debug window now receives characters,
-  settings and the feelings model. Before, it simulated stories without them.
+- **Arrival states in one pass.** Core `analysis/arrivalStates.ts`:
+  `arrivalStates(paths)` gives each beat its distinct arriving states, each
+  with a sample path and a count. Path Analysis and Story Logic share one
+  simulation (`services/storySimulation.ts`); the presets keep one per story.
+  Presets still condense by `relevantState` themselves.
+- **Hubs by state, not by link count.** A hub is a beat the way taken reaches
+  in different states: paths that started alike arrive differently
+  (`arrivesDifferently`). Differences the story starts with (a variant drawn
+  at random) don't count. The cards say what differs
+  (`describeArrivalDifferences`: "with or without notebook", "Tomas's trust →
+  player 0 to 0.9", "@confidant: Ingrid / Tomas").
+- **The keyword check uses the states** (`stateMentions`): flagged only when
+  some arriving state holds nothing named like what the text assumes.
+- **Gate on a configured provider** moves to Phase 1, with the button. The
+  tab's old "configure an AI provider" notice is gone.
+- Done before: the Debug window receives characters, settings and the
+  feelings model.
 
 ### Phase 1: Check with AI (beats reached in different states)
 
