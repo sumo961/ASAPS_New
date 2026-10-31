@@ -117,6 +117,14 @@ describe('applyGeneratedStory', () => {
     expect(deps.loaded[0].beats[0].adopted).toMatchObject({ timeDisplayMode: 'none' });
   });
 
+  it("keeps a beat's own look written beside its parameters (as a beat saves it)", async () => {
+    const deps = makeDeps();
+    const s = story();
+    (s.beats[0] as any).look = { stageColor: '#000' };
+    await applyGeneratedStory(s, deps, { fallbackTitle: 'x' });
+    expect(deps.loaded[0].beats[0].adopted).toMatchObject({ look: { stageColor: '#000' } });
+  });
+
   it('flattens nested conditionBeat params and extracts true/false targets', async () => {
     const deps = makeDeps();
     await applyGeneratedStory(story(), deps, { fallbackTitle: 'x' });

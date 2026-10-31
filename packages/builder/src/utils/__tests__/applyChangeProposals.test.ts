@@ -38,6 +38,43 @@ describe('applyChangeProposals', () => {
     expect(results[0].detail).toMatch(/speaker name hidden/);
   });
 
+  it("updateParams patches the beat's own look (This beat's look): named fields change, the rest stay", () => {
+    const c = ctx([{ id: 'b1', name: 'Alarm', type: 'infoText',
+      look: { textColor: '#ffffff', textBox: { opacity: 50, borderRadius: 4 } } }]);
+    const results = applyChangeProposals([{ kind: 'updateParams', beatId: 'b1', params: {
+      look: { stageColor: '#1a0505', textBox: { backgroundColor: '#7f1d1d', opacity: 90, borderRadius: null } },
+      textBoxBorder: 'hide',
+    } }], c);
+    expect(c.updateBeat).toHaveBeenCalledWith('b1', {
+      look: { textColor: '#ffffff', stageColor: '#1a0505', textBox: { opacity: 90, backgroundColor: '#7f1d1d' } },
+      textBoxBorder: 'hide',
+    });
+    expect(results[0]).toMatchObject({ ok: true });
+    expect(results[0].detail).toMatch(/this beat's look/);
+  });
+
+  it("look: null gives the beat the project's look again", () => {
+    const c = ctx([{ id: 'b1', name: 'Alarm', type: 'infoText', look: { textColor: '#fff' } }]);
+    applyChangeProposals([{ kind: 'updateParams', beatId: 'b1', params: { look: null } }], c);
+    expect(c.updateBeat).toHaveBeenCalledWith('b1', { look: undefined });
+  });
+
+  it('refuses a look field that does not exist or a value out of range, with the reason', () => {
+    const c = ctx([{ id: 'b1', name: 'Alarm', type: 'infoText' }]);
+    const r = applyChangeProposals([
+      { kind: 'updateParams', beatId: 'b1', params: { look: { textBox: { glow: 3 } } } },
+      { kind: 'updateParams', beatId: 'b1', params: { look: { textBox: { opacity: 140 } } } },
+      { kind: 'updateParams', beatId: 'b1', params: { look: { textBox: { framePicture: 'on' } } } },
+      { kind: 'updateParams', beatId: 'b1', params: { textBoxBorder: 'thick' } },
+    ], c);
+    expect(c.updateBeat).not.toHaveBeenCalled();
+    expect(r.map((x) => x.ok)).toEqual([false, false, false, false]);
+    expect(r[0].detail).toMatch(/look\.textBox\.glow is not a look field/);
+    expect(r[1].detail).toMatch(/0–100/);
+    expect(r[2].detail).toMatch(/"off"/);
+    expect(r[3].detail).toMatch(/textBoxBorder/);
+  });
+
   it('reports missing beats without applying', () => {
     const c = ctx([]);
     const results = applyChangeProposals(

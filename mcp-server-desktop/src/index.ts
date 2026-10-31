@@ -649,7 +649,14 @@ const injectStoryTool: Tool = {
             name: { type: 'string', description: 'Display name in editor' },
             parameters: {
               type: 'object',
-              description: 'Beat-specific parameters (varies by type)',
+              description: 'Beat-specific parameters (varies by type). Any visible beat may also carry, rarely, ' +
+                '"look": its own look over the theme, for a scene that must feel different (a dream in pale colours, a letter in a ' +
+                'handwriting font, an alarm in red) — every field optional: stageColor, textColor (CSS colours); textBox { backgroundColor, ' +
+                'opacity (0-100), borderColor, borderWidth, borderRadius, padding (px), visibility: "all" | "hideText" | "hideAll", ' +
+                'framePicture: "off" (a plain box where the theme draws the text box with a picture) }; button { backgroundColor, textColor, ' +
+                'borderColor, borderRadius }; fonts { titleFont, textFont, buttonFont (font names), titleFontSize, textFontSize, ' +
+                'buttonFontSize (px) }. Set only the fields that change; most beats have none. "textBoxBorder": "show" | "hide" ' +
+                'draws or hides this beat\'s text-box border.',
             },
             x: { type: 'number', description: 'X position in editor (use ~300px spacing)' },
             y: { type: 'number', description: 'Y position in editor (use ~200px spacing)' },

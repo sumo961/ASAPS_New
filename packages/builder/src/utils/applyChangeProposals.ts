@@ -15,6 +15,8 @@ import { setSiteField, labelFieldOf, addOption, listWiringSites } from './choice
 import { redirectIncoming, retargetValue } from './redirectIncoming';
 import { beatLinks } from './storyLinks';
 import { beatParameterProblem, beatConnectionType } from './beatTypeReference';
+import { beatLookPatchProblem, applyBeatLookPatch } from './beatLookPatch';
+import type { BeatLook } from '@asaps/core';
 
 type Link = { targetId: string; label?: string; effects?: unknown[] };
 
@@ -110,6 +112,8 @@ export interface ApplyContext {
     name?: string;
     requires?: Array<Record<string, unknown>>;
     requiresMode?: 'all' | 'any';
+    look?: BeatLook;
+    textBoxBorder?: 'show' | 'hide';
     connections?: Array<Record<string, unknown>>;
     defaultTarget?: string;
     toJSON?: () => Record<string, any>;
@@ -178,7 +182,21 @@ export function applyChangeProposals(
           // the speaker's NAME is drawn. "Link, don't label" — a line that
           // mixes narration and speech keeps its linked character but hides
           // the label.
-          const { showSpeaker, ...schemaParams } = p.params as Record<string, any>;
+          // look (this beat's own look over the project's, a patch) and
+          // textBoxBorder are beat-level too — what the Visual Editor's
+          // "This beat's look" sets.
+          const { showSpeaker, look, textBoxBorder, ...schemaParams } = p.params as Record<string, any>;
+          const hasLook = 'look' in (p.params as Record<string, any>);
+          const lookProblem = hasLook ? beatLookPatchProblem(look) : null;
+          if (lookProblem) {
+            results.push({ index, ok: false, detail: `${beat.name || p.beatId}: ${lookProblem}` });
+            return;
+          }
+          const hasBorder = 'textBoxBorder' in (p.params as Record<string, any>);
+          if (hasBorder && textBoxBorder !== null && textBoxBorder !== 'show' && textBoxBorder !== 'hide') {
+            results.push({ index, ok: false, detail: `${beat.name || p.beatId}: textBoxBorder must be "show", "hide" or null (the theme's)` });
+            return;
+          }
           const paramProblem = beat.type ? beatParameterProblem(beat.type, schemaParams, false) : null;
           if (paramProblem) {
             results.push({ index, ok: false, detail: paramProblem });
@@ -193,6 +211,8 @@ export function applyChangeProposals(
           const updates: Record<string, unknown> = {};
           if (Object.keys(params).length) updates.parameters = params;
           if (typeof showSpeaker === 'boolean') updates.showSpeaker = showSpeaker;
+          if (hasLook) updates.look = applyBeatLookPatch(beat.look, look);
+          if (hasBorder) updates.textBoxBorder = textBoxBorder ?? undefined;
           // The link REPLACES the beat's exits: a single-exit beat with two
           // links follows the first, which is how stray old links bypass
           // new ones.
@@ -200,6 +220,8 @@ export function applyChangeProposals(
           ctx.updateBeat(p.beatId, updates);
           const parts = Object.keys(params);
           if (typeof showSpeaker === 'boolean') parts.push(showSpeaker ? 'speaker name shown' : 'speaker name hidden');
+          if (hasLook) parts.push(updates.look ? "this beat's look" : "the project's look again");
+          if (hasBorder) parts.push(textBoxBorder ? `text box border: ${textBoxBorder}` : "the theme's text box border");
           if (split) parts.push(split.links.length ? `exit → ${split.links[0].targetId} (replaces its previous exit)` : 'exit removed');
           results.push({ index, ok: true, detail: `Updated ${parts.join(', ')} on ${beat.name || p.beatId}` });
           return;

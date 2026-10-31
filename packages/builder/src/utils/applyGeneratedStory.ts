@@ -403,6 +403,11 @@ export async function applyGeneratedStory(
       // are read only by the constructor; updateParameters drops them.
       beat.adoptBaseParameters(params);
     }
+    // A beat's own look may also come beside its parameters (as the beat
+    // saves it); adoptBaseParameters checks the values.
+    if (beatData.look || beatData.textBoxBorder) {
+      beat.adoptBaseParameters({ look: beatData.look, textBoxBorder: beatData.textBoxBorder });
+    }
     return beat;
   });
   if (unknownBeatTypes.length) {

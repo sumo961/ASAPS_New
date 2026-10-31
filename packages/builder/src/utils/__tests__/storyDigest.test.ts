@@ -173,4 +173,13 @@ describe('digest reports enough to preserve a counter', () => {
     expect(digest).toContain('    checks: lacks key OR metBefore == true');
     expect(digest).toContain('metBefore');
   });
+
+  it("shows a beat's own look, so a look patch builds on it", () => {
+    const digest = buildStoryDigest({
+      title: 'T',
+      beats: [beat({ look: { stageColor: '#000', textBox: { framePicture: 'off' } }, textBoxBorder: 'hide' }), beat({ id: 'b2' })],
+    } as any);
+    expect(digest).toContain('    look: {"stageColor":"#000","textBox":{"framePicture":"off"}}; textBoxBorder: hide');
+    expect(digest.match(/look:/g)).toHaveLength(1);
+  });
 });

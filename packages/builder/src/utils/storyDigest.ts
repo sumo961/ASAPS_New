@@ -10,6 +10,8 @@
 
 import { listWiringSites } from './choiceWiring';
 import { describeEffect, describeCondition } from './wiringVocabulary';
+import { describeBeatLook } from './beatLookPatch';
+import type { BeatLook } from '@asaps/core';
 
 export interface DigestBeat {
   id: string;
@@ -23,6 +25,9 @@ export interface DigestBeat {
   /** Entry gate (top-level beat field, not a parameter). */
   requires?: Array<{ condition?: Record<string, unknown>; fallbackTarget?: string }>;
   requiresMode?: 'all' | 'any';
+  /** This beat's own look over the project's (top-level beat fields). */
+  look?: BeatLook;
+  textBoxBorder?: string;
 }
 
 export interface DigestCharacter {
@@ -163,6 +168,12 @@ const SITE_WORD: Record<string, string> = {
  * Dialog nodes are listed only when they carry wiring of their own; every
  * dialog choice is listed so it can be addressed.
  */
+/** The beat's own look, when it has one (so a look patch builds on it). */
+function lookLine(beat: DigestBeat): string {
+  const look = describeBeatLook(beat.look, beat.textBoxBorder);
+  return look ? `\n    look: ${look}` : '';
+}
+
 function wiringLines(beat: DigestBeat): string[] {
   const out: string[] = [];
   const req = Array.isArray(beat.requires) ? beat.requires : [];
@@ -320,7 +331,8 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
       beatLines.push(
         `- ${beat.id} [${beat.type}]${beat.name ? ` "${beat.name}"` : ''}${cluster}` +
         `${snippet ? ` — ${snippet}` : ''}${connectionLines(beat)}` +
-        wiringLines(beat).map((l) => `\n${l}`).join('')
+        wiringLines(beat).map((l) => `\n${l}`).join('') +
+        lookLine(beat)
       );
     } catch {
       beatLines.push(`- ${beat.id} [${beat.type}]`);

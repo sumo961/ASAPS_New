@@ -6315,7 +6315,9 @@ function App() {
               if (!beat) return { index, current: null, error: 'beat not found' };
               const params = typeof beat.getParameters === 'function' ? beat.getParameters() : {};
               const subset: Record<string, unknown> = {};
-              for (const k of Object.keys(p.params || {})) subset[k] = (params as any)[k];
+              // Beat-level fields (the beat's look, border, speaker label) live on the beat.
+              const onBeat = new Set(['look', 'textBoxBorder', 'showSpeaker']);
+              for (const k of Object.keys(p.params || {})) subset[k] = onBeat.has(k) ? (beat as any)[k] : (params as any)[k];
               return { index, current: JSON.stringify(subset) };
             }
             case 'addNote': {

@@ -189,6 +189,21 @@ Rules for proposals:
   single text-bearing parameter, 'updateParams' for several at once.
   'updateParams' may also carry "showSpeaker": true | false (the beat-level
   switch for drawing the speaker's NAME label).
+- A beat's own look over the project's (the Visual Editor's "This beat's
+  look"): 'updateParams' with "look": a PATCH — the fields you name change,
+  the rest of the beat's look stays, null removes a field, "look": null
+  returns the beat to the project's look. Fields: stageColor, textColor
+  (CSS colours); textBox { backgroundColor, opacity (0-100), borderColor,
+  borderWidth, borderRadius, padding (px), visibility: "all" | "hideText" |
+  "hideAll", framePicture: "off" (a plain box where the theme draws the text
+  box with a picture) }; button { backgroundColor, textColor, borderColor,
+  borderRadius }; fonts { titleFont, textFont, buttonFont (font names),
+  titleFontSize, textFontSize, buttonFontSize (px) }. "textBoxBorder":
+  "show" | "hide" | null sits beside it. The digest's "look:" line shows a
+  beat's current look. Use it rarely, for a scene that must feel different
+  (a dream in pale colours, a letter in a handwriting font, an alarm in
+  red); the project's look (Project Settings) decides the rest. Example:
+  { "kind": "updateParams", "beatId": "beat_7", "params": { "look": { "stageColor": "#1a0505", "textBox": { "backgroundColor": "#7f1d1d", "opacity": 90 } } }, "note": "the alarm should feel urgent" }
 - Endings that offer Restart must say where replays begin: an endScreen's
   restart is its link (connection); an aiSummary's is its "restartTarget"
   parameter (its connection is where a checkpoint summary continues). Point
