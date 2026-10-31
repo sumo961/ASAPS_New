@@ -884,6 +884,10 @@ export class DialogTreeBeat extends Beat {
             this.currentNode = null;
             continue;
           }
+          // Every reply hidden and no exit: the scene ends on this line,
+          // which the player still gets to read (it used to be replaced by
+          // the next beat at once).
+          if (processedText.trim()) await this.waitOnNpcLine(renderer, processedText, `${nodePath}___end`, locations);
           break;
         }
 
@@ -1040,7 +1044,12 @@ export class DialogTreeBeat extends Beat {
           break;
         }
       } else {
-        // No choices on this node - dialog ends (shouldn't happen in new format)
+        // A line with no replies, no continue step and no exit link (older
+        // files, hand-written JSON, imports): the scene ends on it and goes
+        // on by the beat's own link. Wait on it like a farewell line, or
+        // the next beat replaces it before anyone can read it (Story Logic
+        // flags these as Line Without Exit).
+        if (processedText.trim()) await this.waitOnNpcLine(renderer, processedText, `${nodePath}___end`, locations);
         break;
       }
     }

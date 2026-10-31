@@ -3,12 +3,18 @@
 ## Unreleased (since v0.9.153, 2026-10-31)
 
 ### Overview
-Open-questions pass after v0.9.153. Fixed: the constraint path analyzer ignored every Set Variable beat made in the editor.
+Open-questions pass after v0.9.153. A Dialog Tree line with no replies and no exit link is now shown (with Continue) before the scene ends; players never got to read it. Fixed: the constraint path analyzer ignored every Set Variable beat made in the editor. The stray draft release "vrefs/heads/main" was deleted from GitHub.
+
+### A line without exit is shown before the scene ends (Hartmut: "show it, then go on")
+- A Dialog Tree line with no replies, no continue step and no exit link (older files, hand-written JSON, imports; Story Logic's **Line Without Exit**) was drawn and replaced by the next beat at once — `DialogTreeBeat` left its loop without waiting, so players never read it. The guide and the warning said only that the scene "goes on by the beat's own link"; the tab's About box said players never read it. Now the line waits like a farewell line (`waitOnNpcLine`: a Continue button, or the reading timer where lines move on by themselves), then the scene goes on by the beat's link, or the story stops if there is none. The same when every reply is hidden by its conditions and the line has no exit. A line with no text still moves on at once.
+- The warning reads "the scene ends on it (after Continue) and goes on by the beat's own link to …"; the About box says players read it and click Continue. Path analysis is unchanged (the way on is the same).
+- Checked headless on QA fixed boxes (a test Dialog Tree added through the Co-Designer's apply message, undone afterwards): the line stays on screen with its Continue until clicked, then The End; a line with an exit link draws the same. Tests: DialogTreeBeat (the old "empty choices end at once" test now expects the Continue; + all replies hidden).
+- User Guide at release: Story Logic's Line Without Exit — players read the line and click Continue, then the scene goes on by the beat's own link (or the story stops).
 
 ### Fix: the constraint analyzer ignored Set Variable beats
 - `ConstraintPathAnalyzer.applyBeatEffects` read a Set Variable beat's variable as `params.variableName || params.variable`; the beat stores it as `name` (SetVariableBeat), so the analyzer never saw the variable set and could report a Condition Check's branch on it as reachable or not by the starting value. Now `name` first, the older spellings after. Test in `ConstraintPathAnalyzer.test.ts` (fails before the fix).
 
-**Files modified:** packages/core/src/analysis/ConstraintPathAnalyzer.ts, tests/analysis/ConstraintPathAnalyzer.test.ts
+**Files modified:** packages/core/src/beats/DialogTreeBeat.ts, tests/beats/DialogTreeBeat.test.ts, packages/core/src/analysis/ConstraintPathAnalyzer.ts, tests/analysis/ConstraintPathAnalyzer.test.ts; packages/builder/src/utils/storyLogicValidator.ts (+ test), components/debug/LogicValidationReport.tsx
 
 ---
 

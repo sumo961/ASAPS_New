@@ -186,7 +186,7 @@ describe('Dialog Tree lines nothing follows', () => {
     const lines = findDialogLinesWithoutExit([tree({}), reflection]);
     expect(lines).toEqual([expect.objectContaining({ beatId: 'wisdom', nodeId: 'n1', fallbackTo: 'Reflection' })]);
     const issue = validateStoryLogic({ beats: [tree({}), reflection] }).issues.find((i) => i.category === 'dialog_line_without_exit');
-    expect(issue?.message).toBe('In "Heart to Heart", the line "Be brave enough to be yourself." has no replies and no exit link: the scene ends there and goes on by the beat\'s own link to "Reflection".');
+    expect(issue?.message).toBe('In "Heart to Heart", the line "Be brave enough to be yourself." has no replies and no exit link: the scene ends on it (after Continue) and goes on by the beat\'s own link to "Reflection".');
   });
 
   it('says so when the beat has no link either', () => {

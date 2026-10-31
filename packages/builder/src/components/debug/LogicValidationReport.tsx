@@ -396,7 +396,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
           <li><strong>Hub State Assumption:</strong> Text that assumes the player has something (a key, the evidence) where some of the states players arrive in hold nothing by that name</li>
           <li><strong>Undescribed Item:</strong> Items picked up via pickProp should be described in the following beat (what does the letter say? what does the photo show?)</li>
           <li><strong>Ungated State Reference:</strong> Text that assumes something no way in holds by that name (or, for a beat Path Analysis never reaches, that no condition checks first)</li>
-          <li><strong>Line Without Exit:</strong> A Dialog Tree line with no replies and no exit link ends the scene the moment it appears, so players never read it: give it an exit link or replies</li>
+          <li><strong>Line Without Exit:</strong> A Dialog Tree line with no replies and no exit link ends the scene: players read it, click Continue, and the story goes on by the beat's own link (or stops, if the beat has none). Give it an exit link or replies so the scene says where it goes</li>
         </ul>
       </div>
     </div>

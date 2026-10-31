@@ -269,7 +269,7 @@ describe('DialogTreeBeat', () => {
       expect(mockRenderer.getDialogCalls()[1].text).toBe('Excellent choice! That will be 100 gold.');
     });
 
-    it('should handle empty choices array gracefully', async () => {
+    it('a line with no replies is shown with Continue before the scene ends (Line Without Exit)', async () => {
       const beat = new DialogTreeBeat({
         id: 'dialog_empty',
         name: 'Empty Choices Dialog',
@@ -282,13 +282,34 @@ describe('DialogTreeBeat', () => {
         }
       });
 
+      mockRenderer.queueChoice('root___end');
       const result = await beat.execute(context, mockRenderer.renderer);
 
-      // Should render dialog once, then exit (no choices)
+      // The line is drawn and waits on a Continue button (it used to be
+      // replaced by the next beat at once, so nobody could read it).
       expect(mockRenderer.getDialogCalls().length).toBe(1);
-      expect(mockRenderer.getChoicesCalls().length).toBe(0);
-      // Result should be null (no target specified)
+      expect(mockRenderer.getChoicesCalls()).toHaveLength(1);
+      expect(mockRenderer.getChoicesCalls()[0].choices).toEqual([expect.objectContaining({ isContinue: true })]);
+      // Then the scene ends by the beat's own link (none here)
       expect(result).toBeNull();
+    });
+
+    it('a line whose replies are all hidden waits on Continue before the scene ends', async () => {
+      const beat = new DialogTreeBeat({
+        id: 'dialog_hidden',
+        name: 'Hidden Replies',
+        type: 'dialogTree',
+        dialogTree: {
+          id: 'root',
+          speaker: 'Guard',
+          text: 'Nothing for you here.',
+          choices: [{ id: 'c1', text: 'Show the pass', target: 'gate', conditions: [{ type: 'variable', variableName: 'hasPass', operator: '==', value: true }] }],
+        },
+      });
+      mockRenderer.queueChoice('root___end');
+      await beat.execute(context, mockRenderer.renderer);
+      expect(mockRenderer.getChoicesCalls()).toHaveLength(1);
+      expect(mockRenderer.getChoicesCalls()[0].choices).toEqual([expect.objectContaining({ isContinue: true })]);
     });
 
     it('should filter out choices with visible=false', async () => {

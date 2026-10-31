@@ -359,8 +359,8 @@ function lineSnippet(text: string): string {
 /** Author sentence for a line nothing follows (Story Logic and the import banner). */
 export function describeLineWithoutExit(l: LineWithoutExit): string {
   const where = l.fallbackTo
-    ? `the scene ends there and goes on by the beat's own link to "${l.fallbackTo}"`
-    : `the scene ends there, and the beat has no link, so the story stops`;
+    ? `the scene ends on it (after Continue) and goes on by the beat's own link to "${l.fallbackTo}"`
+    : `the scene ends on it, and the beat has no link, so the story stops there`;
   return `In "${l.beatName || l.beatId}", the line "${lineSnippet(l.text)}" has no replies and no exit link: ${where}.`;
 }
 
