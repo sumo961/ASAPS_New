@@ -5221,10 +5221,11 @@ function App() {
       const storyData = getSerializedStoryData();
       debugWindowManager.sendStoryUpdate(
         storyData as unknown as import('./services/PreviewWindowManager').SerializedStoryData,
+        { settings: globalSettings, characters, emotionPalette, traitModulations },
       );
     }, 300);
     return () => clearTimeout(timeout);
-  }, [showDebugPanel, state.beats, state.connections, getSerializedStoryData]);
+  }, [showDebugPanel, state.beats, state.connections, getSerializedStoryData, globalSettings, characters, emotionPalette, traitModulations]);
 
   // Asset and character handlers
   const handleAssetSelect = useCallback((type: 'background' | 'character' | 'prop' | 'sound', callback: (asset: Asset) => void) => {
@@ -6625,9 +6626,9 @@ function App() {
    */
   const handleOpenDebugPanel = useCallback(() => {
     const storyData = getSerializedStoryData() as unknown as import('./services/PreviewWindowManager').SerializedStoryData;
-    debugWindowManager.open(storyData);
+    debugWindowManager.open(storyData, { settings: globalSettings, characters, emotionPalette, traitModulations });
     setShowDebugPanel(true); // kept for backwards-compatible state tracking
-  }, [getSerializedStoryData]);
+  }, [getSerializedStoryData, globalSettings, characters, emotionPalette, traitModulations]);
   openDebugPanelRef.current = handleOpenDebugPanel;
 
   /**

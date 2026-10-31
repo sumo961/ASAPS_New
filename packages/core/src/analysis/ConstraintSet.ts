@@ -62,12 +62,20 @@ export interface PathVariation {
 }
 
 /**
+ * How a path ends: at an End Screen or AI Summary ('ending'), with no way on
+ * ('deadEnd'), back where it has already been with nothing new to find
+ * ('cycle'), or cut off because it grew longer than the analysis follows
+ * ('depthLimit' — not a fault in the story).
+ */
+export type PathEndType = 'ending' | 'deadEnd' | 'cycle' | 'depthLimit';
+
+/**
  * Represents an outcome group - paths that end at the same beat
  */
 export interface OutcomeGroup {
   endingBeatId: string;
   endingBeatName: string;
-  endType: 'ending' | 'deadEnd' | 'cycle';
+  endType: PathEndType;
 
   // Different constraint sets that can lead to this ending (disjunction)
   constraintSets: ConstraintSet[];

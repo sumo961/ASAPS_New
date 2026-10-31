@@ -661,7 +661,7 @@ const TreeNodeView: React.FC<TreeNodeViewProps> = ({
         )}
 
         {/* Type icon */}
-        <NodeTypeIcon type={node.type} />
+        <NodeTypeIcon type={node.type} endType={node.endType} />
 
         {/* Beat summary */}
         <span className="text-gray-800 truncate" title={node.beats.map(b => b.beatName).join(' → ')}>
@@ -689,7 +689,24 @@ const TreeNodeView: React.FC<TreeNodeViewProps> = ({
             Ending
           </span>
         )}
-        {node.type === 'deadEnd' && (
+        {/* Terminal nodes other than endings: say how the path stopped. */}
+        {(node.type === 'deadEnd' || node.type === 'hub') && node.endType === 'cycle' && (
+          <span
+            className="px-1.5 py-0.5 text-xs rounded bg-purple-100 text-purple-700 flex-shrink-0"
+            title="Every way on comes back round with nothing new to find, e.g. a hub where every choice was already tried and none leads further."
+          >
+            Cycle
+          </span>
+        )}
+        {node.type === 'deadEnd' && node.endType === 'depthLimit' && (
+          <span
+            className="px-1.5 py-0.5 text-xs rounded bg-orange-100 text-orange-700 flex-shrink-0"
+            title="The analysis stopped following this path because it grew very long. It is not a fault in the story."
+          >
+            Depth Limit
+          </span>
+        )}
+        {node.type === 'deadEnd' && node.endType !== 'cycle' && node.endType !== 'depthLimit' && (
           <span className="px-1.5 py-0.5 text-xs rounded bg-red-100 text-red-600 flex-shrink-0">
             Dead End
           </span>
@@ -1375,7 +1392,9 @@ const VisitCard: React.FC<VisitCardProps> = ({
 // NodeTypeIcon
 // ============================================================================
 
-const NodeTypeIcon: React.FC<{ type: PathTreeNode['type'] }> = ({ type }) => {
+const NodeTypeIcon: React.FC<{ type: PathTreeNode['type']; endType?: PathTreeNode['endType'] }> = ({ type, endType }) => {
+  if (type === 'deadEnd' && endType === 'cycle') return <RotateCw className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />;
+  if (type === 'deadEnd' && endType === 'depthLimit') return <AlertTriangle className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />;
   switch (type) {
     case 'hub':
       return <Layers className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />;

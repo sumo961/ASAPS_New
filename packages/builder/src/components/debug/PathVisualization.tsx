@@ -209,7 +209,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
       case 'cycle':
         return <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Cycle</span>;
       case 'depthLimit':
-        return <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Depth Limit</span>;
+        return <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full" title="The analysis stopped following this path because it grew very long. It is not a fault in the story.">Depth Limit</span>;
       default:
         return null;
     }
@@ -266,6 +266,8 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
                       ? 'bg-green-500 text-white'
                       : isLast && endType === 'cycle'
                       ? 'bg-purple-500 text-white'
+                      : isLast && endType === 'depthLimit'
+                      ? 'bg-orange-400 text-white'
                       : 'bg-gray-300 text-gray-700'
                   }`}>
                     {stepIndex + 1}
@@ -362,7 +364,8 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
             const endingCount = analysisResult.outcomes.filter((o: any) => o.endType === 'ending').length;
             const cycleCount = analysisResult.outcomes.filter((o: any) => o.endType === 'cycle').length;
             const deadEndCount = analysisResult.outcomes.filter((o: any) => o.endType === 'deadEnd').length;
-            const hasNonEnding = cycleCount > 0 || deadEndCount > 0;
+            const depthLimitCount = analysisResult.outcomes.filter((o: any) => o.endType === 'depthLimit').length;
+            const hasNonEnding = cycleCount > 0 || deadEndCount > 0 || depthLimitCount > 0;
             return (
             <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
               <div className="grid grid-cols-4 gap-3 mb-3">
@@ -372,10 +375,11 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
                     {analysisResult.outcomes.length}
                   </div>
                   {hasNonEnding && (
-                    <div className="text-[10px] text-blue-600 mt-0.5 leading-tight" title="Cycles and dead ends are simulator terminations — the BFS gave up on loops or missing exits. Only 'endings' are narrative outcomes (endScreen/aiSummary).">
+                    <div className="text-[10px] text-blue-600 mt-0.5 leading-tight" title="Only endings (End Screen, AI Summary) finish the story. A cycle comes back round with nothing new to find, a dead end has no way on, and a depth limit is a path the analysis stopped following because it grew very long.">
                       {endingCount} ending{endingCount !== 1 ? 's' : ''}
                       {cycleCount > 0 && ` + ${cycleCount} cycle${cycleCount !== 1 ? 's' : ''}`}
                       {deadEndCount > 0 && ` + ${deadEndCount} dead end${deadEndCount !== 1 ? 's' : ''}`}
+                      {depthLimitCount > 0 && ` + ${depthLimitCount} at the depth limit`}
                     </div>
                   )}
                 </div>

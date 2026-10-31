@@ -18,9 +18,23 @@ export interface DebugMessage {
     | 'CLEAR_HIGHLIGHT';
   payload?: {
     storyData?: SerializedStoryData;
+    context?: DebugStoryContext;
     beatIds?: string[];
     beatId?: string;
   };
+}
+
+/**
+ * What the analyzers need besides the beats: characters (their counters,
+ * starting items, variants), the project settings (variable defaults, roles,
+ * the item list) and the feelings model. Without them the Debug window
+ * simulated a story with no characters and no variable defaults.
+ */
+export interface DebugStoryContext {
+  settings?: Record<string, any>;
+  characters?: any[];
+  emotionPalette?: any[];
+  traitModulations?: any;
 }
 
 export interface DebugWindowState {
@@ -40,6 +54,7 @@ class DebugWindowManager {
   private highlightListeners = new Set<(evt: HighlightCallback) => void>();
   /** Most recent story data — re-sent whenever the debug window reports ready. */
   private latestStoryData: SerializedStoryData | null = null;
+  private latestContext: DebugStoryContext | undefined;
   private isElectron: boolean = false;
   /** Set by the Electron `debug:ready` listener; gates whether
    *  `sendStoryUpdate` fires over IPC immediately vs. waits. */
@@ -102,8 +117,9 @@ class DebugWindowManager {
    * Open the debug window (or focus it if already open) and push the latest
    * story data to it.
    */
-  open(storyData: SerializedStoryData): boolean {
+  open(storyData: SerializedStoryData, context?: DebugStoryContext): boolean {
     this.latestStoryData = storyData;
+    this.latestContext = context;
 
     if (this.isElectron) {
       const api = (window as any).electronAPI;
@@ -122,7 +138,7 @@ class DebugWindowManager {
 
     if (this.isWindowOpen()) {
       this.debugWindow?.focus();
-      this.sendStoryUpdate(storyData);
+      this.sendStoryUpdate(storyData, context);
       return true;
     }
 
@@ -170,9 +186,10 @@ class DebugWindowManager {
    * Push an updated story to the debug window. Called from App.tsx whenever
    * the authored story changes so the analyzers stay in sync.
    */
-  sendStoryUpdate(storyData: SerializedStoryData): void {
+  sendStoryUpdate(storyData: SerializedStoryData, context: DebugStoryContext | undefined = this.latestContext): void {
     this.latestStoryData = storyData;
-    const message: DebugMessage = { type: 'STORY_UPDATE', payload: { storyData } };
+    this.latestContext = context;
+    const message: DebugMessage = { type: 'STORY_UPDATE', payload: { storyData, context } };
     if (this.isElectron) {
       if (!this.electronWindowOpen) return;
       try {

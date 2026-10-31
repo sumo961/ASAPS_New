@@ -23,6 +23,7 @@ export type {
 export type {
   ConstraintSet,
   OutcomeGroup,
+  PathEndType,
   PathStep,
   PathVariation,
   ConstraintPathResult,

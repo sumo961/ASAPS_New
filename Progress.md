@@ -1,5 +1,27 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.150, 2026-10-31)
+
+### Overview
+Path Analysis follow-ups from the v0.9.150 release audit: a path the analysis stops following is labelled **Depth Limit**, not Dead End; the Tree view shows **Cycle**; the Tree view names what each choice does (feelings and casting included) and spells out feelings conditions. The Debug window now gets the story's characters, settings and feelings model; it used to simulate stories without them. New CLAUDE.md rule: changes to how a story plays update the debug tools in the same change. A plan for AI-assisted Story Logic.
+
+### Path Analysis
+- **Depth Limit.** A path longer than the analysis follows (300 beats in the Debug window) ended as a red *Dead End*; the simulator now ends it as `depthLimit`, which the Forward view shows with its orange **Depth Limit** badge (with a tooltip saying it's no fault in the story) and counts on the Outcomes card. Outcomes are grouped by how *and* where a path ends, so a cut-off path no longer joins a dead end on the same beat. One type for all of it: `PathEndType` in `analysis/ConstraintSet.ts`.
+- **Cycle in the Tree view.** The tree folds a loop into a hub; a hub with no way out where every path only comes back round now ends as a cycle (`endType: 'cycle'`) and shows a purple **Cycle** badge; a terminal node that ended as a cycle or at the depth limit shows its own badge and icon instead of *Dead End*.
+- **What a choice does.** The Tree view's choice rows said *no effect* for choices that only change feelings or variables, and showed nothing for lost items. They now list variable changes (`brave = true`), items lost (`−lantern`), feelings (`Tomas trust → player +0.3`) and casting (`@confidant = Ingrid`), with characters by their display names.
+- **Feelings conditions** read as words in the tree (`@confidant trust → player >= 0.5`, mood, emotion, goal); a sentiment check showed "sentiment: undefined >= 0.5".
+- **The Debug window gets the whole story.** It rebuilt the story from its beats only: no characters (counters, starting items, variants, roles), no project settings (variable defaults, the item list) and no feelings model, so its Path Analysis, Reachability and Story Logic didn't see what v0.9.150 taught them. `DebugWindowManager` now sends a `DebugStoryContext` with the beats, and `DebugWindow` sets it on the story as the Preview does (clusters too); the builder re-sends when characters or settings change.
+- Checked headless on The Last Ferry: the Debug window's tree shows each choice's casting and trust changes and the trust check as `@confidant trust → player >= 0.5`; Forward shows both endings. Suites: core 3070 (+2 analysis tests since), builder 3126.
+- User Guide (at release): replace "A very long path that the analysis stops following is marked this way too" with the Depth Limit label; mention Cycle in Tree mode.
+
+### Process
+- **CLAUDE.md: "Debug tools learn new features in the same change"**: which files encode how the engine plays a story (links, simulation, report labels, Story Logic gates, what the Debug window and presets are given, the guide) and the tripwires that hold them.
+- **Plan: AI-assisted Story Logic** (`docs/AI-Story-Logic-Plan.md`): groundwork without AI (arriving states per beat from one simulation, hubs by state, keyword checks that look at the states), then *Check with AI* on beats reached in different states, grounded in those states, findings checked before shown, fixes only through the existing propose-a-fix review; later whole-path threads. Five decisions listed.
+
+**Files modified:** CLAUDE.md, docs/AI-Story-Logic-Plan.md (new), packages/core/src/analysis/ConstraintSet.ts, analysis/StateSimulationAnalyzer.ts, analysis/PathTree.ts, analysis/ConstraintPathAnalyzer.ts, analysis/index.ts, tests/analysis/StateSimulationCoverage.test.ts; packages/builder/src/components/debug/PathTreeView.tsx, components/debug/PathVisualization.tsx, pages/DebugWindow.tsx, services/DebugWindowManager.ts, App.tsx
+
+---
+
 ## 2026-10-31: The path-analysis release (v0.9.150)
 
 ### Overview

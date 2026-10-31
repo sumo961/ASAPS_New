@@ -26,6 +26,7 @@ import {
   OutcomeGroup,
   ConstraintPathResult,
   createEmptyConstraintSet,
+  type PathEndType,
 } from './ConstraintSet';
 import type { BackwardAnalysisResult, PathRequirement, DecisionPoint } from './BackwardAnalyzer';
 import { isMultiChoiceLike } from '../beats/MultiChoiceBeat';
@@ -87,7 +88,7 @@ export interface SimulatedPath {
   outcome: {
     beatId: string;
     beatName: string;
-    type: 'ending' | 'deadEnd' | 'cycle';
+    type: PathEndType;
   };
   finalState: SimulationState;
 }
@@ -675,7 +676,7 @@ export class StateSimulationAnalyzer {
 
       // Check depth limit
       if (frame.path.length >= this.config.maxDepth) {
-        paths.push(this.buildPath(frame.path, frame.decisions, frame.state, 'deadEnd'));
+        paths.push(this.buildPath(frame.path, frame.decisions, frame.state, 'depthLimit'));
         continue;
       }
 
@@ -1755,7 +1756,7 @@ export class StateSimulationAnalyzer {
     steps: SimulatedStep[],
     decisions: SimulatedPath['decisions'],
     finalState: SimulationState,
-    endType: 'ending' | 'deadEnd' | 'cycle'
+    endType: PathEndType
   ): SimulatedPath {
     const lastStep = steps[steps.length - 1];
     return {
@@ -1790,10 +1791,11 @@ export class StateSimulationAnalyzer {
    * Build ConstraintPathResult from simulated paths
    */
   private buildResult(paths: SimulatedPath[], startTime: number): ConstraintPathResult {
-    // Group paths by outcome (ending beat)
+    // Group paths by outcome (how and where they end): a path cut off at the
+    // depth limit must not join a dead end or cycle on the same beat.
     const outcomeMap = new Map<string, SimulatedPath[]>();
     for (const path of paths) {
-      const key = path.outcome.beatId;
+      const key = `${path.outcome.type}:${path.outcome.beatId}`;
       if (!outcomeMap.has(key)) {
         outcomeMap.set(key, []);
       }
@@ -1802,7 +1804,7 @@ export class StateSimulationAnalyzer {
 
     // Convert to OutcomeGroups
     const outcomes: OutcomeGroup[] = [];
-    for (const [beatId, groupPaths] of outcomeMap) {
+    for (const groupPaths of outcomeMap.values()) {
       const firstPath = groupPaths[0];
 
       // Build path variations from decision sequences
@@ -1831,7 +1833,7 @@ export class StateSimulationAnalyzer {
       });
 
       outcomes.push({
-        endingBeatId: beatId,
+        endingBeatId: firstPath.outcome.beatId,
         endingBeatName: firstPath.outcome.beatName,
         endType: firstPath.outcome.type,
         constraintSets: groupPaths.map(() => createEmptyConstraintSet()),

@@ -16,7 +16,7 @@ import { Story, BeatTypeRegistry } from '@asaps/core';
 import { ReachabilityReport } from '../components/debug/ReachabilityReport';
 import { PathVisualization } from '../components/debug/PathVisualization';
 import { LogicValidationReport } from '../components/debug/LogicValidationReport';
-import type { DebugMessage } from '../services/DebugWindowManager';
+import type { DebugMessage, DebugStoryContext } from '../services/DebugWindowManager';
 import type { SerializedStoryData } from '../services/PreviewWindowManager';
 import { usePersistedState } from '../utils/persistedState';
 
@@ -24,6 +24,7 @@ type Tab = 'reachability' | 'paths' | 'logic';
 
 export const DebugWindow: React.FC = () => {
   const [storyData, setStoryData] = useState<SerializedStoryData | null>(null);
+  const [context, setContext] = useState<DebugStoryContext | undefined>(undefined);
   const [activeTab, setActiveTab] = usePersistedState<Tab>('asaps_ui_debug_tab', 'reachability');
 
   // Listen for STORY_UPDATE messages; ping the opener so it knows we're ready.
@@ -36,6 +37,7 @@ export const DebugWindow: React.FC = () => {
       if (!message || typeof message.type !== 'string') return;
       if (message.type === 'STORY_UPDATE' && message.payload?.storyData) {
         setStoryData(message.payload.storyData);
+        setContext(message.payload.context);
       }
     };
 
@@ -85,6 +87,14 @@ export const DebugWindow: React.FC = () => {
         author: storyData.author || 'Unknown',
         firstBeatId: storyData.firstBeatId,
       });
+      // Characters, settings and the feelings model, as the Preview sets them:
+      // the simulator reads characters' counters and starting items, variable
+      // defaults, roles and the item list from these.
+      if (context?.emotionPalette?.length) newStory.setEmotionPalette(context.emotionPalette as any);
+      if (context?.traitModulations) newStory.setTraitModulations(context.traitModulations);
+      if (context?.characters?.length) newStory.setCharacters(context.characters as any[]);
+      if (context?.settings) newStory.setSettings(context.settings as any);
+      if (Array.isArray((storyData as any).clusters)) newStory.setClusters((storyData as any).clusters);
       for (const beatData of storyData.beats) {
         const beat = registry.createBeat(beatData.type, {
           ...beatData,
@@ -106,7 +116,7 @@ export const DebugWindow: React.FC = () => {
       console.error('[DebugWindow] Failed to reconstruct story:', err);
       return null;
     }
-  }, [storyData]);
+  }, [storyData, context]);
 
   // Forward highlight events to the opener so the flowchart paints them.
   // Uses postMessage on the web and the Electron `debug.sendToMain` IPC

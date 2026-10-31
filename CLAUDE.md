@@ -245,6 +245,42 @@ the AI-generation guidance is part of that change, not a follow-up:
 3. Prompt guidance that lags the schema makes generated stories use dead
    patterns (dialog-layout guidance once stayed stale for a month).
 
+## Debug tools learn new features in the same change
+
+The debug tools (Reachability, Path Analysis forward and tree, Story Logic,
+Story Warnings) and the Preview's "Start as if…" presets re-play a story
+without the engine's renderer. Each one encodes how the engine plays it, so a
+change to how a story plays is invisible to them until they are updated too.
+When a change adds or alters a beat type, a link field, a condition or effect
+type, a gate (requirements, choice conditions), or how variables, counters,
+items, feelings or roles work, review and update the debug tools in that
+change, not as a follow-up:
+
+1. **Which links exist and which beats branch:**
+   `packages/core/src/analysis/analysisLinks.ts` and `utils/storyLinks.ts`.
+   The `storyLinksParity` and `choiceBeatTypes` tests fail until a new type or
+   link field is in both.
+2. **How a path plays:** `StateSimulationAnalyzer.ts` mirrors the engine's
+   gates, choice filtering, effects and inventory. Add a case to
+   `tests/analysis/StateSimulationCoverage.test.ts` for the new behaviour.
+3. **What the reports say:**
+   - `ReachabilityAnalyzer.ts`: what counts as setting a variable.
+   - `StoryWarnings.ts`.
+   - `PathTree.ts`, with `components/debug/PathTreeView.tsx` and
+     `PathVisualization.tsx`: condition and effect labels, end types.
+   - `utils/storyLogicValidator.ts`: what counts as a gate.
+4. **What the tools are given:**
+   - The Debug window rebuilds the story from what `DebugWindowManager`
+     sends (beats plus characters, settings and the feelings model). A new
+     project-level field the simulator reads must be sent.
+   - Presets carry state into the Preview (`PathBasedPresetGenerator.ts`,
+     `PreviewWindow.tsx` preset apply, `StoryContext.loadSimulationState`).
+5. **The User Guide's Debug section** describes what they follow; keep it true.
+
+Each debug tool kept its own copy of the beat list, and Free Layout's buttons
+went unfollowed for a release (v0.9.150). The Debug window simulated stories
+without their characters for longer.
+
 ## Coding Principles
 
 ### Prefer Signal-Based Over Time-Based Solutions

@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { StateSimulationAnalyzer } from '../../src/analysis/StateSimulationAnalyzer';
 import { ReachabilityAnalyzer } from '../../src/analysis/ReachabilityAnalyzer';
+import { buildPathTree, type PathTreeNode } from '../../src/analysis/PathTree';
 import { Story } from '../../src/engine/Story';
 import { createTestBeat } from '../test-utils';
 
@@ -148,4 +149,66 @@ describe('path analysis follows the engine', () => {
     expect(endings(s)).toEqual(['late', 'yes']);
     expect(new ReachabilityAnalyzer(s).analyze().unreachableBeats).toEqual([]);
   });
+
+  it('a path cut off at the depth limit is not a dead end', () => {
+    const chain = Array.from({ length: 10 }, (_, i) =>
+      ({ id: `b${i}`, type: 'infoText', parameters: { text: `${i}` }, connections: i < 9 ? [{ targetId: `b${i + 1}` }] : [] }));
+    const s = story(chain);
+    const r = new StateSimulationAnalyzer(s, { maxDepth: 5 }).analyze();
+    expect(r.outcomes.map((o: any) => o.endType)).toEqual(['depthLimit']);
+    const tree = buildPathTree(new StateSimulationAnalyzer(s, { maxDepth: 5 }).analyzeRaw(), s);
+    expect(terminals(tree.root).map(n => n.endType)).toEqual(['depthLimit']);
+  });
+
+  it('the path tree keeps a cycle a cycle', () => {
+    const s = story([
+      { id: 'hub', type: 'multiChoice', parameters: { question: '?', choices: [
+        { id: 'a', text: 'Look left', target: 'left' }, { id: 'b', text: 'Look right', target: 'right' },
+      ] } },
+      { id: 'left', type: 'infoText', parameters: { text: 'L' }, connections: [{ targetId: 'hub' }] },
+      { id: 'right', type: 'infoText', parameters: { text: 'R' }, connections: [{ targetId: 'hub' }] },
+    ]);
+    const paths = new StateSimulationAnalyzer(s).analyzeRaw();
+    expect(paths.every(p => p.outcome.type === 'cycle')).toBe(true);
+    // The tree folds the loop into a hub; with no way out, it ends as a cycle.
+    const root = buildPathTree(paths, s).root;
+    expect(root.type).toBe('hub');
+    expect(root.endType).toBe('cycle');
+  });
 });
+
+
+describe('the path tree says what a choice does', () => {
+  it('names variable changes, lost items and feelings, and spells out a sentiment check', () => {
+    const chars = [{ id: 'c1', name: 'Tomas' }];
+    const s = story([
+      { id: 'start', type: 'infoText', parameters: { text: 'Go' }, connections: [{ targetId: 'mc' }] },
+      { id: 'mc', type: 'multiChoice', parameters: { question: '?', choices: [
+        { id: 'a', text: 'Back him', target: 'check', effects: [
+          { type: 'setVariable', target: 'brave', value: true },
+          { type: 'addSentiment', target: 'Tomas', sentimentTarget: 'player', sentimentEmotion: 'trust', strengthDelta: 0.6 }] },
+        { id: 'b', text: 'Stay quiet', target: 'check' },
+      ] } },
+      { id: 'check', type: 'conditionBeat', parameters: { conditionType: 'sentiment', character: 'Tomas', sentimentTarget: 'player',
+        sentimentEmotion: 'trust', operator: '>=', value: 0.5, trueTarget: 'yes', falseTarget: 'no' } },
+      end('yes'), end('no'),
+    ], chars);
+    const tree = buildPathTree(new StateSimulationAnalyzer(s).analyzeRaw(), s);
+    const variants = allNodes(tree.root).flatMap(n => n.beats).flatMap(b => b.choiceVariants ?? []);
+    const back = variants.find(v => v.label === 'Back him');
+    expect(back?.stateEffects).toEqual(expect.arrayContaining(['brave = true', 'Tomas trust → player +0.6']));
+    const branch = allNodes(tree.root).find(n => n.conditionAnnotation);
+    expect(branch?.conditionAnnotation?.conditionText).toBe('Tomas trust → player >= 0.5');
+  });
+});
+
+function allNodes(n: PathTreeNode): PathTreeNode[] {
+  return [n, ...n.children.flatMap(c => allNodes(c.child)), ...(n.hubExitNode ? allNodes(n.hubExitNode) : [])];
+}
+
+function terminals(n: PathTreeNode): PathTreeNode[] {
+  const out = n.type === 'ending' || n.type === 'deadEnd' ? [n] : [];
+  for (const c of n.children) out.push(...terminals(c.child));
+  if (n.hubExitNode) out.push(...terminals(n.hubExitNode));
+  return out;
+}

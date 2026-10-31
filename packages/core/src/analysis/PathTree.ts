@@ -10,6 +10,7 @@
  */
 
 import type { SimulatedPath, SimulatedStep, SimulationState } from './StateSimulationAnalyzer';
+import type { PathEndType } from './ConstraintSet';
 import type { Story } from '../engine/Story';
 import { CHOICE_BEAT_TYPES } from './analysisLinks';
 
@@ -105,7 +106,7 @@ export interface PathTreeNode {
   representativePathIndex: number;
   pathIndices: number[];
 
-  endType?: 'ending' | 'deadEnd' | 'cycle';
+  endType?: PathEndType;
   endingBeatId?: string;
   endingBeatName?: string;
 
@@ -135,7 +136,7 @@ interface TrieNode {
   pathIndices: Set<number>;
   decisionLabels: Map<number, string>; // pathIndex → decision label used
   isTerminal: boolean;
-  terminalType?: 'ending' | 'deadEnd' | 'cycle';
+  terminalType?: PathEndType;
   terminalBeatId?: string;
   terminalBeatName?: string;
 }
@@ -149,8 +150,17 @@ function nextId(): string {
   return `ptn_${nodeIdCounter++}`;
 }
 
+/** Character id → name for effect labels, set per build like the id counter. */
+let characterNames = new Map<string, string>();
+const characterLabel = (ref: string): string => characterNames.get(ref) ?? ref;
+
 export function buildPathTree(paths: SimulatedPath[], story: Story): PathTreeResult {
   nodeIdCounter = 0;
+  characterNames = new Map(
+    (((story as any).getCharacters?.() ?? []) as any[])
+      .filter((c) => c?.id && (c.displayName || c.name))
+      .map((c) => [c.id as string, (c.displayName || c.name) as string]),
+  );
 
   if (paths.length === 0) {
     const empty: PathTreeNode = {
@@ -604,6 +614,11 @@ function buildHubNode(
     { beatId: hubBeatId, beatName: hubTrie.beatName, beatType: hubTrie.beatType },
   ];
 
+  // A hub with no way out, where every path only comes back round, ends the
+  // way Forward mode labels it: as a cycle.
+  const hubPaths = [...hubTrie.pathIndices];
+  const onlyCycles = !hubExitNode && hubPaths.length > 0 && hubPaths.every(pi => paths[pi]?.outcome.type === 'cycle');
+
   return {
     id: nextId(),
     type: 'hub',
@@ -613,8 +628,9 @@ function buildHubNode(
     hubExitNode,
     children: [],
     pathCount: hubTrie.pathIndices.size,
-    representativePathIndex: [...hubTrie.pathIndices][0] ?? -1,
-    pathIndices: [...hubTrie.pathIndices],
+    representativePathIndex: hubPaths[0] ?? -1,
+    pathIndices: hubPaths,
+    ...(onlyCycles ? { endType: 'cycle' as const } : {}),
   };
 }
 
@@ -796,14 +812,42 @@ function diffStateEffects(before: SimulationState, after: SimulationState): stri
     if (value < prev) effects.push(`${value - prev} ${name}`);
   }
 
+  for (const [name, value] of after.variables) {
+    if (before.variables.get(name) !== value) effects.push(`${name} = ${JSON.stringify(value)}`);
+  }
+
   for (const [char, items] of after.inventory) {
     const prevItems = before.inventory.get(char) || new Set<string>();
     for (const item of items) {
       if (!prevItems.has(item)) effects.push(`+${item}`);
     }
   }
+  for (const [char, items] of before.inventory) {
+    const nowItems = after.inventory.get(char) || new Set<string>();
+    for (const item of items) {
+      if (!nowItems.has(item)) effects.push(`−${item}`);
+    }
+  }
+
+  // Feelings (sentiments, moods, emotions) wait in pendingRuntime until the
+  // next beat applies them; the ones this step added are its own. Without
+  // them a choice that only builds trust read "no effect".
+  const earlier = new Set(before.pendingRuntime ?? []);
+  for (const e of after.pendingRuntime ?? []) {
+    if (!earlier.has(e)) effects.push(describeFeelingEffect(e));
+  }
 
   return effects;
+}
+
+function describeFeelingEffect(e: any): string {
+  if (e?.type === 'castRole') return `@${e.target} = ${characterLabel(String(e.character ?? ''))}`;
+  const who = typeof e?.target === 'string' ? characterLabel(e.target) : '';
+  const what = e?.sentimentEmotion ?? e?.emotion ?? e?.mood ?? e?.goal ?? e?.type ?? 'feeling';
+  const toward = e?.sentimentTarget ? ` → ${e.sentimentTarget}` : '';
+  const delta = e?.strengthDelta ?? e?.delta ?? e?.intensity ?? e?.value;
+  const amount = typeof delta === 'number' ? ` ${delta > 0 ? '+' : ''}${delta}` : '';
+  return `${who ? who + ' ' : ''}${what}${toward}${amount}`.trim();
 }
 
 function getMajorityDecisionLabel(trie: TrieNode): string | undefined {
@@ -1011,6 +1055,22 @@ function buildConditionAnnotation(condition: any, params: any): ConditionAnnotat
       break;
     case 'fictionalTime':
       conditionText = `time ${operator} ${JSON.stringify(condition?.compareTime)}`;
+      break;
+    case 'sentiment': {
+      const c = condition?.character ?? params?.character;
+      const toward = condition?.sentimentTarget ?? params?.sentimentTarget;
+      const emotion = condition?.sentimentEmotion ?? params?.sentimentEmotion;
+      conditionText = `${c} ${emotion ?? 'sentiment'}${toward ? ` → ${toward}` : ''} ${operator} ${value}`;
+      break;
+    }
+    case 'mood':
+      conditionText = `${condition?.character ?? params?.character} mood ${condition?.moodAxis ?? params?.moodAxis ?? 'valence'} ${operator} ${value}`;
+      break;
+    case 'emotion':
+      conditionText = `${condition?.character ?? params?.character} ${condition?.emotionName ?? params?.emotionName} ${operator} ${value}`;
+      break;
+    case 'goal':
+      conditionText = `${condition?.character ?? params?.character} goal ${condition?.goalId ?? params?.goalId} ${operator} ${condition?.goalStatus ?? params?.goalStatus ?? value ?? 'met'}`;
       break;
     default:
       conditionText = `${type}: ${variable} ${operator} ${value}`;

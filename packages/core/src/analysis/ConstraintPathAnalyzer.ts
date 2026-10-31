@@ -566,8 +566,8 @@ export class ConstraintPathAnalyzer {
 
     // Convert outcome map to array, sorted by outcome type then beat name
     const outcomes = [...this.outcomeGroups.values()].sort((a, b) => {
-      // Endings first, then dead ends, then cycles
-      const typeOrder: Record<string, number> = { ending: 0, deadEnd: 1, cycle: 2 };
+      // Endings first, then dead ends, then cycles, then paths cut off
+      const typeOrder: Record<string, number> = { ending: 0, deadEnd: 1, cycle: 2, depthLimit: 3 };
       if (typeOrder[a.endType] !== typeOrder[b.endType]) {
         return typeOrder[a.endType] - typeOrder[b.endType];
       }
