@@ -286,6 +286,14 @@ without their characters for longer.
 ### Prefer Signal-Based Over Time-Based Solutions
 Never use `setTimeout` or arbitrary delays to coordinate between async operations. Use deterministic signals instead — ref flags, events, callbacks, or promises. Time-based solutions are fragile and break with slow connections, large projects, or varying system performance. For example, use a ref flag that one operation sets and another checks, rather than assuming "2 seconds is enough."
 
+### Visual Settings Live in the Visual Editor
+How a beat looks (its background picture, its look over the project's,
+element fonts and placement) is set in the Visual Editor, not the Properties
+panel (Inspector). The Properties panel holds what a beat says and does:
+text, links, conditions, effects, sound. When adding a visual setting, put
+it in the Visual Editor's left panel; don't add a second copy in the
+Properties panel.
+
 ### No Native alert() / confirm() / prompt()
 They freeze every window and interrupt for news the UI can show ambiently (UX-Eval B4; `no-alert` is an ESLint error in the builder). Use `packages/builder/src/utils/notify.ts`: `notify.success/info/warning/error` for news (errors stay until dismissed), `notifyUndoable` / `undoCommandAction(cmd)` for a "Deleted X · Undo" notice instead of confirm-before-delete on anything undoable, and `await confirmAction({...})` only where a modal is earned (data that cannot come back, git history rewrites, layout-mode switch, replacing the workspace, deletes that break links). Name the confirm button after the action, never "OK".
 

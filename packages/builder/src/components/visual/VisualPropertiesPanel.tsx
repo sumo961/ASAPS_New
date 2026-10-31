@@ -61,6 +61,8 @@ interface VisualPropertiesPanelProps {
    */
   layoutMode?: 'absolute' | 'slot' | 'spatial';
   backgroundAssetId?: string;
+  /** Take the beat's background picture away. */
+  onBackgroundRemove?: () => void;
   elements: VisualElement[];
   /**
    * Free Layout beats: the words on text boxes and buttons, and which
@@ -188,6 +190,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   dialogStackPinned = false,
   layoutMode = 'absolute',
   backgroundAssetId,
+  onBackgroundRemove,
   elements,
   freeLayout,
   selectedElements,
@@ -753,18 +756,38 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
           
           {expandedSections.background && (
             <div className="px-4 pb-4">
-              <button
-                onClick={onBackgroundSelect}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-              >
-                {backgroundAsset
-                  ? (beatType === 'panorama' ? 'Change Panorama Image' : 'Change Background')
-                  : (beatType === 'panorama' ? 'Choose Panorama Image' : 'Choose Background')}
-              </button>
-              {backgroundAsset && (
-                <div className="mt-2 text-xs text-gray-600">
-                  {backgroundAsset.name}
+              {backgroundAsset ? (
+                <div className="flex items-center gap-2" data-testid="ve-background">
+                  <div className="flex-1 flex items-center gap-2 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-sm min-w-0">
+                    {backgroundAsset.url && (
+                      <img src={backgroundAsset.url} alt="" className="w-10 h-7 object-cover rounded flex-shrink-0" />
+                    )}
+                    <span className="truncate">{backgroundAsset.name}</span>
+                  </div>
+                  <button
+                    onClick={onBackgroundSelect}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                    title={beatType === 'panorama' ? 'Change the panorama image' : 'Change the background image'}
+                  >
+                    Change
+                  </button>
+                  {onBackgroundRemove && beatType !== 'panorama' && (
+                    <button
+                      onClick={onBackgroundRemove}
+                      className="px-2 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg"
+                      title="Remove the background image"
+                    >
+                      {'\u2715'}
+                    </button>
+                  )}
                 </div>
+              ) : (
+                <button
+                  onClick={onBackgroundSelect}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                >
+                  {beatType === 'panorama' ? 'Choose Panorama Image' : 'Choose Background'}
+                </button>
               )}
 
               {/* Bug 26 follow-up — Background fit. Sits next to "Change

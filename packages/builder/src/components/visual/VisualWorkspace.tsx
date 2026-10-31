@@ -4925,7 +4925,40 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   };
 
   // Handle background selection
+  // The background picture lives here, not in the Properties panel (visual
+  // settings belong to the Visual Editor). Set through onBeatUpdate, without
+  // touching the beat first, so the change is one undo step.
+  const setBeatBackground = useCallback((assetId: string) => {
+    if (!beat) return;
+    const params = beat.getParameters ? beat.getParameters() : {};
+    const patch = beat.type === 'panorama'
+      ? { panoramaAssetId: assetId }
+      : { backgroundAssetId: assetId, node: assetId };
+    setBackgroundAssetId(assetId);
+    setHasChanges(true);
+    if (onBeatUpdate) {
+      onBeatUpdate(beat.id, { parameters: { ...params, ...patch } } as any);
+    } else if (beat.updateParameters) {
+      beat.updateParameters({ ...params, ...patch });
+    }
+  }, [beat, onBeatUpdate]);
+
+  // Undo/redo (or the Properties panel) can change the background under us.
+  const beatBackgroundId = beat && beat.type !== 'panorama'
+    ? String((beat.getParameters?.() as any)?.node || (beat.getParameters?.() as any)?.backgroundAssetId || '')
+    : '';
+  useEffect(() => {
+    if (beat && beat.type !== 'panorama') setBackgroundAssetId(prev => (prev === beatBackgroundId ? prev : beatBackgroundId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beatBackgroundId]);
+
+  const handleBackgroundRemove = useCallback(() => setBeatBackground(''), [setBeatBackground]);
+
   const handleBackgroundSelect = useCallback(() => {
+    if (onBeatUpdate) {
+      handleAssetSelection('background', (asset) => setBeatBackground(asset.id));
+      return;
+    }
     handleAssetSelection('background', (asset) => {
       setBackgroundAssetId(asset.id);
       setHasChanges(true);
@@ -4946,7 +4979,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         console.log(`[VisualWorkspace] Background immediately persisted to beat: ${asset.id}`);
       }
     });
-  }, [handleAssetSelection, beat]);
+  }, [handleAssetSelection, beat, onBeatUpdate, setBeatBackground]);
 
   // Save visual changes
   const handleSave = () => {
@@ -5402,6 +5435,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 } : undefined}
                 selectedElements={selectedElementIds}
                 onBackgroundSelect={handleBackgroundSelect}
+                onBackgroundRemove={handleBackgroundRemove}
                 onElementSelect={(id: string | null) => {
                   // Selection is exclusive across the panel: choosing an
                   // element clears any expanded slot row, and vice versa
