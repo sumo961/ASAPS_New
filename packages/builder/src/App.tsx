@@ -1107,7 +1107,7 @@ function App() {
   // Persistence hooks
   const { markChanged, saveNow } = useSave();
   const { updateStory, updateGlobalSettings, project: currentProject, load: loadProject, create: createProject, saveCurrent, updateMetadata, discardUntitled, deleteAssetFromDirectory } = useProject();
-  const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback, pauseAutoSave, resumeAutoSave, initialized: storageInitialized, openDirectoryProject, saveAsDirectory, projectFormat, projectPath } = usePersistence();
+  const { isUntitledProject, setIsUntitledProject, hasUnsavedChanges, storage, registerSyncCallback, unregisterSyncCallback, pauseAutoSave, resumeAutoSave, flushPendingSave, initialized: storageInitialized, openDirectoryProject, saveAsDirectory, projectFormat, projectPath } = usePersistence();
   const vcs = useVCSStatus();
   const vcsRef = useRef(vcs);
   vcsRef.current = vcs;
@@ -1311,6 +1311,13 @@ function App() {
     const openFolderPath = async (folderPath: string) => {
       console.log('[Electron] Opening project folder:', folderPath);
       try {
+        // Opening ANOTHER folder: save the project being left first, or edits
+        // made inside the auto-save window are lost. Reopening the same
+        // folder is a reload from disk, which must not be overwritten.
+        if (projectPathRef.current !== folderPath) {
+          const flushed = await flushPendingSave();
+          if (!flushed) console.warn('[Electron] Could not save the current project before opening', folderPath);
+        }
         // Pause auto-save so stale in-memory state isn't written to disk
         // before the load effect updates refs from the new project
         pauseAutoSave();

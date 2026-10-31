@@ -182,6 +182,9 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { status, lastSaved, error: saveError, markChanged } = useSave();
   const { load } = useProject();
+  // Before leaving the project (another one, or a new one): save what the
+  // auto-save hasn't yet, so recent edits aren't lost.
+  const { flushPendingSave } = usePersistence();
   const translationState = useTranslationState();
   const translationActions = useTranslationActions();
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
@@ -1232,10 +1235,12 @@ export const Header: React.FC<HeaderProps> = ({
         // is the right default; auto-save will have caught up by the
         // time the user clicks the prompt anyway, but the explicit
         // call protects the rare just-edited-then-jumped case.
-        const guardCreate = (action: () => void) => {
+        const guardCreate = async (action: () => void) => {
           // Save-then-proceed without asking (the old confirm's only
-          // non-"stay" answer was "save and continue").
-          if (hasUnsavedChanges && onSave) onSave();
+          // non-"stay" answer was "save and continue"). Awaited: the save
+          // used to start and the switch go ahead without waiting for it.
+          const saved = await flushPendingSave();
+          if (!saved && hasUnsavedChanges && onSave) onSave();
           action();
         };
         return (
@@ -1292,16 +1297,17 @@ export const Header: React.FC<HeaderProps> = ({
       <NewProjectPicker
         isOpen={showNewProjectPicker}
         onClose={() => setShowNewProjectPicker(false)}
-        onPickEmpty={() => {
+        onPickEmpty={async () => {
           if (onInterceptNewProject) {
             const intercepted = onInterceptNewProject();
             if (intercepted) return;
           }
+          await flushPendingSave();
           setShowNewProjectDialog(true);
         }}
-        onPickPrompt={onStoryGenerated ? () => setShowStoryGenerator(true) : undefined}
-        onPickIdeator={onIdeator ? () => onIdeator() : undefined}
-        onPickTemplate={onImportZipFile ? () => setShowTemplateGallery(true) : undefined}
+        onPickPrompt={onStoryGenerated ? async () => { await flushPendingSave(); setShowStoryGenerator(true); } : undefined}
+        onPickIdeator={onIdeator ? async () => { await flushPendingSave(); onIdeator(); } : undefined}
+        onPickTemplate={onImportZipFile ? async () => { await flushPendingSave(); setShowTemplateGallery(true); } : undefined}
       />
 
       {/* Template gallery — the "Start from a template" destination. Using

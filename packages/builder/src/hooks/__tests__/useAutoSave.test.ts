@@ -118,6 +118,41 @@ describe('useAutoSave', () => {
     expect(result.current.isPaused).toBe(false);
   });
 
+  it('flushPending saves a pending change at once (leaving the project)', async () => {
+    const { result } = renderHook(() => useAutoSave(projectData, { delay: 99999 }));
+    act(() => result.current.markChanged());
+    let ok = false;
+    await act(async () => { ok = await result.current.flushPending(); });
+    expect(ok).toBe(true);
+    expect(storage.updateProject).toHaveBeenCalledTimes(1);
+  });
+
+  it('flushPending writes nothing when there is nothing unsaved, or while paused', async () => {
+    const { result } = renderHook(() => useAutoSave(projectData, { delay: 99999 }));
+    await act(async () => { await result.current.flushPending(); });
+    act(() => result.current.markChanged());
+    act(() => result.current.pause());
+    await act(async () => { await result.current.flushPending(); });
+    expect(storage.updateProject).not.toHaveBeenCalled();
+  });
+
+  it('a change made while a save is in flight is saved afterwards, not dropped', async () => {
+    let release: () => void = () => {};
+    storage.updateProject.mockImplementationOnce(() => new Promise((r) => { release = () => r({ success: true }); }));
+    const { result } = renderHook(() => useAutoSave(projectData, { delay: 1000 }));
+
+    act(() => { void result.current.saveNow(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(result.current.status).toBe('saving');
+    act(() => result.current.markChanged()); // edit during the save
+    await act(async () => { release(); await vi.advanceTimersByTimeAsync(0); });
+    expect(storage.updateProject).toHaveBeenCalledTimes(1);
+
+    // saved display (2s) → pending → debounce (1s) → second save
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(storage.updateProject).toHaveBeenCalledTimes(2);
+  });
+
   it('cancelPending clears a scheduled save and resets state', async () => {
     storage.updateProject.mockResolvedValue({ success: false, error: new Error('x') });
     const { result } = renderHook(() => useAutoSave(projectData, { delay: 1000 }));

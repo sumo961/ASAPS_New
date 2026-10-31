@@ -66,6 +66,8 @@ export interface PersistenceContextValue {
   pauseAutoSave: () => void;
   resumeAutoSave: () => void;
   isAutoSavePaused: boolean;
+  /** Save what is unsaved before leaving the project (opening another one); true when nothing is left unsaved. */
+  flushPendingSave: () => Promise<boolean>;
 
   // Project management
   loadProject: (projectId: string) => Promise<boolean>;
@@ -585,6 +587,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     saveNow,
     markChanged,
     cancelPending,
+    flushPending,
     pause,
     resume,
     isPaused,
@@ -686,8 +689,20 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
    */
   const loadProject = useCallback(async (projectId: string): Promise<boolean> => {
     try {
-      // Cancel any pending auto-save before loading new project
-      // This prevents stale error/pending states from persisting
+      // Save the project being LEFT before switching: edits made inside the
+      // auto-save window (an undo, a colour change) used to be dropped here,
+      // because the pending save was cancelled, not run. Runs while the
+      // current project, sync callback and folder adapter still belong to
+      // the old project. Same id = a reload (e.g. after an import that
+      // overwrote this project) — the in-memory version must not win then.
+      if (currentProjectRef.current && currentProjectRef.current.id !== projectId) {
+        const flushed = await flushPending();
+        if (!flushed) {
+          console.warn('[PersistenceProvider] Could not save the current project before switching:', currentProjectRef.current.id);
+        }
+      }
+      // Then reset save state so the old project's pending/error status
+      // doesn't carry over to the new one (the reason this cancel exists).
       cancelPending();
 
       // If currently on an untitled project, clean up before loading the new
@@ -819,7 +834,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       console.error('[PersistenceProvider] Failed to load project:', error);
       return false;
     }
-  }, [storage, commandManager, cancelPending, syncCallback, repairRunawayBeatIds, reportDuplicateBeatIds, guardNewerVersion]);
+  }, [storage, commandManager, cancelPending, flushPending, syncCallback, repairRunawayBeatIds, reportDuplicateBeatIds, guardNewerVersion]);
 
   /**
    * Create a new project
@@ -1570,6 +1585,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     projectId,
     isUntitledProject,
     hasUnsavedChanges: saveStatus === 'pending',
+    flushPendingSave: flushPending,
     storage,
     commandManager,
     executeCommand,

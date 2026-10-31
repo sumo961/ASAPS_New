@@ -134,3 +134,88 @@ describe('useProject selector', () => {
     expect(typeof h.result.current.project.load).toBe('function');
   });
 });
+
+describe('loadProject saves the project being left', () => {
+  // Auto-save ON with a delay no test reaches: an edit stays 'pending', the
+  // state an author is in right after an edit (or an undo) inside the
+  // auto-save window.
+  const autoSaveWrapper = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(PersistenceProvider, { autoSave: true, autoSaveDelay: 600000 }, children);
+
+  async function renderWithAutoSave() {
+    const h = renderHook(() => usePersistence(), { wrapper: autoSaveWrapper });
+    await waitFor(() => expect(h.result.current.initialized).toBe(true));
+    return h;
+  }
+
+  /** Stand-in for App's sync callback: writes the editor's beats into the project. */
+  function editorWith(result: { current: ReturnType<typeof usePersistence> }, beats: any[]) {
+    act(() => {
+      result.current.registerSyncCallback(() => result.current.updateProjectStory({ beats }));
+    });
+  }
+
+  /** Whether the STORED copy of the project has a beat with this id. */
+  async function storedHas(result: { current: ReturnType<typeof usePersistence> }, id: string, beatId: string) {
+    const stored = await result.current.storage.getProject(id);
+    const beats = (stored.data?.story as any)?.beats;
+    return Array.isArray(beats) && beats.some((b: any) => b?.id === beatId);
+  }
+
+  it('an edit still pending when another project is opened is saved, not dropped', async () => {
+    const { result } = await renderWithAutoSave();
+    let a = '';
+    let b = '';
+    await act(async () => { b = await result.current.createProject('Project B'); });
+    await act(async () => { a = await result.current.createProject('Project A'); });
+    await waitFor(() => expect(result.current.currentProject?.id).toBe(a));
+
+    editorWith(result, [{ id: 'edited-beat', type: 'infoText' }]);
+    act(() => result.current.markChanged());
+    await waitFor(() => expect(result.current.saveStatus).toBe('pending'));
+
+    await act(async () => { await result.current.loadProject(b); });
+
+    expect(await storedHas(result, a, 'edited-beat')).toBe(true);
+    // The switch still resets save state for the project now open.
+    expect(result.current.currentProject?.id).toBe(b);
+    expect(result.current.saveStatus).toBe('idle');
+    expect(result.current.saveError).toBeNull();
+    // ...and B was not written with A's editor content.
+    expect(await storedHas(result, b, 'edited-beat')).toBe(false);
+  });
+
+  it('reloading the same project does not write the in-memory version over storage', async () => {
+    const { result } = await renderWithAutoSave();
+    let a = '';
+    await act(async () => { a = await result.current.createProject('Project A'); });
+    await waitFor(() => expect(result.current.currentProject?.id).toBe(a));
+
+    editorWith(result, [{ id: 'stale-in-memory', type: 'infoText' }]);
+    act(() => result.current.markChanged());
+    await waitFor(() => expect(result.current.saveStatus).toBe('pending'));
+
+    await act(async () => { await result.current.loadProject(a); });
+
+    expect(await storedHas(result, a, 'stale-in-memory')).toBe(false);
+    expect(result.current.saveStatus).toBe('idle');
+  });
+
+  it('a paused auto-save is not flushed on switch (files changed outside, preview)', async () => {
+    const { result } = await renderWithAutoSave();
+    let a = '';
+    let b = '';
+    await act(async () => { b = await result.current.createProject('Project B'); });
+    await act(async () => { a = await result.current.createProject('Project A'); });
+    await waitFor(() => expect(result.current.currentProject?.id).toBe(a));
+
+    editorWith(result, [{ id: 'held-back', type: 'infoText' }]);
+    act(() => result.current.markChanged());
+    await waitFor(() => expect(result.current.saveStatus).toBe('pending'));
+    act(() => result.current.pauseAutoSave());
+
+    await act(async () => { await result.current.loadProject(b); });
+
+    expect(await storedHas(result, a, 'held-back')).toBe(false);
+  });
+});

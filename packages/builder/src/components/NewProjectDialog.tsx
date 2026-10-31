@@ -12,7 +12,7 @@
 
 import React, { useState } from 'react';
 import { X, Folder, ChevronRight, ChevronDown } from 'lucide-react';
-import { useProject } from '../contexts/PersistenceContext';
+import { useProject, usePersistence } from '../contexts/PersistenceContext';
 import { DEFAULT_THEME_ID } from '@asaps/core';
 import { normalizeGlobalSettings } from '../utils/themeConverter';
 import { COMMON_LANGUAGES } from '../utils/languageCatalog';
@@ -41,6 +41,7 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
   isModal = true,
 }) => {
   const { create, updateGlobalSettings } = useProject();
+  const { flushPendingSave } = usePersistence();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('responsive');
@@ -66,6 +67,9 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
     setError(null);
 
     try {
+      // Save the project being left first: create() makes the new project
+      // the current one, after which the old one's unsaved edits are lost.
+      await flushPendingSave();
       // Its settings are the Ink & Brass defaults (below); record that so
       // the theme picker names the theme instead of "Custom (No Theme)".
       const projectId = await create(name.trim(), description.trim() || undefined, { themeId: DEFAULT_THEME_ID });

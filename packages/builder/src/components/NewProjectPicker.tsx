@@ -19,13 +19,13 @@ import { useAIFeatures } from '../utils/aiFeatures';
 export interface NewProjectPickerProps {
   isOpen: boolean;
   onClose: () => void;
-  onPickEmpty: () => void;
+  onPickEmpty: () => void | Promise<void>;
   /** Undefined when no AI provider is wired; card renders disabled. */
-  onPickPrompt?: () => void;
+  onPickPrompt?: () => void | Promise<void>;
   /** Undefined when no Ideator handler is wired; card renders disabled. */
-  onPickIdeator?: () => void;
+  onPickIdeator?: () => void | Promise<void>;
   /** Opens the template gallery (worked examples instantiated as copies). */
-  onPickTemplate?: () => void;
+  onPickTemplate?: () => void | Promise<void>;
 }
 
 export const NewProjectPicker: React.FC<NewProjectPickerProps> = ({

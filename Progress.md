@@ -3,12 +3,18 @@
 ## Unreleased (since v0.9.151, 2026-10-31)
 
 ### Overview
-A beat can turn off the theme's text-box frame picture (Hartmut, after the v0.9.151 release check found that a frame picture hides the beat's box colour).
+A beat can turn off the theme's text-box frame picture (Hartmut, after the v0.9.151 release check found that a frame picture hides the beat's box colour). Fixed: edits made in the 30 seconds before opening another project were lost.
 
 ### This beat's look: Frame picture
 - **Frame picture: Off on this beat** in *This beat's look* (`BeatLook.textBox.framePicture: 'off'`). Where the theme draws the text box with a picture (an imported Ren'Py theme), the beat gets a plain box, which its Colour and Opacity then fill. `applyBeatLook` drops `textboxFrameUrl` for the beat, so the player, the Preview and exports follow; both Visual Editor paths, which add the frame picture after the look, honour it too.
 - Checked headless on RED's Introduction (QA copy, undone afterwards): with Frame picture off and a green colour, the editor and the Preview show a plain green box; the next beat keeps the frame. Test in `renderer/tests/utils/beatLook.test.ts`.
 - User Guide at release: add **Frame picture** (*Off on this beat* draws a plain box where the theme uses a frame picture) to *This beat's look*'s text-box list, and change the frame-picture note to point to it.
+
+### Fix: recent edits lost when opening another project
+- **Edits made in the 30 seconds before opening another project were thrown away.** `loadProject` began with `cancelPending()`, which reset the auto-save without saving (it was added in January to stop an untitled project's "Cannot auto-save" error carrying over). Found while cleaning up after the release check: an Undo made after an auto-save, then a switch, came back undone. Affected: the Projects menu's recent list, the desktop start window, templates, Open a file and drag-and-drop imports; the in-page library started a save but didn't wait for it.
+- Now the project being left is saved first (`useAutoSave.flushPending`, which waits for a save in flight and does nothing while auto-save is paused), then the save state is reset as before. Reloading the same project (after an import onto it) is not saved over. The same happens before Open Folder of another folder, before the New Project dialog creates its project, and when + New's or the library's choices are picked (now awaited).
+- An edit made while a save was running was not saved either (the follow-up save was never scheduled); it is now.
+- Checked headless: an edit made just before switching to The Last Ferry and back is still there; an Undo made after an auto-save, then a switch, stays undone. Tests: `PersistenceContext.test.tsx` (switching saves A and leaves B alone; a reload of the same project doesn't write; paused isn't flushed), `useAutoSave.test.ts` (flush saves; nothing to save; edit during a save gets a second save). Root cause found with a helper agent.
 
 **Files modified:** packages/core/src/types/index.ts, packages/renderer/src/utils/beatLook.ts, tests/utils/beatLook.test.ts, packages/builder/src/components/visual/BeatLookSection.tsx, VisualWorkspace.tsx, VisualBeatEditor.tsx, packages/builder/public/player-web.js (rebuilt)
 

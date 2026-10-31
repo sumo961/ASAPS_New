@@ -73,6 +73,11 @@ export interface UseAutoSaveReturn {
   /** Clear the pending save timer */
   cancelPending: () => void;
 
+  /** Save now if anything is unsaved (pending, failed, or edited during a
+   *  save) — for leaving the project, e.g. switching to another one. Does
+   *  nothing while paused. Resolves true when nothing is left unsaved. */
+  flushPending: () => Promise<boolean>;
+
   /** Pause auto-save (e.g., during preview) */
   pause: () => void;
 
@@ -293,9 +298,12 @@ export function useAutoSave(
       return;
     }
 
-    // Don't interrupt an active save
+    // Don't interrupt an active save — but remember the change: the save in
+    // flight read its data before this edit, and the post-save timer below
+    // schedules the follow-up save off this flag.
     if (isSavingRef.current) {
       log('Save in progress, will reschedule after completion');
+      pendingChangesDuringSavedRef.current = true;
       return;
     }
 
@@ -352,6 +360,13 @@ export function useAutoSave(
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
+    // The "saved" display's follow-up timer would otherwise schedule a save
+    // after the reset (of whatever project is open by then).
+    if (savedTimeoutRef.current !== null) {
+      clearTimeout(savedTimeoutRef.current);
+      savedTimeoutRef.current = null;
+    }
+    pendingChangesDuringSavedRef.current = false;
     // Always reset to idle and clear error when cancelling
     // This is important when switching projects to clear stale state
     setStatus('idle');
@@ -420,6 +435,16 @@ export function useAutoSave(
     return statusRef.current !== 'pending' && statusRef.current !== 'saving' && statusRef.current !== 'error';
   }, [performSave]);
 
+  /**
+   * Before leaving the project (opening another one): save what is unsaved
+   * instead of dropping it. Paused means "don't write now" (preview, files
+   * changed outside ASAPS, a newer ASAPS saved it) — that holds here too.
+   */
+  const flushPending = useCallback(async (): Promise<boolean> => {
+    if (isPausedRef.current) return true;
+    return saveBeforeQuit();
+  }, [saveBeforeQuit]);
+
   useEffect(() => {
     if (!enabled) return;
     const desktop = (window as any).electronAPI?.app;
@@ -467,6 +492,7 @@ export function useAutoSave(
     saveNow,
     markChanged,
     cancelPending,
+    flushPending,
     pause,
     resume,
     isPaused,
