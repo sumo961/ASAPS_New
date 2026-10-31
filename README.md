@@ -22,9 +22,16 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.151** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.151 is the per-beat look
-release**: a new *This beat's look* section in the Visual Editor changes the
+Current release: **v0.9.152** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.152 is the save-before-switching
+release**: edits you made in the half minute before opening another project
+are no longer lost — the project you leave is now saved first, whether you
+switch from the Projects menu, the start window, a template, Open or a
+dropped file. A beat's look can also turn off the theme's text-box frame
+picture (*This beat's look* ▸ *Frame picture*), so the beat gets a plain box
+in its own colour.
+
+**v0.9.151 was the per-beat look release**: a new *This beat's look* section in the Visual Editor changes the
 project's look for one beat only — the stage and text colours, the text box
 (colour, opacity, corners, padding, border, whether boxes show), the buttons,
 and the fonts and their sizes. Everything about how a beat looks is now set

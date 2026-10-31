@@ -2622,7 +2622,7 @@ The layout of choices and dialogs has its own section above (**Layout** or **Dia
 Your project's colours, text box and fonts live in [Project Settings](#global-settings) and apply to every beat. Sometimes one beat should look different: a dream sequence on a dark stage, a letter in a handwriting font, a quiet moment with no box behind the text. Open that beat in the Visual Editor and expand **This beat's look** in the left panel (just above *Transition*). It lets you change, for this beat only:
 
 - **Stage colour** and **Text colour**
-- **Text box:** **Boxes** (*Show all boxes*, *Hide text/dialog boxes*, *Hide all boxes* — this works even when the project hides them), **Colour**, **Opacity %**, **Corners px**, **Padding px**, **Border** (*Show on this beat* or *Hide on this beat*), **Border width** and **Border colour**
+- **Text box:** **Boxes** (*Show all boxes*, *Hide text/dialog boxes*, *Hide all boxes* — this works even when the project hides them), **Frame picture** (*Off on this beat (plain box)*, for a theme that draws the text box with a picture), **Colour**, **Opacity %**, **Corners px**, **Padding px**, **Border** (*Show on this beat* or *Hide on this beat*), **Border width** and **Border colour**
 - **Buttons:** **Colour**, **Text colour**, **Border colour** and **Corners px**
 - **Fonts:** the **Title**, **Text** and **Buttons** fonts and their sizes
 
@@ -2631,7 +2631,7 @@ Your project's colours, text box and fonts live in [Project Settings](#global-se
 
 Each row shows the project's value until you change it. Rows you've changed turn bold, and the section's header counts them (*2 changed*). The **↺** button next to a row puts that one back to the project setting; **Use the project's look for everything** puts them all back. Every change can be undone, and picking a colour is one undo step.
 
-The next beat goes back to the project's look, so nothing carries over by accident. The Visual Editor, the Preview Window and exported stories all show the beat's look. A font size you give a single text element in the Visual Editor still wins over both the beat's and the project's size. When your theme draws the text box with a frame picture (an imported Ren'Py theme, say), the picture is the box: **Colour** and **Opacity** then have nothing to fill, as with the project's own colours. (360 Panorama beats don't have this section.)
+The next beat goes back to the project's look, so nothing carries over by accident. The Visual Editor, the Preview Window and exported stories all show the beat's look. A font size you give a single text element in the Visual Editor still wins over both the beat's and the project's size. When your theme draws the text box with a frame picture (an imported Ren'Py theme, say), the picture is the box, so **Colour** and **Opacity** have nothing to fill, as with the project's own colours. To give one beat a plain box instead (a flashback, say, or a beat whose picture already frames the text), set **Frame picture** to *Off on this beat (plain box)*: that beat draws a simple box, and its **Colour** and **Opacity** fill it. (360 Panorama beats don't have this section.)
 
 ### Positioning Characters
 
@@ -4217,7 +4217,7 @@ The import window lists what it found (colours, fonts and UI graphics) and shows
 - **Text outlines** (and Ren'Py's character name colours) aren't carried over.
 - **A pack with nothing usable.** If a ZIP has pictures but no text-box frame ASAPS can use, no choice-button pictures, no fonts and no `.rpy` settings, the importer explains why instead of making an empty theme. You can still upload single pictures from it and use them under Text Box → Pictures.
 
-Prefer plain text boxes? Open **Advanced Options** in the import window and untick *Use the theme's text-box picture as the frame*: the theme keeps its colours, fonts and button pictures, and the text boxes stay plain. You can still choose a frame later under [Settings → Text Box → Pictures](#text-box-pictures).
+Prefer plain text boxes? Open **Advanced Options** in the import window and untick *Use the theme's text-box picture as the frame*: the theme keeps its colours, fonts and button pictures, and the text boxes stay plain. You can still choose a frame later under [Settings → Text Box → Pictures](#text-box-pictures). To keep the frame but give a single beat a plain box, use **Frame picture** in that beat's [This beat's look](#this-beats-look).
 
 **The theme's pictures and fonts travel with your project.** When a Ren'Py theme is applied, its text-box frame picture, its button pictures (the normal one and the one under the pointer) and its fonts are copied into the project as ordinary assets, and a notice lists them. You'll find them in **Assets** like any other picture or font. From then on the look is the same everywhere: both Visual Editor layouts, the Preview Window, HTML exports, `.asaps` copies, and project folders shared through Git, so a teammate on another computer sees the frame and fonts without installing the theme. A project made with an earlier version gets the same treatment the first time you open it on a computer where its theme is installed.
 
