@@ -1,5 +1,17 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.153, 2026-10-31)
+
+### Overview
+Open-questions pass after v0.9.153. Fixed: the constraint path analyzer ignored every Set Variable beat made in the editor.
+
+### Fix: the constraint analyzer ignored Set Variable beats
+- `ConstraintPathAnalyzer.applyBeatEffects` read a Set Variable beat's variable as `params.variableName || params.variable`; the beat stores it as `name` (SetVariableBeat), so the analyzer never saw the variable set and could report a Condition Check's branch on it as reachable or not by the starting value. Now `name` first, the older spellings after. Test in `ConstraintPathAnalyzer.test.ts` (fails before the fix).
+
+**Files modified:** packages/core/src/analysis/ConstraintPathAnalyzer.ts, tests/analysis/ConstraintPathAnalyzer.test.ts
+
+---
+
 ## 2026-10-31: The story-logic release (v0.9.153)
 
 ### Overview

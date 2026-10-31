@@ -451,7 +451,8 @@ export class ConstraintPathAnalyzer {
 
     // Handle setVariable beat
     if (beat.type === 'setVariable') {
-      const varName = params.variableName || params.variable;
+      // The beat stores `name` (SetVariableBeat); variableName / variable are older spellings.
+      const varName = params.name || params.variableName || params.variable;
       const value = params.value;
       const operation = params.operation || 'set';
 

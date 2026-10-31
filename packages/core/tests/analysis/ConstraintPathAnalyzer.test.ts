@@ -287,4 +287,13 @@ describe('choice beats keep their other ways on', () => {
     ]);
     expect(endings(story)).toEqual(['boarding']);
   });
+
+  it("reads a Set Variable beat's variable by the name it is stored under", () => {
+    const story = build([
+      { id: 'set', type: 'setVariable', parameters: { name: 'door', value: 'open', operation: 'set' }, connections: [{ targetId: 'check' }] },
+      { id: 'check', type: 'conditionBeat', parameters: { conditionType: 'variable', variableName: 'door', operator: '==', value: 'open', trueTarget: 'in', falseTarget: 'out' } },
+      end('in'), end('out'),
+    ]);
+    expect(endings(story)).toEqual(['in']);
+  });
 });
