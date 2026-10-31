@@ -5,6 +5,7 @@ import type {
   Transition,
   Sound,
   AnimationPath,
+  BeatLook,
 } from '../types';
 import type { IRenderer } from '../types';
 
@@ -31,7 +32,7 @@ export const DEFAULT_TARGET_TIMEOUT_TYPES: ReadonlySet<string> = new Set([
 export const BEAT_BASE_PARAMETERS: ReadonlySet<string> = new Set([
   'defaultTargetDelay', 'showTimer', 'node', 'slotIntent', 'spatialFit', 'slotAnimations', 'spatialAnimations',
   'animations', 'notes', 'speaker', 'characterRef', 'showSpeaker', 'timeDisplayMode', 'timeDisplayText',
-  'overrideCountdownMeter', 'explainHuds', 'requires', 'requiresMode', 'textBoxBorder',
+  'overrideCountdownMeter', 'explainHuds', 'requires', 'requiresMode', 'textBoxBorder', 'look',
 ]);
 
 /** Can this beat's defaultTarget ever fire? (on its timer, or as the only exit) */
@@ -82,6 +83,8 @@ export abstract class Beat {
    * Text Box border (Settings → Text Box); unset follows the project.
    */
   public textBoxBorder?: 'show' | 'hide';
+  /** This beat's own look over the project's (colours, text box, fonts); unset follows the project. */
+  public look?: BeatLook;
   /**
    * Responsive motion intent (P3-anim). Per-slot enter/exit/emphasis (and
    * later spatial pan/zoom + hotspot reveal). DELIBERATELY a separate
@@ -154,6 +157,10 @@ export abstract class Beat {
       const border = (config as any).textBoxBorder ?? (config.parameters as any)?.textBoxBorder;
       this.textBoxBorder = border === 'show' || border === 'hide' ? border : undefined;
     }
+    {
+      const look = (config as any).look ?? (config.parameters as any)?.look;
+      this.look = look && typeof look === 'object' && !Array.isArray(look) ? look : undefined;
+    }
     this.slotAnimations = (config.parameters as any)?.slotAnimations ?? (config as any).slotAnimations;
     this.spatialAnimations = (config.parameters as any)?.spatialAnimations ?? (config as any).spatialAnimations;
     this.animations = (config as any).animations || (config.parameters as any)?.animations;
@@ -208,6 +215,7 @@ export abstract class Beat {
       if (value === undefined || value === null) continue;
       if (key === 'spatialFit' && value !== 'contain' && value !== 'cover') continue;
       if (key === 'textBoxBorder' && value !== 'show' && value !== 'hide') continue;
+      if (key === 'look' && (typeof value !== 'object' || Array.isArray(value))) continue;
       if (key === 'requiresMode') {
         if (value === 'any' || value === 'all') this.requiresMode = value;
         continue;
@@ -283,6 +291,7 @@ export abstract class Beat {
       renderer.setState('spatialFit', this.spatialFit);
       // Same rule: always set, so one beat's border choice can't leak on.
       renderer.setState('textBoxBorder', this.textBoxBorder);
+      renderer.setState('beatLook', this.look);
 
       // Fixed-frame island (decision C, 2026-08-31): a beat whose
       // parameters carry fixedFrame keeps its authored aspect on
@@ -832,6 +841,7 @@ export abstract class Beat {
       ...(this.textBoxBorder === 'show' || this.textBoxBorder === 'hide'
         ? { textBoxBorder: this.textBoxBorder }
         : {}),
+      ...(this.look && Object.keys(this.look).length > 0 ? { look: this.look } : {}),
     };
 
     const json = {

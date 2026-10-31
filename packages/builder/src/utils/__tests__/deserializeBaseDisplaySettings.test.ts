@@ -18,3 +18,13 @@ describe('loading keeps a beat\'s display settings', () => {
     expect(b.textBoxBorder).toBe('show');
   });
 });
+
+describe('loading keeps a beat\'s own look', () => {
+  const look = { stageColor: '#101010', textBox: { opacity: 40 }, fonts: { textFont: 'Georgia' } };
+  it('from the top level and from the parameters', () => {
+    const [a] = deserializeBeats([{ id: 'a', name: 'A', type: 'infoText', x: 0, y: 0, look, parameters: { text: 'hi' } }]) as any[];
+    const [b] = deserializeBeats([{ id: 'b', name: 'B', type: 'infoText', x: 0, y: 0, parameters: { text: 'hi', look } }]) as any[];
+    expect(a.look).toEqual(look);
+    expect(b.look).toEqual(look);
+  });
+});

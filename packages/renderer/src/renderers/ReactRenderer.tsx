@@ -6,9 +6,10 @@ import ReactDOM from 'react-dom/client';
 import { BaseRenderer } from './BaseRenderer';
 import { getAudioManager } from '../audio/AudioManager';
 import { computeStageFitScale } from '../utils/hudLayout';
-import type { Location, AnimationPath, SlotIntent, DialogExchange, FreeLayoutScreen } from '@asaps/core';
+import type { Location, AnimationPath, SlotIntent, DialogExchange, FreeLayoutScreen, BeatLook } from '@asaps/core';
 import { placeByPercent } from '../utils/freeLayoutPlacement';
 import { applyTextBoxBorder } from '../utils/textBoxBorder';
+import { applyBeatLook } from '../utils/beatLook';
 
 /** One piece of a line read aloud: whose voice reads it. */
 export interface TTSVoiceSegment { text: string; speaker?: string }
@@ -1093,7 +1094,7 @@ export class ReactRenderer extends BaseRenderer {
   private characterPortraitResolver: ((speakerName: string) => string | undefined) | null = null;  // Speaker portrait resolver
   /** A speaker's character Theme Color (speakerDisplay.useCharacterColors). */
   private speakerColorResolver: ((speakerName: string) => string | undefined) | null = null;
-  private speakerThemeCache: { base: RenderThemeSettings | undefined; color: string; border: string; theme: RenderThemeSettings } | null = null;
+  private speakerThemeCache: { base: RenderThemeSettings | undefined; color: string; border: string; look: BeatLook | undefined; theme: RenderThemeSettings } | null = null;
   protected timerState: { totalTime: number; remainingTime: number; visible: boolean; label?: string } | undefined;  // NEW: Timer state for progress bar
   private timerStateListeners: Set<(state: typeof this.timerState) => void> = new Set();  // Listeners for timer state changes
   protected timerHudConfig: import('../components/TimerHudDisplay').TimerHudConfig | undefined;  // Timer HUD config from global settings
@@ -1343,7 +1344,7 @@ export class ReactRenderer extends BaseRenderer {
           countdownMeterValue={this.countdownMeterValue}
           overrideCountdownMeter={this.overrideCountdownMeter}
           fontScale={this.mobileFontScale}
-          fontFamily={this.theme?.fonts?.textFont}
+          fontFamily={this.speakerTheme()?.fonts?.textFont}
           onSubscribeReservedHudRects={(l) => this.subscribeToReservedHudRects(l)}
         />
       </>
@@ -1654,6 +1655,17 @@ export class ReactRenderer extends BaseRenderer {
    * Name Color stands). The same object comes back while nothing changed, so
    * views don't re-render for it.
    */
+  /**
+   * Whether this beat hides its text or button boxes: the beat's own look
+   * decides when it sets a visibility, else the project's (or the editor's
+   * explicit setHideTextBoxes/setHideButtonBoxes).
+   */
+  protected beatHidesBoxes(which: 'text' | 'button'): boolean {
+    const vis = (this.getState('beatLook') as BeatLook | undefined)?.textBox?.visibility;
+    if (!vis) return which === 'text' ? this.hideTextBoxes : this.hideButtonBoxes;
+    return which === 'text' ? vis === 'hideText' || vis === 'hideAll' : vis === 'hideAll';
+  }
+
   protected speakerTheme(): RenderThemeSettings | undefined {
     const base = this.theme;
     if (!base) return base;
@@ -1665,14 +1677,16 @@ export class ReactRenderer extends BaseRenderer {
     // project's: 'hide' drops the border, 'show' draws one even where the
     // project has none.
     const border = (this.getState('textBoxBorder') as string | undefined) ?? '';
-    if (!color && border !== 'show' && border !== 'hide') return base;
+    // A beat's own look (Beat.look: colours, text box, fonts) over the project's.
+    const look = this.getState('beatLook') as BeatLook | undefined;
+    if (!color && border !== 'show' && border !== 'hide' && !look) return base;
     const c = this.speakerThemeCache;
-    if (c && c.base === base && c.color === color && c.border === border) return c.theme;
+    if (c && c.base === base && c.color === color && c.border === border && c.look === look) return c.theme;
     const named: RenderThemeSettings = color
       ? { ...base, speakerDisplay: { ...base.speakerDisplay, nameColor: color } } as RenderThemeSettings
       : base;
-    const theme: RenderThemeSettings = applyTextBoxBorder(named, border);
-    this.speakerThemeCache = { base, color, border, theme };
+    const theme: RenderThemeSettings = applyTextBoxBorder(applyBeatLook(named, look), border);
+    this.speakerThemeCache = { base, color, border, look, theme };
     return theme;
   }
 
@@ -1740,7 +1754,7 @@ export class ReactRenderer extends BaseRenderer {
       const defaultGradient = 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
       const backgroundColor = this.backgroundImageUrl
         ? 'transparent'
-        : (this.theme?.backgroundColor || defaultGradient);
+        : (this.speakerTheme()?.backgroundColor || defaultGradient);
 
       const stageWidth = this.context.width;
       const stageHeight = this.context.height;
@@ -1808,7 +1822,7 @@ export class ReactRenderer extends BaseRenderer {
       // Inline input component with optional mic button and auto-listen mode.
       // Chrome derives from the theme (was hardcoded white field + #0a66c2
       // Send) so the bar sits inside ANY theme, incl. the dark default.
-      const inputTheme = this.theme;
+      const inputTheme = this.speakerTheme();
       const inputInsetRight = this.chatInputRightInset;
       const ConversationInput = () => {
         const [inputText, setInputText] = React.useState('');
@@ -2165,16 +2179,16 @@ export class ReactRenderer extends BaseRenderer {
             : { top: `${boxRect.top}%` };
         // Match the VE's dialog-box styling (PositionedBeatView reads the same
         // theme.textBox). No drop shadow — the VE has none.
-        const tb = this.theme?.textBox;
+        const tb = this.speakerTheme()?.textBox;
         const panelBg = tb?.backgroundColor || 'rgba(15,23,42,0.82)';
         const borderW = typeof tb?.borderWidth === 'number' ? tb.borderWidth : 0;
         const borderRadius = typeof tb?.borderRadius === 'number' ? tb.borderRadius : 12;
         const pad = typeof tb?.padding === 'number' ? tb.padding : 18;
-        const textColor = this.theme?.colors?.textColor || '#f8fafc';
+        const textColor = this.speakerTheme()?.colors?.textColor || '#f8fafc';
         // Faithful background: in fit mode ScaledStage does NOT paint a
         // background (PositionedBeatView normally does), so render our own
         // stage-filling background layer — image (cover) or theme color.
-        const stageBg = this.backgroundImageUrl ? undefined : (this.theme?.backgroundColor || defaultGradient);
+        const stageBg = this.backgroundImageUrl ? undefined : (this.speakerTheme()?.backgroundColor || defaultGradient);
         this.renderComponent(
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <ScaledStage
@@ -2807,7 +2821,7 @@ export class ReactRenderer extends BaseRenderer {
         if (fitOverride === 'contain' || fitOverride === 'cover') {
           spatialSpec.fit = fitOverride;
         }
-        const spBg = this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
+        const spBg = this.speakerTheme()?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
         console.log(`[ReactRenderer ${this.instanceId}] Rendering SPATIAL-MODE ${beatType} (no author locations)`);
         const spIntent = (this.getState('slotIntent') as SlotIntent | undefined)
           ?? (content.slotIntent as SlotIntent | undefined);
@@ -2860,7 +2874,7 @@ export class ReactRenderer extends BaseRenderer {
       if (slotSpec) {
         const slotBg = this.backgroundImageUrl
           ? 'transparent'
-          : (this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
+          : (this.speakerTheme()?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
         console.log(`[ReactRenderer ${this.instanceId}] Rendering SLOT-MODE ${beatType} (no author locations)`);
         // Soft author layout intent travels via renderer state (same
         // uniform channel as currentBeatType) so no render-method signatures
@@ -2934,7 +2948,7 @@ export class ReactRenderer extends BaseRenderer {
       const defaultGradient = 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
       const backgroundColor = this.backgroundImageUrl
         ? 'transparent'
-        : (this.theme?.backgroundColor || defaultGradient);
+        : (this.speakerTheme()?.backgroundColor || defaultGradient);
 
       // Get showTextOnHover from renderer state (set by MovementChoiceBeat)
       const showTextOnHover = this.getState('showTextOnHover') || false;
@@ -2976,8 +2990,8 @@ export class ReactRenderer extends BaseRenderer {
               elements={elements}
               onAction={this.handleAction}
               interactive={true}
-              hideTextBoxes={this.hideTextBoxes}
-              hideButtonBoxes={this.hideButtonBoxes}
+              hideTextBoxes={this.beatHidesBoxes('text')}
+              hideButtonBoxes={this.beatHidesBoxes('button')}
               theme={this.speakerTheme()}
               previewMode={false}
               visitedBeats={this.visitedBeats}
@@ -3303,7 +3317,7 @@ export class ReactRenderer extends BaseRenderer {
     const defaultGradient = 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
     const backgroundColor = this.backgroundImageUrl
       ? 'transparent'
-      : (this.theme?.backgroundColor || defaultGradient);
+      : (this.speakerTheme()?.backgroundColor || defaultGradient);
 
     // Bug 20 — chat presentation modes render responsively. ChatDialogView
     // is already flex-internally; the legacy ScaledStage wrapper was
@@ -3445,7 +3459,7 @@ export class ReactRenderer extends BaseRenderer {
         if (fitOverride === 'contain' || fitOverride === 'cover') {
           spatialSpec.fit = fitOverride;
         }
-        const bg = this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
+        const bg = this.speakerTheme()?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
         const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
         const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
         const spatialAnimations = (this.getState('spatialAnimations') as Record<string, any> | undefined);
@@ -3591,7 +3605,7 @@ export class ReactRenderer extends BaseRenderer {
     if (useSlotMode && effectiveSlotSpec) {
       const slotBg = this.backgroundImageUrl
         ? 'transparent'
-        : (this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
+        : (this.speakerTheme()?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
       const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
       const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
       const slotTemplate: 'stacked' | 'conversation' | 'custom' = rawTemplate === 'conversation'
@@ -3833,7 +3847,7 @@ export class ReactRenderer extends BaseRenderer {
         if (fitOverride === 'contain' || fitOverride === 'cover') {
           spatialSpec.fit = fitOverride;
         }
-        const bg = this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
+        const bg = this.speakerTheme()?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
         const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
         const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
         const spatialAnimations = (this.getState('spatialAnimations') as Record<string, any> | undefined);
@@ -3905,7 +3919,7 @@ export class ReactRenderer extends BaseRenderer {
     if (projectIsResponsive && !anyHasHotspot && !authorPositioned) {
       const slotBg = this.backgroundImageUrl
         ? 'transparent'
-        : (this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
+        : (this.speakerTheme()?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
       const moveSlots: SlotSpec[] = [
         { name: 'question', role: 'body', source: 'question' },
         { name: 'actions', role: 'action' },
@@ -3992,7 +4006,7 @@ export class ReactRenderer extends BaseRenderer {
         if (fitOverride === 'contain' || fitOverride === 'cover') {
           spatialSpec.fit = fitOverride;
         }
-        const bg = this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
+        const bg = this.speakerTheme()?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
         const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
         const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
         const spatialAnimations = (this.getState('spatialAnimations') as Record<string, any> | undefined);
@@ -4051,7 +4065,7 @@ export class ReactRenderer extends BaseRenderer {
     if (projectIsResponsive && !anyHasHotspot && !authorPositioned) {
       const slotBg = this.backgroundImageUrl
         ? 'transparent'
-        : (this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
+        : (this.speakerTheme()?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
       const propSlots: SlotSpec[] = [
         { name: 'question', role: 'body', source: 'question' },
         { name: 'actions', role: 'action' },
@@ -4778,34 +4792,36 @@ export class ReactRenderer extends BaseRenderer {
             resolveAssetUrl={(assetId) => this.resolveAssetUrl(assetId) || undefined}
             soundBlobResolver={this.soundBlobResolver || undefined}
             stageWidth={this.context.width}
-            hotspotStyle={this.theme?.hotspot ? {
-              highlightColor: this.theme.hotspot.highlightColor,
-              opacity: this.theme.hotspot.opacity,
-              visible: this.theme.hotspot.visible,
-              showInPreview: this.theme.hotspot.showInPreview,
-              labelDisplay: this.theme.hotspot.labelDisplay,
-              fontFamily: this.theme.fonts?.textFont,
-              fontSize: this.theme.fonts?.textFontSize,
-              fontColor: this.theme.colors?.textColor,
-              tooltipBackgroundColor: this.theme.button?.backgroundColor,
-              tooltipTextColor: this.theme.button?.textColor,
-              tooltipBorderColor: this.theme.button?.borderColor,
-              tooltipBorderRadius: this.theme.button?.borderRadius,
-              tooltipFontFamily: this.theme.fonts?.buttonFont,
-            } : undefined}
-            promptStyle={this.theme ? {
-              fontFamily: this.theme.fonts?.textFont,
-              fontSize: this.theme.fonts?.textFontSize,
-              color: this.theme.colors?.textColor,
-              backgroundColor: this.theme.textBox?.backgroundColor?.startsWith('#')
-                ? `rgba(${parseInt(this.theme.textBox.backgroundColor.slice(1,3), 16)}, ${parseInt(this.theme.textBox.backgroundColor.slice(3,5), 16)}, ${parseInt(this.theme.textBox.backgroundColor.slice(5,7), 16)}, ${(this.theme.textBox.opacity ?? 70) / 100})`
-                : this.theme.textBox?.backgroundColor || undefined,
-              border: (this.theme.textBox?.borderWidth && this.theme.textBox?.borderColor)
-                ? `${this.theme.textBox.borderWidth}px solid ${this.theme.textBox.borderColor}`
+            {...((th) => ({
+            hotspotStyle: th?.hotspot ? {
+              highlightColor: th!.hotspot!.highlightColor,
+              opacity: th!.hotspot!.opacity,
+              visible: th!.hotspot!.visible,
+              showInPreview: th!.hotspot!.showInPreview,
+              labelDisplay: th!.hotspot!.labelDisplay,
+              fontFamily: th!.fonts?.textFont,
+              fontSize: th!.fonts?.textFontSize,
+              fontColor: th!.colors?.textColor,
+              tooltipBackgroundColor: th!.button?.backgroundColor,
+              tooltipTextColor: th!.button?.textColor,
+              tooltipBorderColor: th!.button?.borderColor,
+              tooltipBorderRadius: th!.button?.borderRadius,
+              tooltipFontFamily: th!.fonts?.buttonFont,
+            } : undefined,
+            promptStyle: th ? {
+              fontFamily: th!.fonts?.textFont,
+              fontSize: th!.fonts?.textFontSize,
+              color: th!.colors?.textColor,
+              backgroundColor: th!.textBox?.backgroundColor?.startsWith('#')
+                ? `rgba(${parseInt(th!.textBox.backgroundColor.slice(1,3), 16)}, ${parseInt(th!.textBox.backgroundColor.slice(3,5), 16)}, ${parseInt(th!.textBox.backgroundColor.slice(5,7), 16)}, ${(th!.textBox.opacity ?? 70) / 100})`
+                : th!.textBox?.backgroundColor || undefined,
+              border: (th!.textBox?.borderWidth && th!.textBox?.borderColor)
+                ? `${th!.textBox.borderWidth}px solid ${th!.textBox.borderColor}`
                 : undefined,
-              borderRadius: this.theme.textBox?.borderRadius ?? 8,
-              padding: this.theme.textBox?.padding ?? 8,
-            } : undefined}
+              borderRadius: th!.textBox?.borderRadius ?? 8,
+              padding: th!.textBox?.padding ?? 8,
+            } : undefined,
+            }))(this.speakerTheme())}
           />
         </div>
       );

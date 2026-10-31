@@ -556,6 +556,7 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         // Base-class display settings, stored top-level or in parameters.
         spatialFit: beatData.spatialFit ?? beatData.parameters?.spatialFit,
         textBoxBorder: beatData.textBoxBorder ?? beatData.parameters?.textBoxBorder,
+        look: beatData.look ?? beatData.parameters?.look,
         // State requirements (Level-2 authoring). Accept both top-level and
         // nested-in-parameters placements for forward/backwards compatibility.
         requires: beatData.requires ?? beatData.parameters?.requires,

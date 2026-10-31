@@ -1,3 +1,4 @@
+import { BeatLookSection, type BeatLookValue } from './BeatLookSection';
 import React, { useState } from 'react';
 import { duplicateHudCounterOwner } from '../../utils/duplicateHudCounter';
 import {
@@ -168,6 +169,9 @@ interface VisualPropertiesPanelProps {
   // concern and belongs next to the "Change Background" button.
   spatialFit?: 'contain' | 'cover';
   onSpatialFitChange?: (fit: 'contain' | 'cover' | undefined) => void;
+  /** This beat's look over the project's ("This beat's look"). */
+  beatLook?: BeatLookValue;
+  onBeatLookChange?: (next: BeatLookValue) => void;
 }
 
 // Helper to format beat type for display (camelCase -> Title Case)
@@ -241,6 +245,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   onVideoSettingsChange,
   spatialFit,
   onSpatialFitChange,
+  beatLook,
+  onBeatLookChange,
 }) => {
   // Get available fonts (built-in + custom from assets)
   const { fonts } = useFonts(assets);
@@ -1022,6 +1028,18 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
             </div>
           )}
         </div>}
+
+        {/* This beat's look: the project's colours, text box and fonts, for this beat only */}
+        {onBeatLookChange && (
+          <BeatLookSection
+            value={beatLook ?? {}}
+            globalSettings={globalSettings}
+            fonts={fonts}
+            expanded={!!expandedSections.beatLook}
+            onToggle={() => toggleSection('beatLook')}
+            onChange={onBeatLookChange}
+          />
+        )}
 
         {/* Transition Section - Beat-level setting */}
         {onBeatTransitionChange && (

@@ -337,6 +337,7 @@ function serializeBeatForStory(beat: Beat): any {
     // fit and text-box border.
     ...(beat.spatialFit ? { spatialFit: beat.spatialFit } : {}),
     ...(beat.textBoxBorder ? { textBoxBorder: beat.textBoxBorder } : {}),
+    ...((beat as any).look ? { look: (beat as any).look } : {}),
     parameters: beat.getParameters?.() || {},
     connections: beat.connections?.map(conn => ({
       targetId: conn.targetId,

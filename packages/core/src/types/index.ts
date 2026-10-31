@@ -17,6 +17,45 @@ export interface VideoCaption {
   displayText?: string;
 }
 
+/**
+ * One beat's own look, over the project's (Project Settings ▸ Colors, Text
+ * Box, Fonts). Every field is optional; unset follows the project. Values are
+ * in the renderer's theme units (colours as CSS colours, opacity 0-100,
+ * sizes in px). Set in the Visual Editor's "This beat's look" section; the
+ * renderer lays it over the project theme for this beat only
+ * (renderer utils/beatLook.ts). The text-box border is Beat.textBoxBorder.
+ */
+export interface BeatLook {
+  /** Stage colour, where no background picture covers it. */
+  stageColor?: string;
+  textBox?: {
+    backgroundColor?: string;
+    opacity?: number;
+    borderColor?: string;
+    borderWidth?: number;
+    borderRadius?: number;
+    padding?: number;
+    /** 'hideText' hides text/dialog boxes, 'hideAll' button boxes too, 'all' shows them where the project hides them. */
+    visibility?: 'all' | 'hideText' | 'hideAll';
+  };
+  textColor?: string;
+  button?: {
+    backgroundColor?: string;
+    textColor?: string;
+    borderColor?: string;
+    borderRadius?: number;
+  };
+  /** Font names as an element's font (the renderer resolves the family); sizes in px. */
+  fonts?: {
+    titleFont?: string;
+    textFont?: string;
+    buttonFont?: string;
+    titleFontSize?: number;
+    textFontSize?: number;
+    buttonFontSize?: number;
+  };
+}
+
 export interface Location {
   kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'input' | 'meter' | 'keypad' | 'webview' | 'camera';
   name: string;
@@ -48,6 +87,16 @@ export interface Location {
   /** Mirrored left↔right / upside down — a sprite facing the other way without a second picture (pictures, characters, props). */
   flipX?: boolean;
   flipY?: boolean;
+  /**
+   * How a picture (prop, character) fills its box. 'scale': the picture is
+   * drawn at the box's size. 'crop': the box is a window onto the picture,
+   * which sits at `imageFrame`. Unset: the picture is drawn at its own size
+   * (times `size`), as before 2026-10-31 — dragging a box edge then cropped
+   * it, which surprised authors, so the editor sets 'scale' on a resize.
+   */
+  imageFit?: 'scale' | 'crop';
+  /** With imageFit 'crop': where the picture sits, as fractions of the box (x, y may be negative, w/h above 1). */
+  imageFrame?: { x: number; y: number; w: number; h: number };
   // Character-specific fields (for kind='character')
   characterId?: string;     // Reference to Character definition (modern)
   characterName?: string;   // Character name for ASML export and legacy import

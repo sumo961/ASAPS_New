@@ -30,3 +30,28 @@ describe('Beat.textBoxBorder', () => {
     expect(renderer.setState).toHaveBeenCalledWith('textBoxBorder', undefined);
   });
 });
+
+describe('Beat.look', () => {
+  const look = { stageColor: '#102030', textBox: { backgroundColor: '#000000', opacity: 50 }, fonts: { textFontSize: 22 } };
+
+  it('reads an object from the beat or its parameters, ignores anything else', () => {
+    expect(make({ look }).look).toEqual(look);
+    expect(make({ parameters: { text: 'Hi', look } }).look).toEqual(look);
+    expect(make({ look: 'dark' }).look).toBeUndefined();
+    expect(make({ look: [1] }).look).toBeUndefined();
+  });
+
+  it('round-trips through toJSON, and an empty look is not written', () => {
+    expect(make({ parameters: make({ look }).toJSON().parameters }).look).toEqual(look);
+    expect(make({ look: {} }).toJSON().parameters.look).toBeUndefined();
+  });
+
+  it('tells the renderer on every beat, unset included', async () => {
+    const renderer: any = {
+      setState: vi.fn(), getState: vi.fn(), renderText: vi.fn(async () => 'continue'),
+      renderChoices: vi.fn(async () => 'continue'), clear: vi.fn(),
+    };
+    await make({}).execute(new StoryContext(), renderer).catch(() => undefined);
+    expect(renderer.setState).toHaveBeenCalledWith('beatLook', undefined);
+  });
+});

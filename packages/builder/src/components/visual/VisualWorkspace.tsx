@@ -24,11 +24,11 @@ import { MarkersPlugin as PSVMarkersPlugin } from '@photo-sphere-viewer/markers-
 import '@photo-sphere-viewer/core/index.css';
 import '@photo-sphere-viewer/markers-plugin/index.css';
 import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
-import type { DialogNode, DialogChoice } from '@asaps/core';
+import type { DialogNode, DialogChoice, BeatLook } from '@asaps/core';
 import type { SlotIntentResolution, SlotIntentEntry, SlotAnimations, SpatialAnimations } from '@asaps/core';
 import { mergeSlotIntent } from '../../utils/slotIntentEdit';
 import { resolveLayoutMode } from '../../utils/projectLayoutMode';
-import { SlotFlowView, SpatialFlowView, ChatDialogView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec, TimerHudDisplay, ScreenHudLayer, buildScreenHudLayout, resolveMeterFrame, toMeterCounterData, type TimerHudConfig, type ScreenHudCharacter , LEGACY_TEXT_LOCATION_NAME, applyTextBoxBorder } from '@asaps/renderer';
+import { SlotFlowView, SpatialFlowView, ChatDialogView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec, TimerHudDisplay, ScreenHudLayer, buildScreenHudLayout, resolveMeterFrame, toMeterCounterData, type TimerHudConfig, type ScreenHudCharacter , LEGACY_TEXT_LOCATION_NAME, applyTextBoxBorder, applyBeatLook } from '@asaps/renderer';
 import { hudStackWarnings, describeHudStackWarning } from '../../utils/hudStackWarning';
 import { HotspotEditOverlay } from './HotspotEditOverlay';
 import type { Hotspot } from '@asaps/core';
@@ -1480,19 +1480,23 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Memoized render theme for smart sizing - converts GlobalSettings to RenderThemeSettings
   // The beat's own text-box border choice applies on the canvas too.
   const beatTextBoxBorder = (beat as any)?.textBoxBorder as 'show' | 'hide' | undefined;
+  // And its own look (colours, text box, fonts): see "This beat's look".
+  const beatLook = (beat as any)?.look as BeatLook | undefined;
+  const beatLookKey = beatLook ? JSON.stringify(beatLook) : '';
   // The theme's frame and button pictures ride along, as in the fixed-layout
   // editor and the Preview — without them the responsive canvas showed plain
   // boxes where the Preview showed the theme's frame.
   const renderTheme = useMemo(() => {
     if (!globalSettings) return null;
     return {
-      ...applyTextBoxBorder(convertGlobalSettingsToTheme(globalSettings), beatTextBoxBorder),
+      ...applyTextBoxBorder(applyBeatLook(convertGlobalSettingsToTheme(globalSettings), beatLook), beatTextBoxBorder),
       textboxFrameUrl: themeAssets?.textboxFrame,
       buttonNormalUrl: themeAssets?.buttonNormal,
       buttonHoverUrl: themeAssets?.buttonHover,
       buttonLayout: themeAssets?.buttonLayout,
     };
-  }, [globalSettings, beatTextBoxBorder, themeAssets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalSettings, beatTextBoxBorder, beatLookKey, themeAssets]);
 
   // ---- Undo/Redo snapshot tracking for visual element changes ----
   const snapshotRef = useRef<VisualElement[] | null>(null);
@@ -2439,6 +2443,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
       if (el.flipX) location.flipX = true;
       if (el.flipY) location.flipY = true;
+      if (el.imageFit) location.imageFit = el.imageFit;
+      if (el.imageFrame) location.imageFrame = el.imageFrame;
       if (el.scale !== undefined && el.scale !== 1) location.scale = el.scale;
 
       // Add character-specific properties
@@ -2809,6 +2815,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
         if (el.flipX) location.flipX = true;
         if (el.flipY) location.flipY = true;
+        if (el.imageFit) location.imageFit = el.imageFit;
+        if (el.imageFrame) location.imageFrame = el.imageFrame;
         if (el.scale !== undefined && el.scale !== 1) location.scale = el.scale;
 
         // Add character-specific properties (for kind='character')
@@ -3212,6 +3220,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             rotation: loc.rotation ?? 0,
             ...(loc.flipX ? { flipX: true } : {}),
             ...(loc.flipY ? { flipY: true } : {}),
+            ...(loc.imageFit ? { imageFit: loc.imageFit } : {}),
+            ...(loc.imageFrame ? { imageFrame: loc.imageFrame } : {}),
             scale: loc.scale ?? 1,
             visible: true,
             locked: false,
@@ -3389,6 +3399,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             rotation: (loc as any).rotation ?? 0,
             ...((loc as any).flipX ? { flipX: true } : {}),
             ...((loc as any).flipY ? { flipY: true } : {}),
+            ...((loc as any).imageFit ? { imageFit: (loc as any).imageFit } : {}),
+            ...((loc as any).imageFrame ? { imageFrame: (loc as any).imageFrame } : {}),
             scale: (loc as any).scale ?? 1,
             visible: true,
             locked: false,
@@ -3537,6 +3549,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               rotation: loc.rotation ?? 0,
               ...(loc.flipX ? { flipX: true } : {}),
               ...(loc.flipY ? { flipY: true } : {}),
+              ...(loc.imageFit ? { imageFit: loc.imageFit } : {}),
+              ...(loc.imageFrame ? { imageFrame: loc.imageFrame } : {}),
               scale: loc.scale ?? 1,
               visible: true,
               locked: false,
@@ -3681,6 +3695,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           rotation: loc.rotation ?? 0,
           ...(loc.flipX ? { flipX: true } : {}),
           ...(loc.flipY ? { flipY: true } : {}),
+          ...(loc.imageFit ? { imageFit: loc.imageFit } : {}),
+          ...(loc.imageFrame ? { imageFrame: loc.imageFrame } : {}),
           scale: loc.scale ?? 1,
           visible: true,
           locked: false,
@@ -3901,6 +3917,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           rotation: loc.rotation || 0,
           ...(loc.flipX ? { flipX: true } : {}),
           ...(loc.flipY ? { flipY: true } : {}),
+          ...(loc.imageFit ? { imageFit: loc.imageFit } : {}),
+          ...(loc.imageFrame ? { imageFrame: loc.imageFrame } : {}),
           scale: loc.scale || 1,
           visible: true,
           locked: false,
@@ -4992,6 +5010,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
       if (el.flipX) location.flipX = true;
       if (el.flipY) location.flipY = true;
+      if (el.imageFit) location.imageFit = el.imageFit;
+      if (el.imageFrame) location.imageFrame = el.imageFrame;
       if (el.scale !== undefined && el.scale !== 1) location.scale = el.scale;
 
       // Add font properties (only if explicitly overridden by user)
@@ -5981,10 +6001,21 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     ? ((beat as any).spatialFit as 'contain' | 'cover' | undefined)
                     : undefined
                 }
+                beatLook={{ look: (beat as any).look, textBoxBorder: (beat as any).textBoxBorder }}
+                onBeatLookChange={
+                  onBeatUpdate && beat.type !== 'panorama'
+                    ? (next) => {
+                        // Not written onto the beat first: the update records
+                        // the beat as it was, so Undo puts the look back.
+                        onBeatUpdate(beat.id, { look: next.look, textBoxBorder: next.textBoxBorder } as any);
+                        setHasChanges(true);
+                      }
+                    : undefined
+                }
                 onSpatialFitChange={
                   beat.type !== 'panorama' && onBeatUpdate
                     ? (fit) => {
-                        (beat as any).spatialFit = fit;
+                        // Not written onto the beat first, so Undo can put the old fit back.
                         onBeatUpdate(beat.id, { spatialFit: fit } as any);
                         setHasChanges(true);
                       }
@@ -7241,6 +7272,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           /* Layout Mode: Standard Visual Beat Editor (with viewport rect for panorama) */
           <VisualBeatEditor
             textBoxBorder={beatTextBoxBorder}
+            look={beatLook}
             backgroundAssetId={backgroundAssetId}
             backgroundUrl={backgroundUrl}
             chatFrameImageAssetId={beat?.type === 'dialogTree' && /^chat-/.test(String((beat.getParameters?.() as any)?.layoutTemplate || '')) ? (beat.getParameters?.() as any)?.chatFrameImage : undefined}

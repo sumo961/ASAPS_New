@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { applyTextBoxBorder } from '@asaps/renderer';
+import { applyTextBoxBorder, applyBeatLook } from '@asaps/renderer';
 import {
   Move,
   Square,
@@ -28,7 +28,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
-import type { Location } from '@asaps/core';
+import type { Location, BeatLook } from '@asaps/core';
 import type { Character } from '../../types/character';
 import type { GlobalSettings } from '../../storage/types';
 import type { ThemeAssetUrls } from '../../hooks/useThemes';
@@ -57,6 +57,7 @@ import {
   alignCenterH, alignCenterV, distributeH, distributeV,
 } from './alignmentUtils';
 import { computeSnap, type SnapLine } from './snapGuides';
+import { pictureStart, resizePicture } from '../../utils/pictureResize';
 
 /**
  * Helper to resolve fresh image URL from assets using assetId.
@@ -133,6 +134,9 @@ export interface VisualElement {
   /** Mirrored left↔right / upside down (pictures, characters, props). */
   flipX?: boolean;
   flipY?: boolean;
+  /** Pictures: 'scale' fills the box, 'crop' shows the picture at imageFrame (see utils/pictureResize). */
+  imageFit?: 'scale' | 'crop';
+  imageFrame?: { x: number; y: number; w: number; h: number };
   visible: boolean;
   locked: boolean;
   name: string;
@@ -167,6 +171,8 @@ export interface VisualElement {
 interface VisualBeatEditorProps {
   /** This beat's text-box border choice ('show' | 'hide'; unset = project). */
   textBoxBorder?: 'show' | 'hide';
+  /** This beat's own look (Beat.look) over the project's. */
+  look?: BeatLook;
   backgroundAssetId?: string;
   backgroundUrl?: string; // Direct URL from ASML import
   /** Chat layouts: the frame picture (asset id) the chat window sits in, shown see-through so the window can be lined up with it. */
@@ -238,6 +244,7 @@ interface VisualBeatEditorProps {
 
 export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   textBoxBorder,
+  look,
   backgroundAssetId,
   backgroundUrl: backgroundUrlProp,
   chatFrameImageAssetId,
@@ -278,6 +285,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const [resizingElement, setResizingElement] = useState<string | null>(null);
   const [resizeCorner, setResizeCorner] = useState<'nw' | 'ne' | 'sw' | 'se' | null>(null);
   const [resizeStart, setResizeStart] = useState({ mouseX: 0, mouseY: 0, x: 0, y: 0, width: 0, height: 0 });
+  /** A picture being resized: where it was drawn at the start (pictureResize.pictureStart). */
+  const pictureResizeRef = useRef<ReturnType<typeof pictureStart> | null>(null);
+  /** Pictures' natural sizes by URL, for scaling and cropping them on the stage. */
+  const [naturalSizes, setNaturalSizes] = useState<Record<string, { w: number; h: number }>>({});
 
   // Marquee (rubber band) selection state
   const [marquee, setMarquee] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
@@ -424,7 +435,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   // common portrait aspect. Teaches the crop problem at a glance while
   // placing elements and drawing image-anchored paths.
   const [showPhoneCrop, setShowPhoneCrop] = useState(false);
-  const activeBoxVisibility = boxVisibility || 'all';
+  // The beat's own look decides first, then the project (Settings → Text Box).
+  const activeBoxVisibility = look?.textBox?.visibility || boxVisibility || globalSettings?.textbox?.boxVisibility || 'all';
   const [tool, setTool] = useState<'select' | 'hotspot' | 'text' | 'character' | 'prop'>('select');
 
   const backgroundAsset = assets.find(a => a.id === backgroundAssetId);
@@ -469,7 +481,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
 
   // Get stage background color from global settings (used when no background image is set)
-  const stageBackgroundColor = globalSettings?.colors?.bgColor || 'transparent';
+  const stageBackgroundColor = look?.stageColor || globalSettings?.colors?.bgColor || 'transparent';
 
   // Convenience: first selected element (for single-select operations like resize)
   const selectedElement = selectedElements.length > 0 ? selectedElements[0] : null;
@@ -635,6 +647,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       scale: el.scale,
       ...(el.flipX ? { flipX: true } : {}),
       ...(el.flipY ? { flipY: true } : {}),
+      ...(el.imageFit ? { imageFit: el.imageFit } : {}),
+      ...(el.imageFrame ? { imageFrame: el.imageFrame } : {}),
       // Character-specific fields
       characterId: el.characterId,
       characterName: el.characterName,
@@ -642,7 +656,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       size: el.size,
       // Include font properties directly in Location (only if explicitly overridden)
       font: el.fontOverridden ? el.font : undefined,
-      fontSize: el.fontSize,
+      // Only a size chosen for the element, as the saved story keeps it
+      // (VisualWorkspace writes fontSize only when overridden): otherwise
+      // the project's or this beat's text size applies, as in the Preview.
+      fontSize: el.fontOverridden ? el.fontSize : undefined,
       textAlign: el.textAlign,
       // Only autosize if font is not explicitly overridden
       autosize: !el.fontOverridden || el.fontSize === undefined,
@@ -792,6 +809,29 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     }
   });
 
+  // Pictures that can be scaled or cropped by hand: still images, not
+  // sprite sheets or videos. Their natural sizes are loaded once per URL.
+  const pictureUrlById = new Map<string, string>();
+  positionedElements.forEach(pe => {
+    const loc: any = pe.location;
+    if ((loc.kind === 'character' || loc.kind === 'prop') && pe.assetUrl && !pe.spriteSheet
+      && loc.assetType !== 'video' && !/\.(mp4|webm|mov|ogv)(\?|$)/i.test(pe.assetUrl) && loc.id) {
+      pictureUrlById.set(loc.id, pe.assetUrl);
+    }
+  });
+  const pictureUrlsKey = [...new Set(pictureUrlById.values())].sort().join('\n');
+  useEffect(() => {
+    for (const url of pictureUrlsKey ? pictureUrlsKey.split('\n') : []) {
+      if (naturalSizes[url]) continue;
+      const img = new Image();
+      img.onload = () => {
+        if (img.naturalWidth > 0) setNaturalSizes(prev => ({ ...prev, [url]: { w: img.naturalWidth, h: img.naturalHeight } }));
+      };
+      img.src = url;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pictureUrlsKey]);
+
   // Handle element drag and resize
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!canvasRef.current) return;
@@ -834,6 +874,15 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     if (resizingElement && resizeCorner) {
       const deltaX = (e.clientX - resizeStart.mouseX) / zoom;
       const deltaY = (e.clientY - resizeStart.mouseY) / zoom;
+
+      // Pictures scale with their proportions; Option/Alt crops instead.
+      if (pictureResizeRef.current) {
+        const next = resizePicture(pictureResizeRef.current, resizeCorner, deltaX, deltaY, e.altKey);
+        onElementsChange(elements.map(el =>
+          el.id === resizingElement ? { ...el, ...next, manuallyResized: true } : el,
+        ));
+        return;
+      }
 
       let newX = resizeStart.x;
       let newY = resizeStart.y;
@@ -990,6 +1039,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     if (!element) return;
 
     onInteractionStart?.();
+    const pictureUrl = pictureUrlById.get(elementId);
+    const natural = pictureUrl ? naturalSizes[pictureUrl] : undefined;
+    pictureResizeRef.current = natural ? pictureStart(element, natural) : null;
     setResizingElement(elementId);
     setResizeCorner(corner);
     setResizeStart({
@@ -1544,7 +1596,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                       })) || []}
                       mode={presentationMode as 'chat-scroll' | 'chat-bubble'}
                       theme={globalSettings ? (() => {
-                        const baseTheme = applyTextBoxBorder(convertGlobalSettingsToTheme(globalSettings), textBoxBorder);
+                        const baseTheme = applyTextBoxBorder(applyBeatLook(convertGlobalSettingsToTheme(globalSettings), look), textBoxBorder);
                         return {
                           ...baseTheme,
                           textEffects: {
@@ -1592,7 +1644,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         speakerName={effectiveShowSpeaker && beatContent?.speaker ? resolvedSpeakerName : undefined}
                         speakerPortraitUrl={speakerPortraitUrl}
                         theme={globalSettings ? (() => {
-                          const baseTheme = applyTextBoxBorder(convertGlobalSettingsToTheme(globalSettings), textBoxBorder);
+                          const baseTheme = applyTextBoxBorder(applyBeatLook(convertGlobalSettingsToTheme(globalSettings), look), textBoxBorder);
                           return {
                             ...baseTheme,
                             textEffects: {
@@ -1623,7 +1675,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   speakerName={effectiveShowSpeaker && beatContent?.speaker ? resolvedSpeakerName : undefined}
                   speakerPortraitUrl={speakerPortraitUrl}
                   theme={globalSettings ? (() => {
-                    const baseTheme = applyTextBoxBorder(convertGlobalSettingsToTheme(globalSettings), textBoxBorder);
+                    const baseTheme = applyTextBoxBorder(applyBeatLook(convertGlobalSettingsToTheme(globalSettings), look), textBoxBorder);
                     return {
                       ...baseTheme,
                       // Disable text animations in visual editor

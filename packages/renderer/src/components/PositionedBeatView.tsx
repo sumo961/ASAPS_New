@@ -2599,7 +2599,9 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   // The size percentage will be applied as a CSS scale transform in AssetElement
   const hasDefaultDimensions = (location.width === 100 && location.height === 100) ||
                                (location.width === 128 && location.height === 128);
+  // A picture with an imageFit ('scale' or 'crop') is drawn into its box.
   const isAssetWithSize = (location.kind === 'character' || location.kind === 'prop') &&
+                          !location.imageFit &&
                           ((location as any).size !== undefined || hasDefaultDimensions);
 
   // Ensure text/button/dialog elements always appear above characters/props
@@ -3024,6 +3026,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
             name={location.name}
             kind={location.kind}
             size={location.size}
+            imageFit={location.imageFit}
+            imageFrame={location.imageFrame}
             interactive={interactive}
             actionId={element.actionId}
             onAction={onAction}
@@ -3099,6 +3103,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           name={location.name}
           kind={location.kind}
           size={location.size}
+          imageFit={location.imageFit}
+          imageFrame={location.imageFrame}
           interactive={interactive}
           actionId={element.actionId}
           onAction={onAction}
@@ -4889,6 +4895,9 @@ const AssetElement: React.FC<{
   name: string;
   kind: string;
   size?: number;  // Character-specific: scale percentage (e.g., 90 = 90% scale)
+  /** 'scale': fill the box; 'crop': the box shows the picture placed at imageFrame. Unset: natural size. */
+  imageFit?: 'scale' | 'crop';
+  imageFrame?: { x: number; y: number; w: number; h: number };
   interactive?: boolean;
   actionId?: string;
   onAction?: (id: string) => void;
@@ -4897,7 +4906,7 @@ const AssetElement: React.FC<{
   spriteSheet?: SpriteSheetData;  // Sprite sheet configuration for character sprites
   description?: string;  // Tooltip text shown on hover (e.g., pickProp item description)
   theme?: RenderThemeSettings;  // Theme for tooltip styling
-}> = ({ style, assetUrl, assetId, assetType, editorMode, name, kind, size, interactive, actionId, onAction, sound, soundBlobResolver, spriteSheet, description, theme }) => {
+}> = ({ style, assetUrl, assetId, assetType, editorMode, name, kind, size, imageFit, imageFrame, interactive, actionId, onAction, sound, soundBlobResolver, spriteSheet, description, theme }) => {
   const [isHovered, setIsHovered] = React.useState(false);
   const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
   const showTooltip = interactive && description && description.length > 0 && isHovered;
@@ -5087,6 +5096,39 @@ const AssetElement: React.FC<{
       );
     }
 
+    // A cropped picture: the box is a window onto the picture, which keeps
+    // its own size and place (imageFrame, fractions of the box).
+    if (imageFit === 'crop' && imageFrame) {
+      return (
+        <>
+          <div
+            style={{ ...finalStyle, overflow: 'hidden', cursor: isClickable ? 'pointer' : 'default' }}
+            onClick={handleClick}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+          >
+            <img
+              src={assetUrl}
+              alt={name}
+              draggable={false}
+              style={{
+                position: 'absolute',
+                left: `${imageFrame.x * 100}%`,
+                top: `${imageFrame.y * 100}%`,
+                width: `${imageFrame.w * 100}%`,
+                height: `${imageFrame.h * 100}%`,
+                maxWidth: 'none',
+                maxHeight: 'none',
+                pointerEvents: 'none',
+              }}
+            />
+          </div>
+          {tooltipPortal}
+        </>
+      );
+    }
+
     // Standard image rendering (non-sprite)
     return (
       <>
@@ -5095,8 +5137,9 @@ const AssetElement: React.FC<{
           alt={name}
           style={{
             ...finalStyle,
-            // Don't constrain image - let it render at natural size (scaled by size %)
-            objectFit: 'none',
+            // 'scale' draws the picture at its box's size; otherwise it keeps
+            // its natural size (scaled by size %), cropped by a smaller box.
+            objectFit: imageFit === 'scale' ? 'fill' : 'none',
             maxWidth: 'none',
             maxHeight: 'none',
             // Make clickable props visually interactive
