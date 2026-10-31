@@ -1372,8 +1372,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   elements,
   onAction,
   interactive = true,
-  hideTextBoxes = false,
-  hideButtonBoxes = false,
+  hideTextBoxes: hideTextBoxesProp = false,
+  hideButtonBoxes: hideButtonBoxesProp = false,
   theme = DEFAULT_THEME,
   previewMode = false,
   visitedBeats = [],
@@ -1412,6 +1412,14 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   speakerPortraitUrl,
   thought,
 }) => {
+  // Settings → Text Box → Box Visibility rides the theme, as it does for
+  // ReactRenderer.setTheme. Reading it here too means every caller follows it:
+  // the Visual Editor's fixed-layout stage never passed the props, so it drew
+  // the boxes while the Preview hid them (user report, 2026-10-31).
+  const boxVisibility = theme?.textBox?.boxVisibility;
+  const hideTextBoxes = hideTextBoxesProp || boxVisibility === 'hideText' || boxVisibility === 'hideAll';
+  const hideButtonBoxes = hideButtonBoxesProp || boxVisibility === 'hideAll';
+
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
 

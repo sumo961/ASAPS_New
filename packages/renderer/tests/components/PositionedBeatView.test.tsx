@@ -75,6 +75,39 @@ describe('PositionedBeatView', () => {
   });
 });
 
+// Settings → Text Box → Box Visibility rides the theme. The Visual Editor's
+// fixed-layout stage passed no hideTextBoxes prop, so it drew the boxes the
+// Preview hid (user report, 2026-10-31).
+describe('box visibility from the theme', () => {
+  const themed = (boxVisibility: 'all' | 'hideText' | 'hideAll') =>
+    ({ ...DEFAULT_THEME, textBox: { ...DEFAULT_THEME.textBox, boxVisibility, backgroundColor: '#123456', opacity: 100 } });
+  const boxOf = (container: HTMLElement, text: string): HTMLElement => {
+    const leaf = [...container.querySelectorAll('*')].find(e => e.childElementCount === 0 && e.textContent === text)!;
+    let e: HTMLElement | null = leaf as HTMLElement;
+    while (e && !e.style.border) e = e.parentElement;
+    return e!;
+  };
+
+  it('hides the text box but keeps the text and the button box for hideText', async () => {
+    const { container } = render(
+      <PositionedBeatView stageWidth={1024} stageHeight={768} theme={themed('hideText')} elements={[textEl({ content: 'Bare words.' }), buttonEl()]} />,
+    );
+    await waitFor(() => expect(container.textContent).toContain('Bare words.'));
+    const box = boxOf(container, 'Bare words.');
+    expect(box.style.backgroundColor).toBe('transparent');
+    expect(box.style.borderStyle).toBe('none');
+    expect(container.innerHTML).toContain('Continue');
+  });
+
+  it('keeps the text box for all', async () => {
+    const { container } = render(
+      <PositionedBeatView stageWidth={1024} stageHeight={768} theme={themed('all')} elements={[textEl({ content: 'Boxed words.' })]} />,
+    );
+    await waitFor(() => expect(container.textContent).toContain('Boxed words.'));
+    expect(boxOf(container, 'Boxed words.').style.backgroundColor).not.toBe('transparent');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Fixed-layout overflow containment (field case: "Getting Around Lima").
 // An AI-baked onlineContent layout put the content box at titleY + a title

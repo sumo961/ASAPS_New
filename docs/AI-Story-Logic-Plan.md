@@ -93,8 +93,16 @@ These are kept from the old plan.
 
 - **Which beats.** Every beat that Phase 0 says is reached in different
   states, plus every beat the keyword check flags. Order them by how many
-  paths pass through and how much the states differ. Default cap: 40 beats
-  per run, shown up front with the estimate.
+  paths pass through and how much the states differ.
+- **How many per run scales with the story.** A fixed number fits no story:
+  40 beats is all of a 15-beat story and a tenth of a 397-beat one. A run
+  covers every candidate by default, split into batches. Before it starts,
+  the panel shows the candidate count, the share of the story they are and
+  the estimated cost. For a large story it also offers a first pass on the
+  most-travelled part, for example "the 60 beats most players pass (about
+  half the paths), ≈ $0.40" next to "all 180 candidates, ≈ $1.20". Later
+  runs only check beats whose text or arriving states changed, so the first
+  full pass is the expensive one.
 - **What the model sees, per beat:**
   - the beat's words: text, Dialog Tree lines, choice texts, `${…}`
     placeholders;
@@ -171,21 +179,18 @@ These are things one beat can't show:
 - Release checklist: run it on a generated story with the desktop app's
   configured provider.
 
-## Decisions for Hartmut
+## Decisions (Hartmut, 2026-10-31)
 
-1. **Where findings appear.** In the Debug window only, or also as a notice
-   in the main window? Recommended: Debug window. Phase 3 adds the review
-   banner after generation.
-2. **Dismissals travel with the project?** In `generation/` (shared with a
-   group through Git) or on this computer only. Recommended: with the
-   project, so a group doesn't re-triage the same findings.
-3. **Default cap and model.** Recommended: 40 beats per run, using the model
-   set for authoring, with the cost shown before running. An option could
-   use a cheaper model.
-4. **Keyword checks once AI is on.** Recommended: keep them. They're free,
-   instant and work offline.
-5. **Phase order.** Phase 0 is worth shipping alone: fewer false alarms and
-   state-based hubs. Phase 1 builds on it.
+1. **Findings appear in the Debug window.** Phase 3 adds the review banner
+   after generation.
+2. **Dismissals travel with the project** (`generation/story-logic.json`), so
+   a group doesn't re-triage the same findings.
+3. **How much a run covers depends on the story's size,** not a fixed cap
+   (see Phase 1, "How many per run"). The model is the one set for
+   authoring, and the cost is shown before running.
+4. **The keyword checks stay** when AI is on: they're free, instant and work
+   offline.
+5. **Phase 0 ships first,** on its own.
 
 ## Rough size
 
