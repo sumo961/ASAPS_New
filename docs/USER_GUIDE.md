@@ -2631,7 +2631,7 @@ Your project's colours, text box and fonts live in [Project Settings](#global-se
 
 Each row shows the project's value until you change it. Rows you've changed turn bold, and the section's header counts them (*2 changed*). The **↺** button next to a row puts that one back to the project setting; **Use the project's look for everything** puts them all back. Every change can be undone, and picking a colour is one undo step.
 
-The next beat goes back to the project's look, so nothing carries over by accident. The Visual Editor, the Preview Window and exported stories all show the beat's look. A font size you give a single text element in the Visual Editor still wins over both the beat's and the project's size. (360 Panorama beats don't have this section.)
+The next beat goes back to the project's look, so nothing carries over by accident. The Visual Editor, the Preview Window and exported stories all show the beat's look. A font size you give a single text element in the Visual Editor still wins over both the beat's and the project's size. When your theme draws the text box with a frame picture (an imported Ren'Py theme, say), the picture is the box: **Colour** and **Opacity** then have nothing to fill, as with the project's own colours. (360 Panorama beats don't have this section.)
 
 ### Positioning Characters
 
