@@ -10,7 +10,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { getStorageManager, getStorageAdapter, type Project, type StorageManager, type GlobalSettings } from '../storage';
-import { CommandManager, type Command } from '../commands';
+import { getCommandManager, type CommandManager, type Command } from '../commands';
 import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave';
 import type { ProjectFormat } from '../storage/adapters/PersistenceAdapter';
 import { DirectoryAdapter, ConflictMarkersError, isElectronWithFS } from '../storage/adapters/DirectoryAdapter';
@@ -257,12 +257,11 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
   // Managers (created once)
   const [storage] = useState(() => getStorageManager({ debug }));
-  const [commandManager] = useState(() => new CommandManager({
-    projectId: initialProjectId,
-    maxHistory: 50,
-    autoSave: true,
-    debug,
-  }));
+  // The app-wide undo history (App and the toolbar use getCommandManager()).
+  // A private instance here meant the clears below never reached it, so a
+  // project's Undo history carried over into the next project. History is
+  // per session: it is emptied when the project changes, not stored.
+  const [commandManager] = useState<CommandManager>(() => getCommandManager());
 
   // Command manager state
   const [canUndo, setCanUndo] = useState(false);
@@ -633,8 +632,6 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
             currentProjectRef.current = result.data;
             deletionWatchRef.current.reset(result.data.id, result.data.story);
             setCurrentProject(result.data);
-            commandManager.setProjectId(initialProjectId);
-            await commandManager.loadFromStorage();
           }
         }
 
@@ -825,9 +822,8 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       deletionWatchRef.current.reset(loadedProject.id, loadedProject.story);
       setCurrentProject(loadedProject);
 
-      // Update command manager
-      commandManager.setProjectId(projectId);
-      await commandManager.loadFromStorage();
+      // A new project starts with an empty Undo history
+      commandManager.clear();
 
       return true;
     } catch (error) {
@@ -918,7 +914,6 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       deletionWatchRef.current.reset(newProject.id, newProject.story);
       setCurrentProject(newProject);
       setProjectId(newProjectId);
-      commandManager.setProjectId(newProjectId);
       commandManager.clear();
 
       // CRITICAL: Set isUntitledProject based on the project name
@@ -1231,7 +1226,6 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       isUntitledProjectRef.current = false;
       setIsUntitledProject(false);
       // Note: hasUnsavedChanges will be cleared by saveNow() which sets status to 'saved'
-      commandManager.setProjectId(newProjectId);
       commandManager.clear();
 
       // Trigger a save to ensure everything is persisted
@@ -1348,7 +1342,6 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         console.warn('[PersistenceProvider] Failed to sync directory project to IndexedDB:', e);
       }
 
-      commandManager.setProjectId(project.id);
       commandManager.clear();
 
       console.log('[PersistenceProvider] Opened directory project:', dirPath);

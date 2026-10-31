@@ -19,6 +19,8 @@ import {
 } from '../PersistenceContext';
 import { resetStorageManager } from '../../storage/StorageManager';
 import { deleteDatabase } from '../../storage/schema';
+import { getCommandManager } from '../../commands';
+import type { Command } from '../../commands';
 
 const wrapper = ({ children }: { children: React.ReactNode }) =>
   React.createElement(PersistenceProvider, { autoSave: false }, children);
@@ -31,6 +33,7 @@ async function renderInitialized() {
 }
 
 afterEach(async () => {
+  getCommandManager().clear();
   resetStorageManager();
   await deleteDatabase();
 });
@@ -217,5 +220,37 @@ describe('loadProject saves the project being left', () => {
     await act(async () => { await result.current.loadProject(b); });
 
     expect(await storedHas(result, a, 'held-back')).toBe(false);
+  });
+});
+
+describe('Undo history belongs to the open project', () => {
+  const fakeEdit = (): Command => ({
+    type: 'test', description: 'edit in A',
+    execute: vi.fn(async () => {}), undo: vi.fn(async () => {}), redo: vi.fn(async () => {}),
+    canMergeWith: () => false, mergeWith: vi.fn(), toJSON: () => ({ type: 'test' }),
+  }) as unknown as Command;
+
+  it('the provider uses the app-wide history (the one Undo and the toolbar use)', async () => {
+    const { result } = await renderInitialized();
+    expect(result.current.commandManager).toBe(getCommandManager());
+  });
+
+  it("opening another project empties it — Undo can't replay the previous project's edits", async () => {
+    const { result } = await renderInitialized();
+    let a = '';
+    let b = '';
+    await act(async () => { b = await result.current.createProject('Project B'); });
+    await act(async () => { a = await result.current.createProject('Project A'); });
+    await waitFor(() => expect(result.current.currentProject?.id).toBe(a));
+
+    const edit = fakeEdit();
+    await act(async () => { await getCommandManager().execute(edit); });
+    expect(getCommandManager().canUndo()).toBe(true);
+
+    await act(async () => { await result.current.loadProject(b); });
+
+    expect(getCommandManager().canUndo()).toBe(false);
+    expect(getCommandManager().getHistorySize()).toBe(0);
+    expect(edit.undo).not.toHaveBeenCalled();
   });
 });
