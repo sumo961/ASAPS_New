@@ -515,6 +515,7 @@ Design what a specific beat looks like on screen. Position characters, add backg
 - Positioning characters
 - Creating hotspots (clickable areas)
 - Designing UI elements
+- Giving one beat its own colours, text box and fonts ([This beat's look](#this-beats-look))
 
 When a **translation language** is active, the Visual Editor overlays translated text on top of the source text, so you can see how your layout looks in different languages without leaving the editor.
 
@@ -759,19 +760,19 @@ This is where interactivity shines. Present text and multiple choices, each pote
 **Key Settings:**
 - **Main Text** - The prompt or situation
 - **Dialog Elements** - The choices (add as many as needed)
-- **Presentation Mode** - How the dialog appears:
-  - *Positioned (traditional elements / spatial)* - Traditional visual novel style
+- **Layout** - How the dialog appears. It is set in the Visual Editor, under **Dialog Settings** in the left panel, with the rest of how the beat looks:
+  - *Stacked* or *Conversation* - Traditional visual novel style
   - *Chat — scrolling history* - Messaging app style
   - *Chat — single bubble* - One speech bubble at a time
+- **Show character avatars** and **NPC Response Delay (seconds)** - Chat layouts only, also under **Dialog Settings** in the Visual Editor: portraits next to the bubbles, and how long the typing indicator shows before a character's line (1.5 seconds unless you change it)
 
-Presentation Mode and the pacing settings below sit under **Show Advanced Options** at the bottom of the Inspector. Presentation Mode and the Visual Editor's **Layout Template** are one setting seen from two places: a chat layout picked in either shows up in both, and choosing *Positioned* here turns a chat layout back into the stacked dialog box (a Conversation or Custom layout stays as it is).
-- **Show character avatars** and **NPC Response Delay (seconds)** - Chat modes only: portraits next to the bubbles, and how long the typing indicator shows before a character's line (1.5 seconds unless you change it)
+The pacing settings below sit under **Show Advanced Options** at the bottom of the Inspector.
 - **Choice Delay (seconds)** - Hold the choices back for a moment so the line gets read first
 - **Lines without a reply move on** - How lines the player doesn't answer (another character speaking next, a farewell) move on: **when the player clicks Continue**, or **by themselves after reading time**. The two chat layouts (*Chat — scrolling history*, *Chat — single bubble*) move on by themselves unless you change it; every other layout waits for Continue
 - **Players can skip ahead** - Only when lines move on by themselves. On by default: a **Continue** button lets the player move on early. Turn it off and those lines play at reading pace (see [Several characters before the player answers](#then-another-character-speaks) below)
 
-![The Dialog Tree's advanced options in the Inspector: Presentation Mode set to Positioned, Choice Delay 0, and "Lines without a reply move on" set to "when the player clicks Continue", with the hint that chats move on by themselves unless you change it.](images/94-dialog-line-advance.png)
-*In a Positioned Dialog Tree, lines without a reply wait for Continue, so **Players can skip ahead** stays hidden. Switch to **by themselves after reading time** and it appears below.*
+![The Dialog Tree's advanced options in the Inspector: Choice Delay 0, and "Lines without a reply move on" set to "when the player clicks Continue", with the hint that chats move on by themselves unless you change it.](images/94-dialog-line-advance.png)
+*In a Dialog Tree that isn't a chat, lines without a reply wait for Continue, so **Players can skip ahead** stays hidden. Switch to **by themselves after reading time** and it appears below.*
 
 **Each Choice Can Have:**
 - **Text** - What the option says
@@ -818,7 +819,7 @@ The flowchart draws a choice's conditions on its edge, so you can see at a glanc
 **Layout on responsive stages.** In a responsive project the *Visual Editor's* left panel adds a **Layout Template** for dialog beats — *Stacked (Visual Novel)*, *Conversation (side-by-side)*, *Chat - Scrollable History*, *Chat - Single Bubble*, or *Custom (drag-place)*. Conversation puts the NPC text on one side and the choices on the other; it needs genuine side-by-side room, so below roughly 640 px of usable width (a phone held upright) the same beat quietly falls back to the stacked flow — nothing to configure, and your choices and effects are untouched. Long NPC speeches scroll inside their card instead of running off the bottom of the stage, and a narrow corner HUD indents the text beside it rather than pushing everything down.
 
 <a id="chat-window"></a>
-**Where the chat appears.** In the two chat layouts the conversation fills the whole stage unless you say otherwise. Open the beat in the Visual Editor: the NPC text box is now labelled **Chat window** (*The conversation appears here*). Move and resize it like any other element, on the canvas or with its X, Y, Width and Height fields, and the chat appears in exactly that area when the story plays — say, in a narrow column on the right, so the background stays visible beside it. It's one undo step, like any other move. For a messenger look, pick a **Chat frame picture** under **Show Advanced Options** — a phone, say. It covers the whole stage, with the chat running inside the Chat window; the Visual Editor shows it see-through so you can fit the Chat window into the picture's screen. In the story, the picture and the chat grow and shrink together with the stage.
+**Where the chat appears.** In the two chat layouts the conversation fills the whole stage unless you say otherwise. Open the beat in the Visual Editor: the NPC text box is now labelled **Chat window** (*The conversation appears here*). Move and resize it like any other element, on the canvas or with its X, Y, Width and Height fields, and the chat appears in exactly that area when the story plays — say, in a narrow column on the right, so the background stays visible beside it. It's one undo step, like any other move. For a messenger look, pick a **Chat frame picture** under **Display** in the Visual Editor's left panel — a phone, say. It covers the whole stage, with the chat running inside the Chat window; the Visual Editor shows it see-through so you can fit the Chat window into the picture's screen. In the story, the picture and the chat grow and shrink together with the stage.
 
 **Per-Node Speakers (Multi-Character Conversations):** Every NPC node in a Dialog Tree has its own **NPC Speaker** field — a [Character combobox](#character-combobox) that lets each line of dialog come from a different character. A wolf-and-grandmother scene can flow Granny → Wolf → Granny just by setting different linked characters per node. When a node's speaker is linked to a defined Character, the speaker label and portrait update everywhere automatically — no need to keep the names in sync by hand. If your project has [roles](#roles), they're pinned at the top of the list (*@ The confidant*): the line is then spoken by whoever plays that role. In the editor each speaker gets their own colour, in the order they first speak in the tree, so the lines of a scene are easy to tell apart.
 
@@ -922,7 +923,7 @@ A Multi Choice whose buttons are people. Each choice names a character, and pick
 - **Role** - Which role the pick fills (from Project Settings → Roles; a new beat starts on the `player` role). Picking a role while the beat has no choices yet fills them in for you. **Add a choice for each character of this role** does the same on demand: one choice per character, labelled with their name and the first sentence of their description; choices you have already edited are kept.
 - **Question** - The prompt above the buttons ("Who will you be?")
 - **Choices** - Each with a **character**, a label (leave it empty to show the character's name), a **description**, and a target. Usually every choice goes to the same beat: the story stays one story, and later beats refer to the role. A choice without a target simply goes where the other choices go (only if no choice has a target yet does nothing happen — see [A choice that isn't linked yet](#unlinked-choices)). The Inspector flags a choice that has no character yet. *Show only if…* conditions work as in Multi Choice — a character can unlock on a second playthrough.
-- **Show options as** - *Buttons* (the default), *Pictures with names* or *Pictures only*. With pictures, each choice is a card showing the character's portrait (the portrait of their current variant, if it has one), with the name and description under it, or the picture alone. *Pictures only* still gives the name to screen readers and shows it with the description when the pointer rests on a card. Once a picture style is chosen, each choice in the Inspector gets a small picture row showing what the card will use. **Other picture…** there uses any image instead of the portrait, for example a full-figure drawing (the button then reads **Change**); ✕ goes back to the portrait. A character without any picture gets a card with their initial and name.
+- **Show options as** (in the Visual Editor's left panel, under **Display**) - *Buttons* (the default), *Pictures with names* or *Pictures only*. With pictures, each choice is a card showing the character's portrait (the portrait of their current variant, if it has one), with the name and description under it, or the picture alone. *Pictures only* still gives the name to screen readers and shows it with the description when the pointer rests on a card. Once a picture style is chosen, each choice in the Inspector gets a small picture row showing what the card will use. **Other picture…** there uses any image instead of the portrait, for example a full-figure drawing (the button then reads **Change**); ✕ goes back to the portrait. A character without any picture gets a card with their initial and name.
 - Layouts, effects, speaker and revisit settings are the same as [Multi Choice](#multi-choice). A choice's own effects run *after* the character is cast, so an effect aimed at *@ The player* lands on the person just chosen.
 
 ![The same screen with Show options as set to Pictures with names: Mara's card shows her portrait (a tired doctor in a coat and scarf on the night deck) above her name and description; Jonas has no portrait yet, so his card shows a large J.](images/83-choose-your-character-pictures.png)
@@ -1613,8 +1614,7 @@ Instead of scripting every possible response, let AI generate a contextually app
 - **Exit Targets** - Named exits with descriptions telling the AI when to use each one
 - **Max Turns** - Limit conversation length
 - **Max choices per turn** - Cap on how many replies the player is offered per exchange (1–4), applied after the opening turn. Leave it empty and the model chooses (usually 2–3). This one number decides how long the player waits: a tree grows *exponentially* with branching, so five turns at three choices is a 40-plus-node tree (about two minutes to generate on any model), while two choices halves it. Five turns with a cap of two is the sweet spot for a personal conversation — set **2** on any AI Dialog Tree with four or more turns.
-- **Presentation Mode** - Positioned, chat scroll, or chat bubble
-- **Show Avatars** - Show character portraits beside the lines in the chat layouts (chat scroll and chat bubble). On by default
+- **Layout** and **Show Avatars** - In the Visual Editor, under **Dialog Settings**: positioned, chat scroll or chat bubble, and character portraits beside the lines in the two chat layouts (on by default)
 - **Context Toggles** - Include variables, inventory, visited beats, choice history
 - **System Instructions** - Extra guidance for the AI that writes the tree: what to reference, what to avoid, the tone (*"Reference the player's earlier choices; inform without preaching"*). The player never sees it. (Generated stories could set this before v0.9.110, but the Inspector didn't show it — open such a beat now and you can read and edit what's there.)
 
@@ -2597,11 +2597,41 @@ Below the button rows, the group's **Action layout** box places the shared row i
 
 Every beat can have its own background:
 
-1. In Visual Properties (left panel), click **Choose Background**
+1. In the Visual Editor's left panel, click **Choose Background**
 2. Select from your assets or upload new
 3. The image fills the stage
 
+Once a beat has a background, the panel shows a small picture of it with **Change** next to it, and **✕** removes it. Undo takes either back. The background is set only here, in the Visual Editor; the Properties panel keeps what the beat says and does, like its text, links and sound.
+
 **Pro Tip:** Prepare backgrounds at your stage size for best quality.
+
+<a id="ve-display"></a>
+### Display settings
+
+A few settings of a beat change only how it is shown, and they sit with the rest in the Visual Editor's left panel, under **Display** (which ones depend on the beat type):
+
+- **Keep shape on phones** - Letterbox this beat at its own proportions instead of cropping it to fill a phone screen. For screens composed as a frame: a title card, an illustrated page, a carefully staged scene.
+- **Show options as** - For *Choose Your Character*: buttons, picture cards with names, or pictures only.
+- **Chat frame picture** - For a Dialog Tree in a chat layout: a picture behind the chat, like a phone.
+
+The layout of choices and dialogs has its own section above (**Layout** or **Dialog Settings**). Everything a beat says and does (its text, links, conditions, effects and sound) stays in the Properties panel on the right.
+
+<a id="this-beats-look"></a>
+### This beat's look
+
+Your project's colours, text box and fonts live in [Project Settings](#global-settings) and apply to every beat. Sometimes one beat should look different: a dream sequence on a dark stage, a letter in a handwriting font, a quiet moment with no box behind the text. Open that beat in the Visual Editor and expand **This beat's look** in the left panel (just above *Transition*). It lets you change, for this beat only:
+
+- **Stage colour** and **Text colour**
+- **Text box:** **Boxes** (*Show all boxes*, *Hide text/dialog boxes*, *Hide all boxes* — this works even when the project hides them), **Colour**, **Opacity %**, **Corners px**, **Padding px**, **Border** (*Show on this beat* or *Hide on this beat*), **Border width** and **Border colour**
+- **Buttons:** **Colour**, **Text colour**, **Border colour** and **Corners px**
+- **Fonts:** the **Title**, **Text** and **Buttons** fonts and their sizes
+
+![This beat's look, open in the Visual Editor's left panel: Boxes set to Show all boxes, the text box Colour set to a red #aa2222 and Opacity to 100, all three in bold with a ↺ beside them; the other rows show the project's values, and the header says 4 changed.](images/108-this-beats-look.png)
+*Changed rows are bold; the rest show the project's values.*
+
+Each row shows the project's value until you change it. Rows you've changed turn bold, and the section's header counts them (*2 changed*). The **↺** button next to a row puts that one back to the project setting; **Use the project's look for everything** puts them all back. Every change can be undone, and picking a colour is one undo step.
+
+The next beat goes back to the project's look, so nothing carries over by accident. The Visual Editor, the Preview Window and exported stories all show the beat's look. A font size you give a single text element in the Visual Editor still wins over both the beat's and the project's size. (360 Panorama beats don't have this section.)
 
 ### Positioning Characters
 
@@ -2609,13 +2639,16 @@ Every beat can have its own background:
 2. Select a character from your cast
 3. Click on stage to place them
 4. Drag to reposition
-5. Use corner handles to resize
+5. Drag a corner handle to resize (see *Resizing pictures* below)
 
 Each character placement includes:
 - Position (x, y coordinates)
 - Size (width, height)
 - Which appearance to show
 - Layer order (z-index)
+
+<a id="resizing-pictures"></a>
+**Resizing pictures.** Drag a corner of a character or prop and the picture grows or shrinks with it, keeping its proportions; the opposite corner stays where it is. To **crop** instead, hold **Option** (Mac) or **Alt** (Windows, Linux) while you drag: the edge of the frame moves over the picture, which stays put, so you can trim away a part you don't want. A cropped picture keeps its crop when you scale it later. Pictures you've never resized look just as they did before. (This is for still pictures; animated sprite sheets and videos resize as before.)
 
 <a id="flip-pictures"></a>
 **Facing the other way: Flip.** Need your character to look left instead of right, or a prop turned upside down? No need to draw and import a second picture. Select the character or prop, and under **Rotation** use the **Flip** buttons: **⇋ Left–right** mirrors it, **⇅ Upside down** turns it over. Click again to flip it back; each click is one Undo step. The flip shows in the Visual Editor, the Preview and exported stories. (While a [waypoint animation](#waypoint-animations) that walks the character the other way is playing, the animation decides which way they face.)
@@ -3447,10 +3480,13 @@ The summary shows *Outcomes*, *Total Paths*, *Unique Endings*, *Reachable Beats*
 The analysis plays the story the way a player would: it follows every link the flowchart draws, only takes a choice when its conditions would show it, sends the player to a requirement's fallback when the requirement isn't met, and keeps track of how many of an item the player holds and which character holds what. Each outcome carries a label saying how the path ends:
 
 - **Ending** — it reaches an End Screen or an AI Summary.
-- **Dead End** — the player is stuck: the beat has no way on, or every choice is hidden by its conditions. A very long path that the analysis stops following is marked this way too.
-- **Cycle** — the path comes back round to where it has already been, with nothing new to find, for example a hub where every choice has already been tried. The choices are still on screen, so the player can leave the way they came; it's a loop, not a trap.
+- **Dead End** (red) — the player is stuck: the beat has no way on, or every choice is hidden by its conditions.
+- **Cycle** (purple) — the path comes back round to where it has already been, with nothing new to find, for example a hub where every choice has already been tried. The choices are still on screen, so the player can leave the way they came; it's a loop, not a trap.
+- **Depth Limit** (orange) — the path grew so long that the analysis stopped following it. That's a limit of the analysis, not a fault in your story; hover over the badge for a reminder.
 
-When some outcomes aren't endings, the *Outcomes* card breaks the count down (for example *3 endings + 2 cycles*).
+When some outcomes aren't endings, the *Outcomes* card breaks the count down (for example *3 endings + 2 cycles*, or *+ 1 at the depth limit*).
+
+In **Tree** mode the same labels mark where a branch stops: a hub with no way out, where every path only comes back round, shows **Cycle**, and a branch cut off for length shows **Depth Limit**. Each choice in the tree also says what it does: variables it sets (*brave = true*), items it takes away (*−lantern*), feelings it changes (*Tomas trust → player +0.3*) and who it casts in a role (*@confidant = Ingrid*). Conditions on feelings read as words too, for example *@confidant trust → player >= 0.5*.
 
 
 #### Story Warnings
@@ -4042,6 +4078,8 @@ Use sprite sheets for frame-by-frame animation:
 - Text box colors
 - Background color
 
+These colours, and the Text Box and Fonts settings below, apply to every beat. To give a single beat its own, use [This beat's look](#this-beats-look) in the Visual Editor.
+
 <a id="story-fonts"></a>
 **Settings → Fonts:**
 - Default fonts for titles, body, buttons
@@ -4065,7 +4103,7 @@ Your own fonts (TrueType `.ttf`, OpenType `.otf`, `.woff` or `.woff2`) go into t
 Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual Editor, the Preview Window, exported stories, and responsive (slot-mode) layouts all honor them consistently. What you set here is what your interactors get.
 
 <a id="per-beat-text-box-border"></a>
-**One beat with or without a border.** These settings apply to the whole story. To change the border on a single beat — no frame around the text for a quiet moment over a picture, or a frame on one beat in a story that otherwise has none — select the beat and pick its **Text Box Border** in the Inspector (below *Background Image*): *Project setting* (the default), *Show on this beat* or *Hide on this beat*. *Show* uses the border width and colour from Settings → Text Box, or a thin border in the text colour if the project has none. The next beat goes back to the project setting. The Visual Editor, the Preview Window and exported stories all show it.
+**One beat with or without a border.** These settings apply to the whole story. To change the border on a single beat — no frame around the text for a quiet moment over a picture, or a frame on one beat in a story that otherwise has none — open the beat in the Visual Editor and set **Border** under [This beat's look](#this-beats-look): *Project setting* (the default), *Show on this beat* or *Hide on this beat*. *Show* uses the border width and colour from Settings → Text Box, or a thin border in the text colour if the project has none. The next beat goes back to the project setting. The Visual Editor, the Preview Window and exported stories all show it. The same section can change the rest of the project's look for one beat, too: colours, the text box, buttons and fonts.
 
 **Settings → Effects:**
 - Text animations (typewriter, fade)

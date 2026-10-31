@@ -22,9 +22,20 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.150** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.150 is the path-analysis
-release**: the Debug window's Reachability, Path Analysis and Story Logic
+Current release: **v0.9.151** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.151 is the per-beat look
+release**: a new *This beat's look* section in the Visual Editor changes the
+project's look for one beat only — the stage and text colours, the text box
+(colour, opacity, corners, padding, border, whether boxes show), the buttons,
+and the fonts and their sizes. Everything about how a beat looks is now set
+in the Visual Editor: the text-box border, the background picture, *Keep
+shape on phones*, *Show options as* and a dialog's layout and chat frame
+moved there from the Properties panel. Dragging a picture's corner now scales it, keeping its
+proportions; hold Option (Alt) to crop it instead. Hiding text boxes works
+again in the Visual Editor for fixed layouts, and Path Analysis marks very
+long paths as "Depth Limit" and loops as "Cycle" instead of dead ends.
+
+**v0.9.150 was the path-analysis release**: the Debug window's Reachability, Path Analysis and Story Logic
 now play a story the way the Preview does. Path Analysis follows every
 button of a Free Layout (it used to follow only the first), a Set Timer's
 "time runs out" link and QR codes, and it respects what decides a real
