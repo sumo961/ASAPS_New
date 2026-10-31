@@ -179,6 +179,18 @@ export const BeatLookSection: React.FC<Props> = ({ value, globalSettings, fonts,
                 <option value="hideAll">Hide all boxes</option>
               </select>
             </Row>
+            <Row label="Frame picture" changed={!!get('textBox', 'framePicture')} onReset={() => setIn('textBox', 'framePicture', undefined)}>
+              <select
+                data-testid="beat-frame-picture"
+                value={get('textBox', 'framePicture') ?? ''}
+                onChange={(e) => setIn('textBox', 'framePicture', e.target.value || undefined)}
+                className="w-full px-1 py-0.5 text-xs border border-gray-300 rounded"
+                title="Where the theme draws the text box with a picture (an imported Ren'Py theme, say): keep it, or draw a plain box on this beat, which Colour and Opacity then fill."
+              >
+                <option value="">Project setting</option>
+                <option value="off">Off on this beat (plain box)</option>
+              </select>
+            </Row>
             <Row label="Colour" changed={!!get('textBox', 'backgroundColor')} onReset={() => setIn('textBox', 'backgroundColor', undefined)}>
               {color(get('textBox', 'backgroundColor'), project?.textBox.backgroundColor, (c) => setIn('textBox', 'backgroundColor', c))}
             </Row>

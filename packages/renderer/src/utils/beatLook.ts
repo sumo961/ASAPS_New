@@ -31,6 +31,8 @@ export function applyBeatLook<T extends RenderThemeSettings | undefined>(theme: 
   return {
     ...t,
     ...(look.stageColor ? { backgroundColor: look.stageColor } : {}),
+    // A plain box on this beat, where the theme draws one with a frame picture.
+    ...(tb.framePicture === 'off' ? { textboxFrameUrl: undefined } : {}),
     textBox: set(t.textBox, {
       backgroundColor: tb.backgroundColor,
       opacity: tb.opacity,

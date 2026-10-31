@@ -37,6 +37,8 @@ export interface BeatLook {
     padding?: number;
     /** 'hideText' hides text/dialog boxes, 'hideAll' button boxes too, 'all' shows them where the project hides them. */
     visibility?: 'all' | 'hideText' | 'hideAll';
+    /** 'off': a plain box on this beat where the theme draws the text box with a frame picture. */
+    framePicture?: 'off';
   };
   textColor?: string;
   button?: {

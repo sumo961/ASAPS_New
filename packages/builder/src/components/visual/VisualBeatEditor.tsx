@@ -1684,8 +1684,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         typewriterSpeed: baseTheme.textEffects?.typewriterSpeed ?? 30,
                         fadeInDuration: baseTheme.textEffects?.fadeInDuration ?? 500,
                       },
-                      // Add theme asset URLs for button/textbox graphics
-                      textboxFrameUrl: themeAssets?.textboxFrame,
+                      // Add theme asset URLs for button/textbox graphics (this
+                      // beat's look can turn the frame picture off)
+                      textboxFrameUrl: look?.textBox?.framePicture === 'off' ? undefined : themeAssets?.textboxFrame,
                       buttonNormalUrl: themeAssets?.buttonNormal,
                       buttonHoverUrl: themeAssets?.buttonHover,
                       buttonLayout: themeAssets?.buttonLayout,

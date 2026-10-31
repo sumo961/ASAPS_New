@@ -26,3 +26,11 @@ describe('applyBeatLook', () => {
     expect(t.fonts.titleFont).toBe(DEFAULT_THEME.fonts.titleFont);
   });
 });
+
+describe('applyBeatLook: frame picture', () => {
+  it("turns the theme's frame picture off for the beat, and only when asked", () => {
+    const framed = { ...DEFAULT_THEME, textboxFrameUrl: 'frame.png' };
+    expect(applyBeatLook(framed, { textBox: { framePicture: 'off' } }).textboxFrameUrl).toBeUndefined();
+    expect(applyBeatLook(framed, { textBox: { opacity: 50 } }).textboxFrameUrl).toBe('frame.png');
+  });
+});

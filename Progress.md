@@ -1,5 +1,19 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.151, 2026-10-31)
+
+### Overview
+A beat can turn off the theme's text-box frame picture (Hartmut, after the v0.9.151 release check found that a frame picture hides the beat's box colour).
+
+### This beat's look: Frame picture
+- **Frame picture: Off on this beat** in *This beat's look* (`BeatLook.textBox.framePicture: 'off'`). Where the theme draws the text box with a picture (an imported Ren'Py theme), the beat gets a plain box, which its Colour and Opacity then fill. `applyBeatLook` drops `textboxFrameUrl` for the beat, so the player, the Preview and exports follow; both Visual Editor paths, which add the frame picture after the look, honour it too.
+- Checked headless on RED's Introduction (QA copy, undone afterwards): with Frame picture off and a green colour, the editor and the Preview show a plain green box; the next beat keeps the frame. Test in `renderer/tests/utils/beatLook.test.ts`.
+- User Guide at release: add **Frame picture** (*Off on this beat* draws a plain box where the theme uses a frame picture) to *This beat's look*'s text-box list, and change the frame-picture note to point to it.
+
+**Files modified:** packages/core/src/types/index.ts, packages/renderer/src/utils/beatLook.ts, tests/utils/beatLook.test.ts, packages/builder/src/components/visual/BeatLookSection.tsx, VisualWorkspace.tsx, VisualBeatEditor.tsx, packages/builder/public/player-web.js (rebuilt)
+
+---
+
 ## 2026-10-31: The per-beat look release (v0.9.151)
 
 ### Overview

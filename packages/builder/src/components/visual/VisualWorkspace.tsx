@@ -1493,7 +1493,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     if (!globalSettings) return null;
     return {
       ...applyTextBoxBorder(applyBeatLook(convertGlobalSettingsToTheme(globalSettings), beatLook), beatTextBoxBorder),
-      textboxFrameUrl: themeAssets?.textboxFrame,
+      // This beat's look can turn the frame picture off (a plain box).
+      textboxFrameUrl: beatLook?.textBox?.framePicture === 'off' ? undefined : themeAssets?.textboxFrame,
       buttonNormalUrl: themeAssets?.buttonNormal,
       buttonHoverUrl: themeAssets?.buttonHover,
       buttonLayout: themeAssets?.buttonLayout,
