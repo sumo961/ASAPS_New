@@ -105,6 +105,7 @@ import { listSessions as listIdeatorSessions, saveSession as saveIdeatorSession 
 import { listSessions as listCoDesignerSessions, saveSession as saveCoDesignerSession } from './components/ai/codesigner/coDesignerSessionStore';
 import { ApplyFixProposalCommand } from './commands/BeatCommands';
 import { BatchCommand } from './commands/BatchCommand';
+import type { Command } from './commands/Command';
 import { UpdateCharactersCommand, UpdateGlobalSettingsCommand } from './commands/ProjectStateCommands';
 import { AIDebugModal } from './components/ai/AIDebugModal';
 import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal';
@@ -5693,51 +5694,60 @@ function App() {
       ...oldSettings,
       project: { ...oldSettings?.project, layoutMode: target },
     };
-    applyGlobalSettingsChange(newSettings);
-    const cmd = new UpdateGlobalSettingsCommand(
+    // The setting and the migrated beats are ONE undo step. The beats used
+    // to be written with actions.updateBeat (outside the history), so Undo
+    // put back only the setting; a project with no stored mode then
+    // re-inferred the new mode from the migrated beats and stayed switched.
+    const cmds: Command[] = [new UpdateGlobalSettingsCommand(
       oldSettings,
       newSettings,
       globalSettingsMutationsRef.current,
       `Switch to ${targetLabel}`
-    );
-    getCommandManager().pushWithoutExecute(cmd);
-    if (changeCount > 0) {
-      // Per-beat update — the store has no setBeats wholesale setter,
-      // and per-beat updates undo-tag individually anyway. Beats with
-      // no entry in summary were unchanged, so we only touch the ones
-      // the migrator marked.
-      const touched = new Set(result.summary.map(s => s.beatId));
-      for (const beat of result.applied) {
-        const id = (beat as any).id;
-        if (!touched.has(id)) continue;
-        // The migrator may rewrite parameters (choice.hotspot
-        // normalization, waypoint percent enrichment), set
-        // slotAnimations (translated slot paths), and update the
-        // per-element AnimationPath list. We must forward ALL of these
-        // — passing only locations/slotIntent silently dropped the
-        // hotspot conversion and animation enrichments.
-        const next = beat as any;
-        actions.updateBeat(id, {
-          locations: next.locations,
-          slotIntent: next.slotIntent,
-          slotAnimations: next.slotAnimations,
-          spatialAnimations: next.spatialAnimations,
-          // Direct fields on Beat — Object.assign sets them in place
-          // (per-beat updateParameters() doesn't surface these).
-          //
-          // CRITICAL: the migrator stores the enriched waypoints (with
-          // xPercent/yPercent) in `nextParams.animations`. `next.animations`
-          // comes from `{...beat}` and is the ORIGINAL un-enriched array.
-          // Read parameters.animations FIRST so the engine sees the
-          // percent-aware waypoints; falling back to next.animations only
-          // when params didn't have any.
-          animations: next.parameters?.animations ?? next.animations,
-          parameters: next.parameters,
-        } as any);
+    )];
+    // Beats with no entry in summary were unchanged; only touch the ones
+    // the migrator marked.
+    const touched = new Set(result.summary.map(s => s.beatId));
+    for (const beat of result.applied) {
+      const id = (beat as any).id;
+      if (!touched.has(id)) continue;
+      const currentBeat = state.beats.find(b => b.id === id);
+      if (!currentBeat) continue;
+      // The migrator may rewrite parameters (choice.hotspot
+      // normalization, waypoint percent enrichment), set
+      // slotAnimations (translated slot paths), and update the
+      // per-element AnimationPath list. We must forward ALL of these
+      // — passing only locations/slotIntent silently dropped the
+      // hotspot conversion and animation enrichments.
+      const next = beat as any;
+      const updates: Record<string, any> = {
+        locations: next.locations,
+        slotIntent: next.slotIntent,
+        slotAnimations: next.slotAnimations,
+        spatialAnimations: next.spatialAnimations,
+        // Direct fields on Beat — Object.assign sets them in place
+        // (per-beat updateParameters() doesn't surface these).
+        //
+        // CRITICAL: the migrator stores the enriched waypoints (with
+        // xPercent/yPercent) in `nextParams.animations`. `next.animations`
+        // comes from `{...beat}` and is the ORIGINAL un-enriched array.
+        // Read parameters.animations FIRST so the engine sees the
+        // percent-aware waypoints; falling back to next.animations only
+        // when params didn't have any.
+        animations: next.parameters?.animations ?? next.animations,
+        parameters: next.parameters,
+      };
+      const oldValues: Record<string, any> = {};
+      for (const key of Object.keys(updates)) {
+        const val = key === 'parameters' && typeof (currentBeat as any).getParameters === 'function'
+          ? (currentBeat as any).getParameters()
+          : (currentBeat as any)[key];
+        oldValues[key] = (val && typeof val === 'object') ? structuredClone(val) : val;
       }
-      markChanged();
+      cmds.push(new UpdateBeatCommand(id, oldValues, updates as any, stableMutations.current));
     }
-  }, [globalSettings, state.beats, applyGlobalSettingsChange, actions, markChanged]);
+    await getCommandManager().execute(cmds.length === 1 ? cmds[0] : new BatchCommand(cmds, `Switch to ${targetLabel}`));
+    if (changeCount > 0) markChanged();
+  }, [globalSettings, state.beats, markChanged]);
 
   /**
    * Handle manual save - for untitled projects, this shows the Save Project dialog

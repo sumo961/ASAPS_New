@@ -3,19 +3,23 @@
 ## Unreleased (since v0.9.152, 2026-10-31)
 
 ### Overview
-Fixed: the Undo history carried over from one project into the next, so Undo in the newly opened project could replay the previous project's edits. User Guide screenshot 108 retaken with the Frame picture row.
+Fixed: the Undo history carried over from one project into the next, so Undo in the newly opened project could replay the previous project's edits; Undo of a switch between Responsive and Fixed canvas didn't switch back. User Guide screenshot 108 retaken with the Frame picture row.
 
 ### Fix: Undo history followed you into the next project
 - Found during the v0.9.152 release check: after switching from RED to another project, the history list still showed RED's steps. `PersistenceContext` made its own `CommandManager` (since the first commit), but the editor, the toolbar and ⌘Z use the shared one from `getCommandManager()`. Every history reset on opening, creating, deleting or opening a folder project went to the private instance, which nothing read. Undo after a switch could apply the old project's steps (by beat id) to the project now open.
 - `PersistenceContext` now uses the shared manager, so those resets reach the history everyone sees: a project opens with an empty Undo history. The history is not stored per project (the private instance's store-and-restore never reached the editor, and several command types can't be restored); it lasts for the session of one project, as it effectively always has.
 - Checked headless: change Frame picture in QA fixed boxes and undo it (history 0/1), open RED: no history; back to QA fixed boxes: none either. Tests in `PersistenceContext.test.tsx` (the provider uses the shared history; opening another project empties it and doesn't call the old step's undo), both failing before the fix. Builder suite 3142.
 - Noticed, not changed: right after opening a project the header says *Unsaved changes* (the old code does too); the next auto-save clears it.
-- Still open from the release check: Undo of a layout-mode switch doesn't switch back (see the v0.9.152 notes in memory).
+
+### Fix: Undo of a layout-mode switch didn't switch back
+- Project Settings ▸ Project ▸ Layout Mode recorded only the setting as an undo step; the migrated beats (baked or cleared positions, slotIntent, hotspots, animations) were written with `actions.updateBeat`, outside the history. Undo put the setting back, but a project that never stored its mode (the mode is then inferred from the beats) re-inferred the new mode from the migrated beats and stayed switched, with the beats still migrated. Found in the v0.9.152 release check on RED.
+- The switch is now one undo step: `UpdateGlobalSettingsCommand` plus an `UpdateBeatCommand` per migrated beat (old values snapshotted as `handleBeatsUpdate` does) in a `BatchCommand` named *Switch to …* (`App.tsx handleRequestLayoutModeChange`).
+- Checked headless on RED: Responsive → Fixed canvas → Undo is back to Responsive, and the saved beats are identical to before the switch (locations, slotIntent, parameters, animations); Redo switches to Fixed again.
 
 ### User Guide
 - Screenshot 108 (*This beat's look*) retaken: it now shows the Frame picture row.
 
-**Files modified:** packages/builder/src/contexts/PersistenceContext.tsx, contexts/__tests__/PersistenceContext.test.tsx; docs/images/108-this-beats-look.png
+**Files modified:** packages/builder/src/App.tsx, contexts/PersistenceContext.tsx, contexts/__tests__/PersistenceContext.test.tsx; docs/images/108-this-beats-look.png
 
 ---
 
