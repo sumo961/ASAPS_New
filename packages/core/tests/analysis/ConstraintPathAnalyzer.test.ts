@@ -256,3 +256,35 @@ describe('ConstraintPathAnalyzer — counter-gated endings', () => {
     expect(endings).toContain('end_high');
   });
 });
+
+describe('choice beats keep their other ways on', () => {
+  const build = (beats: any[]) => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: beats[0].id });
+    for (const b of beats) story.addBeat(createTestBeat({ name: b.id, ...b } as any));
+    return story;
+  };
+  const end = (id: string) => ({ id, type: 'endScreen', parameters: { message: id } });
+  const endings = (story: Story) =>
+    [...new Set(new ConstraintPathAnalyzer(story).analyze().outcomes.filter(o => o.endType === 'ending').map(o => o.endingBeatId))].sort();
+
+  it("follows a Multi Choice's timeout link and a requirement fallback", () => {
+    const story = build([
+      { id: 'mc', type: 'multiChoice', defaultTarget: 'late',
+        requires: [{ condition: { type: 'variable', variableName: 'ticket', operator: '==', value: true }, fallbackTarget: 'turned' }],
+        parameters: { question: '?', choices: [{ id: 'a', text: 'Board', target: 'aboard' }] } },
+      end('aboard'), end('late'), end('turned'),
+    ]);
+    expect(endings(story)).toEqual(['aboard', 'late', 'turned']);
+  });
+
+  it('a Choose Your Character option without a target goes where the others go', () => {
+    const story = build([
+      { id: 'cc', type: 'chooseCharacter', parameters: { question: 'Who?', choices: [
+        { id: 'o1', text: 'Mara', character: 'mara' },
+        { id: 'o2', text: 'Jonas', character: 'jonas', target: 'boarding' },
+      ] }, connections: [{ targetId: 'credits' }, { targetId: 'boarding' }] },
+      end('boarding'), end('credits'),
+    ]);
+    expect(endings(story)).toEqual(['boarding']);
+  });
+});

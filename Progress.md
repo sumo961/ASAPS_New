@@ -3,7 +3,7 @@
 ## Unreleased (since v0.9.152, 2026-10-31)
 
 ### Overview
-Fixed: the Undo history carried over from one project into the next, so Undo in the newly opened project could replay the previous project's edits; Undo of a switch between Responsive and Fixed canvas didn't switch back. User Guide screenshot 108 retaken with the Frame picture row.
+Fixed: the Undo history carried over from one project into the next, so Undo in the newly opened project could replay the previous project's edits; Undo of a switch between Responsive and Fixed canvas didn't switch back. A code review of v0.9.149 onward found six more bugs, fixed: false dead ends and borrowed effects in Path Analysis, requirement redirect loops, Story Logic treating a fallback-less requirement as a gate, item quantities missing from the path tree, choice beats' timeout and fallback links dropped by the constraint analyzer, and edits lost when cloning or creating a GitHub project. User Guide screenshot 108 retaken with the Frame picture row.
 
 ### Fix: Undo history followed you into the next project
 - Found during the v0.9.152 release check: after switching from RED to another project, the history list still showed RED's steps. `PersistenceContext` made its own `CommandManager` (since the first commit), but the editor, the toolbar and ⌘Z use the shared one from `getCommandManager()`. Every history reset on opening, creating, deleting or opening a folder project went to the private instance, which nothing read. Undo after a switch could apply the old project's steps (by beat id) to the project now open.
@@ -16,10 +16,21 @@ Fixed: the Undo history carried over from one project into the next, so Undo in 
 - The switch is now one undo step: `UpdateGlobalSettingsCommand` plus an `UpdateBeatCommand` per migrated beat (old values snapshotted as `handleBeatsUpdate` does) in a `BatchCommand` named *Switch to …* (`App.tsx handleRequestLayoutModeChange`).
 - Checked headless on RED: Responsive → Fixed canvas → Undo is back to Responsive, and the saved beats are identical to before the switch (locations, slotIntent, parameters, animations); Redo switches to Fixed again.
 
+### Code review of v0.9.149..HEAD (9 findings; 7 real, fixed)
+- **Path Analysis: a hidden choice hid a plain one to the same beat.** With no choice effects, links to one beat were merged before their conditions were checked (first one kept), so 'Pay with gold' (needs gold) hid 'Ask nicely' → false Dead End. Now a link that is always offered stands for its target; conditional ones are kept unless such a link exists (`StateSimulationAnalyzer.getConnections`).
+- **Requirement redirects that loop** (A's fallback is B, B's is A) bounced until the run's 300,000-expansion budget was spent, then reported "truncated". A redirect is now remembered, so the loop ends as a **Cycle**.
+- **A Dialog Tree's own default (timeout) link** was folded into a reply to the same beat — the reply's condition made both vanish (false Dead End) — and, followed, borrowed that reply's conditions and effects. `analysisLinks` now reads the tree's reply conditions when deciding whether a link is always offered, and the default/timer links get an empty route (no reply on the way).
+- **Story Logic counted any requirement as a gate**, but the engine only redirects when the requirement has a fallback; without one it logs and plays the beat. The "not gated" warning now stays for those (`storyLogicValidator`).
+- **The path tree's effect labels ignored quantities**: buying a second coin, or spending one of three, showed no effect. Labels now compare how many (`+coin`, `+2 coin`, `−coin`).
+- **The constraint analyzer (`ConstraintPathAnalyzer`) dropped a choice beat's other ways on** — its timeout link, requirement fallbacks, a timer's or QR code's target — since Multi Choice, Free Layout and Choose Your Character count as choice beats. It follows them now; a Choose Your Character option without a target goes where the others go, as in the engine. The extra-link labels are defined once (`analysisLinks.EXTRA_LINK`).
+- **Cloning a repository or creating a project on GitHub** paused auto-save and opened the folder without saving the project being left (the save-before-switch fix covered Open Folder only). Both now save first.
+- Not bugs: the look's number fields send a change per keystroke, but edits to one beat within 2 s merge into one undo step. A beat's look isn't in the Co-Designer or the Claude Desktop (MCP) guidance (the story generator has it; `framePicture` added there now) — teaching the Co-Designer needs applier support, a decision for later.
+- Tests (each failing before its fix): StateSimulationCoverage (+4), ConstraintPathAnalyzer (+2), storyLogicValidator (+1). Suites: core 3079, builder 3142. The Last Ferry's Path Analysis in the Debug window: 2 endings, all beats reachable.
+
 ### User Guide
 - Screenshot 108 (*This beat's look*) retaken: it now shows the Frame picture row.
 
-**Files modified:** packages/builder/src/App.tsx, contexts/PersistenceContext.tsx, contexts/__tests__/PersistenceContext.test.tsx; docs/images/108-this-beats-look.png
+**Files modified:** packages/core/src/analysis/StateSimulationAnalyzer.ts, analysisLinks.ts, PathTree.ts, ConstraintPathAnalyzer.ts, ReachabilityAnalyzer.ts, tests/analysis/StateSimulationCoverage.test.ts, ConstraintPathAnalyzer.test.ts; packages/builder/src/utils/storyLogicValidator.ts (+ test), services/prompts/storyGenerationEnhanced.ts, App.tsx, contexts/PersistenceContext.tsx, contexts/__tests__/PersistenceContext.test.tsx; docs/images/108-this-beats-look.png
 
 ---
 

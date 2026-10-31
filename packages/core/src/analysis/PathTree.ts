@@ -9,7 +9,7 @@
  * for state snapshots and preset generation.
  */
 
-import type { SimulatedPath, SimulatedStep, SimulationState } from './StateSimulationAnalyzer';
+import { itemQuantity, type SimulatedPath, type SimulatedStep, type SimulationState } from './StateSimulationAnalyzer';
 import type { PathEndType } from './ConstraintSet';
 import type { Story } from '../engine/Story';
 import { CHOICE_BEAT_TYPES } from './analysisLinks';
@@ -816,17 +816,17 @@ function diffStateEffects(before: SimulationState, after: SimulationState): stri
     if (before.variables.get(name) !== value) effects.push(`${name} = ${JSON.stringify(value)}`);
   }
 
-  for (const [char, items] of after.inventory) {
-    const prevItems = before.inventory.get(char) || new Set<string>();
-    for (const item of items) {
-      if (!prevItems.has(item)) effects.push(`+${item}`);
-    }
+  // By quantity: a second coin, or one spent of three, is a change too
+  // (the repeat choices the simulator follows: buy one more).
+  const held = new Set<string>();
+  for (const st of [before, after]) {
+    for (const [bag, items] of st.inventory) for (const item of items) held.add(`${bag}\u0001${item}`);
   }
-  for (const [char, items] of before.inventory) {
-    const nowItems = after.inventory.get(char) || new Set<string>();
-    for (const item of items) {
-      if (!nowItems.has(item)) effects.push(`−${item}`);
-    }
+  for (const key of held) {
+    const [bag, item] = key.split('\u0001');
+    const diff = itemQuantity(after, bag, item) - itemQuantity(before, bag, item);
+    if (diff > 0) effects.push(diff === 1 ? `+${item}` : `+${diff} ${item}`);
+    if (diff < 0) effects.push(diff === -1 ? `−${item}` : `−${-diff} ${item}`);
   }
 
   // Feelings (sentiments, moods, emotions) wait in pendingRuntime until the

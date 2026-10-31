@@ -7633,6 +7633,8 @@ function App() {
               // git grep scan that checks every file's content (causes crashes on
               // slow filesystems like Parallels shared folders).
               console.log('[App] Opening cloned project as directory...');
+              // Save the project being left first (a paused auto-save can't).
+              if (!(await flushPendingSave())) console.warn('[App] Could not save the current project before opening the clone');
               pauseAutoSave();
               resumeAutoSaveAfterLoadRef.current = true;
               // Do NOT clear loadedProjectIdRef — see Open Project Folder handler
@@ -7668,6 +7670,8 @@ function App() {
             // Open the freshly-created directory project. VCS auto-init effect
             // will pick up the origin URL from `git remote get-url origin`.
             try {
+              // Save the project being left first (a paused auto-save can't).
+              if (!(await flushPendingSave())) console.warn('[App] Could not save the current project before opening the new GitHub project');
               pauseAutoSave();
               resumeAutoSaveAfterLoadRef.current = true;
               await openDirectoryProject(projectPath);

@@ -2,7 +2,7 @@ import type { Story } from '../engine/Story';
 import { normalizeRoles } from '../engine/roles';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
-import { analysisLinks } from './analysisLinks';
+import { analysisLinks, EXTRA_LINK } from './analysisLinks';
 import { StoryContext, PLAYTHROUGH_VARIABLE } from '../engine/StoryContext';
 
 /**
@@ -779,7 +779,7 @@ export class ReachabilityAnalyzer {
       for (const connection of analysisLinks(beat)) {
         if (connection.targetId !== targetBeatId) continue;
         // Requirement redirects name their explanation.
-        const req = connection.label === 'requires-fallback'
+        const req = connection.label === EXTRA_LINK.requiresFallback
           ? ((beat as any).requires as any[] | undefined)?.find((r) => r?.fallbackTarget === targetBeatId)
           : undefined;
         incoming.push({

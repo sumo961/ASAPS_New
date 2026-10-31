@@ -15,7 +15,7 @@
 import type { Story } from '../engine/Story';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
-import { analysisLinks, isChoiceBeatType } from './analysisLinks';
+import { analysisLinks, isChoiceBeatType, EXTRA_LINK_LABELS } from './analysisLinks';
 import {
   ConstraintSet,
   OutcomeGroup,
@@ -305,7 +305,12 @@ export class ConstraintPathAnalyzer {
     // Explore each choice
     for (let i = 0; i < choices.length; i++) {
       const choice = choices[i];
-      const targetId = choice.targetId || choice.target || connections[i]?.targetId;
+      // A Choose Your Character option without a target goes where the other
+      // options go (ChooseCharacterBeat.targetFor); list order is no guide.
+      const shared = beat.type === 'chooseCharacter'
+        ? (choices.find((c: any) => (c?.target || c?.targetId) && (c.target || c.targetId) !== '__self__')?.target ?? connections[0]?.targetId)
+        : connections[i]?.targetId;
+      const targetId = choice.targetId || choice.target || shared;
 
       if (!targetId) continue;
 
@@ -340,12 +345,15 @@ export class ConstraintPathAnalyzer {
       }
     }
 
-    // Also check defaultTarget
-    if (params.defaultTarget) {
-      const defaultBeat = this.story.getBeat(params.defaultTarget);
-      if (defaultBeat) {
-        this.explore(defaultBeat, state);
-      }
+    // And the beat's other ways on (analysisLinks): its auto-advance /
+    // timeout link, requirement fallbacks, a timer's or QR code's target.
+    const extras = connections.filter((c) => EXTRA_LINK_LABELS.has(c.label ?? ''));
+    if (params.defaultTarget && !extras.some((c) => c.targetId === params.defaultTarget)) {
+      extras.push({ targetId: params.defaultTarget, label: 'default' });
+    }
+    for (const extra of extras) {
+      const extraBeat = this.story.getBeat(extra.targetId);
+      if (extraBeat) this.explore(extraBeat, state);
     }
   }
 

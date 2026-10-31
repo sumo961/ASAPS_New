@@ -109,6 +109,14 @@ describe('state-assumption text', () => {
     expect(requirement.issues.some((i) => i.beatId === 'gated')).toBe(false);
   });
 
+  it('a requirement without a fallback is no gate (the engine plays the beat anyway)', () => {
+    const r = validateStoryLogic(story([
+      info('a', 'Open the chest.', 'gated'),
+      { ...info('gated', 'You have the key now.'), requires: [{ condition: { type: 'inventory', item: 'key' } }] },
+    ]));
+    expect(r.issues.some((i) => i.beatId === 'gated')).toBe(true);
+  });
+
   it('does not flag plain text with no state assumptions', () => {
     const r = validateStoryLogic(story([info('a', 'The rain taps the window.', 'b'), info('b', 'He says nothing.')]));
     expect(r.issues).toEqual([]);

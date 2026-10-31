@@ -65,6 +65,18 @@ describe('path analysis follows the engine', () => {
     expect(endings(s)).toEqual(['no', 'yes']);
   });
 
+  it("a Dialog Tree's own default link doesn't borrow a reply's condition or effects", () => {
+    const s = story([
+      { id: 'd', type: 'dialogTree', defaultTarget: 'check', parameters: { dialogTree: { id: 'r', speaker: 'Bob', text: 'Hi', choices: [
+        { id: 'c1', text: 'Show the key', target: 'check', effects: setFlag,
+          conditions: [{ type: 'variable', variableName: 'hasKey', operator: '==', value: true }] },
+      ] } } },
+      flagCheck, end('yes'), end('no'),
+    ]);
+    // The reply is hidden (no key); the default link plays without its effects.
+    expect(endings(s)).toEqual(['no']);
+  });
+
   it('a choice that stays on the beat still changes state', () => {
     const s = story([
       { id: 'mc', type: 'multiChoice', parameters: { question: '?', choices: [
@@ -87,6 +99,19 @@ describe('path analysis follows the engine', () => {
     expect(endings(s)).toEqual(['no']);
   });
 
+  it('a hidden choice does not hide a plain one to the same beat', () => {
+    const s = story([
+      { id: 'mc', type: 'multiChoice', parameters: { question: '?', choices: [
+        { id: 'c1', text: 'Pay with gold', target: 'yes', conditions: [{ type: 'variable', variableName: 'gold', operator: '>=', value: 5 }] },
+        { id: 'c2', text: 'Ask nicely', target: 'yes' },
+      ] } },
+      end('yes'),
+    ]);
+    const r = new StateSimulationAnalyzer(s).analyze();
+    expect(endings(s)).toEqual(['yes']);
+    expect(r.outcomes.some((o: any) => o.endType === 'deadEnd')).toBe(false);
+  });
+
   it('an unmet requirement jumps to its fallback before the beat shows', () => {
     const s = story([
       { id: 'door', type: 'infoText', parameters: { text: 'The door opens' }, connections: [{ targetId: 'yes' }],
@@ -94,6 +119,19 @@ describe('path analysis follows the engine', () => {
       end('yes'), end('no'),
     ]);
     expect(endings(s)).toEqual(['no']);
+  });
+
+  it('requirements that redirect back and forth end as a cycle, not a runaway search', () => {
+    const needs = (v: string, fallbackTarget: string) => [{ condition: { type: 'variable', variableName: v, operator: '==', value: true }, fallbackTarget }];
+    const s = story([
+      { id: 'a', type: 'infoText', parameters: { text: 'A' }, connections: [{ targetId: 'yes' }], requires: needs('x', 'b') },
+      { id: 'b', type: 'infoText', parameters: { text: 'B' }, connections: [{ targetId: 'yes' }], requires: needs('y', 'a') },
+      end('yes'),
+    ]);
+    const analyzer = new StateSimulationAnalyzer(s);
+    const r = analyzer.analyze();
+    expect(analyzer.truncated).toBe(false);
+    expect(r.outcomes.some((o: any) => o.endType === 'cycle')).toBe(true);
   });
 
   it('a Condition Check with more conditions matches all or any', () => {
@@ -199,6 +237,22 @@ describe('the path tree says what a choice does', () => {
     expect(back?.stateEffects).toEqual(expect.arrayContaining(['brave = true', 'Tomas trust → player +0.6']));
     const branch = allNodes(tree.root).find(n => n.conditionAnnotation);
     expect(branch?.conditionAnnotation?.conditionText).toBe('Tomas trust → player >= 0.5');
+  });
+
+  it('names a second coin, not just the first', () => {
+    const s = story([
+      { id: 'start', type: 'addRemoveInventory', parameters: { action: 'add', item: 'coin', quantity: 1 }, connections: [{ targetId: 'shop' }] },
+      { id: 'shop', type: 'multiChoice', parameters: { question: '?', choices: [
+        { id: 'buy', text: 'Buy one more', target: '__self__', effects: [{ type: 'addInventory', target: 'coin' }] },
+        { id: 'go', text: 'Leave', target: 'out' },
+      ] } },
+      end('out'),
+    ]);
+    const tree = buildPathTree(new StateSimulationAnalyzer(s).analyzeRaw(), s);
+    // The coin from the start beat is no choice's doing; buying another is.
+    const labels: string[] = [];
+    JSON.stringify(tree.root, (k, v) => { if (k === 'stateEffects' && Array.isArray(v)) labels.push(...v); return v; });
+    expect(labels).toContain('+coin');
   });
 });
 

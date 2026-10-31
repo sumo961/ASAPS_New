@@ -18,7 +18,7 @@ import type { Story } from '../engine/Story';
 import { alignForComparison } from '../engine/variableValues';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
-import { analysisLinks, isChoiceBeatType } from './analysisLinks';
+import { analysisLinks, isChoiceBeatType, EXTRA_LINK } from './analysisLinks';
 import { StoryContext, PLAYTHROUGH_VARIABLE, type SerializedStoryState } from '../engine/StoryContext';
 import {
   ConstraintSet,
@@ -702,12 +702,15 @@ export class StateSimulationAnalyzer {
       // the story jumps to the fallback without showing this beat.
       const redirect = this.requirementRedirect(beat, frame.state);
       if (redirect) {
+        // Remember the redirect, so requirements that send the player back
+        // and forth (A's fallback is B, B's is A) end as a cycle instead of
+        // bouncing until the run's expansion budget is spent.
         enqueue({
           beatId: redirect,
           state: frame.state,
           path: frame.path,
           decisions: frame.decisions,
-          visitedStates: frame.visitedStates,
+          visitedStates: new Set(frame.visitedStates).add(stateKey),
           takenChoicesPerBeat: frame.takenChoicesPerBeat,
         });
         continue;
@@ -965,14 +968,18 @@ export class StateSimulationAnalyzer {
     // Every way on, including auto-advance and timer / QR targets — the
     // walk every analyzer shares. Requirement redirects are not a way on
     // here: they are taken before the beat shows (requirementRedirect).
-    let connections = analysisLinks(beat).filter((c) => c.label !== 'requires-fallback');
+    let connections = analysisLinks(beat).filter((c) => c.label !== EXTRA_LINK.requiresFallback);
     const routes = beat.type === 'dialogTree' ? this.dialogRoutes(beat) : [];
     if (routes.length > 0) {
       // Each way through the tree is its own route: two replies whose lines
       // end at the same exit set different things (the beat's own list
       // merges them). The tree's links are all in the routes.
       const own = new Set(beat.getConnections().map((c) => `${c.targetId}\u0000${c.label ?? ''}`));
-      connections = [...routes, ...connections.filter((c) => !own.has(`${c.targetId}\u0000${c.label ?? ''}`))];
+      // The other links (auto-advance, timer) pass through no reply: an empty
+      // route, or the reply lookup would lend them the conditions and effects
+      // of a reply that happens to share their target.
+      const extras = connections.filter((c) => !own.has(`${c.targetId}\u0000${c.label ?? ''}`));
+      connections = [...routes, ...extras.map((c) => ({ ...c, route: [] }) as Connection)];
     } else if (beat.type === 'chooseCharacter') {
       // Every option casts someone, linked or not (ChooseCharacterBeat).
       const extras = connections.filter((c) => !beat.getConnections().some((o) => o.targetId === c.targetId && o.label === c.label));
@@ -989,15 +996,25 @@ export class StateSimulationAnalyzer {
       return connections;
     }
 
-    // Deduplicate connections by targetId
-    // Keep first connection for each unique target (preserves label)
+    // Deduplicate connections by targetId. A link that is always on screen
+    // stands for every link to its target; links with conditions are kept
+    // (each may be the only one offered in some state) unless such an
+    // always-offered link to the same target exists. Keeping just the first
+    // link let a hidden 'Pay with gold' hide the plain 'Ask nicely' beside it.
+    const conditional = (conn: Connection): boolean => {
+      const own: any = conn.condition;
+      if (Array.isArray(own) ? own.length > 0 : !!own) return true;
+      return ((conn as any).route ?? []).some((st: any) => Array.isArray(st?.choice?.conditions) && st.choice.conditions.length > 0);
+    };
+    const alwaysTo = new Set(connections.filter((c) => !conditional(c)).map((c) => c.targetId));
     const seenTargets = new Set<string>();
     const uniqueConnections: Connection[] = [];
     for (const conn of connections) {
-      if (!seenTargets.has(conn.targetId)) {
+      if (alwaysTo.has(conn.targetId)) {
+        if (conditional(conn) || seenTargets.has(conn.targetId)) continue;
         seenTargets.add(conn.targetId);
-        uniqueConnections.push(conn);
       }
+      uniqueConnections.push(conn);
     }
 
     return uniqueConnections;

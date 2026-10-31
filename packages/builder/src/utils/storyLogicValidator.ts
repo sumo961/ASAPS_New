@@ -172,11 +172,12 @@ function pathHasConditionGate(
   }
 
   // A choice shown only under conditions gates where it leads, as does a
-  // beat's own requirement (the engine redirects when it is unmet).
+  // beat's own requirement with a fallback (the engine redirects when it is
+  // unmet; without a fallbackTarget it only logs and the beat plays).
   if (intoBeatId && choicesInto(sourceBeat, intoBeatId).every(hasConditions) && choicesInto(sourceBeat, intoBeatId).length > 0) {
     return true;
   }
-  if (Array.isArray(sourceBeat.requires) && sourceBeat.requires.some((r: any) => r?.condition)) {
+  if (Array.isArray(sourceBeat.requires) && sourceBeat.requires.some((r: any) => r?.condition && r?.fallbackTarget)) {
     return true;
   }
 
@@ -220,9 +221,10 @@ function isPrecededByConditionCheck(
 ): boolean {
   const incoming = incomingPaths.get(beatId) || [];
 
-  // The beat's own requirement gates it whichever way it is reached.
+  // The beat's own requirement gates it whichever way it is reached — when
+  // it has a fallback to send the player to (without one the beat plays).
   const self = beats.find(b => b.id === beatId);
-  if (Array.isArray(self?.requires) && self.requires.some((r: any) => r?.condition)) return true;
+  if (Array.isArray(self?.requires) && self.requires.some((r: any) => r?.condition && r?.fallbackTarget)) return true;
 
   if (incoming.length === 0) return false;
 
