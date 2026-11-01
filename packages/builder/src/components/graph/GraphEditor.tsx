@@ -24,6 +24,7 @@ import { DialogContainerNode } from './DialogContainerNode';
 import { DialogInternalNode } from './DialogInternalNode';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { buildGraphNodes, buildGraphEdges } from './graphBuild';
+import { setGraphNodeIds } from './graphNodeIds';
 import { CLUSTER_HEADER_H } from './graphStyle';
 import { resolveBeatDrop, toContentRelative, clusterAt } from './clusterDrop';
 import { confirmBeatDelete, confirmBeatsDelete, describeManyBeatsDelete, MANY_BEATS } from '../../utils/confirmBeatDelete';
@@ -436,6 +437,12 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   );
 
   const [nodesState, setNodes, onNodesChange] = useNodesState(nodes);
+
+  // Which beats the flowchart holds (drawn or not; see graphNodeIds).
+  useEffect(() => {
+    setGraphNodeIds(new Set(nodes.map((n) => n.id)));
+  }, [nodes]);
+  useEffect(() => () => setGraphNodeIds(null), []);
   const [edgesState, setEdges, onEdgesChange] = useEdgesState(edges);
 
   // Hovering a beat picks out where it leads (class feedback: "hovering a
@@ -1102,6 +1109,10 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         // above its own internal-edge layers; explicit zIndex tiers on the
         // dialog nodes/edges handle stacking instead.
         elevateNodesOnSelect={false}
+        // Draw only the beats and links in view: a 400-beat story kept
+        // ~11,000 elements on the page, and every drop, selection and edit
+        // made the browser restyle and redraw all of them.
+        onlyRenderVisibleElements
         deleteKeyCode={null}
         onConnectStart={onConnectStart}
         onConnectEnd={stableConnectEnd}

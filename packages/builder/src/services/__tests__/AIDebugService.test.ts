@@ -5,6 +5,7 @@
  * connection-target extractors. UI checks are disabled unless a test targets
  * them, since jsdom has no ReactFlow [data-id] nodes.
  */
+import { setGraphNodeIds } from '../../components/graph/graphNodeIds';
 import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { AIDebugService, getAIDebugService } from '../AIDebugService';
 
@@ -212,6 +213,21 @@ describe('checkUIRendering', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ category: 'ui_not_rendered', beatId: 'b2' });
     document.body.innerHTML = '';
+  });
+
+  it("with a flowchart mounted, believes its node list (beats out of view aren't drawn)", () => {
+    document.body.innerHTML = '<div data-id="b1"></div>';
+    setGraphNodeIds(new Set(['b1', 'b2']));
+    try {
+      const issues = (svc() as any).checkUIRendering(
+        [{ id: 'b1', name: 'In view' }, { id: 'b2', name: 'Out of view' }, { id: 'b3', name: 'Missing' }],
+        false,
+      );
+      expect(issues.map((i: any) => i.beatId)).toEqual(['b3']);
+    } finally {
+      setGraphNodeIds(null);
+      document.body.innerHTML = '';
+    }
   });
 });
 

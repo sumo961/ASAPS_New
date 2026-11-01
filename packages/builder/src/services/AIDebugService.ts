@@ -5,6 +5,7 @@
  * to identify discrepancies after story generation.
  */
 
+import { getGraphNodeIds } from '../components/graph/graphNodeIds';
 import type { Beat } from '@asaps/core';
 import type {
   AIDebugResult,
@@ -458,14 +459,16 @@ export class AIDebugService {
       return issues;
     }
 
-    // ReactFlow nodes have data-id attributes
-    const beatNodes = document.querySelectorAll('[data-id]');
-    const renderedBeatIds = new Set<string>();
-
-    beatNodes.forEach(node => {
-      const id = node.getAttribute('data-id');
-      if (id) renderedBeatIds.add(id);
-    });
+    // The flowchart's own node list: it draws only what is in view, so the
+    // page's elements would report every beat outside it as missing. Without
+    // a mounted flowchart, fall back to the page (ReactFlow nodes' data-id).
+    const renderedBeatIds = new Set<string>(getGraphNodeIds() ?? []);
+    if (!getGraphNodeIds()) {
+      document.querySelectorAll('[data-id]').forEach(node => {
+        const id = node.getAttribute('data-id');
+        if (id) renderedBeatIds.add(id);
+      });
+    }
 
     if (verbose) {
       console.log(`[AIDebugService] Found ${renderedBeatIds.size} rendered nodes in DOM`);
