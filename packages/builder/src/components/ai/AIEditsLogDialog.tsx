@@ -18,6 +18,7 @@ const SOURCE_LABEL: Record<AIEditSource, { label: string; icon: React.ReactNode;
   'co-designer': { label: 'Co-Designer', icon: <Compass className="w-3 h-3" />, cls: 'bg-teal-100 text-teal-900' },
   'ask-ai': { label: 'Ask AI', icon: <Sparkles className="w-3 h-3" />, cls: 'bg-violet-100 text-violet-900' },
   'generator-review': { label: 'Review', icon: <Wrench className="w-3 h-3" />, cls: 'bg-amber-100 text-amber-900' },
+  'story-logic': { label: 'Story Logic', icon: <Sparkles className="w-3 h-3" />, cls: 'bg-blue-100 text-blue-900' },
 };
 const DECISION_LABEL: Record<AIEditDecision, { label: string; icon: React.ReactNode; cls: string }> = {
   accepted: { label: 'accepted', icon: <Check className="w-3 h-3" />, cls: 'text-emerald-800' },

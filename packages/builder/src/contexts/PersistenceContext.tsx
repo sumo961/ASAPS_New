@@ -1531,6 +1531,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       translationManifest: copy.translationManifest,
       generationReview: copy.generationReview,
       aiEdits: copy.aiEdits,
+      storyLogic: copy.storyLogic,
       ideatorSessions: copy.ideatorSessions,
       coDesignerSessions: copy.coDesignerSessions,
       modifiedAt: new Date(),

@@ -1,5 +1,26 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.154, 2026-11-01)
+
+### Overview
+Story Logic Phase 1: **Check with AI** in the Debug window reads each beat next to the states players arrive in and reports where its words don't hold. Not yet run against a real model.
+
+### Story Logic: Check with AI (docs/AI-Story-Logic-Plan.md, Phase 1)
+- **Which beats:** those the way taken reaches in different states, plus those the keyword check flags, with words to judge; most-travelled first. The panel says how many of the story's beats are to check and how big the run is before it starts. Above 40 candidates it also offers a first pass on the beats about half the path visits go through. A run is split into requests of up to 12 beats; Cancel stops it, and what was checked is kept (also when a request fails).
+- **What the model reads:** the beat's words, its speaker, each distinct arriving state in plain words (up to 6: items with quantities, variables, counters, who plays each role, feelings, plus one example route), the words of the beats before it; the story digest once as `systemContext`. Its reply is `findings[]` (schema on Claude). `services/prompts/storyLogicReview.ts`, `services/storyLogicReview.ts`.
+- **Checked before shown:** a finding must quote words really in the beat, name a beat it was given and point at one of its states; the rest are dropped and counted ("3 findings were left out").
+- **In the tab:** an "AI findings" section under the keyword warnings: the quote, the reason, the state that breaks it, a suggestion; **Propose a fix**, **Show this path**, **Go to beat**, **Not a problem**. Shown only with Show AI features on; without a configured provider it says how to set one up.
+- **Propose a fix** reuses the review's `requestAIFix` (at most 4 edits, replayed on a copy; nothing new may break) with a before/after card. **Apply** goes to the builder over a new channel (`STORY_LOGIC_FIX`, `FIX_RESULT`, modelled on Co-Designer's) and is one undo step ("Story Logic fix: 1 edit"). Accepted and declined fixes go in the AI changes ledger under a new source, Story Logic.
+- **Saved with the project:** `generation/story-logic.json` (zip and folder formats, IndexedDB): results per beat under a key of its words, states and the words before it, and dismissals. A re-run checks only what changed; a changed beat's findings retire. Differs from the plan, which didn't store findings: re-running them would mean paying again.
+- **Cost:** the panel shows estimated tokens and requests, not money; ASAPS has no price list per model, and a guessed one would go stale silently.
+- Checked headless on The Last Ferry with a scripted stand-in for the model (no key): 6 candidates of 9 beats with the size shown; digest and schema sent; 3 grounded findings kept, 3 bogus ones dropped; Not a problem; a fix applied as one undo step, Undo reverts it; after a save and reload the results, dismissal and ledger entry are there and only the 2 changed beats are due again. No provider: the set-up line. Tests: `storyLogicReview.test.ts` (17, on the real path simulator), `DebugWindowManager.storyLogic.test.ts`, `DirectoryFormat.test.ts`. Suites: core 3089, builder 3176.
+- **Not yet done:** a run against a real model (the plan's eval of planted problems and clean twins needs one), and the desktop app's Debug window with a real provider.
+- User Guide at release: Story Logic's callout ("it doesn't use AI") becomes the Check with AI description; AI changes lists the Story Logic source.
+
+**Files modified:** packages/builder/src/services/storyLogicReview.ts (new), services/prompts/storyLogicReview.ts (new), types/storyLogic.ts (new), components/debug/StoryLogicAISection.tsx (new), components/debug/LogicValidationReport.tsx, pages/DebugWindow.tsx, services/DebugWindowManager.ts, services/AIService.ts, services/findingFixService.ts, App.tsx, utils/aiEditsLedger.ts, utils/projectZipManager.ts, storage/types.ts, storage/adapters/DirectoryAdapter.ts, contexts/PersistenceContext.tsx, types/aiEdits.ts, types/generationReview.ts, components/ai/AIEditsLogDialog.tsx; packages/core/src/persistence/DirectoryFormat.ts; tests
+
+---
+
 ## 2026-11-01: The large-project release (v0.9.154)
 
 ### Overview

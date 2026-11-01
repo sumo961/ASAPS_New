@@ -96,7 +96,7 @@ export function buildFixPrompt(finding: GenerationFinding, ctx: FixRequestContex
   for (const t of types) { const ex = schemaExcerptFor(ctx.schema, t); if (ex) schemaExcerpt[t] = ex; }
   const allIds = (ctx.story.beats || []).map((b: any) => ({ id: b.id, name: b.name, type: b.type }));
 
-  const systemPrompt = `You repair ONE structural problem in an interactive story authored in ASAPS (beats with parameters; links are beat ids stored in parameters).
+  const systemPrompt = `You repair ONE problem in an interactive story authored in ASAPS (beats with parameters; links are beat ids stored in parameters).
 Reply with JSON only, no prose, in exactly this shape:
 {"edits":[{"beatId":"<id>","path":"<parameter path>","value":<json>,"why":"<one sentence>"}],"rationale":"<one or two sentences>"}
 

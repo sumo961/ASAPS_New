@@ -400,6 +400,12 @@ describe('generation review record (2026-09-08)', () => {
     expect(JSON.parse(file!.content).entries).toHaveLength(1);
     expect(serializeToDirectory(createMinimalInput()).files.some(f => f.path === 'generation/ai-edits.json')).toBe(false);
   });
+  it('writes generation/story-logic.json only when there is something to keep', () => {
+    const storyLogic = { version: 1, dismissed: ['k'], checked: {} };
+    const { files } = serializeToDirectory({ ...createMinimalInput(), storyLogic } as any);
+    expect(JSON.parse(files.find(f => f.path === 'generation/story-logic.json')!.content).dismissed).toEqual(['k']);
+    expect(serializeToDirectory(createMinimalInput()).files.some(f => f.path === 'generation/story-logic.json')).toBe(false);
+  });
   it('round-trips the project-bound AI sessions', () => {
     const { files } = serializeToDirectory({ ...createMinimalInput(), ideatorSessions: [{ id: 'i1', lastUpdatedAt: 1, messages: [] }], coDesignerSessions: [{ id: 'c1', lastUpdatedAt: 2, messages: [] }] } as any);
     expect(JSON.parse(files.find(f => f.path === 'generation/ideator-sessions.json')!.content)[0].id).toBe('i1');

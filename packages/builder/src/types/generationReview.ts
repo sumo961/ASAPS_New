@@ -11,7 +11,7 @@
  * their own.
  */
 
-export type FindingKind = 'missing-target' | 'unreachable-beat' | 'unsatisfiable-threshold' | 'restart-without-target' | 'role' | 'time-gate' | 'line-without-exit' | 'clock-prose';
+export type FindingKind = 'missing-target' | 'unreachable-beat' | 'unsatisfiable-threshold' | 'restart-without-target' | 'role' | 'time-gate' | 'line-without-exit' | 'clock-prose' | 'story-logic';
 
 interface FindingBase {
   /** Stable id: kind + beat + discriminator, so status survives re-analysis. */
@@ -106,7 +106,15 @@ export interface ClockProseFinding extends FindingBase {
   kind: 'clock-prose';
 }
 
-export type GenerationFinding = MissingTargetFinding | UnreachableBeatFinding | UnsatisfiableThresholdFinding | RestartWithoutTargetFinding | RoleFinding | TimeGateFinding | LineWithoutExitFinding | ClockProseFinding;
+/** Words that don't hold for a state arriving at the beat (AI Story Logic). */
+export interface StoryLogicProblemFinding extends FindingBase {
+  kind: 'story-logic';
+  quote: string;
+  arrivingState: string;
+  suggestion?: string;
+}
+
+export type GenerationFinding = MissingTargetFinding | UnreachableBeatFinding | UnsatisfiableThresholdFinding | RestartWithoutTargetFinding | RoleFinding | TimeGateFinding | LineWithoutExitFinding | ClockProseFinding | StoryLogicProblemFinding;
 
 export type ProposalKind = 'retarget' | 'clamp-threshold' | 'link-from-previous' | 'set-restart-target' | 'ai-edit';
 

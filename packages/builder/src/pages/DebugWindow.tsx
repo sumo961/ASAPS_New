@@ -19,6 +19,8 @@ import { LogicValidationReport } from '../components/debug/LogicValidationReport
 import type { DebugMessage, DebugStoryContext } from '../services/DebugWindowManager';
 import type { SerializedStoryData } from '../services/PreviewWindowManager';
 import { usePersistedState } from '../utils/persistedState';
+import type { StoryLogicStore } from '../types/storyLogic';
+import type { AIFixSuggestion } from '../types/generationReview';
 
 type Tab = 'reachability' | 'paths' | 'logic';
 
@@ -26,6 +28,8 @@ export const DebugWindow: React.FC = () => {
   const [storyData, setStoryData] = useState<SerializedStoryData | null>(null);
   const [context, setContext] = useState<DebugStoryContext | undefined>(undefined);
   const [activeTab, setActiveTab] = usePersistedState<Tab>('asaps_ui_debug_tab', 'reachability');
+  const [storyLogic, setStoryLogic] = useState<StoryLogicStore | null>(null);
+  const [fixResult, setFixResult] = useState<{ findingId: string; ok: boolean; error?: string } | null>(null);
 
   // Listen for STORY_UPDATE messages; ping the opener so it knows we're ready.
   // In Electron the preload exposes the same transport via IPC.
@@ -38,6 +42,10 @@ export const DebugWindow: React.FC = () => {
       if (message.type === 'STORY_UPDATE' && message.payload?.storyData) {
         setStoryData(message.payload.storyData);
         setContext(message.payload.context);
+        setStoryLogic(message.payload.storyLogic ?? null);
+      }
+      if (message.type === 'FIX_RESULT' && message.payload?.findingId) {
+        setFixResult({ findingId: message.payload.findingId, ok: !!message.payload.ok, error: message.payload.error });
       }
     };
 
@@ -142,6 +150,16 @@ export const DebugWindow: React.FC = () => {
     postToOpener({ type: 'HIGHLIGHT_PATH', payload: { beatIds } });
   };
 
+  const handleStoryLogicChange = (store: StoryLogicStore) => {
+    setStoryLogic(store);
+    postToOpener({ type: 'SAVE_STORY_LOGIC', payload: { storyLogic: store } });
+  };
+
+  const handleFixDecision = (suggestion: AIFixSuggestion, decision: 'accepted' | 'rejected') => {
+    setFixResult(null);
+    postToOpener({ type: 'STORY_LOGIC_FIX', payload: { suggestion, decision } });
+  };
+
   if (!story) {
     return (
       <div className="flex items-center justify-center h-screen text-gray-500">
@@ -211,7 +229,15 @@ export const DebugWindow: React.FC = () => {
           <PathVisualization story={story} onHighlightPath={handleHighlightPath} />
         )}
         {activeTab === 'logic' && (
-          <LogicValidationReport story={story} onHighlightBeat={handleHighlightBeat} />
+          <LogicValidationReport
+            story={story}
+            onHighlightBeat={handleHighlightBeat}
+            onHighlightPath={handleHighlightPath}
+            storyLogic={storyLogic}
+            onStoryLogicChange={handleStoryLogicChange}
+            onFixDecision={handleFixDecision}
+            fixResult={fixResult}
+          />
         )}
       </div>
 

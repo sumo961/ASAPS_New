@@ -186,6 +186,9 @@ export async function exportProjectAsZip(
   if (project.aiEdits) {
     zip.file('generation/ai-edits.json', JSON.stringify(project.aiEdits, null, 2));
   }
+  if (project.storyLogic) {
+    zip.file('generation/story-logic.json', JSON.stringify(project.storyLogic, null, 2));
+  }
   if (project.ideatorSessions?.length) zip.file('generation/ideator-sessions.json', JSON.stringify(project.ideatorSessions, null, 2));
   if (project.coDesignerSessions?.length) zip.file('generation/codesigner-sessions.json', JSON.stringify(project.coDesignerSessions, null, 2));
 
@@ -608,6 +611,11 @@ export async function importProjectFromZip(
     if (aiEditsFile) {
       try { aiEdits = JSON.parse(await aiEditsFile.async('string')); } catch { /* unreadable ledger: ignore */ }
     }
+    let storyLogic: any = undefined;
+    const storyLogicFile = zip.file('generation/story-logic.json');
+    if (storyLogicFile) {
+      try { storyLogic = JSON.parse(await storyLogicFile.async('string')); } catch { /* unreadable: checks run again */ }
+    }
     let generationReview: any = undefined;
     const reviewFile = zip.file('generation/review.json');
     if (reviewFile) {
@@ -656,6 +664,7 @@ export async function importProjectFromZip(
       ...(translationManifest ? { translationManifest } : {}),
       ...(generationReview ? { generationReview } : {}),
       ...(aiEdits ? { aiEdits } : {}),
+      ...(storyLogic ? { storyLogic } : {}),
       ...(ideatorSessions?.length ? { ideatorSessions } : {}),
       ...(coDesignerSessions?.length ? { coDesignerSessions } : {}),
     } as any;
@@ -704,6 +713,7 @@ export interface ProjectCopy {
   translationManifest?: any;
   generationReview?: any;
   aiEdits?: any;
+  storyLogic?: any;
   ideatorSessions?: any[];
   coDesignerSessions?: any[];
 }
@@ -739,6 +749,7 @@ export async function readProjectCopy(file: File | Blob): Promise<ProjectCopy> {
     ...(translations.length ? { translations, translationManifest: await json('translations/_manifest.json') } : {}),
     generationReview: await json('generation/review.json'),
     aiEdits: await json('generation/ai-edits.json'),
+    storyLogic: await json('generation/story-logic.json'),
     ...(Array.isArray(ideator) && ideator.length ? { ideatorSessions: ideator } : {}),
     ...(Array.isArray(codesigner) && codesigner.length ? { coDesignerSessions: codesigner } : {}),
   };

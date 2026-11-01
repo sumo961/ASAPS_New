@@ -136,6 +136,8 @@ export interface SerializeInput {
   generationReview?: any;
   /** AI edits ledger (proposals + decisions across AI surfaces). Opaque to core. Written to generation/ai-edits.json. */
   aiEdits?: any;
+  /** AI Story Logic results and dismissals. Opaque to core. Written to generation/story-logic.json. */
+  storyLogic?: any;
   /** AI conversation sessions that belong to the project (Ideator session that produced it, Co-Designer sessions about it). Opaque to core. */
   ideatorSessions?: any[];
   coDesignerSessions?: any[];
@@ -174,6 +176,8 @@ export interface DeserializeResult {
   generationReview?: any;
   /** AI edits ledger from generation/ai-edits.json (if present) */
   aiEdits?: any;
+  /** AI Story Logic results from generation/story-logic.json (if present) */
+  storyLogic?: any;
   ideatorSessions?: any[];
   coDesignerSessions?: any[];
   /** Beat ids found in more than one file, and how loading settled them. */
@@ -423,6 +427,9 @@ export function serializeToDirectory(input: SerializeInput): SerializeResult {
       path: 'generation/ai-edits.json',
       content: deterministicStringify(input.aiEdits),
     });
+  }
+  if (input.storyLogic) {
+    files.push({ path: 'generation/story-logic.json', content: deterministicStringify(input.storyLogic) });
   }
   if (input.ideatorSessions && input.ideatorSessions.length > 0) {
     files.push({ path: 'generation/ideator-sessions.json', content: deterministicStringify(input.ideatorSessions) });
@@ -722,6 +729,16 @@ export async function deserializeFromDirectory(
     }
   }
 
+  let storyLogic: any = undefined;
+  const storyLogicPath = join(rootPath, 'generation', 'story-logic.json');
+  if (await reader.exists(storyLogicPath)) {
+    try {
+      storyLogic = JSON.parse(await reader.readText(storyLogicPath));
+    } catch (err) {
+      console.warn('[DirectoryFormat] generation/story-logic.json unreadable; ignoring:', err);
+    }
+  }
+
   const readSessions = async (name: string): Promise<any[] | undefined> => {
     const p = join(rootPath, 'generation', name);
     if (!(await reader.exists(p))) return undefined;
@@ -755,6 +772,7 @@ export async function deserializeFromDirectory(
     translationManifest,
     generationReview,
     aiEdits,
+    storyLogic,
     ideatorSessions,
     coDesignerSessions,
     duplicateBeatIds,

@@ -196,6 +196,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
       translationManifest: result.translationManifest,
       ...(result.generationReview ? { generationReview: result.generationReview } : {}),
       ...(result.aiEdits ? { aiEdits: result.aiEdits } : {}),
+      ...(result.storyLogic ? { storyLogic: result.storyLogic } : {}),
       ...(result.ideatorSessions?.length ? { ideatorSessions: result.ideatorSessions } : {}),
       ...(result.coDesignerSessions?.length ? { coDesignerSessions: result.coDesignerSessions } : {}),
     };
@@ -933,6 +934,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
       ...(project.translationManifest ? { translationManifest: project.translationManifest } : {}),
       ...(project.generationReview ? { generationReview: project.generationReview } : {}),
       ...(project.aiEdits ? { aiEdits: project.aiEdits } : {}),
+      ...(project.storyLogic ? { storyLogic: project.storyLogic } : {}),
       ...(project.ideatorSessions?.length ? { ideatorSessions: project.ideatorSessions } : {}),
       ...(project.coDesignerSessions?.length ? { coDesignerSessions: project.coDesignerSessions } : {}),
     };

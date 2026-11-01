@@ -90,6 +90,8 @@ These are kept from the old plan.
 
 ### Phase 1: Check with AI (beats reached in different states)
 
+*Built 2026-11-01 (unreleased), checked with a scripted model; a real-model run and the eval are still to do. Differences from below: findings are stored with the cache (re-running them would cost money); the panel shows tokens and requests, not money (no price list exists); a state's "has seen" became one example route, since states are grouped by what they hold, not by route.*
+
 - **Which beats.** Every beat that Phase 0 says is reached in different
   states, plus every beat the keyword check flags. Order them by how many
   paths pass through and how much the states differ.

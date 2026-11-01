@@ -4,10 +4,18 @@ import type { Story } from '@asaps/core';
 import { validateStoryLogic, type LogicIssue, type LogicValidationResult } from '../../utils/storyLogicValidator';
 import { arrivalKey, arrivesDifferently, describeArrivalDifferences, type BeatArrival, type SimulationState } from '@asaps/core';
 import { simulateStory } from '../../services/storySimulation';
+import { StoryLogicAISection } from './StoryLogicAISection';
+import type { StoryLogicStore } from '../../types/storyLogic';
+import type { AIFixSuggestion } from '../../types/generationReview';
 
 interface LogicValidationReportProps {
   story: Story;
   onHighlightBeat?: (beatId: string) => void;
+  onHighlightPath?: (beatIds: string[]) => void;
+  storyLogic?: StoryLogicStore | null;
+  onStoryLogicChange?: (store: StoryLogicStore) => void;
+  onFixDecision?: (suggestion: AIFixSuggestion, decision: 'accepted' | 'rejected') => void;
+  fixResult?: { findingId: string; ok: boolean; error?: string } | null;
 }
 
 interface HubAnalysis {
@@ -36,7 +44,12 @@ function extractBeatText(params: any): string {
 
 export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
   story,
-  onHighlightBeat
+  onHighlightBeat,
+  onHighlightPath,
+  storyLogic,
+  onStoryLogicChange,
+  onFixDecision,
+  fixResult,
 }) => {
   const [expandedHubs, setExpandedHubs] = useState<Set<string>>(new Set());
   const allBeats = useMemo(() => story.getAllBeats(), [story]);
@@ -357,6 +370,24 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
           </div>
         );
       })()}
+
+      {/* AI findings: under the keyword warnings */}
+      {simulation && arrivals && onStoryLogicChange && (
+        <StoryLogicAISection
+          story={story}
+          analyzer={simulation.analyzer}
+          arrivals={arrivals}
+          hubBeats={validation.hubBeats}
+          flaggedBeats={validation.issues.filter((i) => i.category === 'hub_state_assumption' || i.category === 'ungated_state_reference').map((i) => i.beatId)}
+          incoming={validation.pathAnalysis}
+          store={storyLogic ?? null}
+          onStoreChange={onStoryLogicChange}
+          onHighlightBeat={onHighlightBeat}
+          onHighlightPath={onHighlightPath}
+          onFixDecision={onFixDecision}
+          fixResult={fixResult ?? null}
+        />
+      )}
 
       {/* Info */}
       {infos.length > 0 && (

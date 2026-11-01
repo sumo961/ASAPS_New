@@ -10,7 +10,7 @@
  * record of proposals AND decisions — declined proposals included.
  */
 
-export type AIEditSource = 'generator-review' | 'ask-ai' | 'co-designer';
+export type AIEditSource = 'generator-review' | 'ask-ai' | 'co-designer' | 'story-logic';
 
 export type AIEditDecision = 'accepted' | 'rejected' | 'skipped' | 'failed';
 

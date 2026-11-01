@@ -65,3 +65,11 @@ export function aiFixRejectedEntries(s: AIFixSuggestion, reason = 'Rejected by t
     source: 'ask-ai', decision: 'rejected', batch: s.findingId, summary: e.description, beatIds: [e.beatId], detail: reason, proposal: e,
   }));
 }
+
+/** A Story Logic fix the author accepted or declined, one entry per edit. */
+export function storyLogicFixEntries(s: AIFixSuggestion, decision: 'accepted' | 'rejected'): NewAIEditEntry[] {
+  return s.edits.map((e) => ({
+    source: 'story-logic', decision, batch: s.findingId, summary: e.description, beatIds: [e.beatId],
+    ...(decision === 'rejected' ? { detail: 'Rejected by the author' } : {}), proposal: e,
+  }));
+}

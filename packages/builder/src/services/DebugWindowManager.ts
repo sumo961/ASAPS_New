@@ -8,6 +8,8 @@
  */
 
 import type { SerializedStoryData } from './PreviewWindowManager';
+import type { StoryLogicStore } from '../types/storyLogic';
+import type { AIFixSuggestion } from '../types/generationReview';
 
 export interface DebugMessage {
   type:
@@ -15,8 +17,20 @@ export interface DebugMessage {
     | 'PING'
     | 'HIGHLIGHT_PATH'
     | 'HIGHLIGHT_BEAT'
-    | 'CLEAR_HIGHLIGHT';
+    | 'CLEAR_HIGHLIGHT'
+    // AI Story Logic: the window saves its results with the project, and
+    // hands a fix the author accepted or declined to the builder, which
+    // applies it (one undo step) and answers with FIX_RESULT.
+    | 'SAVE_STORY_LOGIC'
+    | 'STORY_LOGIC_FIX'
+    | 'FIX_RESULT';
   payload?: {
+    storyLogic?: StoryLogicStore | null;
+    suggestion?: AIFixSuggestion;
+    decision?: 'accepted' | 'rejected';
+    findingId?: string;
+    ok?: boolean;
+    error?: string;
     storyData?: SerializedStoryData;
     context?: DebugStoryContext;
     beatIds?: string[];
@@ -41,6 +55,10 @@ export interface DebugWindowState {
   isOpen: boolean;
 }
 
+type StoryLogicEvent =
+  | { kind: 'save'; store: StoryLogicStore }
+  | { kind: 'fix'; suggestion: AIFixSuggestion; decision: 'accepted' | 'rejected' };
+
 type StateChangeCallback = (state: DebugWindowState) => void;
 type HighlightCallback =
   | { kind: 'path'; beatIds: string[] }
@@ -55,6 +73,8 @@ class DebugWindowManager {
   /** Most recent story data — re-sent whenever the debug window reports ready. */
   private latestStoryData: SerializedStoryData | null = null;
   private latestContext: DebugStoryContext | undefined;
+  private latestStoryLogic: StoryLogicStore | null = null;
+  private storyLogicListeners = new Set<(evt: StoryLogicEvent) => void>();
   private isElectron: boolean = false;
   /** Set by the Electron `debug:ready` listener; gates whether
    *  `sendStoryUpdate` fires over IPC immediately vs. waits. */
@@ -102,6 +122,22 @@ class DebugWindowManager {
   subscribeToHighlights(callback: (evt: HighlightCallback) => void): () => void {
     this.highlightListeners.add(callback);
     return () => this.highlightListeners.delete(callback);
+  }
+
+  /** AI Story Logic results and fix decisions coming back from the window. */
+  subscribeToStoryLogic(callback: (evt: StoryLogicEvent) => void): () => void {
+    this.storyLogicListeners.add(callback);
+    return () => this.storyLogicListeners.delete(callback);
+  }
+
+  /** The open project's stored results; sent with every story update. */
+  setStoryLogic(store: StoryLogicStore | null): void {
+    this.latestStoryLogic = store;
+  }
+
+  /** Tell the window how a fix it handed over went. */
+  sendFixResult(findingId: string, ok: boolean, error?: string): void {
+    this.post({ type: 'FIX_RESULT', payload: { findingId, ok, error } });
   }
 
   getState(): DebugWindowState {
@@ -189,7 +225,10 @@ class DebugWindowManager {
   sendStoryUpdate(storyData: SerializedStoryData, context: DebugStoryContext | undefined = this.latestContext): void {
     this.latestStoryData = storyData;
     this.latestContext = context;
-    const message: DebugMessage = { type: 'STORY_UPDATE', payload: { storyData, context } };
+    this.post({ type: 'STORY_UPDATE', payload: { storyData, context, storyLogic: this.latestStoryLogic } });
+  }
+
+  private post(message: DebugMessage): void {
     if (this.isElectron) {
       if (!this.electronWindowOpen) return;
       try {
@@ -203,7 +242,7 @@ class DebugWindowManager {
     try {
       this.debugWindow.postMessage(message, window.location.origin);
     } catch (error) {
-      console.error('[DebugWindowManager] Failed to send STORY_UPDATE:', error);
+      console.error(`[DebugWindowManager] Failed to send ${message.type}:`, error);
     }
   }
 
@@ -232,6 +271,19 @@ class DebugWindowManager {
       case 'CLEAR_HIGHLIGHT':
         this.highlightListeners.forEach(cb => cb({ kind: 'clear' }));
         break;
+      case 'SAVE_STORY_LOGIC': {
+        const store = message.payload?.storyLogic;
+        if (store) {
+          this.latestStoryLogic = store;
+          this.storyLogicListeners.forEach(cb => cb({ kind: 'save', store }));
+        }
+        break;
+      }
+      case 'STORY_LOGIC_FIX': {
+        const { suggestion, decision } = message.payload ?? {};
+        if (suggestion && decision) this.storyLogicListeners.forEach(cb => cb({ kind: 'fix', suggestion, decision }));
+        break;
+      }
     }
   };
 
@@ -266,6 +318,7 @@ class DebugWindowManager {
     this.close();
     this.listeners.clear();
     this.highlightListeners.clear();
+    this.storyLogicListeners.clear();
   }
 }
 

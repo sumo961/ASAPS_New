@@ -96,7 +96,8 @@ import { analyzeStoryFindings, proposeFixes, planBeatEdit, createGenerationRevie
 import type { GenerationFinding, FixProposal, GenerationReview } from './types/generationReview';
 import { requestAIFix } from './services/findingFixService';
 import type { AIFixState } from './components/ImportIssuesBanner';
-import { appendAIEdits, coDesignerAppliedEntries, coDesignerDeclinedEntries, reviewProposalEntry, aiFixRejectedEntries, type NewAIEditEntry } from './utils/aiEditsLedger';
+import { appendAIEdits, coDesignerAppliedEntries, coDesignerDeclinedEntries, reviewProposalEntry, aiFixRejectedEntries, storyLogicFixEntries, type NewAIEditEntry } from './utils/aiEditsLedger';
+import type { StoryLogicStore } from './types/storyLogic';
 import type { AIEditLedger } from './types/aiEdits';
 import { upsertSession, mergeSessions, sessionsNewerThan } from './utils/projectSessions';
 import type { IdeatorSessionRecord } from './components/ai/ideator/types';
@@ -476,6 +477,7 @@ function App() {
   const [, setGenerationReviewTick] = useState(0);
   /** AI edits ledger (see types/aiEdits.ts): ref persists, tick re-renders the header count. */
   const aiEditsRef = useRef<AIEditLedger | null>(null);
+  const storyLogicRef = useRef<StoryLogicStore | null>(null);
   const [, setAiEditsTick] = useState(0);
   /**
    * AI conversations that belong to this project (see utils/projectSessions):
@@ -551,6 +553,8 @@ function App() {
     generationReviewRef.current = review;
     setGenerationReviewTick(t => t + 1);
     aiEditsRef.current = project?.aiEdits ?? null;
+    storyLogicRef.current = project?.storyLogic ?? null;
+    debugWindowManager.setStoryLogic(storyLogicRef.current);
     setAiEditsTick(t => t + 1);
     ideatorSessionsRef.current = Array.isArray(project?.ideatorSessions) ? project.ideatorSessions : [];
     coDesignerSessionsRef.current = Array.isArray(project?.coDesignerSessions) ? project.coDesignerSessions : [];
@@ -1662,6 +1666,8 @@ function App() {
       else delete projForTranslations.generationReview;
       if (aiEditsRef.current) projForTranslations.aiEdits = aiEditsRef.current;
       else delete projForTranslations.aiEdits;
+      if (storyLogicRef.current) projForTranslations.storyLogic = storyLogicRef.current;
+      else delete projForTranslations.storyLogic;
       if (ideatorSessionsRef.current.length) projForTranslations.ideatorSessions = ideatorSessionsRef.current;
       else delete projForTranslations.ideatorSessions;
       if (coDesignerSessionsRef.current.length) projForTranslations.coDesignerSessions = coDesignerSessionsRef.current;
@@ -3522,6 +3528,27 @@ function App() {
     pruneResolvedFindings();
     markChanged();
   }, [aiFix, proposalCommand, setGenerationReview, markChanged, pruneResolvedFindings, recordAIEdits]);
+
+  // AI Story Logic in the Debug window: results are saved with the project;
+  // a fix the author accepted there is applied here, as one undo step.
+  useEffect(() => debugWindowManager.subscribeToStoryLogic(async (evt) => {
+    if (evt.kind === 'save') {
+      storyLogicRef.current = evt.store;
+      markChanged();
+      return;
+    }
+    const { suggestion, decision } = evt;
+    recordAIEdits(storyLogicFixEntries(suggestion, decision));
+    if (decision !== 'accepted') return;
+    const cmds = suggestion.edits.map(e => proposalCommand(e)).filter((c): c is ApplyFixProposalCommand => !!c);
+    if (cmds.length === 0) {
+      debugWindowManager.sendFixResult(suggestion.findingId, false, 'The beats to edit are no longer in the story.');
+      return;
+    }
+    await getCommandManager().execute(new BatchCommand(cmds, `Story Logic fix: ${cmds.length === 1 ? '1 edit' : `${cmds.length} edits`}`));
+    markChanged();
+    debugWindowManager.sendFixResult(suggestion.findingId, true);
+  }), [proposalCommand, recordAIEdits, markChanged]);
 
   const handleDismissImportIssues = useCallback(() => {
     setAiFix(null);
