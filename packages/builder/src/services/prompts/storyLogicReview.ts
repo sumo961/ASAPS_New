@@ -23,6 +23,7 @@ Reading a script:
 - "Reply: text" is a choice the player can click.
 - "[shown only if X]" and "[next line only if X]" are gates. A gated line or reply reaches only players who meet the gate: judge it only against them. Arriving states don't list visited beats, so assume a "visited" gate holds for whoever reads that line.
 - Sibling "[next line only if …]" branches are tried in order and the first that matches plays; "[otherwise, next line]" plays only when none did. A player covered by an earlier branch never reads the later ones, so a line under "otherwise" is no problem for them.
+- "[this next line never plays…]" marks a line no player reaches: do not judge its words, but the dead line can be reported.
 - A gate that is itself broken, such as a condition with no beat chosen, can be reported.
 
 Report a finding only where a beat's words do not hold for at least one listed arriving state:

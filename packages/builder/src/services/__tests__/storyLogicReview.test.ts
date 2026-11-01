@@ -217,6 +217,14 @@ describe('what the model reads about a beat', () => {
     expect(script).toEqual(['A: One.', 'Reply: (a button with no label) [shown only if visited "b"]', '  B: Two.', 'Reply: (a button with no label)', '  C: Three.']);
   });
 
+  it('of two next lines with no conditions the second never plays, as in the engine', () => {
+    const script = beatScript({ dialogTree: { speaker: 'A', text: 'One.', choices: [
+      { continue: true, text: '', dialogNode: { speaker: 'B', text: 'Two.' } },
+      { continue: true, text: '', dialogNode: { speaker: 'C', text: 'Three.' } },
+    ] } });
+    expect(script).toEqual(['A: One.', 'B: Two.', '[this next line never plays: the one before it always does]', '  C: Three.']);
+  });
+
   it('a plain next line is not called a branch', () => {
     const script = beatScript({ dialogTree: { speaker: 'A', text: 'One.', choices: [{ continue: true, text: '', dialogNode: { speaker: 'B', text: 'Two.' } }] } });
     expect(script).toEqual(['A: One.', 'B: Two.']);

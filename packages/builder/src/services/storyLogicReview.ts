@@ -125,14 +125,19 @@ export function beatScript(
     seen.add(node);
     if (typeof node.text === 'string' && node.text.trim()) line(depth, label(node.speaker, node.text));
     const choices: any[] = Array.isArray(node.choices) ? node.choices : [];
-    const nextLines = choices.filter((c) => c?.continue);
-    const branching = nextLines.length > 1 || nextLines.some((c) => gatesOf(c?.conditions, beatName));
+    // The engine plays the first next line whose conditions hold: gated ones
+    // are tried in order, and one with no conditions always plays.
+    let gatedBefore = false;
+    let alwaysPlays = false;
     for (const c of choices) {
       if (c?.continue) {
-        if (!branching) { walk(c.dialogNode, depth); continue; }
         const gate = gatesOf(c.conditions, beatName);
-        line(depth, gate ? `[next line only if ${gate}]` : '[otherwise, next line]');
-        walk(c.dialogNode, depth + 1);
+        if (alwaysPlays) line(depth, '[this next line never plays: the one before it always does]');
+        else if (gate) line(depth, `[next line only if ${gate}]`);
+        else if (gatedBefore) line(depth, '[otherwise, next line]');
+        const nested = alwaysPlays || gate !== '' || gatedBefore;
+        if (gate) gatedBefore = true; else alwaysPlays = true;
+        walk(c.dialogNode, nested ? depth + 1 : depth);
         continue;
       }
       if (typeof c?.text === 'string' && c.text.trim()) reply(depth, c);
