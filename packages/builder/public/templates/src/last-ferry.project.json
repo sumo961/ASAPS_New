@@ -221,7 +221,7 @@
       }
      ],
      "parameters": {
-      "question": "Halfway across, the ferry lurches. Somewhere below, metal groans, and a child starts to cry. ${@confidant} is already running for the stairs.",
+      "question": "Halfway across, the ferry lurches. Somewhere below, metal groans. A little girl is thrown against a bench, and when she sits up there is blood running from a cut on her head. She starts to cry. ${@confidant} is already running for the stairs.",
       "choices": [
        {
         "id": "st_child",
@@ -299,7 +299,7 @@
      "parameters": {
       "speaker": "@confidant",
       "showSpeaker": true,
-      "question": "${@confidant} finds ${@player.name} on the stairs when the worst is over. \"You backed me in front of the captain. Nobody does that. Why did you?\"",
+      "question": "${@confidant} finds ${@player.name} on the stairs when the worst is over, a battered notebook clutched in one hand, pages swollen with spray and crammed with cramped handwriting. \"You backed me in front of the captain. Nobody does that. Why did you?\"",
       "choices": [
        {
         "id": "cf_meant",
