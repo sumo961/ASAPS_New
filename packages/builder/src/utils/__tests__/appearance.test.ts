@@ -61,4 +61,9 @@ describe('appearance', () => {
     expect(css).toContain(':where(html.dark) .bg-white:where(');
     expect(css).toContain('.hover\\:bg-gray-50:hover');
   });
+
+  it('a field that turns white when clicked stays dark (focus:bg-white)', () => {
+    const css = darkStylesheet();
+    expect(css).toContain('.focus\\:bg-white:focus');
+  });
 });

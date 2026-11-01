@@ -181,7 +181,9 @@ export function darkStylesheet(): string {
 
   for (const [shade, color] of Object.entries(SURFACE)) {
     const names = shade === 'white' ? ['bg-white'] : greys.map((g) => `bg-${g}-${shade}`);
-    out.push(rule(names.map((n) => sel(n)).concat(names.map((n) => sel(n, 'disabled'))), `background-color: ${color};`));
+    // Focus too: a field that turns white when clicked (the Dialog editor's
+    // NPC lines: bg-white/60 focus:bg-white) showed the light text on white.
+    out.push(rule(names.map((n) => sel(n)).concat(names.map((n) => sel(n, 'disabled')), names.map((n) => sel(n, 'focus'))), `background-color: ${color};`));
   }
   for (const [shade, color] of Object.entries(SURFACE_HOVER)) {
     const names = shade === 'white' ? ['bg-white'] : greys.map((g) => `bg-${g}-${shade}`);
