@@ -22,8 +22,17 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.153** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.153 is the story-logic release**:
+Current release: **v0.9.154** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.154 is the large-project
+release**: big stories stay responsive. Typing a beat's text while the
+flowchart is open no longer keeps the computer busy (it used to redraw the
+whole flowchart on every keystroke), and the flowchart now draws only the
+beats in view, so dropping, selecting and moving beats in a 400-beat story
+is quicker. A Dialog Tree line with no replies and no exit is now shown with
+Continue before the scene moves on. Fixed: in dark mode, NPC lines in the
+Dialog editor turned white when clicked.
+
+**v0.9.153 was the story-logic release**:
 the Debug window's Story Logic tab now knows what players arrive with. A hub
 is a beat players reach in different states, and its card says what differs —
 with or without an item, someone's trust from 0 to 0.8, who plays a role — so
