@@ -54,7 +54,8 @@ const costOf = (t: Pick<AISpend, 'inputTokens' | 'cacheReadTokens' | 'cacheWrite
 /** Takes what was used on a route since the last call, so overlapping requests are each counted once. */
 export function createSpendMeter(route: string, read: () => AIUsageTotals[] = getAIUsageSummary): () => AISpend {
   const key = (t: AIUsageTotals) => t.model;
-  const snapshot = () => new Map(read().filter((t) => t.route === route).map((t) => [key(t), t]));
+  // Copies: the totals are updated in place, so a kept reference would always read as no change.
+  const snapshot = () => new Map(read().filter((t) => t.route === route).map((t) => [key(t), { ...t }]));
   let seen = snapshot();
   return () => {
     const now = snapshot();

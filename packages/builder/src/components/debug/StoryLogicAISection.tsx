@@ -235,9 +235,7 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
     if (!price) return `≈ ${formatTokens(e.inputTokens)} tokens in, up to ${formatTokens(e.maxOutputTokens)} out, ${requests}`;
     const last = store?.lastRun;
     const cost = estimateRunCost(e, price, last?.calls ? last.outputTokens / last.calls : undefined);
-    return cost.likely === null
-      ? `at most ${formatUsd(cost.atMost)}, ${requests}`
-      : `≈ ${formatUsd(cost.likely)} going by the last check, at most ${formatUsd(cost.atMost)}, ${requests}`;
+    return `≈ ${formatUsd(cost)}${last?.calls ? ' going by the last check' : ''}, ${requests}`;
   };
   const totalBeats = beats.length;
 

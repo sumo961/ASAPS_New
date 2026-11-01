@@ -209,6 +209,14 @@ describe('what the model reads about a beat', () => {
     expect(beatScript(tree, { speakerNames: false })[0]).toBe('Wiard waits.');
   });
 
+  it('a gated choice with no words is a button with no label, and keeps its gate', () => {
+    const script = beatScript({ dialogTree: { speaker: 'A', text: 'One.', choices: [
+      { text: '', conditions: [{ type: 'visitedBeat', beatId: 'b', operator: '==' }], dialogNode: { speaker: 'B', text: 'Two.' } },
+      { text: '', dialogNode: { speaker: 'C', text: 'Three.' } },
+    ] } });
+    expect(script).toEqual(['A: One.', 'Reply: (a button with no label) [shown only if visited "b"]', '  B: Two.', 'Reply: (a button with no label)', '  C: Three.']);
+  });
+
   it('a plain next line is not called a branch', () => {
     const script = beatScript({ dialogTree: { speaker: 'A', text: 'One.', choices: [{ continue: true, text: '', dialogNode: { speaker: 'B', text: 'Two.' } }] } });
     expect(script).toEqual(['A: One.', 'B: Two.']);
@@ -255,12 +263,19 @@ describe('what a check costs', () => {
     expect(describeSpend(s)).toBe('5k tokens in, 0 from cache, 900 out, 2 requests');
   });
 
+  it('sees totals that are updated in place', () => {
+    const live = totals({ calls: 1, inputTokens: 100, outputTokens: 10 });
+    const meter = createSpendMeter('story-logic', () => live);
+    live[0].calls = 2; live[0].inputTokens = 300;
+    expect(meter()).toMatchObject({ calls: 1, inputTokens: 200 });
+    live[0].calls = 3; live[0].inputTokens = 450;
+    expect(meter()).toMatchObject({ calls: 1, inputTokens: 150 });
+  });
+
   it('estimates caching the shared part, and goes by real output when it can', () => {
     const e = { batches: 2, inputTokens: 2_200_000, sharedTokens: 1_000_000, maxOutputTokens: 8000 };
     const p = { input: 1, cacheWrite: 2, cacheRead: 0.5, output: 100 };
-    const { atMost, likely } = estimateRunCost(e, p, 1000);
-    expect(atMost).toBeCloseTo(0.2 + 2 + 0.5 + 0.8);
-    expect(likely).toBeCloseTo(0.2 + 2 + 0.5 + 0.2);
-    expect(estimateRunCost(e, p).likely).toBeNull();
+    expect(estimateRunCost(e, p, 500)).toBeCloseTo(0.2 + 2 + 0.5 + 0.1);
+    expect(estimateRunCost(e, p)).toBeCloseTo(0.2 + 2 + 0.5 + 0.2);
   });
 });

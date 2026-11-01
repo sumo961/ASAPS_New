@@ -90,9 +90,9 @@ describe('Story Logic: fixes run per finding', () => {
 describe('Story Logic: what it costs', () => {
   const spend = { calls: 2, inputTokens: 100_000, cacheReadTokens: 50_000, cacheWriteTokens: 0, outputTokens: 2000, costUsd: 0.45, unpricedCalls: 0 };
 
-  it('shows dollars before a first check, without guessing a likely figure', () => {
+  it('shows rough dollars before a first check', () => {
     render(<StoryLogicAISection {...props({ store: { version: 1, dismissed: [], checked: {}, showPending: true } })} />);
-    expect(screen.getByText(/^at most \$\d+\.\d\d, 2 requests$/)).toBeTruthy();
+    expect(screen.getByText(/^≈ \$\d+\.\d\d, 2 requests$/)).toBeTruthy();
     expect(screen.queryByTestId('story-logic-spend')).toBeNull();
   });
 
@@ -101,6 +101,6 @@ describe('Story Logic: what it costs', () => {
     const line = screen.getByTestId('story-logic-spend').textContent;
     expect(line).toContain('Last check: $0.45 (100k tokens in, 50k from cache, 2k out, 2 requests)');
     expect(line).toContain('All checks and fixes on this story: $0.60');
-    expect(screen.getByText(/going by the last check, at most/)).toBeTruthy();
+    expect(screen.getByText(/going by the last check/)).toBeTruthy();
   });
 });

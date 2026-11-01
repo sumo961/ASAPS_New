@@ -20,6 +20,9 @@ const MAX_STATES_PER_BEAT = 6;
 const MAX_BEATS_PER_BATCH = 12;
 const MAX_CHARS_PER_BATCH = 24000;
 const MAX_OUTPUT_TOKENS = 4000;
+/** Measured on Birka (2026-11-01): a chars/4 estimate came out well under what the provider counted. */
+const CHARS_PER_TOKEN = 3;
+const TYPICAL_OUTPUT_PER_REQUEST = 1000;
 /** A story with more candidates than this also gets the first-pass offer. */
 export const FIRST_PASS_MIN_CANDIDATES = 40;
 
@@ -133,6 +136,8 @@ export function beatScript(
         continue;
       }
       if (typeof c?.text === 'string' && c.text.trim()) reply(depth, c);
+      // Not a next line, so the player gets a button for it, with no words on it.
+      else if (c?.dialogNode) reply(depth, { ...c, text: '(a button with no label)' });
       walk(c?.dialogNode, depth + 1);
     }
     if (node.next && typeof node.next === 'object') walk(node.next, depth);
@@ -271,23 +276,23 @@ export function estimateRun(candidates: StoryLogicCandidate[], digestChars: numb
   const batches = makeBatches(candidates);
   const shared = STORY_LOGIC_SYSTEM_PROMPT.length + digestChars;
   const chars = batches.reduce((n, b) => n + buildStoryLogicUserPrompt(b.map(promptBeat)).length + shared, 0);
-  return { batches: batches.length, inputTokens: Math.ceil(chars / 4), sharedTokens: Math.ceil(shared / 4), maxOutputTokens: batches.length * MAX_OUTPUT_TOKENS };
+  return { batches: batches.length, inputTokens: Math.ceil(chars / CHARS_PER_TOKEN), sharedTokens: Math.ceil(shared / CHARS_PER_TOKEN), maxOutputTokens: batches.length * MAX_OUTPUT_TOKENS };
 }
 
 /**
- * Dollars for a run: instructions and digest are written to the prompt cache
- * once and read back after that. `at most` assumes every request fills its
- * output cap; `likely` goes by what requests really wrote on this story.
+ * Rough dollars for a run: instructions and digest are written to the prompt
+ * cache once and read back after that. Output goes by what requests really
+ * wrote on this story, or a typical figure before the first check. Thinking
+ * models can raise their own output cap, so no figure here is a ceiling.
  */
 export function estimateRunCost(
   e: { batches: number; inputTokens: number; sharedTokens: number; maxOutputTokens: number },
   price: ModelPrice,
-  outputPerRequest?: number,
-): { atMost: number; likely: number | null } {
+  outputPerRequest: number = TYPICAL_OUTPUT_PER_REQUEST,
+): number {
   const fresh = e.inputTokens - e.sharedTokens * e.batches;
   const input = fresh * price.input + e.sharedTokens * price.cacheWrite + e.sharedTokens * Math.max(0, e.batches - 1) * price.cacheRead;
-  const dollars = (output: number) => (input + output * price.output) / 1e6;
-  return { atMost: dollars(e.maxOutputTokens), likely: outputPerRequest === undefined ? null : dollars(Math.min(outputPerRequest, MAX_OUTPUT_TOKENS) * e.batches) };
+  return (input + outputPerRequest * e.batches * price.output) / 1e6;
 }
 
 /** The first pass offered on a large story: the most-travelled beats covering about half the path visits. */
@@ -344,7 +349,7 @@ export function findingKey(beatId: string, kind: string, quote: string): string 
 export type StoryLogicComplete = (
   systemPrompt: string,
   userPrompt: string,
-  opts: { systemContext?: string; schema?: Record<string, unknown>; maxTokens: number; signal?: AbortSignal; route?: string },
+  opts: { systemContext?: string; schema?: Record<string, unknown>; maxTokens: number; signal?: AbortSignal; route?: string; cacheContext?: boolean },
 ) => Promise<string>;
 
 export interface RunProgress { done: number; total: number; found: number }
@@ -369,6 +374,7 @@ export async function runStoryLogicCheck(
       maxTokens: MAX_OUTPUT_TOKENS,
       signal: handlers.signal,
       route: STORY_LOGIC_ROUTE,
+      cacheContext: true,
     });
     if (handlers.signal?.aborted) return;
     const { findings, dropped } = validateFindings(reply, batches[i]);

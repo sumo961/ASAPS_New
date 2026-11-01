@@ -286,7 +286,7 @@ export class ClaudeProvider extends BaseAIProvider {
    * the effort handling they had before — third-party endpoints vary.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private prepareRequest(requestBody: any, opts: { schema?: Record<string, unknown>; cacheConversation?: boolean; systemContext?: string } = {}): void {
+  private prepareRequest(requestBody: any, opts: { schema?: Record<string, unknown>; cacheConversation?: boolean; cacheContext?: boolean; systemContext?: string } = {}): void {
     this.applyThinkingConfig(requestBody);
     if (this.requiresAdaptiveThinking()) {
       requestBody.max_tokens = Math.min(
@@ -303,11 +303,12 @@ export class ClaudeProvider extends BaseAIProvider {
     }
     // The system prompt is the stable prefix (tools come before it and are
     // cached with it). Context that changes between sessions (the
-    // Co-Designer's story digest) follows in a second, uncached block.
+    // Co-Designer's story digest) follows in a second block, uncached unless
+    // the caller is about to send it many times in a row (cacheContext).
     if (typeof requestBody.system === 'string' && requestBody.system) {
       requestBody.system = [
         { type: 'text', text: requestBody.system, cache_control: { type: 'ephemeral' } },
-        ...(opts.systemContext ? [{ type: 'text', text: opts.systemContext }] : []),
+        ...(opts.systemContext ? [{ type: 'text', text: opts.systemContext, ...(opts.cacheContext ? { cache_control: { type: 'ephemeral' } } : {}) }] : []),
       ];
     }
     // A conversation is resent with every turn and tool call: let the
@@ -805,6 +806,8 @@ Respond with JSON in this format:
     /** Reply must be JSON of this shape (structured outputs, direct API). */
     schema?: Record<string, unknown>;
     route?: string;
+    /** Cache systemContext too: for a run of requests sharing it. */
+    cacheContext?: boolean;
   }): Promise<{ text: string }> {
     this.ensureReady();
 
@@ -828,6 +831,7 @@ Respond with JSON in this format:
     this.prepareRequest(requestBody, {
       schema: request.schema,
       systemContext: request.systemContext,
+      cacheContext: request.cacheContext,
       cacheConversation: claudeMessages.length > 1,
     });
 
