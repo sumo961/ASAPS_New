@@ -61,3 +61,26 @@ describe('presets carry feelings', () => {
     expect(trusts[1]).toBeGreaterThanOrEqual(0.6);
   });
 });
+
+describe('presets and visited beats', () => {
+  const beats = [
+    { id: 'a', type: 'multiChoice', name: 'A', parameters: { question: 'q', choices: [choice('a1', 'One', 'x', []), choice('a2', 'Two', 'y', [])] } },
+    { id: 'x', type: 'infoText', name: 'X', parameters: { text: 'x' }, connections: [{ targetId: 'hub' }] },
+    { id: 'y', type: 'infoText', name: 'Y', parameters: { text: 'y' }, connections: [{ targetId: 'hub' }] },
+    { id: 'hub', type: 'multiChoice', name: 'Hub', parameters: { question: 'h', choices: [
+      { id: 'h1', text: 'Only after X', target: 'end', conditions: [{ type: 'visitedBeat', beatId: 'x' }] },
+      { id: 'h2', text: 'Always', target: 'end' },
+    ] } },
+    { id: 'end', type: 'endScreen', name: 'End', parameters: { message: 'x', showRestart: false } },
+  ];
+
+  it('routes a condition ahead asks about stay apart, with or without an operator', () => {
+    const presets = generatePathPresets(story(beats), 'hub').presets;
+    expect(presets.map((p) => p.preset.state.visitedBeats.includes('x')).sort()).toEqual([false, true]);
+  });
+
+  it('routes nothing ahead asks about still merge', () => {
+    const presets = generatePathPresets(story(beats), 'end').presets;
+    expect(presets).toHaveLength(1);
+  });
+});

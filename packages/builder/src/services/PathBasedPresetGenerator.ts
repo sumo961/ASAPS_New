@@ -191,7 +191,8 @@ function presetsFromAnalysis(
   // Deduplicate presets with identical states, then with states that only
   // differ in what nothing from here on reads (hundreds → a handful).
   const totalPaths = presets.length;
-  const uniquePresets = condenseByRelevance(deduplicatePresets(presets), relevantState(story, targetBeatId));
+  const relevant = relevantState(story, targetBeatId);
+  const uniquePresets = condenseByRelevance(deduplicatePresets(presets, relevant.visitedAhead), relevant);
 
   return {
     targetBeatId,
@@ -423,13 +424,15 @@ function createEmptyState(): SimulationState {
  * condition (beat conditions, choice guards, requirements) and every text
  * placeholder.
  */
-export function relevantState(story: Story, targetBeatId: string): { conditions: any[]; placeholders: Set<string>; roles: Set<string>; context: StoryContext } {
+export function relevantState(story: Story, targetBeatId: string): { conditions: any[]; visitedAhead: Set<string>; placeholders: Set<string>; roles: Set<string>; context: StoryContext } {
   const conditions: any[] = [];
   const placeholders = new Set<string>();
   // Cast roles used ahead ('@role' speakers / AI partners, ${@role…} text):
   // who plays them changes what the player sees.
   const roles = new Set<string>();
   const seenConds = new Set<string>();
+  // Beats a condition ahead asks about. The operator is optional on these.
+  const visitedAhead = new Set<string>();
   const seen = new Set<string>();
   const queue = [targetBeatId];
   const collect = (o: any): void => {
@@ -437,7 +440,10 @@ export function relevantState(story: Story, targetBeatId: string): { conditions:
     if (!o || typeof o !== 'object') return;
     // Any condition: variables, counters, items — and feelings (sentiment,
     // mood, emotion, goal, variant), which presets now carry.
-    if (typeof o.operator === 'string' && (typeof o.type === 'string' || typeof o.variableName === 'string')) {
+    if (o.type === 'visitedBeat') {
+      const id = o.beatId || o.variableName || o.left;
+      if (id) visitedAhead.add(id);
+    } else if (typeof o.operator === 'string' && (typeof o.type === 'string' || typeof o.variableName === 'string')) {
       const k = JSON.stringify(o);
       if (!seenConds.has(k)) { seenConds.add(k); conditions.push(o); }
     }
@@ -465,7 +471,7 @@ export function relevantState(story: Story, targetBeatId: string): { conditions:
   // A runtime context for evaluating them (feelings need the story's cast).
   let context: StoryContext;
   try { context = new StoryContext(undefined, story); } catch { context = new StoryContext(); }
-  return { conditions, placeholders, roles, context };
+  return { conditions, visitedAhead, placeholders, roles, context };
 }
 
 /**
@@ -473,7 +479,7 @@ export function relevantState(story: Story, targetBeatId: string): { conditions:
  * ahead comes out the same and every placeholder reads the same. The kept
  * preset keeps its FULL state (play is unchanged); pathCount sums the rest.
  */
-function condenseByRelevance(presets: GeneratedPreset[], relevant: { conditions: any[]; placeholders: Set<string>; roles: Set<string>; context: StoryContext }): GeneratedPreset[] {
+function condenseByRelevance(presets: GeneratedPreset[], relevant: { conditions: any[]; visitedAhead: Set<string>; placeholders: Set<string>; roles: Set<string>; context: StoryContext }): GeneratedPreset[] {
   const seen = new Map<string, GeneratedPreset>();
   for (const p of presets) {
     const { variables, counters, inventory, inventoryQuantities, affect } = p.preset.state;
@@ -483,7 +489,8 @@ function condenseByRelevance(presets: GeneratedPreset[], relevant: { conditions:
     const outcomes = relevant.conditions.map((c) => { try { return ctx.checkCondition(c) ? 1 : 0; } catch { return -1; } });
     const texts = [...relevant.placeholders].map((n) => variables[n] ?? counters[n] ?? null);
     const holders = [...relevant.roles].map((r) => (ctx as any).getRoleHolder?.(r) ?? null);
-    const key = JSON.stringify([outcomes, texts, holders]);
+    const visited = p.preset.state.visitedBeats.filter((id) => relevant.visitedAhead.has(id)).sort();
+    const key = JSON.stringify([outcomes, texts, holders, visited]);
     const kept = seen.get(key);
     if (kept) kept.pathCount += p.pathCount;
     else seen.set(key, p);
@@ -494,13 +501,13 @@ function condenseByRelevance(presets: GeneratedPreset[], relevant: { conditions:
 /**
  * Deduplicate presets with identical states
  */
-function deduplicatePresets(presets: GeneratedPreset[]): GeneratedPreset[] {
+function deduplicatePresets(presets: GeneratedPreset[], visitedAhead: Set<string> = new Set()): GeneratedPreset[] {
   const seen = new Map<string, GeneratedPreset>();
 
   for (const preset of presets) {
     // Create a hash of the game-relevant state (vars, counters, inventory)
-    // Exclude visitedBeats because paths with identical game state but
-    // different routes are redundant for testing purposes
+    // Routes are redundant for testing, except where a condition ahead asks
+    // about a beat on them: those stay apart until condenseByRelevance.
     const stateHash = JSON.stringify({
       vars: preset.preset.state.variables,
       counters: preset.preset.state.counters,
@@ -508,6 +515,7 @@ function deduplicatePresets(presets: GeneratedPreset[]): GeneratedPreset[] {
       qty: preset.preset.state.inventoryQuantities ?? null,
       others: preset.preset.state.characterInventories ?? null,
       affect: preset.preset.state.affect ?? null, // feelings are state too
+      visited: preset.preset.state.visitedBeats.filter((id) => visitedAhead.has(id)).sort(),
     });
 
     const existing = seen.get(stateHash);

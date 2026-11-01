@@ -12,6 +12,9 @@ Story Logic Phase 1: **Check with AI** in the Debug window reads each beat next 
 - A project opens in the editor and on the beat it was left with (Flowchart, Visual Editor, Script, Knowledge Graph). A project never opened on this machine opens on the full flowchart. If the beat is gone, or can't be edited visually, it opens on the flowchart.
 - This also fixes opening onto a blank "No Beat Selected" page: the editor tab was remembered across all projects, while the selected beat was not. Kept per project in localStorage (`utils/projectUiState.ts`), never in the project file.
 
+### Preview: "Start as if…" states
+- States that differ only in a beat a condition ahead asks about no longer merge. Visited beats were left out of both merging steps, and a visited condition with no operator wasn't seen at all, so a beat gated on visited beats could offer only states that fail its gates.
+
 ### Story Logic summary
 - Hub Beats, Warnings and Info jump to their sections. With AI enabled in the app, an AI findings figure sits beside them and jumps to the AI section.
 
