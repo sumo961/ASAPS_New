@@ -12,6 +12,8 @@ import ReactFlow, {
   useReactFlow, // Move here for children-level usage
   NodeTypes,
   EdgeTypes,
+  type ReactFlowInstance,
+  type Viewport,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
@@ -112,6 +114,21 @@ const nodeTypes: NodeTypes = {
   dialogContainer: DialogContainerNode,
   dialogInternal: DialogInternalNode,
 };
+
+// Props React Flow copies into its store when their identity changes: kept
+// stable, or every render of the graph (each keystroke in the Properties
+// panel) updated the store and made every node re-check itself.
+const MULTI_SELECTION_KEYS = ['Meta', 'Control'];
+
+/** The same function every render, calling the latest `fn`: for handlers
+ *  handed to React Flow, whose dependencies (the story's beats, App's
+ *  callbacks) change with every edit. */
+function useStableHandler<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+  const ref = useRef(fn);
+  ref.current = fn;
+  return useCallback((...args: A) => ref.current(...args), []);
+}
+const FIT_VIEW_OPTIONS = { padding: 0.2, maxZoom: 1 };
 
 const edgeTypes: EdgeTypes = {
   custom: CustomEdge,
@@ -425,6 +442,26 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // beat highlights its outgoing lines"): its links drawn thicker and on
   // top, the rest faded. Only the drawing changes, not the edges.
   const [hoveredBeatId, setHoveredBeatId] = useState<string | null>(null);
+  // Stable handlers: React Flow hands node handlers to every node, so an
+  // inline arrow here re-rendered all of them on each render of the graph
+  // (each keystroke in the Properties panel).
+  const onNodeMouseEnter = useCallback((_: React.MouseEvent, node: Node) => setHoveredBeatId(node.id), []);
+  const onNodeMouseLeave = useCallback(() => setHoveredBeatId(null), []);
+  const onInit = useCallback((instance: ReactFlowInstance) => {
+    // Set the instance for viewport controls
+    setReactFlowInstance(instance);
+    // Dev-only hook so automated tests can drive selection/inspection
+    if (import.meta.env.DEV) {
+      (window as any).__graphEditorInstance = instance;
+    }
+    console.log('🎯 ReactFlow ready');
+  }, []);
+  const projectIdRef = useRef(projectId);
+  projectIdRef.current = projectId;
+  const onMoveEnd = useCallback((_: unknown, viewport: Viewport) => {
+    savedViewportRef.current = viewport;
+    saveViewport(projectIdRef.current, viewport);
+  }, []);
   const drawnEdges = useMemo(() => {
     if (!hoveredBeatId || !edgesState.some(e => e.source === hoveredBeatId)) return edgesState;
     return edgesState.map(e => {
@@ -514,8 +551,16 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     });
   }, [selectedBeat?.id, setNodes]);
 
-  // Update edges when beats change
+  // Update edges when beats change — only when they really did. Every edit
+  // (each keystroke in the Properties panel) gives the story a new beats
+  // list, so the edges are rebuilt; handing React Flow a new edge array
+  // re-rendered every node and edge, which kept the CPU busy while typing
+  // in large projects (student report: "my computer became a stove").
+  const prevEdgesKeyRef = useRef('');
   useEffect(() => {
+    const key = JSON.stringify(edges);
+    if (key === prevEdgesKeyRef.current) return;
+    prevEdgesKeyRef.current = key;
     setEdges(edges);
   }, [edges, setEdges]);
 
@@ -912,6 +957,14 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
+  // Handed to React Flow as stable functions: a handler that changes on every
+  // edit made React Flow re-render all its nodes 4× per keystroke in the
+  // Properties panel (large projects: the CPU busy while typing).
+  const stableNodeClick = useStableHandler(onNodeClick);
+  const stableNodeDragStop = useStableHandler(onNodeDragStop);
+  const stableConnectEnd = useStableHandler(onConnectEnd);
+  const stableDrop = useStableHandler(onDrop);
+
   // Debug logging for ReactFlow mounting
   useEffect(() => {
     console.log('[GraphEditor] === ReactFlow mounting with', nodesState.length, 'nodes ===');
@@ -1031,11 +1084,11 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         nodes={nodesState}
         edges={drawnEdges}
         onNodesChange={onNodesChange}
-        onNodeMouseEnter={(_, node) => setHoveredBeatId(node.id)}
-        onNodeMouseLeave={() => setHoveredBeatId(null)}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={onNodeMouseLeave}
         onEdgesChange={onEdgesChange}
-        onNodeClick={onNodeClick}
-        onNodeDragStop={onNodeDragStop}
+        onNodeClick={stableNodeClick}
+        onNodeDragStop={stableNodeDragStop}
         onSelectionChange={onSelectionChange}
         // Shift-drag on the pane draws a selection box; Shift comes from
         // shiftHeld (see above), not React Flow's key tracking. Shift must not
@@ -1044,33 +1097,22 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         selectionKeyCode={null}
         selectionOnDrag={shiftHeld}
         panOnDrag={!shiftHeld}
-        multiSelectionKeyCode={['Meta', 'Control']}
+        multiSelectionKeyCode={MULTI_SELECTION_KEYS}
         // Selection elevation (+1000) would lift an opaque expanded dialog
         // above its own internal-edge layers; explicit zIndex tiers on the
         // dialog nodes/edges handle stacking instead.
         elevateNodesOnSelect={false}
         deleteKeyCode={null}
         onConnectStart={onConnectStart}
-        onConnectEnd={onConnectEnd}
+        onConnectEnd={stableConnectEnd}
         nodesConnectable={!!onLinkOutput}
         connectionRadius={40}
         onNodeContextMenu={onNodeContextMenu}
         onPaneContextMenu={onPaneContextMenu}
         onPaneClick={closeContextMenu}
-        onInit={(instance) => {
-          // Set the instance for viewport controls
-          setReactFlowInstance(instance);
-          // Dev-only hook so automated tests can drive selection/inspection
-          if (import.meta.env.DEV) {
-            (window as any).__graphEditorInstance = instance;
-          }
-          console.log('🎯 ReactFlow ready');
-        }}
-        onMoveEnd={(_, viewport) => {
-          savedViewportRef.current = viewport;
-          saveViewport(projectId, viewport);
-        }}
-        onDrop={onDrop}
+        onInit={onInit}
+        onMoveEnd={onMoveEnd}
+        onDrop={stableDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
@@ -1078,7 +1120,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         minZoom={0.05}
         maxZoom={4}
         fitView={!savedViewportRef.current}
-        fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
+        fitViewOptions={FIT_VIEW_OPTIONS}
       >
         <Background color={dark ? '#3d424b' : '#aaa'} gap={16} />
         <Controls showInteractive={false}>

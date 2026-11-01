@@ -3068,7 +3068,13 @@ function App() {
   }, [currentProject, setIsUntitledProject, updateMetadata, updateStory, initializeStory, resumeAutoSave]);
 
   // Handler functions
+  // Reads the selection through a ref: it changes with every edit of the
+  // selected beat, and a new handler here reached every flowchart node
+  // (all of them re-rendered on each keystroke in large projects).
+  const selectedBeatForSelectRef = useRef(selectedBeat);
+  selectedBeatForSelectRef.current = selectedBeat;
   const handleBeatSelect = useCallback((beat: Beat) => {
+    const selectedBeat = selectedBeatForSelectRef.current;
     // If selecting the same beat but with updated _version (e.g., after merge),
     // force re-render by clearing first, then setting in next tick
     if (selectedBeat?.id === beat.id && (beat as any)._version !== (selectedBeat as any)?._version) {
@@ -3079,7 +3085,7 @@ function App() {
     } else {
       setSelectedBeat(beat);
     }
-  }, [selectedBeat]);
+  }, []);
 
   const handleClusterSelect = useCallback((cluster: Cluster | null) => {
     setSelectedCluster(cluster);

@@ -718,11 +718,6 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
         connections = beat.connections;
       }
 
-      // Debug: Log connections for troubleshooting
-      if (connections.length > 0 || beat.defaultTarget) {
-        console.log(`[GraphEditor] Beat ${beat.id} (${beat.type}): connections=${connections.length}, defaultTarget=${beat.defaultTarget}`);
-      }
-
       // B1b — expanded dialogTree: outgoing edges leave from the per-exit
       // handles inside the node (sourceHandle = outline pathId), so each
       // edge visibly originates from the choice that produces it. Only for
