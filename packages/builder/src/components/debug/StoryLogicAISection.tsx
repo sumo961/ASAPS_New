@@ -30,9 +30,13 @@ const KIND_LABEL: Record<StoryLogicKind, string> = {
 };
 
 type FixState =
-  | { findingKey: string; status: 'loading' }
-  | { findingKey: string; status: 'error'; error: string }
-  | { findingKey: string; status: 'ready' | 'applying'; suggestion: AIFixSuggestion };
+  | { status: 'loading' }
+  | { status: 'error'; error: string }
+  | { status: 'ready' | 'applying'; suggestion: AIFixSuggestion };
+
+/** Findings run their fixes side by side, so two can target the same text: once one is applied, the other was written against words that are gone. */
+const editTargets = (s: AIFixSuggestion) => s.preview.map(p => `${p.beatId}|${p.path}`);
+const STALE_FIX = 'Another fix changed this text. Propose a fix again to work from the new words.';
 
 interface Props {
   story: Story;
@@ -126,14 +130,25 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
     }
   };
 
-  const [fix, setFix] = useState<FixState | null>(null);
-  const fixAbortRef = useRef<AbortController | null>(null);
+  // One entry per finding: asking about a second finding leaves the first running.
+  const [fixes, setFixes] = useState<Record<string, FixState>>({});
+  const fixAbortRef = useRef(new Map<string, AbortController>());
+  const appliedTargetsRef = useRef(new Set<string>());
+  useEffect(() => {
+    const running = fixAbortRef.current;
+    return () => running.forEach(c => c.abort());
+  }, []);
+  const setFix = (key: string, state: FixState | null) => setFixes(prev => {
+    const next = { ...prev };
+    if (state) next[key] = state; else delete next[key];
+    return next;
+  });
 
   const proposeFix = async (f: StoryLogicFinding) => {
-    fixAbortRef.current?.abort();
+    fixAbortRef.current.get(f.key)?.abort();
     const controller = new AbortController();
-    fixAbortRef.current = controller;
-    setFix({ findingKey: f.key, status: 'loading' });
+    fixAbortRef.current.set(f.key, controller);
+    setFix(f.key, { status: 'loading' });
     const c = byId.get(f.beatId);
     const finding: StoryLogicProblemFinding = {
       id: f.key, kind: 'story-logic', beatId: f.beatId, beatName: c?.name, quote: f.quote,
@@ -150,18 +165,36 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
         controller.signal,
       );
       if (controller.signal.aborted) return;
-      if (result.ok) setFix({ findingKey: f.key, status: 'ready', suggestion: result.suggestion });
-      else setFix({ findingKey: f.key, status: 'error', error: result.rationale ? `${result.reason} (AI: ${result.rationale})` : result.reason });
+      if (!result.ok) setFix(f.key, { status: 'error', error: result.rationale ? `${result.reason} (AI: ${result.rationale})` : result.reason });
+      else if (editTargets(result.suggestion).some(t => appliedTargetsRef.current.has(t))) setFix(f.key, { status: 'error', error: STALE_FIX });
+      else setFix(f.key, { status: 'ready', suggestion: result.suggestion });
     } catch (err) {
-      if (!controller.signal.aborted) setFix({ findingKey: f.key, status: 'error', error: err instanceof Error ? err.message : String(err) });
+      if (!controller.signal.aborted) setFix(f.key, { status: 'error', error: err instanceof Error ? err.message : String(err) });
     }
   };
 
   // The builder answers once it has applied the fix.
   useEffect(() => {
-    if (!fixResult || !fix || fix.status !== 'applying' || fixResult.findingId !== fix.findingKey) return;
-    setFix(fixResult.ok ? null : { findingKey: fix.findingKey, status: 'error', error: fixResult.error || 'The fix could not be applied.' });
-  }, [fixResult, fix]);
+    if (!fixResult) return;
+    const applying = fixes[fixResult.findingId];
+    if (applying?.status !== 'applying') return;
+    if (!fixResult.ok) {
+      setFix(fixResult.findingId, { status: 'error', error: fixResult.error || 'The fix could not be applied.' });
+      return;
+    }
+    const targets = new Set(editTargets(applying.suggestion));
+    targets.forEach(t => appliedTargetsRef.current.add(t));
+    setFixes(prev => {
+      const next: Record<string, FixState> = {};
+      for (const [key, state] of Object.entries(prev)) {
+        if (key === fixResult.findingId) continue;
+        next[key] = state.status === 'ready' && editTargets(state.suggestion).some(t => targets.has(t))
+          ? { status: 'error', error: STALE_FIX }
+          : state;
+      }
+      return next;
+    });
+  }, [fixResult, fixes]);
 
   const sizeLabel = (list: StoryLogicCandidate[]) => {
     const e = estimateRun(list, digest.length);
@@ -216,7 +249,7 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
       <div className="mt-3 space-y-2">
         {findings.map((f) => {
           const c = byId.get(f.beatId);
-          const thisFix = fix?.findingKey === f.key ? fix : null;
+          const thisFix = fixes[f.key] ?? null;
           return (
             <div key={f.key} className="p-3 border border-purple-200 rounded-lg text-sm" data-testid="story-logic-finding">
               <div className="flex items-center gap-2 mb-1">
@@ -242,14 +275,14 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
                   {thisFix.suggestion.rationale && <p className="mt-1">{thisFix.suggestion.rationale}</p>}
                   {thisFix.suggestion.preview.map((p, i) => (
                     <div key={i} className="mt-1">
-                      <div className="opacity-70">{p.beatName || p.beatId} · {p.path}</div>
+                      <div className="opacity-70">{p.beatId !== f.beatId ? 'In another beat: ' : ''}{p.beatName || p.beatId} · {p.path}</div>
                       <div className="line-through opacity-70 break-words">{typeof p.before === 'string' ? p.before : JSON.stringify(p.before)}</div>
                       <div className="break-words">{typeof p.after === 'string' ? p.after : JSON.stringify(p.after)}</div>
                     </div>
                   ))}
                   <div className="mt-2 flex gap-3">
-                    <button type="button" disabled={thisFix.status === 'applying'} onClick={() => { onFixDecision?.(thisFix.suggestion, 'accepted'); setFix({ findingKey: f.key, status: 'applying', suggestion: thisFix.suggestion }); }} className="px-2 py-0.5 rounded bg-purple-600 text-white disabled:opacity-50">Apply</button>
-                    <button type="button" onClick={() => { onFixDecision?.(thisFix.suggestion, 'rejected'); setFix(null); }} className="underline">Decline</button>
+                    <button type="button" disabled={thisFix.status === 'applying'} onClick={() => { onFixDecision?.(thisFix.suggestion, 'accepted'); setFix(f.key, { status: 'applying', suggestion: thisFix.suggestion }); }} className="px-2 py-0.5 rounded bg-purple-600 text-white disabled:opacity-50">Apply</button>
+                    <button type="button" onClick={() => { onFixDecision?.(thisFix.suggestion, 'rejected'); setFix(f.key, null); }} className="underline">Decline</button>
                   </div>
                 </div>
               )}

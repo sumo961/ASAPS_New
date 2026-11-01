@@ -3,9 +3,10 @@
 ## Unreleased (since v0.9.154, 2026-11-01)
 
 ### Overview
-Story Logic Phase 1: **Check with AI** in the Debug window reads each beat next to the states players arrive in and reports where its words don't hold. Not yet run against a real model.
+Story Logic Phase 1: **Check with AI** in the Debug window reads each beat next to the states players arrive in and reports where its words don't hold. Run against a real model on The Last Ferry (2 findings, both true) and Birka (224 beats, 26 findings, verification under way).
 
 ### Story Logic: Check with AI (docs/AI-Story-Logic-Plan.md, Phase 1)
+- **Propose a fix runs per finding:** asking about a second finding used to cancel the first without saying so. Each finding now keeps its own request and answer. An edit outside the finding's beat says "In another beat", and applying a fix retires any other proposal written against the same text.
 - **Which beats:** those the way taken reaches in different states, plus those the keyword check flags, with words to judge; most-travelled first. The panel says how many of the story's beats are to check and how big the run is before it starts. Above 40 candidates it also offers a first pass on the beats about half the path visits go through. A run is split into requests of up to 12 beats; Cancel stops it, and what was checked is kept (also when a request fails).
 - **What the model reads:** the beat's words, its speaker, each distinct arriving state in plain words (up to 6: items with quantities, variables, counters, who plays each role, feelings, plus one example route), the words of the beats before it; the story digest once as `systemContext`. Its reply is `findings[]` (schema on Claude). `services/prompts/storyLogicReview.ts`, `services/storyLogicReview.ts`.
 - **Checked before shown:** a finding must quote words really in the beat, name a beat it was given and point at one of its states; the rest are dropped and counted ("3 findings were left out").
