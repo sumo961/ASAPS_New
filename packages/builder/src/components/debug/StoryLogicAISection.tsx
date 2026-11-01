@@ -259,11 +259,14 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
         <div className="p-3 border border-gray-200 rounded-lg text-sm space-y-2">
           <p className="text-gray-600">
             An AI reads each beat next to the states players arrive in and reports where the words don't hold.{' '}
-            {pending.length} of the story's {totalBeats} beats {pending.length === 1 ? 'is' : 'are'} to check; beats unchanged since their last check are skipped. Nothing changes without you.
+            {pending.length < candidates.length && Object.keys(store?.checked ?? {}).length > 0
+              ? `${pending.length} of the ${candidates.length} beats it reads ${pending.length === 1 ? 'is' : 'are'} new or changed since the last check; the rest keep their results.`
+              : `${pending.length} of the story's ${totalBeats} beats ${pending.length === 1 ? 'is' : 'are'} to check.`}
+            {' '}Nothing changes without you.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" data-testid="story-logic-run" onClick={() => run(pending)} className="px-3 py-1.5 rounded bg-purple-600 text-white hover:bg-purple-700">
-              Check with AI: all {pending.length}
+              {pending.length < candidates.length ? `Check these ${pending.length} with AI` : `Check with AI: all ${pending.length}`}
             </button>
             <span className="text-xs text-gray-500">{sizeLabel(pending)}</span>
           </div>
