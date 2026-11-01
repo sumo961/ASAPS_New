@@ -121,6 +121,10 @@ export interface SimulationAnalysisConfig {
   maxFrontier?: number;
   /** Most beat steps explored in one run (default 300000). */
   maxExpansions?: number;
+  /** When breadth runs out of budget, the search for beats still on no path: most extra paths (default 5000). */
+  maxCoveragePaths?: number;
+  /** ...and most extra steps (default 150000). */
+  maxCoverageExpansions?: number;
 }
 
 // ============================================================================
@@ -445,6 +449,8 @@ export class StateSimulationAnalyzer {
       maxBeatRevisits: config.maxBeatRevisits ?? 1,
       maxFrontier: config.maxFrontier ?? 4000,
       maxExpansions: config.maxExpansions ?? 300000,
+      maxCoveragePaths: config.maxCoveragePaths ?? 5000,
+      maxCoverageExpansions: config.maxCoverageExpansions ?? 150000,
     };
   }
 
@@ -667,8 +673,18 @@ export class StateSimulationAnalyzer {
     const admittedNew = new Set<string>();
     const seenBeatStates = new Set<string>();
     const cap = this.config.maxFrontier ?? 4000;
+    // The coverage pass (below): once the budget is spent on breadth, search
+    // for what no finished path passed through yet.
+    let coverage = false;
+    const covered = new Set<string>();
+    const coverageSeen = new Set<string>();
+    let countedPaths = 0;
+    let distance = new Map<string, number>();
+    let distanceFor = -1;
+    let buckets: Array<Array<(typeof stack)[number]>> = [];
+    const askedVisits = this.beatsAskedAboutByVisited();
     const enqueue = (f: (typeof stack)[number]) => {
-      if (stack.length < cap) { stack.push(f); return; }
+      if (coverage || stack.length < cap) { stack.push(f); return; }
       if (!seenBeats.has(f.beatId) && !admittedNew.has(f.beatId)) { admittedNew.add(f.beatId); stack.push(f); return; }
       if (seenBeatStates.size < cap * 4) {
         const k = `${f.beatId}|${hashState(f.state)}`;
@@ -677,14 +693,69 @@ export class StateSimulationAnalyzer {
       this.truncated = true;
     };
 
-    while (stack.length > 0 && paths.length < this.config.maxPaths) {
-      if (++expansions > (this.config.maxExpansions ?? 300000)) { this.truncated = true; break; }
+    const firstFrames = [...stack];
+    const maxExpansions = this.config.maxExpansions ?? 300000;
+    const coveragePaths = this.config.maxCoveragePaths ?? 5000;
+    const coverageExpansions = this.config.maxCoverageExpansions ?? 150000;
+    const pathLimit = this.config.maxPaths;
+    let coverageStart = 0;
+    for (;;) {
+      if (!coverage) {
+        const spent = paths.length >= pathLimit || expansions >= maxExpansions;
+        if (spent) this.truncated = true;
+        if (stack.length === 0 && !this.truncated) break; // Every path was explored.
+        if (spent || stack.length === 0) {
+          // Breadth first reaches everything in a small story and only the
+          // first few choices of a large one: a 400-beat story spent 20000
+          // paths and never reached 168 beats. Start over, deep first,
+          // preferring what's uncovered, until every beat that can be
+          // reached is on a finished path.
+          coverage = true;
+          coverageStart = paths.length;
+          stack.length = 0;
+          stack.push(...firstFrames);
+          expansions = 0;
+        }
+      }
+      for (; countedPaths < paths.length; countedPaths++) {
+        for (const step of paths[countedPaths].steps) covered.add(step.beatId);
+      }
+      if (coverage && (paths.length - coverageStart >= coveragePaths || expansions >= coverageExpansions)) break;
+      expansions++;
       if (expansions % 250 === 0) yield { expansions, beatsReached: seenBeats.size };
       // Use BFS (shift) instead of DFS (pop) to ensure fair coverage
       // across all branches at each level. DFS can exhaust the maxPaths
       // budget on the first few branches of a wide choice beat,
       // leaving later branches unexplored.
-      const frame = stack.shift()!;
+      let frame: (typeof stack)[number];
+      if (coverage) {
+        // Finish paths carrying something uncovered, then go to whichever
+        // waiting branch is nearest to a beat still uncovered.
+        if (covered.size !== distanceFor) {
+          distanceFor = covered.size;
+          distance = this.distanceToUncovered(covered);
+          stack.push(...buckets.flat());
+          buckets = [];
+        }
+        for (const f of stack) {
+          const rank = f.path.some((step) => !covered.has(step.beatId))
+            ? 0
+            : 1 + (distance.get(f.beatId) ?? Number.POSITIVE_INFINITY);
+          if (Number.isFinite(rank)) (buckets[rank] ??= []).push(f);
+        }
+        stack.length = 0;
+        const nearest = buckets.find((b) => b && b.length > 0);
+        if (!nearest) break;
+        frame = nearest.pop()!;
+        // The same beat in the same state plays the same from here, so it only
+        // goes on if finishing it would put something uncovered on a path.
+        const asked = [...askedVisits].filter((id) => frame.state.visitedBeats.has(id)).sort().join(',');
+        const key = `${frame.beatId}|${hashState(frame.state)}|${asked}`;
+        if (coverageSeen.has(key) && frame.path.every((step) => covered.has(step.beatId)) && covered.has(frame.beatId)) continue;
+        coverageSeen.add(key);
+      } else {
+        frame = stack.shift()!;
+      }
 
       // Check depth limit
       if (frame.path.length >= this.config.maxDepth) {
@@ -957,6 +1028,46 @@ export class StateSimulationAnalyzer {
   /**
    * Get a beat by ID (cached)
    */
+  /** Links to the nearest beat on no finished path yet, for every beat that can get to one. */
+  private distanceToUncovered(covered: Set<string>): Map<string, number> {
+    const incoming = new Map<string, string[]>();
+    const beats = this.story.getAllBeats();
+    for (const beat of beats) {
+      const targets = this.getConnections(beat).map((c) => c.targetId);
+      for (const r of (beat as any).requires ?? []) if (r?.fallbackTarget) targets.push(r.fallbackTarget);
+      for (const target of targets) {
+        const from = incoming.get(target);
+        if (from) from.push(beat.id); else incoming.set(target, [beat.id]);
+      }
+    }
+    const distance = new Map<string, number>();
+    let level = beats.filter((b) => !covered.has(b.id)).map((b) => b.id);
+    level.forEach((id) => distance.set(id, 0));
+    for (let d = 1; level.length > 0; d++) {
+      const next: string[] = [];
+      for (const id of level) {
+        for (const from of incoming.get(id) ?? []) {
+          if (!distance.has(from)) { distance.set(from, d); next.push(from); }
+        }
+      }
+      level = next;
+    }
+    return distance;
+  }
+
+  /** Every beat some visited-beat condition in the story asks about. */
+  private beatsAskedAboutByVisited(): Set<string> {
+    const ids = new Set<string>();
+    const walk = (o: any): void => {
+      if (Array.isArray(o)) { o.forEach(walk); return; }
+      if (!o || typeof o !== 'object') return;
+      if (o.type === 'visitedBeat' && (o.beatId || o.value)) ids.add(String(o.beatId || o.value));
+      Object.values(o).forEach(walk);
+    };
+    for (const beat of this.story.getAllBeats()) walk([(beat as any).getParameters?.(), (beat as any).requires, (beat as any).connections]);
+    return ids;
+  }
+
   private getBeat(beatId: string): Beat | null {
     if (this.beatCache.has(beatId)) {
       return this.beatCache.get(beatId) ?? null;
@@ -1052,8 +1163,12 @@ export class StateSimulationAnalyzer {
         if (changes(route)) out.push({ targetId: beat.id, label, route } as any);
       } else out.push({ targetId: target, label, route } as any);
     };
+    const onRoute = new Set<any>();
     const walk = (node: any, route: Array<{ choice?: any; node?: any }>, depth: number): void => {
-      if (!node || typeof node !== 'object' || depth > 20 || out.length >= 200) return;
+      // Any depth: a long scene nests a level per line, and missing its exit
+      // made the whole beat look like an ending.
+      if (!node || typeof node !== 'object' || onRoute.has(node) || out.length >= 200) return;
+      onRoute.add(node);
       // A line with its own exit ends the conversation there (its replies are never shown).
       if (typeof node.target === 'string' && node.target) { exit(node.target, `[NPC exit] ${node.speaker || 'NPC'}`, route); return; }
       for (const choice of Array.isArray(node.choices) ? node.choices : []) {
@@ -1062,6 +1177,7 @@ export class StateSimulationAnalyzer {
         if (typeof choice.target === 'string' && choice.target) exit(choice.target, choice.text || 'Choice', taken);
         else if (choice.dialogNode) walk(choice.dialogNode, [...taken, { node: choice.dialogNode }], depth + 1);
       }
+      onRoute.delete(node);
     };
     walk(tree, [], 0);
     return out;
@@ -1493,7 +1609,7 @@ export class StateSimulationAnalyzer {
   private dialogPathTo(tree: any, target: string, label?: string): Array<{ choice?: any; node?: any }> {
     const npcExit = typeof label === 'string' && label.startsWith('[NPC exit]');
     const find = (node: any, depth: number, strict: boolean): Array<{ choice?: any; node?: any }> | null => {
-      if (!node || typeof node !== 'object' || depth > 20) return null;
+      if (!node || typeof node !== 'object' || depth > 1000) return null;
       if (node.target === target && (!strict || npcExit)) return [];
       for (const choice of Array.isArray(node.choices) ? node.choices : []) {
         if (!choice) continue;

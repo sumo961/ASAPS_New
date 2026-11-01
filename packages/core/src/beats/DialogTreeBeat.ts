@@ -94,6 +94,9 @@ export function continueStepOf(visibleChoices: DialogChoice[]): DialogChoice | u
   return visibleChoices.find(c => c.continue === true);
 }
 
+/** A safety net against corrupt data: a long scene nests a level per line, and a lower limit silently lost its links. */
+const MAX_DIALOG_DEPTH = 1000;
+
 export class DialogTreeBeat extends Beat {
   public dialogTree: DialogNode;
   public speaker: string;
@@ -336,8 +339,8 @@ export class DialogTreeBeat extends Beat {
     // Extract connections from a dialog node recursively
     const extractFromNode = (node: DialogNode | undefined | null, depth: number = 0): void => {
       // Safety check - prevent infinite recursion
-      if (!node || depth > 20) {
-        if (depth > 20) {
+      if (!node || depth > MAX_DIALOG_DEPTH) {
+        if (depth > MAX_DIALOG_DEPTH) {
           console.warn('[DialogTreeBeat] Max recursion depth reached for beat', this.id);
         }
         return;

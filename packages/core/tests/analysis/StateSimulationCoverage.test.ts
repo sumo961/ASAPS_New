@@ -266,3 +266,61 @@ function terminals(n: PathTreeNode): PathTreeNode[] {
   if (n.hubExitNode) out.push(...terminals(n.hubExitNode));
   return out;
 }
+
+describe('long scenes and large stories', () => {
+  const deepTree = (levels: number, target: string) => {
+    const root: any = { speaker: 'A', text: 'Line 0', choices: [] };
+    let node = root;
+    for (let i = 1; i < levels; i++) {
+      const next: any = { speaker: 'A', text: `Line ${i}`, choices: [] };
+      node.choices = [{ id: `c${i}`, text: '', continue: true, dialogNode: next }];
+      node = next;
+    }
+    node.target = target;
+    return root;
+  };
+  const build = (beats: any[]) => story(beats);
+  const beatsOnPaths = (result: any) => new Set<string>(result.outcomes.flatMap((o: any) => (o.pathVariations ?? []).flatMap((v: any) => v.pathBeatIds ?? [])));
+
+  it('follows the exit of a scene nested deeper than 20 lines', () => {
+    const story = build([
+      { id: 'a', type: 'dialogTree', name: 'Long', parameters: { dialogTree: deepTree(30, 'end') } },
+      { id: 'end', type: 'endScreen', name: 'End', parameters: { message: 'x', showRestart: false } },
+    ]);
+    expect(story.getBeat('a')!.getConnections().map((c: any) => c.targetId)).toContain('end');
+    expect(beatsOnPaths(new StateSimulationAnalyzer(story).analyze()).has('end')).toBe(true);
+  });
+
+  it('when the budget runs out on breadth, still reaches beats behind a late gate', () => {
+    // Ten two-way choices: 1024 ways through, far over a budget of 50 paths.
+    const beats: any[] = [];
+    for (let i = 0; i < 10; i++) {
+      beats.push({ id: `q${i}`, type: 'multiChoice', name: `Q${i}`, parameters: { question: 'q', choices: [
+        { id: 'l', text: 'L', target: i < 9 ? `q${i + 1}` : 'gate', ...(i === 0 ? { effects: [{ type: 'setVariable', target: 'key', value: 'yes' }] } : {}) },
+        { id: 'r', text: 'R', target: i < 9 ? `q${i + 1}` : 'gate' },
+      ] } });
+    }
+    beats.push({ id: 'gate', type: 'multiChoice', name: 'Gate', parameters: { question: 'g', choices: [
+      { id: 'o', text: 'Open', target: 'secret', conditions: [{ type: 'variable', variableName: 'key', operator: '==', value: 'yes' }] },
+      { id: 'c', text: 'Leave', target: 'end' },
+    ] } });
+    beats.push({ id: 'secret', type: 'infoText', name: 'Secret', parameters: { text: 's' }, connections: [{ targetId: 'end' }] });
+    beats.push({ id: 'end', type: 'endScreen', name: 'End', parameters: { message: 'x', showRestart: false } });
+    const analyzer = new StateSimulationAnalyzer(build(beats), { maxPaths: 2, maxFrontier: 4 });
+    const on = beatsOnPaths(analyzer.analyze());
+    expect(analyzer.truncated).toBe(true);
+    expect(on.has('secret')).toBe(true);
+    expect(on.has('end')).toBe(true);
+  });
+
+  it('a story that fits the budget gets no extra pass', () => {
+    const story = build([
+      { id: 'a', type: 'multiChoice', name: 'A', parameters: { question: 'q', choices: [{ id: 'x', text: 'X', target: 'e1' }, { id: 'y', text: 'Y', target: 'e2' }] } },
+      { id: 'e1', type: 'endScreen', name: 'E1', parameters: { message: 'x', showRestart: false } },
+      { id: 'e2', type: 'endScreen', name: 'E2', parameters: { message: 'x', showRestart: false } },
+    ]);
+    const analyzer = new StateSimulationAnalyzer(story);
+    expect(analyzer.analyzeRaw()).toHaveLength(2);
+    expect(analyzer.truncated).toBe(false);
+  });
+});

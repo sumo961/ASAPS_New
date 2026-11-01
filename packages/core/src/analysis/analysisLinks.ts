@@ -96,7 +96,7 @@ function dialogOpenTargets(tree: any): Set<string> {
   const open = new Set<string>();
   const hasConds = (c: any): boolean => Array.isArray(c?.conditions) && c.conditions.length > 0;
   const walk = (node: any, gated: boolean, depth: number): void => {
-    if (!node || typeof node !== 'object' || depth > 20) return;
+    if (!node || typeof node !== 'object' || depth > 1000) return;
     if (typeof node.target === 'string' && node.target && !gated) open.add(node.target);
     for (const choice of Array.isArray(node.choices) ? node.choices : []) {
       if (!choice) continue;

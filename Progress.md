@@ -15,6 +15,10 @@ Story Logic Phase 1: **Check with AI** in the Debug window reads each beat next 
 ### Preview: "Start as if…" states
 - States that differ only in a beat a condition ahead asks about no longer merge. Visited beats were left out of both merging steps, and a visited condition with no operator wasn't seen at all, so a beat gated on visited beats could offer only states that fail its gates.
 
+### Debug tools reach the whole story
+- **Long scenes:** several walkers stopped reading a Dialog Tree after 12 to 20 levels (a level per line), so a long scene's exits, effects and item pictures were lost and the beat looked like an ending. This included the engine's own link list behind the flowchart. On Birka, one such scene hid a 30-beat storyline.
+- **Large stories:** when the path budget runs out on breadth, a second pass now steers to the nearest beat on no finished path. On a rebuilt copy of Birka (no characters or settings), beats linked from the start but on no path fell from about 70 to 10; a six-times-larger budget reached no more, so those 10 look gated. It takes about 6 seconds in all. Stories that fit the budget are unaffected.
+
 ### Story Logic summary
 - Hub Beats, Warnings and Info jump to their sections. With AI enabled in the app, an AI findings figure sits beside them and jumps to the AI section.
 

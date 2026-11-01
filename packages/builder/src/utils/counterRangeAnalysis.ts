@@ -89,7 +89,7 @@ function applyChoiceCounters(choice: any, map: Map<string, CounterRange>): void 
 }
 
 function walkDialogCounters(node: any, map: Map<string, CounterRange>, depth = 0): void {
-  if (!node || typeof node !== 'object' || depth > 50) return;
+  if (!node || typeof node !== 'object' || depth > 2000) return;
   if (Array.isArray(node.choices)) {
     for (const c of node.choices) {
       applyChoiceCounters(c, map);

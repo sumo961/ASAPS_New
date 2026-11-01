@@ -96,7 +96,7 @@ function inventoryImagesOf(beat: any): Array<[string, string]> {
   }
   const seen = new Set<object>();
   const walk = (node: any, depth: number) => {
-    if (!node || typeof node !== 'object' || depth > 12 || seen.has(node)) return;
+    if (!node || typeof node !== 'object' || depth > 2000 || seen.has(node)) return;
     seen.add(node);
     if (Array.isArray(node)) {
       for (const child of node) walk(child, depth + 1);

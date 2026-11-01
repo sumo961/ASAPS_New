@@ -388,7 +388,7 @@ export class ReachabilityAnalyzer {
   private collectEffectsOf(beat: any, params: any): void {
     const seen = new Set<object>();
     const visit = (node: any, depth: number): void => {
-      if (!node || typeof node !== 'object' || depth > 16 || seen.has(node)) return;
+      if (!node || typeof node !== 'object' || depth > 2000 || seen.has(node)) return;
       seen.add(node);
       if (Array.isArray(node)) {
         for (const child of node) visit(child, depth + 1);

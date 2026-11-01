@@ -221,7 +221,7 @@ function choicesInto(beat: any, targetId: string): any[] {
   const p = beat?.parameters || {};
   for (const c of Array.isArray(p.choices) ? p.choices : []) if (c && (c.target ?? c.targetId) === targetId) out.push(c);
   const walk = (node: any, depth: number): void => {
-    if (!node || depth > 20) return;
+    if (!node || depth > 1000) return;
     for (const c of Array.isArray(node.choices) ? node.choices : []) {
       if (c?.target === targetId) out.push(c);
       if (c?.dialogNode) walk(c.dialogNode, depth + 1);
