@@ -119,7 +119,7 @@
             "dialogNode": {
              "id": "n_tomas",
              "speaker": "Tomas",
-             "text": "We've crossed in worse. Turn back now and forty people sleep in their cars on the quay. Some of them have children.",
+             "text": "Tomas doesn't look up from the notebook he is writing in. \"We've crossed in worse. Turn back now and forty people sleep in their cars on the quay. Some of them have children.\"",
              "choices": [
               {
                "id": "c_n_ask",
@@ -288,7 +288,7 @@
        "label": "Because I thought you were right."
       },
       {
-       "targetId": "beat_check",
+       "targetId": "beat_notebook",
        "label": "Can I see the notebook?"
       },
       {
@@ -299,7 +299,7 @@
      "parameters": {
       "speaker": "@confidant",
       "showSpeaker": true,
-      "question": "${@confidant} finds ${@player.name} on the stairs when the worst is over, a battered notebook clutched in one hand, pages swollen with spray and crammed with cramped handwriting. \"You backed me in front of the captain. Nobody does that. Why did you?\"",
+      "question": "${@confidant} finds ${@player.name} on the stairs when the worst is over. \"You backed me in front of the captain. Nobody does that. Why did you?\"",
       "choices": [
        {
         "id": "cf_meant",
@@ -318,7 +318,7 @@
        {
         "id": "cf_notebook",
         "text": "Can I see the notebook?",
-        "target": "beat_check",
+        "target": "beat_notebook",
         "conditions": [
          {
           "type": "roleHolder",
@@ -346,6 +346,24 @@
      },
      "speaker": "@confidant",
      "showSpeaker": true
+    },
+    {
+     "id": "beat_notebook",
+     "name": "The notebook",
+     "type": "infoText",
+     "locations": [],
+     "x": 540,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_check",
+       "label": "Hand it back"
+      }
+     ],
+     "parameters": {
+      "text": "Tomas hesitates, then holds it out. Tides, faces, promises, all in cramped pencil. At the bottom of the page is tonight's date, the forecast, the captain's words, and under them: *${@player.name}. Spoke up. Didn't have to.*",
+      "buttonText": "Hand it back"
+     }
     },
     {
      "id": "beat_check",

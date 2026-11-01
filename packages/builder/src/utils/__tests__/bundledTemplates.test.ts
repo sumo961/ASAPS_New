@@ -320,6 +320,19 @@ describe('The Last Ferry (roles example)', () => {
   const story = data.project.story;
   const roles = data.project.globalSettings.roles;
 
+  it('shows the notebook to every player, and pays off asking to see it', () => {
+    const beat = (id: string) => story.beats.find((b: any) => b.id === id);
+    expect(JSON.stringify(beat('beat_argument').parameters)).toContain('notebook he is writing in');
+    // The stairs line is shared with Ingrid, who has no notebook.
+    expect(beat('beat_confide').parameters.question).not.toContain('notebook');
+
+    const ask = beat('beat_confide').parameters.choices.find((c: any) => c.id === 'cf_notebook');
+    expect(ask.conditions).toEqual([{ type: 'roleHolder', role: 'confidant', character: 'char_tomas', operator: '==' }]);
+    expect(ask.target).toBe('beat_notebook');
+    expect(beat('beat_notebook').parameters.text).toContain('Spoke up');
+    expect(beat('beat_notebook').connections.map((c: any) => c.targetId)).toEqual(['beat_check']);
+  });
+
   it('declares the three roles over existing characters', () => {
     const ids = new Set(story.characters.map((c: any) => c.id));
     expect(roles.map((r: any) => r.id)).toEqual(['player', 'confidant', 'captain']);

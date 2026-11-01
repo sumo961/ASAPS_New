@@ -6,7 +6,7 @@
 Story Logic Phase 1: **Check with AI** in the Debug window reads each beat next to the states players arrive in and reports where its words don't hold. Run against a real model on The Last Ferry (2 findings, both true) and Birka (224 beats, 26 findings, verification under way).
 
 ### Templates
-- **The Last Ferry:** the notebook now appears in "On the stairs" and the child's cut in "Halfway" before a choice mentions them. Check with AI caught both; the wording is the AI fix accepted in a test copy.
+- **The Last Ferry:** Check with AI caught two choices mentioning things the player had never read. The child's cut now appears in "Halfway" (the AI fix accepted in a test copy). Tomas now writes in his notebook during the argument, seen on every route, and a new beat "The notebook" shows the page when the player asks to see it, which used to have no visible result.
 
 ### Story Logic: Check with AI (docs/AI-Story-Logic-Plan.md, Phase 1)
 - **Propose a fix runs per finding:** asking about a second finding used to cancel the first without saying so. Each finding now keeps its own request and answer. An edit outside the finding's beat says "In another beat", and applying a fix retires any other proposal written against the same text.
