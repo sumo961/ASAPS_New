@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { flowchartLinkCount } from '../utils/storyLinks';
 import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { Canvas } from './Canvas';
@@ -9,11 +9,13 @@ import { Map, Palette, Share2, FileText } from 'lucide-react';
 import type { Character } from '../types/character';
 import type { GlobalSettings } from '../storage/types';
 import type { ThemeAssetUrls } from '../hooks/useThemes';
-import { usePersistedState } from '../utils/persistedState';
+import { readProjectUiState, writeProjectUiState, type WorkspaceViewName } from '../utils/projectUiState';
 import { supportsVisualEditor as supportsVisualBeat } from '../utils/visualBeatTypes';
 
 interface WorkspaceViewProps {
   projectId?: string;
+  /** The project's selected beat has been restored, so an empty selection now means none. */
+  uiStateReady?: boolean;
   beats: Beat[];
   connections: any[];
   clusters: Cluster[];
@@ -93,6 +95,7 @@ interface WorkspaceViewProps {
 
 export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   projectId,
+  uiStateReady = true,
   beats,
   connections,
   clusters,
@@ -153,8 +156,13 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onBeatsUpdate,
   storyTitle,
 }) => {
-  // Persisted: the workspace tab an author lives in shouldn't reset each launch
-  const [activeView, setActiveView] = usePersistedState<'flowchart' | 'visual' | 'script' | 'knowledgeGraph'>('asaps_ui_workspace_view', 'flowchart');
+  // Per project (this view is remounted for each one): a project opens in the
+  // editor it was left in; one never opened opens on the flowchart.
+  const [activeView, setActiveViewState] = useState<WorkspaceViewName>(() => readProjectUiState(projectId).view ?? 'flowchart');
+  const setActiveView = useCallback((view: WorkspaceViewName) => {
+    setActiveViewState(view);
+    writeProjectUiState(projectId, { view });
+  }, [projectId]);
 
   const showKnowledgeGraph = globalSettings?.features?.showKnowledgeGraph === true;
 
@@ -162,6 +170,14 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   const supportsVisualEditor = (beat: Beat | null) => supportsVisualBeat(beat?.type);
 
   const showVisualTab = supportsVisualEditor(selectedBeat);
+
+  // The Visual Editor needs a beat it can edit: without one there is no tab
+  // to go with it and nothing to show. While a project is still restoring its
+  // beat this only draws the flowchart; after that it really leaves the editor.
+  const shownView = activeView === 'visual' && !showVisualTab ? 'flowchart' : activeView;
+  useEffect(() => {
+    if (shownView !== activeView && uiStateReady) setActiveView('flowchart');
+  }, [shownView, activeView, uiStateReady, setActiveView]);
 
   // Find the cluster containing the selected beat (for shared visuals)
   const selectedBeatCluster = React.useMemo(() => {
@@ -178,7 +194,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
         <button
           onClick={() => setActiveView('flowchart')}
           className={`px-6 py-3 text-sm font-medium border-b-2 transition-all ${
-            activeView === 'flowchart'
+            shownView === 'flowchart'
               ? 'border-blue-500 text-blue-600 bg-blue-50'
               : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
           }`}
@@ -191,7 +207,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
           <button
             onClick={() => setActiveView('visual')}
             className={`px-6 py-3 text-sm font-medium border-b-2 transition-all ${
-              activeView === 'visual'
+              shownView === 'visual'
                 ? 'border-blue-500 text-blue-600 bg-blue-50'
                 : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
             }`}
@@ -204,7 +220,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
         <button
           onClick={() => setActiveView('script')}
           className={`px-6 py-3 text-sm font-medium border-b-2 transition-all ${
-            activeView === 'script'
+            shownView === 'script'
               ? 'border-blue-500 text-blue-600 bg-blue-50'
               : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
           }`}
@@ -218,7 +234,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
           <button
             onClick={() => setActiveView('knowledgeGraph')}
             className={`px-6 py-3 text-sm font-medium border-b-2 transition-all ${
-              activeView === 'knowledgeGraph'
+              shownView === 'knowledgeGraph'
                 ? 'border-blue-500 text-blue-600 bg-blue-50'
                 : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
             }`}
@@ -237,7 +253,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
         {/* View-specific controls can go here */}
         <div className="flex-1" />
 
-        {activeView === 'flowchart' && (
+        {shownView === 'flowchart' && (
           <div className="flex items-center px-4 text-xs text-gray-500">
             <span>Beats: {beats.length}</span>
             <span className="mx-2">•</span>
@@ -250,7 +266,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
 
       {/* Content Area - Fixed to use full available height */}
       <div className="flex-1 overflow-hidden relative" style={{ minHeight: 0 }}>
-        {activeView === 'knowledgeGraph' && showKnowledgeGraph ? (
+        {shownView === 'knowledgeGraph' && showKnowledgeGraph ? (
           <div className="h-full w-full">
             <KnowledgeGraphView
               projectId={projectId}
@@ -260,7 +276,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               globalSettings={globalSettings}
             />
           </div>
-        ) : activeView === 'script' ? (
+        ) : shownView === 'script' ? (
           <ScriptView
             beats={beats}
             clusters={clusters}
@@ -271,7 +287,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
             storyTitle={storyTitle}
             projectId={projectId}
           />
-        ) : activeView === 'visual' ? (
+        ) : shownView === 'visual' ? (
           <div className="h-full w-full">
             <VisualWorkspace
               // Key includes refreshKey to force re-render on undo/redo

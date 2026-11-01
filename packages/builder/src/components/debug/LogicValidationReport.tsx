@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, Info, CheckCircle, FileText, Package, GitMerge, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react';
+import { useAIFeatures } from '../../utils/aiFeatures';
+import { Sparkles, AlertTriangle, Info, CheckCircle, FileText, Package, GitMerge, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react';
 import type { Story } from '@asaps/core';
 import { validateStoryLogic, type LogicIssue, type LogicValidationResult } from '../../utils/storyLogicValidator';
 import { arrivalKey, arrivesDifferently, describeArrivalDifferences, type BeatArrival, type SimulationState } from '@asaps/core';
@@ -42,6 +43,18 @@ function extractBeatText(params: any): string {
   return '';
 }
 
+/** A summary figure that jumps to its section. */
+const SummaryJump: React.FC<{ target: string; disabled?: boolean; children: React.ReactNode }> = ({ target, disabled, children }) => (
+  <button
+    type="button"
+    disabled={disabled}
+    onClick={() => document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+    className="hover:underline disabled:no-underline disabled:cursor-default text-left"
+  >
+    {children}
+  </button>
+);
+
 export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
   story,
   onHighlightBeat,
@@ -51,6 +64,8 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
   onFixDecision,
   fixResult,
 }) => {
+  const aiOn = useAIFeatures();
+  const [aiFindingCount, setAiFindingCount] = useState(0);
   const [expandedHubs, setExpandedHubs] = useState<Set<string>>(new Set());
   const allBeats = useMemo(() => story.getAllBeats(), [story]);
 
@@ -164,28 +179,34 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Summary */}
+      {/* Summary: each figure jumps to its section */}
       <div className="bg-gray-50 rounded-lg p-4">
         <h3 className="text-lg font-semibold mb-3">Story Logic Summary</h3>
-        <div className="grid grid-cols-3 gap-4 text-sm">
+        <div className={`grid ${aiOn ? 'grid-cols-4' : 'grid-cols-3'} gap-4 text-sm`}>
           <div className="flex items-center gap-2">
             <GitMerge className="w-4 h-4 text-blue-500" />
-            <span>Hub Beats: {validation.hubBeats.length}</span>
+            <SummaryJump target="story-logic-hubs" disabled={hubAnalysis.length === 0}>Hub Beats: {validation.hubBeats.length}</SummaryJump>
           </div>
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-yellow-500" />
-            <span>Warnings: {warnings.length}</span>
+            <SummaryJump target={warnings.some((w) => w.category !== 'hub_state_assumption') ? 'story-logic-other-warnings' : 'story-logic-hubs'} disabled={warnings.length === 0}>Warnings: {warnings.length}</SummaryJump>
           </div>
           <div className="flex items-center gap-2">
             <Info className="w-4 h-4 text-blue-500" />
-            <span>Info: {infos.length}</span>
+            <SummaryJump target="story-logic-infos" disabled={infos.length === 0}>Info: {infos.length}</SummaryJump>
           </div>
+          {aiOn && (
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-500" />
+              <SummaryJump target="story-logic-ai">AI findings: {aiFindingCount}</SummaryJump>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Detailed Hub Analysis */}
       {hubAnalysis.length > 0 && (
-        <div>
+        <div id="story-logic-hubs">
           <h4 className="font-semibold mb-3 flex items-center gap-2">
             <GitMerge className="w-4 h-4 text-blue-500" />
             Hub Beat Analysis ({hubAnalysis.length})
@@ -324,7 +345,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
         const otherWarnings = warnings.filter(w => w.category !== 'hub_state_assumption');
         if (otherWarnings.length === 0) return null;
         return (
-          <div>
+          <div id="story-logic-other-warnings">
             <h4 className="font-semibold mb-3 flex items-center gap-2 text-yellow-700">
               <AlertTriangle className="w-4 h-4" />
               Other Warnings ({otherWarnings.length})
@@ -373,6 +394,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
 
       {/* AI findings: under the keyword warnings */}
       {simulation && arrivals && onStoryLogicChange && (
+        <div id="story-logic-ai">
         <StoryLogicAISection
           story={story}
           analyzer={simulation.analyzer}
@@ -386,12 +408,14 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
           onHighlightPath={onHighlightPath}
           onFixDecision={onFixDecision}
           fixResult={fixResult ?? null}
+          onFindingCount={setAiFindingCount}
         />
+        </div>
       )}
 
       {/* Info */}
       {infos.length > 0 && (
-        <div>
+        <div id="story-logic-infos">
           <h4 className="font-semibold mb-3 flex items-center gap-2 text-blue-700">
             <Info className="w-4 h-4" />
             Info ({infos.length})

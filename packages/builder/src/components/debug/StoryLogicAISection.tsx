@@ -52,6 +52,8 @@ interface Props {
   onHighlightPath?: (beatIds: string[]) => void;
   onFixDecision?: (suggestion: AIFixSuggestion, decision: 'accepted' | 'rejected') => void;
   fixResult: { findingId: string; ok: boolean; error?: string } | null;
+  /** Tells the summary above how many findings are showing. */
+  onFindingCount?: (count: number) => void;
 }
 
 export const StoryLogicAISection: React.FC<Props> = (props) => {
@@ -69,7 +71,7 @@ export const StoryLogicAISection: React.FC<Props> = (props) => {
   return <Section {...props} />;
 };
 
-const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flaggedBeats, incoming, store, onStoreChange, onHighlightBeat, onHighlightPath, onFixDecision, fixResult }) => {
+const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flaggedBeats, incoming, store, onStoreChange, onHighlightBeat, onHighlightPath, onFixDecision, fixResult, onFindingCount }) => {
   const beats = useMemo(() => story.getAllBeats().map((b: any) => ({
     id: b.id, name: b.name, type: b.type, speaker: b.speaker, parameters: b.getParameters(),
   })), [story]);
@@ -96,6 +98,7 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
   const first = useMemo(() => (pending.length > FIRST_PASS_MIN_CANDIDATES ? firstPass(pending) : null), [pending]);
   const findings = useMemo(() => visibleFindings(candidates, store), [candidates, store]);
   const byId = useMemo(() => new Map(candidates.map((c) => [c.beatId, c])), [candidates]);
+  useEffect(() => { onFindingCount?.(findings.length); }, [findings.length, onFindingCount]);
 
   const [progress, setProgress] = useState<RunProgress | null>(null);
   const [runError, setRunError] = useState<string | null>(null);

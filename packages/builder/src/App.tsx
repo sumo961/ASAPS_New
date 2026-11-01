@@ -133,6 +133,7 @@ import { resolveExportSpeech } from './utils/exportSpeech';
 import { machineStorage } from './utils/machineStorage';
 import { useAIFeatures } from './utils/aiFeatures';
 import { usePersistedState } from './utils/persistedState';
+import { readProjectUiState, writeProjectUiState } from './utils/projectUiState';
 import { beatSnapshot, mapsAsEntries } from './utils/beatSnapshot';
 
 // Type declaration for Electron API exposed by preload
@@ -2096,6 +2097,24 @@ function App() {
 
   // Track loaded project to avoid re-loading the same project
   const loadedProjectIdRef = useRef<string | null>(null);
+
+  // Open a project where it was left. The load effect below marks the project
+  // in the same tick it sets the beats, so this runs once they have committed;
+  // it must stay declared BEFORE that effect, or it would see the old beats.
+  const uiRestorePendingRef = useRef<string | null>(null);
+  const [uiRestoredFor, setUiRestoredFor] = useState<string | null>(null);
+  useEffect(() => {
+    const id = currentProject?.id;
+    if (!id || uiRestorePendingRef.current !== id) return;
+    uiRestorePendingRef.current = null;
+    const { beatId } = readProjectUiState(id);
+    const beat = beatId ? state.beats.find(b => b.id === beatId) : undefined;
+    if (beat) setSelectedBeat(beat);
+    setUiRestoredFor(id);
+  }, [state.beats, currentProject?.id]);
+  useEffect(() => {
+    if (currentProject?.id && uiRestoredFor === currentProject.id) writeProjectUiState(currentProject.id, { beatId: selectedBeat?.id ?? null });
+  }, [selectedBeat?.id, uiRestoredFor, currentProject?.id]);
   // Track if we've already initialized to prevent React Strict Mode double-init
   const hasInitializedRef = useRef<boolean>(false);
 
@@ -2717,6 +2736,7 @@ function App() {
 
         setIsUntitledProject(currentProject.name === 'Untitled Project');
         loadedProjectIdRef.current = currentProject.id;
+        uiRestorePendingRef.current = currentProject.id;
 
         // Unify the two Empty doors (eval §2.1 #3): a dialog-created project
         // used to load as a BLANK grid while the scratch path got the
@@ -3042,6 +3062,7 @@ function App() {
         // implies "named".
         setIsUntitledProject(currentProject.name === 'Untitled Project');
         loadedProjectIdRef.current = currentProject.id;
+        uiRestorePendingRef.current = currentProject.id;
         console.log('[App] >>> isUntitledProject set to:', currentProject.name === 'Untitled Project');
         // Unify the two Empty doors (eval §2.1 #3): a dialog-created project
         // used to load as a BLANK grid while the scratch path got the
@@ -7085,6 +7106,7 @@ function App() {
           <WorkspaceView
             key={currentProject?.id || 'untitled'}
             projectId={currentProject?.id}
+            uiStateReady={!currentProject || uiRestoredFor === currentProject.id}
             beats={state.beats}
             connections={state.connections}
             clusters={state.clusters || []}

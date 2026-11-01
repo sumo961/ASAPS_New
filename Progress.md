@@ -8,6 +8,13 @@ Story Logic Phase 1: **Check with AI** in the Debug window reads each beat next 
 ### Templates
 - **The Last Ferry:** Check with AI caught two choices mentioning things the player had never read. The child's cut now appears in "Halfway" (the AI fix accepted in a test copy). Tomas now writes in his notebook during the argument, seen on every route, and a new beat "The notebook" shows the page when the player asks to see it, which used to have no visible result.
 
+### Projects open where you left them
+- A project opens in the editor and on the beat it was left with (Flowchart, Visual Editor, Script, Knowledge Graph). A project never opened on this machine opens on the full flowchart. If the beat is gone, or can't be edited visually, it opens on the flowchart.
+- This also fixes opening onto a blank "No Beat Selected" page: the editor tab was remembered across all projects, while the selected beat was not. Kept per project in localStorage (`utils/projectUiState.ts`), never in the project file.
+
+### Story Logic summary
+- Hub Beats, Warnings and Info jump to their sections. With AI enabled in the app, an AI findings figure sits beside them and jumps to the AI section.
+
 ### Story Logic: Check with AI (docs/AI-Story-Logic-Plan.md, Phase 1)
 - **The model now sees speakers and gates:** it was given a beat's words flattened, without who says them or which conditions show them. On Birka that caused all 8 false alarms: names already in a speaker label (2), and lines a condition already handled (6). Beats are now sent as a script with speaker labels (left out when the story hides names), gates on lines and replies, and first-match branches; the words before a beat now send the end of the previous beat, not its start. Finding quotes are still checked against the words alone. This changes every beat's cache key, so existing projects check again.
 - **Real cost:** the panel shows rough dollars before a check ("≈", going by the last check once there is one) and what each check really used, from the provider's token counts, plus a running total for checks and fixes, saved in `generation/story-logic.json`. Prices are in `services/aiPricing.ts` (Claude models, gpt-6-astra); any other model stays in tokens. Usage has its own routes, so nothing else is counted.
