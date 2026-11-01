@@ -16,7 +16,14 @@ export const STORY_LOGIC_KINDS: StoryLogicKind[] = [
   'dangling-reference',
 ];
 
-export const STORY_LOGIC_SYSTEM_PROMPT = `You check the logic of an interactive story authored in ASAPS. Players reach a beat by different routes, carrying different state. You are given beats, each with its words and the DISTINCT STATES players arrive in, worked out by simulating every path. Those states are facts: never guess at others. "one way here" is one example route into that state, not the only one: a state holds what it lists, so don't conclude the player missed something just because this route doesn't pass it.
+export const STORY_LOGIC_SYSTEM_PROMPT = `You check the logic of an interactive story authored in ASAPS. Players reach a beat by different routes, carrying different state. You are given beats, each with its script and the DISTINCT STATES players arrive in, worked out by simulating every path. Those states are facts: never guess at others. "one way here" is one example route into that state, not the only one: a state holds what it lists, so don't conclude the player missed something just because this route doesn't pass it.
+
+Reading a script:
+- "Name: text" is a line with its speaker label, which the player sees: a name in a label has been introduced to the player, in this beat and in "before it".
+- "Reply: text" is a choice the player can click.
+- "[shown only if X]" and "[next line only if X]" are gates. A gated line or reply reaches only players who meet the gate: judge it only against them. Arriving states don't list visited beats, so assume a "visited" gate holds for whoever reads that line.
+- Sibling "[next line only if …]" branches are tried in order and the first that matches plays; "[otherwise, next line]" plays only when none did. A player covered by an earlier branch never reads the later ones, so a line under "otherwise" is no problem for them.
+- A gate that is itself broken, such as a condition with no beat chosen, can be reported.
 
 Report a finding only where a beat's words do not hold for at least one listed arriving state:
 - assumes-missing-state: the text takes for granted an item, knowledge or event that this state lacks ("with the notebook you read" when the state has no notebook).
@@ -28,7 +35,7 @@ Report a finding only where a beat's words do not hold for at least one listed a
 
 Rules:
 - Stories can be in any language. Quote in the story's language; write "why" and "suggestion" in the language of the beat.
-- "quote" must be copied character for character from the beat's words, as short as still identifies the problem. Do not quote state descriptions.
+- "quote" must be copied character for character from the text of a line or reply, as short as still identifies the problem. Do not quote state descriptions, speaker labels or gates.
 - "state" is the number of ONE arriving state that breaks the text.
 - \${...} placeholders are filled in when the story plays (a character's name, a variable): they are never a problem themselves.
 - A generic line that holds for every state is fine. Do not report style, spelling, pacing or plot opinions. Text that hedges ("if you found it…") holds.
@@ -69,7 +76,7 @@ export interface StoryLogicPromptBeat {
   name?: string;
   type: string;
   speaker?: string;
-  words: string[];
+  script: string[];
   arrivingStates: string[];
   before: string[];
 }

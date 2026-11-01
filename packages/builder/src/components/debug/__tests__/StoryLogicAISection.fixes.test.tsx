@@ -8,7 +8,7 @@ const pending = new Map<string, (r: unknown) => void>();
 
 vi.mock('../../../utils/aiFeatures', () => ({ useAIFeatures: () => true }));
 vi.mock('../../../hooks/useAI', () => ({ useAI: () => ({ isConfigured: true }) }));
-vi.mock('../../../services', () => ({ getAIService: () => ({ completeTurn: vi.fn() }) }));
+vi.mock('../../../services', () => ({ getAIService: () => ({ completeTurn: vi.fn(), getCurrentModel: () => 'claude-opus-5-5' }) }));
 vi.mock('../../../services/AIValidator', () => ({ getAIValidator: () => ({ ensureSchemaLoaded: async () => {}, getSchema: () => ({}) }) }));
 vi.mock('../../../utils/storyDigest', () => ({ buildStoryDigest: () => '' }));
 vi.mock('../../../services/findingFixService', () => ({
@@ -20,7 +20,8 @@ vi.mock('../../../services/storyLogicReview', async (original) => ({
     { beatId: 'a', name: 'First', arrivingStates: ['s'], incoming: [] },
     { beatId: 'b', name: 'Second', arrivingStates: ['s'], incoming: [] },
   ],
-  pendingCandidates: () => [],
+  pendingCandidates: (candidates: unknown[], store: { showPending?: boolean } | null) => (store?.showPending ? candidates : []),
+  estimateRun: () => ({ batches: 2, inputTokens: 100_000, sharedTokens: 40_000, maxOutputTokens: 8000 }),
   visibleFindings: () => ['a', 'b'].map((beatId) => ({
     key: beatId, beatId, kind: 'dangling-reference', quote: `quote ${beatId}`, state: 0, why: 'why', severity: 'worth a look', suggestion: 'hint',
   })),
@@ -83,5 +84,23 @@ describe('Story Logic: fixes run per finding', () => {
     await waitFor(() => expect(within(cardOf('quote b')).getByText(/Another fix changed this text/)).toBeTruthy());
     expect(within(cardOf('quote b')).queryByText('Apply')).toBeNull();
     expect(within(cardOf('quote a')).queryByText('answer for a')).toBeNull();
+  });
+});
+
+describe('Story Logic: what it costs', () => {
+  const spend = { calls: 2, inputTokens: 100_000, cacheReadTokens: 50_000, cacheWriteTokens: 0, outputTokens: 2000, costUsd: 0.45, unpricedCalls: 0 };
+
+  it('shows dollars before a first check, without guessing a likely figure', () => {
+    render(<StoryLogicAISection {...props({ store: { version: 1, dismissed: [], checked: {}, showPending: true } })} />);
+    expect(screen.getByText(/^at most \$\d+\.\d\d, 2 requests$/)).toBeTruthy();
+    expect(screen.queryByTestId('story-logic-spend')).toBeNull();
+  });
+
+  it('after a check, shows what it really used and goes by that for the next estimate', () => {
+    render(<StoryLogicAISection {...props({ store: { version: 1, dismissed: [], checked: {}, showPending: true, lastRun: spend, spent: { ...spend, calls: 3, costUsd: 0.6 } } })} />);
+    const line = screen.getByTestId('story-logic-spend').textContent;
+    expect(line).toContain('Last check: $0.45 (100k tokens in, 50k from cache, 2k out, 2 requests)');
+    expect(line).toContain('All checks and fixes on this story: $0.60');
+    expect(screen.getByText(/going by the last check, at most/)).toBeTruthy();
   });
 });

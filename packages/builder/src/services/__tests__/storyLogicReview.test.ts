@@ -6,9 +6,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { BeatTypeRegistry, Story, StateSimulationAnalyzer, arrivalStates, arrivesDifferently } from '@asaps/core';
 import {
-  beatWords, describeState, dismissFinding, estimateRun, firstPass, findingKey, makeBatches, mergeChecked, pendingCandidates,
+  beatScript, beatWords, describeState, dismissFinding, estimateRun, estimateRunCost, firstPass, findingKey, makeBatches, mergeChecked, pendingCandidates,
   runStoryLogicCheck, selectCandidates, validateFindings, visibleFindings, type StoryLogicCandidate,
 } from '../storyLogicReview';
+import { NO_SPEND, createSpendMeter, describeSpend } from '../aiPricing';
 
 function buildStory(beats: any[], characters?: any[]) {
   const story = new Story({ title: 'T', author: 'T', firstBeatId: beats[0].id });
@@ -176,5 +177,90 @@ describe('the store', () => {
     const dismissed = dismissFinding(mergeChecked(null, checked), findings[0].key);
     expect(visibleFindings(candidates, dismissed)).toEqual([]);
     expect(visibleFindings(candidates, mergeChecked(dismissed, checked))).toEqual([]);
+  });
+});
+
+describe('what the model reads about a beat', () => {
+  const tree = {
+    dialogTree: {
+      speaker: 'Narrator', text: 'Wiard waits.',
+      choices: [
+        { continue: true, conditions: [{ type: 'visitedBeat', beatId: 'shame', operator: '==' }], text: '', dialogNode: { speaker: 'Wiard', text: 'You again.', choices: [] } },
+        { continue: true, text: '', dialogNode: { speaker: 'Gudrun', text: 'Good cloth.', choices: [
+          { text: 'Thanks.', conditions: [{ type: 'visitedBeat', beatId: '', operator: '==' }] },
+        ] } },
+      ],
+    },
+  };
+
+  it('shows speakers, gated lines in order, and a gate with no beat', () => {
+    const script = beatScript(tree, { beatName: (id) => (id === 'shame' ? 'Refuse loudly' : id) });
+    expect(script).toEqual([
+      'Narrator: Wiard waits.',
+      '[next line only if visited "Refuse loudly"]',
+      '  Wiard: You again.',
+      '[otherwise, next line]',
+      '  Gudrun: Good cloth.',
+      '  Reply: Thanks. [shown only if visited (no beat chosen: this condition is never true)]',
+    ]);
+  });
+
+  it('leaves speaker labels out when the story hides names', () => {
+    expect(beatScript(tree, { speakerNames: false })[0]).toBe('Wiard waits.');
+  });
+
+  it('a plain next line is not called a branch', () => {
+    const script = beatScript({ dialogTree: { speaker: 'A', text: 'One.', choices: [{ continue: true, text: '', dialogNode: { speaker: 'B', text: 'Two.' } }] } });
+    expect(script).toEqual(['A: One.', 'B: Two.']);
+  });
+
+  it('adding a gate checks the beat again, and quotes still match the words alone', () => {
+    const arrivals = new Map([['x', [
+      { state: { inventory: new Map(), variables: new Map([['a', 1]]), counters: new Map() }, path: { steps: [] }, stepIndex: 0, pathCount: 1 },
+    ]]]) as any;
+    const make = (conditions?: unknown[]) => selectCandidates({
+      beats: [{ id: 'x', type: 'multiChoice', parameters: { question: 'Q?', choices: [{ text: 'Go', conditions }] } }],
+      arrivals, hubBeats: ['x'], incoming: new Map(),
+    })[0];
+    expect(make().cacheKey).not.toBe(make([{ type: 'inventory', item: 'Key' }]).cacheKey);
+    expect(make().words).toEqual(['Q?', 'Go']);
+  });
+
+  it('keeps the spend figures across merges and dismissals', () => {
+    const spent = { ...NO_SPEND, calls: 3 };
+    const store = { version: 1 as const, dismissed: [], checked: {}, spent, lastRun: spent };
+    expect(mergeChecked(store, {}).spent).toBe(spent);
+    expect(dismissFinding(store, 'k').lastRun).toBe(spent);
+  });
+});
+
+describe('what a check costs', () => {
+  const totals = (over: object) => [{ route: 'story-logic', model: 'claude-opus-5-5', calls: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, ...over }];
+
+  it('counts each request once, at the model price', () => {
+    let now = totals({});
+    const meter = createSpendMeter('story-logic', () => now);
+    now = totals({ calls: 1, inputTokens: 1_000_000, cacheReadTokens: 1_000_000, cacheWriteTokens: 1_000_000, outputTokens: 1_000_000 });
+    expect(meter().costUsd).toBeCloseTo(4 + 0.2 + 5 + 20);
+    expect(meter().calls).toBe(0);
+  });
+
+  it('a model with no known price stays in tokens, and other routes are not counted', () => {
+    const now = [...totals({ model: 'llama3', calls: 2, inputTokens: 5000, outputTokens: 900 }), { ...totals({ calls: 9 })[0], route: 'conversation' }];
+    let current: typeof now = [];
+    const meter = createSpendMeter('story-logic', () => current);
+    current = now;
+    const s = meter();
+    expect(s).toMatchObject({ calls: 2, unpricedCalls: 2, costUsd: 0 });
+    expect(describeSpend(s)).toBe('5k tokens in, 0 from cache, 900 out, 2 requests');
+  });
+
+  it('estimates caching the shared part, and goes by real output when it can', () => {
+    const e = { batches: 2, inputTokens: 2_200_000, sharedTokens: 1_000_000, maxOutputTokens: 8000 };
+    const p = { input: 1, cacheWrite: 2, cacheRead: 0.5, output: 100 };
+    const { atMost, likely } = estimateRunCost(e, p, 1000);
+    expect(atMost).toBeCloseTo(0.2 + 2 + 0.5 + 0.8);
+    expect(likely).toBeCloseTo(0.2 + 2 + 0.5 + 0.2);
+    expect(estimateRunCost(e, p).likely).toBeNull();
   });
 });

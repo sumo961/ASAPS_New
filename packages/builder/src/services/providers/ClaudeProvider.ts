@@ -792,6 +792,10 @@ Respond with JSON in this format:
   /**
    * Generate a single conversation turn for AIConversationBeat / Ideator.
    */
+  getModelId(): string {
+    return this.model;
+  }
+
   async generateConversationTurn(request: {
     systemPrompt: string;
     /** Changes between sessions (e.g. a story digest): sent after the cached system prompt. */

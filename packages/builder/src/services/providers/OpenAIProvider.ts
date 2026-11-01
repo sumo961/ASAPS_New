@@ -4,6 +4,7 @@
  * Implementation using OpenAI's GPT API
  */
 
+import { recordAIUsage } from '@asaps/core';
 import OpenAI from 'openai';
 import type { ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat/completions';
 import { BaseAIProvider } from './IProvider';
@@ -928,15 +929,23 @@ Respond with JSON in this format:
   /**
    * Generate a single conversation turn for AIConversationBeat
    */
+  getModelId(): string {
+    return this.model;
+  }
+
   async generateConversationTurn(request: {
     systemPrompt: string;
+    /** Changes between sessions (e.g. a story digest): sent after the system prompt. */
+    systemContext?: string;
     messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
     maxTokens?: number;
+    route?: string;
   }): Promise<{ text: string }> {
     this.ensureReady();
 
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: request.systemPrompt },
+      ...(request.systemContext ? [{ role: 'system' as const, content: request.systemContext }] : []),
       ...request.messages.map(m => ({
         role: m.role as 'system' | 'user' | 'assistant',
         content: m.content,
@@ -948,6 +957,7 @@ Respond with JSON in this format:
 
     let response;
     response = await this.callOpenAI(requestBody, (request as any)?.signal, (request as any)?.onProgress);
+    recordAIUsage(request.route ?? 'conversation', this.model, response?.usage);
 
     const choice = response.choices?.[0];
     const message = choice?.message;

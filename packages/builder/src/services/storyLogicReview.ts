@@ -8,6 +8,11 @@
 import { parseJSONWithRepair, itemQuantity, type BeatArrival, type SimulationState } from '@asaps/core';
 import { STORY_LOGIC_KINDS, STORY_LOGIC_SCHEMA, STORY_LOGIC_SYSTEM_PROMPT, buildStoryLogicUserPrompt, type StoryLogicPromptBeat } from './prompts/storyLogicReview';
 import type { StoryLogicFinding, StoryLogicKind, StoryLogicStore } from '../types/storyLogic';
+import type { ModelPrice } from './aiPricing';
+
+/** Usage routes, so the panel counts its own requests and nothing else. */
+export const STORY_LOGIC_ROUTE = 'story-logic';
+export const STORY_LOGIC_FIX_ROUTE = 'story-logic-fix';
 
 /** Most arriving states described per beat; the commonest come first. */
 const MAX_STATES_PER_BEAT = 6;
@@ -18,7 +23,11 @@ const MAX_OUTPUT_TOKENS = 4000;
 /** A story with more candidates than this also gets the first-pass offer. */
 export const FIRST_PASS_MIN_CANDIDATES = 40;
 
-export interface StoryLogicCandidate extends StoryLogicPromptBeat {
+export interface StoryLogicCandidate extends Omit<StoryLogicPromptBeat, 'script'> {
+  /** The words a finding may quote. */
+  words: string[];
+  /** The beat with speakers and gates, as the model reads it. */
+  script?: string[];
   /** Path visits through this beat: how much of the story meets it. */
   pathCount: number;
   /** A way in that arrives in each state, to show as a path. */
@@ -54,6 +63,82 @@ export function beatWords(params: Record<string, any> | undefined): string[] {
   };
   walk(p.dialogTree);
   return [...new Set(out)];
+}
+
+/** A gate in words. A visited condition with no beat is never true in the engine: said so, since the author probably meant something else. */
+function describeGate(c: any, beatName: (id: string) => string): string {
+  const not = c?.operator === 'not' || c?.operator === '!=';
+  switch (c?.type) {
+    case 'visitedBeat': {
+      const id = c.beatId || c.variableName || c.left;
+      if (!id) return 'visited (no beat chosen: this condition is never true)';
+      return `${not ? 'has not visited' : 'visited'} "${beatName(id)}"`;
+    }
+    case 'inventory':
+      return `${not || c.checkType === 'notHas' ? 'lacks' : 'has'} ${c.item}`;
+    case 'variable':
+      return `${c.variableName} ${c.operator ?? '=='} ${JSON.stringify(c.value)}`;
+    case 'roleHolder':
+      return `@${c.role} ${not ? 'is not' : 'is'} ${c.character}`;
+    default:
+      return JSON.stringify(c);
+  }
+}
+
+const gatesOf = (conditions: unknown, beatName: (id: string) => string): string =>
+  Array.isArray(conditions) && conditions.length ? conditions.map((c) => describeGate(c, beatName)).join(' and ') : '';
+
+/**
+ * The beat as a player meets it, for the model: who says each line, and which
+ * conditions decide whether a line or reply is shown. Without these it reports
+ * names the speaker label has introduced and lines a gate already handles.
+ */
+export function beatScript(
+  params: Record<string, any> | undefined,
+  opts: { beatName?: (id: string) => string; nameOf?: (ref: string) => string; speakerNames?: boolean } = {},
+): string[] {
+  const beatName = opts.beatName ?? ((id: string) => id);
+  const out: string[] = [];
+  const p = params ?? {};
+  const label = (who: unknown, text: string) => (opts.speakerNames !== false && typeof who === 'string' && who.trim() ? `${opts.nameOf?.(who) ?? who}: ${text}` : text);
+  const line = (depth: number, s: string) => out.push(`${'  '.repeat(depth)}${s}`);
+  const reply = (depth: number, c: any) => {
+    const gate = gatesOf(c?.conditions, beatName);
+    line(depth, `Reply: ${c.text}${gate ? ` [shown only if ${gate}]` : ''}`);
+  };
+  for (const k of ['title', 'text', 'question', 'message', 'prompt']) {
+    if (typeof p[k] === 'string' && p[k].trim()) line(0, label(k === 'title' ? '' : p.speaker, p[k]));
+  }
+  for (const list of [p.choices, p.props, p.hotspots]) {
+    if (!Array.isArray(list)) continue;
+    for (const c of list) {
+      const text = c?.text ?? c?.label;
+      if (typeof text === 'string' && text.trim()) reply(0, { ...c, text });
+    }
+  }
+  const seen = new Set<any>();
+  const walk = (node: any, depth: number): void => {
+    if (!node || typeof node !== 'object' || seen.has(node)) return;
+    seen.add(node);
+    if (typeof node.text === 'string' && node.text.trim()) line(depth, label(node.speaker, node.text));
+    const choices: any[] = Array.isArray(node.choices) ? node.choices : [];
+    const nextLines = choices.filter((c) => c?.continue);
+    const branching = nextLines.length > 1 || nextLines.some((c) => gatesOf(c?.conditions, beatName));
+    for (const c of choices) {
+      if (c?.continue) {
+        if (!branching) { walk(c.dialogNode, depth); continue; }
+        const gate = gatesOf(c.conditions, beatName);
+        line(depth, gate ? `[next line only if ${gate}]` : '[otherwise, next line]');
+        walk(c.dialogNode, depth + 1);
+        continue;
+      }
+      if (typeof c?.text === 'string' && c.text.trim()) reply(depth, c);
+      walk(c?.dialogNode, depth + 1);
+    }
+    if (node.next && typeof node.next === 'object') walk(node.next, depth);
+  };
+  walk(p.dialogTree, 0);
+  return out;
 }
 
 /** One arriving state in plain words, as the model and the author read it. */
@@ -98,6 +183,8 @@ export interface CandidateInput {
   incoming: Map<string, string[]>;
   affectOf?: (state: SimulationState) => Record<string, any> | undefined;
   nameOf?: (ref: string) => string;
+  /** False when the story hides speaker names from players. */
+  speakerNames?: boolean;
 }
 
 /**
@@ -128,9 +215,12 @@ export function selectCandidates(input: CandidateInput): StoryLogicCandidate[] {
       const way = a.path.steps.slice(Math.max(0, a.stepIndex - 5), a.stepIndex).map((s) => s.beatName || s.beatId);
       return [way.length ? `${text}; one way here: ${way.join(' → ')}` : text, a] as const;
     });
+    const scriptOpts = { beatName, nameOf: input.nameOf, speakerNames: input.speakerNames };
+    const script = beatScript(beat.parameters, scriptOpts);
+    // The end of the beat before is what the player has just read.
     const before = (input.incoming.get(id) ?? []).filter((from) => from !== id).slice(0, 4).map((from) => {
-      const w = beatWords(byId.get(from)?.parameters).join(' / ');
-      return `${beatName(from)}: ${w.length > 400 ? `${w.slice(0, 400)}…` : w}`;
+      const w = beatScript(byId.get(from)?.parameters, scriptOpts).map((l) => l.trim()).join(' / ');
+      return `${beatName(from)}: ${w.length > 600 ? `…${w.slice(-600)}` : w}`;
     });
     const arrivingStates = kept.map(([text]) => text);
     out.push({
@@ -139,18 +229,19 @@ export function selectCandidates(input: CandidateInput): StoryLogicCandidate[] {
       type: beat.type,
       ...(beat.speaker ? { speaker: beat.speaker } : {}),
       words,
+      script,
       arrivingStates,
       before,
       pathCount: list.reduce((n, a) => n + a.pathCount, 0),
       statePaths: kept.map(([, a]) => a.path.steps.slice(0, a.stepIndex + 1).map((s) => s.beatId)),
-      cacheKey: hash(JSON.stringify([words, arrivingStates, before])),
+      cacheKey: hash(JSON.stringify([script, arrivingStates, before])),
     });
   }
   return out.sort((a, b) => b.pathCount - a.pathCount || b.arrivingStates.length - a.arrivingStates.length);
 }
 
-const promptBeat = ({ beatId, name, type, speaker, words, arrivingStates, before }: StoryLogicCandidate): StoryLogicPromptBeat =>
-  ({ beatId, name, type, ...(speaker ? { speaker } : {}), words, arrivingStates, before });
+const promptBeat = ({ beatId, name, type, speaker, words, script, arrivingStates, before }: StoryLogicCandidate): StoryLogicPromptBeat =>
+  ({ beatId, name, type, ...(speaker ? { speaker } : {}), script: script ?? words, arrivingStates, before });
 
 /** Candidates not yet checked in this form, in order. */
 export function pendingCandidates(candidates: StoryLogicCandidate[], store: StoryLogicStore | null | undefined): StoryLogicCandidate[] {
@@ -176,10 +267,27 @@ export function makeBatches(candidates: StoryLogicCandidate[]): StoryLogicCandid
 }
 
 /** Rough size of a run, shown before it starts (4 characters ≈ 1 token). */
-export function estimateRun(candidates: StoryLogicCandidate[], digestChars: number): { batches: number; inputTokens: number; maxOutputTokens: number } {
+export function estimateRun(candidates: StoryLogicCandidate[], digestChars: number): { batches: number; inputTokens: number; sharedTokens: number; maxOutputTokens: number } {
   const batches = makeBatches(candidates);
-  const chars = batches.reduce((n, b) => n + buildStoryLogicUserPrompt(b.map(promptBeat)).length + STORY_LOGIC_SYSTEM_PROMPT.length + digestChars, 0);
-  return { batches: batches.length, inputTokens: Math.ceil(chars / 4), maxOutputTokens: batches.length * MAX_OUTPUT_TOKENS };
+  const shared = STORY_LOGIC_SYSTEM_PROMPT.length + digestChars;
+  const chars = batches.reduce((n, b) => n + buildStoryLogicUserPrompt(b.map(promptBeat)).length + shared, 0);
+  return { batches: batches.length, inputTokens: Math.ceil(chars / 4), sharedTokens: Math.ceil(shared / 4), maxOutputTokens: batches.length * MAX_OUTPUT_TOKENS };
+}
+
+/**
+ * Dollars for a run: instructions and digest are written to the prompt cache
+ * once and read back after that. `at most` assumes every request fills its
+ * output cap; `likely` goes by what requests really wrote on this story.
+ */
+export function estimateRunCost(
+  e: { batches: number; inputTokens: number; sharedTokens: number; maxOutputTokens: number },
+  price: ModelPrice,
+  outputPerRequest?: number,
+): { atMost: number; likely: number | null } {
+  const fresh = e.inputTokens - e.sharedTokens * e.batches;
+  const input = fresh * price.input + e.sharedTokens * price.cacheWrite + e.sharedTokens * Math.max(0, e.batches - 1) * price.cacheRead;
+  const dollars = (output: number) => (input + output * price.output) / 1e6;
+  return { atMost: dollars(e.maxOutputTokens), likely: outputPerRequest === undefined ? null : dollars(Math.min(outputPerRequest, MAX_OUTPUT_TOKENS) * e.batches) };
 }
 
 /** The first pass offered on a large story: the most-travelled beats covering about half the path visits. */
@@ -236,7 +344,7 @@ export function findingKey(beatId: string, kind: string, quote: string): string 
 export type StoryLogicComplete = (
   systemPrompt: string,
   userPrompt: string,
-  opts: { systemContext?: string; schema?: Record<string, unknown>; maxTokens: number; signal?: AbortSignal },
+  opts: { systemContext?: string; schema?: Record<string, unknown>; maxTokens: number; signal?: AbortSignal; route?: string },
 ) => Promise<string>;
 
 export interface RunProgress { done: number; total: number; found: number }
@@ -260,6 +368,7 @@ export async function runStoryLogicCheck(
       schema: STORY_LOGIC_SCHEMA,
       maxTokens: MAX_OUTPUT_TOKENS,
       signal: handlers.signal,
+      route: STORY_LOGIC_ROUTE,
     });
     if (handlers.signal?.aborted) return;
     const { findings, dropped } = validateFindings(reply, batches[i]);
@@ -273,11 +382,11 @@ export async function runStoryLogicCheck(
 
 /** Add checked results to a store, dropping beats no longer among the story's. */
 export function mergeChecked(store: StoryLogicStore | null | undefined, checked: StoryLogicStore['checked']): StoryLogicStore {
-  return { version: 1, dismissed: store?.dismissed ?? [], checked: { ...(store?.checked ?? {}), ...checked } };
+  return { ...store, version: 1, dismissed: store?.dismissed ?? [], checked: { ...(store?.checked ?? {}), ...checked } };
 }
 
 export function dismissFinding(store: StoryLogicStore | null | undefined, key: string): StoryLogicStore {
-  return { version: 1, checked: store?.checked ?? {}, dismissed: [...new Set([...(store?.dismissed ?? []), key])] };
+  return { ...store, version: 1, checked: store?.checked ?? {}, dismissed: [...new Set([...(store?.dismissed ?? []), key])] };
 }
 
 /** Findings to show: those of beats unchanged since checked, not dismissed; problems first. */

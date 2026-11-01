@@ -4,6 +4,7 @@
  * states arriving there (a re-run only checks what changed), and the findings
  * an author dismissed (a group doesn't re-triage them).
  */
+import type { AISpend } from '../services/aiPricing';
 
 export type StoryLogicKind =
   | 'assumes-missing-state'
@@ -33,4 +34,8 @@ export interface StoryLogicStore {
   dismissed: string[];
   /** Per beat: the key it was checked under and what was found (often nothing). */
   checked: Record<string, { key: string; findings: StoryLogicFinding[] }>;
+  /** What the last check used, as the provider reported it. */
+  lastRun?: AISpend;
+  /** Everything checks and fixes have used on this story. */
+  spent?: AISpend;
 }

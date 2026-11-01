@@ -193,6 +193,11 @@ export class AIService {
     return this.currentProvider;
   }
 
+  /** The model in use, for pricing; undefined when the provider doesn't say. */
+  getCurrentModel(): string | undefined {
+    return (this.currentProvider as any)?.getModelId?.();
+  }
+
   /**
    * Check if service is ready
    */
@@ -2068,7 +2073,7 @@ Always be helpful and try to interpret the user's intent, even if the command is
    * (the generation review's "Ask AI for a fix"). `signal` cancels: both
    * providers honour it on conversation turns.
    */
-  async completeTurn(systemPrompt: string, userPrompt: string, opts: { maxTokens?: number; signal?: AbortSignal; systemContext?: string; schema?: Record<string, unknown> } = {}): Promise<string> {
+  async completeTurn(systemPrompt: string, userPrompt: string, opts: { maxTokens?: number; signal?: AbortSignal; systemContext?: string; schema?: Record<string, unknown>; route?: string } = {}): Promise<string> {
     if (!this.currentProvider) throw new Error('No AI provider configured');
     const provider = this.currentProvider as any;
     if (typeof provider.generateConversationTurn !== 'function') {
@@ -2081,6 +2086,7 @@ Always be helpful and try to interpret the user's intent, even if the command is
       signal: opts.signal,
       ...(opts.systemContext ? { systemContext: opts.systemContext } : {}),
       ...(opts.schema ? { schema: opts.schema } : {}),
+      ...(opts.route ? { route: opts.route } : {}),
     } as any);
     return text;
   }

@@ -13,8 +13,9 @@ import { getAIService } from '../../services';
 import { getAIValidator } from '../../services/AIValidator';
 import { requestAIFix } from '../../services/findingFixService';
 import { buildStoryDigest } from '../../utils/storyDigest';
+import { NO_SPEND, addSpend, createSpendMeter, describeSpend, formatTokens, formatUsd, priceOf, type AISpend } from '../../services/aiPricing';
 import {
-  FIRST_PASS_MIN_CANDIDATES, dismissFinding, estimateRun, firstPass, mergeChecked, pendingCandidates,
+  FIRST_PASS_MIN_CANDIDATES, STORY_LOGIC_FIX_ROUTE, STORY_LOGIC_ROUTE, dismissFinding, estimateRun, estimateRunCost, firstPass, mergeChecked, pendingCandidates,
   runStoryLogicCheck, selectCandidates, visibleFindings, type RunProgress, type StoryLogicCandidate,
 } from '../../services/storyLogicReview';
 import type { StoryLogicFinding, StoryLogicKind, StoryLogicStore } from '../../types/storyLogic';
@@ -73,14 +74,20 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
     id: b.id, name: b.name, type: b.type, speaker: b.speaker, parameters: b.getParameters(),
   })), [story]);
   const characters = useMemo(() => ((story as any).getCharacters?.() ?? []) as any[], [story]);
+  const speakerNames = useMemo(() => {
+    const settings: any = (story as any).getSettings?.() ?? {};
+    const display = settings.speakerDisplay ?? settings.globalSettings?.speakerDisplay;
+    return display?.nameStyle !== 'off' && display?.namePosition !== 'off';
+  }, [story]);
   const candidates = useMemo(() => {
     const names = new Map<string, string>(characters.filter((c) => c?.id).flatMap((c) => [[c.id, c.displayName || c.name || c.id], [c.name, c.displayName || c.name]] as [string, string][]));
     return selectCandidates({
       beats, arrivals, hubBeats, flaggedBeats, incoming,
+      speakerNames,
       affectOf: (st) => analyzer.affectAt(st) as Record<string, any> | undefined,
       nameOf: (r) => names.get(r) ?? r,
     });
-  }, [beats, characters, arrivals, hubBeats, flaggedBeats, incoming, analyzer]);
+  }, [beats, characters, arrivals, hubBeats, flaggedBeats, incoming, analyzer, speakerNames]);
   const digest = useMemo(() => buildStoryDigest({
     title: story.getMetadata().title, beats: story.getAllBeats() as any, characters: characters as any,
   }, { maxChars: 60000 }), [story, characters]);
@@ -98,12 +105,33 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
   storeRef.current = store;
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  // What the provider reports having used. Saved with the findings, so the
+  // figures are still there when the project is opened again.
+  const runMeter = useRef(createSpendMeter(STORY_LOGIC_ROUTE));
+  const fixMeter = useRef(createSpendMeter(STORY_LOGIC_FIX_ROUTE));
+  const recordSpend = (spend: AISpend, thisRun?: AISpend) => {
+    if (spend.calls === 0 && !thisRun?.calls) return;
+    const next: StoryLogicStore = {
+      ...(storeRef.current ?? { version: 1, dismissed: [], checked: {} }),
+      spent: addSpend(storeRef.current?.spent, spend),
+      ...(thisRun ? { lastRun: thisRun } : {}),
+    };
+    storeRef.current = next;
+    onStoreChange(next);
+  };
+
   const run = async (list: StoryLogicCandidate[]) => {
     const controller = new AbortController();
     abortRef.current = controller;
     setRunError(null);
     setDroppedCount(0);
     setProgress({ done: 0, total: 1, found: 0 });
+    let thisRun = NO_SPEND;
+    const noteRun = () => {
+      const spend = runMeter.current();
+      thisRun = addSpend(thisRun, spend);
+      recordSpend(spend, thisRun);
+    };
     try {
       await runStoryLogicCheck(
         list, digest,
@@ -119,12 +147,14 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
             const next = mergeChecked(storeRef.current, checked);
             storeRef.current = next;
             onStoreChange(next);
+            noteRun();
           },
         },
       );
     } catch (err) {
       if (!controller.signal.aborted) setRunError(err instanceof Error ? err.message : String(err));
     } finally {
+      noteRun();
       abortRef.current = null;
       setProgress(null);
     }
@@ -161,7 +191,7 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
       const result = await requestAIFix(
         finding,
         { story: { beats: story.getAllBeats().map((b: any) => b.toJSON()), variables: settings.variables, roles: settings.roles, characters } as any, schema: validator.getSchema() },
-        (sys, user, signal) => getAIService().completeTurn(sys, user, { maxTokens: 4000, signal }),
+        (sys, user, signal) => getAIService().completeTurn(sys, user, { maxTokens: 4000, signal, route: STORY_LOGIC_FIX_ROUTE }),
         controller.signal,
       );
       if (controller.signal.aborted) return;
@@ -170,6 +200,8 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
       else setFix(f.key, { status: 'ready', suggestion: result.suggestion });
     } catch (err) {
       if (!controller.signal.aborted) setFix(f.key, { status: 'error', error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      recordSpend(fixMeter.current());
     }
   };
 
@@ -198,8 +230,14 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
 
   const sizeLabel = (list: StoryLogicCandidate[]) => {
     const e = estimateRun(list, digest.length);
-    const k = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
-    return `≈ ${k(e.inputTokens)} tokens in, up to ${k(e.maxOutputTokens)} out, ${e.batches} ${e.batches === 1 ? 'request' : 'requests'}`;
+    const requests = `${e.batches} ${e.batches === 1 ? 'request' : 'requests'}`;
+    const price = priceOf(getAIService().getCurrentModel());
+    if (!price) return `≈ ${formatTokens(e.inputTokens)} tokens in, up to ${formatTokens(e.maxOutputTokens)} out, ${requests}`;
+    const last = store?.lastRun;
+    const cost = estimateRunCost(e, price, last?.calls ? last.outputTokens / last.calls : undefined);
+    return cost.likely === null
+      ? `at most ${formatUsd(cost.atMost)}, ${requests}`
+      : `≈ ${formatUsd(cost.likely)} going by the last check, at most ${formatUsd(cost.atMost)}, ${requests}`;
   };
   const totalBeats = beats.length;
 
@@ -245,6 +283,14 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
 
       {runError && <p className="mt-2 text-sm text-red-700" data-testid="story-logic-error">The check stopped: {runError}. What was checked so far is kept; run it again to go on.</p>}
       {droppedCount > 0 && <p className="mt-2 text-xs text-gray-500">{droppedCount} {droppedCount === 1 ? 'finding was' : 'findings were'} left out: not grounded in the beat's words or states.</p>}
+
+      {store?.lastRun && store.lastRun.calls > 0 && (
+        <p className="mt-2 text-xs text-gray-500" data-testid="story-logic-spend">
+          Last check: {describeSpend(store.lastRun)}.
+          {store.spent && store.spent.calls > store.lastRun.calls && <> All checks and fixes on this story: {describeSpend(store.spent)}.</>}
+          {' '}At standard API prices; your provider's bill is the final word.
+        </p>
+      )}
 
       <div className="mt-3 space-y-2">
         {findings.map((f) => {

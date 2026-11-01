@@ -12,6 +12,7 @@
  *   - the proxy transport's { baseUrl, apiKey, ...body } wire contract
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { recordAIUsage, resetAIUsage, getAIUsageSummary } from '../../src/ai/aiUsage';
 import {
   createRuntimeAIService,
   createProxyTransport,
@@ -443,6 +444,15 @@ describe('AI usage accounting', () => {
     expect(rows.find((r) => r.route === 'story')).toMatchObject({ calls: 1, inputTokens: 983, outputTokens: 15601, cacheWriteTokens: 64675 });
     expect(rows.find((r) => r.route === 'runtime:content')).toMatchObject({ inputTokens: 200, cacheReadTokens: 100, outputTokens: 40 });
     expect((globalThis as any).__asapsAIUsageTotals.size).toBe(2);
+    resetAIUsage();
+  });
+});
+
+describe('recordAIUsage: cached input', () => {
+  it('takes cached tokens out of the Responses API input count', () => {
+    resetAIUsage();
+    recordAIUsage('r', 'm', { input_tokens: 100, output_tokens: 5, input_tokens_details: { cached_tokens: 60 } });
+    expect(getAIUsageSummary()[0]).toMatchObject({ inputTokens: 40, cacheReadTokens: 60, outputTokens: 5 });
     resetAIUsage();
   });
 });

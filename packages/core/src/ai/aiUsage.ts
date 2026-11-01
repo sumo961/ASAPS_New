@@ -24,15 +24,18 @@ const totals: Map<string, AIUsageTotals> =
  * Record one response's usage. Accepts the Anthropic shape (input_tokens,
  * output_tokens, cache_read_input_tokens, cache_creation_input_tokens) and
  * the OpenAI shape (prompt_tokens, completion_tokens,
- * prompt_tokens_details.cached_tokens). Missing usage is a no-op.
+ * prompt_tokens_details.cached_tokens), and the Responses shape
+ * (input_tokens_details.cached_tokens). Missing usage is a no-op.
  */
 export function recordAIUsage(route: string, model: string, usage: any): void {
   if (!usage || typeof usage !== 'object') return;
   const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
   const cachedOpenAI = n(usage.prompt_tokens_details?.cached_tokens);
-  const input = usage.input_tokens !== undefined ? n(usage.input_tokens) : n(usage.prompt_tokens) - cachedOpenAI;
+  // The Responses API counts cached tokens inside input_tokens; Anthropic doesn't.
+  const cachedResponses = n(usage.input_tokens_details?.cached_tokens);
+  const input = usage.input_tokens !== undefined ? n(usage.input_tokens) - cachedResponses : n(usage.prompt_tokens) - cachedOpenAI;
   const output = usage.output_tokens !== undefined ? n(usage.output_tokens) : n(usage.completion_tokens);
-  const cacheRead = usage.cache_read_input_tokens !== undefined ? n(usage.cache_read_input_tokens) : cachedOpenAI;
+  const cacheRead = usage.cache_read_input_tokens !== undefined ? n(usage.cache_read_input_tokens) : cachedOpenAI + cachedResponses;
   const cacheWrite = n(usage.cache_creation_input_tokens);
 
   const key = `${route}|${model}`;
