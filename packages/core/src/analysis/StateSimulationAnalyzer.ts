@@ -245,6 +245,30 @@ function spreadSample<T>(items: T[], cap: number): T[] {
 // StateSimulationAnalyzer
 // ============================================================================
 
+/** One move on the way to a situation (exploreSituations). */
+export interface SituationStep {
+  beatId: string;
+  next?: string;
+  /** The link's label: a choice's words, 'true', a timer. */
+  label: string;
+  /** The replies said on the way through a Dialog Tree. */
+  replies: string[];
+}
+
+/** What exploreSituations found. */
+export interface SituationSearch {
+  /** Every situation was played: nothing else can be reached under these rules. */
+  complete: boolean;
+  situations: number;
+  perBeat: Map<string, number>;
+  endings: Set<string>;
+  stops: Set<string>;
+  traps: Set<string>;
+  routes: Map<string, number>;
+  /** One way to a beat. */
+  routeTo?: (beatId: string) => SituationStep[];
+}
+
 /** How far a running path analysis has got (analyzeAsync progress). */
 export interface SimulationProgress {
   /** Simulation steps taken so far. */
@@ -519,6 +543,114 @@ export class StateSimulationAnalyzer {
       step = run.next();
     }
     return this.buildResult(step.value, startTime);
+  }
+
+  /**
+   * EXPERIMENT, used by no tool yet: search situations instead of paths. A
+   * situation is a beat plus the state values gates still ahead of it read;
+   * each is played once, remembering one way of getting there. The work grows
+   * with how many situations exist, not with how many orders reach them, so
+   * the search can finish where exploring paths runs out of budget.
+   */
+  public exploreSituations(config: { maxSituations?: number } = {}): SituationSearch {
+    const startBeatId = this.story.getFirstBeatId();
+    const maxSituations = config.maxSituations ?? 500000;
+    const result: SituationSearch = {
+      complete: true, situations: 0, perBeat: new Map(), endings: new Set(), stops: new Set(), traps: new Set(), routes: new Map(),
+    };
+    if (!startBeatId) return result;
+    this.shownReplies = new Set();
+    const keyOf = this.stateThatDecidesGates(new Map(this.story.getAllBeats().map((b) => [b.id, 0])));
+    interface Item { beatId: string; state: SimulationState; parent: number; via: SituationStep | null }
+    const parents: Array<{ parent: number; step: SituationStep }> = [];
+    const seen = new Set<string>();
+    const queue: Item[] = [];
+    const fresh: Item[] = [];
+    let head = 0;
+    const push = (beatId: string, state: SimulationState, parent: number, via: SituationStep | null) => {
+      if (!this.getBeat(beatId) && parent >= 0) { result.stops.add(parents[parent].step.beatId); return; }
+      const key = `${beatId}|${keyOf(beatId, state)}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      // Beats nobody has played yet go first: reach before thoroughness.
+      if (!result.perBeat.has(beatId)) fresh.push({ beatId, state, parent, via });
+      else queue.push({ beatId, state, parent, via });
+    };
+    for (const state of this.initialStates()) push(startBeatId, cloneState(state), -1, null);
+    while (fresh.length > 0 || head < queue.length) {
+      if (result.situations >= maxSituations) { result.complete = false; break; }
+      let item = fresh.pop();
+      if (!item) {
+        item = queue[head];
+        queue[head] = undefined as unknown as Item; // What's played needn't stay in memory.
+        head++;
+      }
+      const beat = this.getBeat(item.beatId);
+      if (!beat) continue;
+      result.situations++;
+      result.perBeat.set(beat.id, (result.perBeat.get(beat.id) ?? 0) + 1);
+      const redirect = this.requirementRedirect(beat, item.state);
+      if (redirect) { push(redirect, item.state, item.parent, item.via); continue; }
+      const me = parents.length;
+      parents.push({ parent: item.parent, step: { beatId: beat.id, label: '', replies: [] } });
+      if (!result.routes.has(beat.id)) result.routes.set(beat.id, me);
+      const state = this.applyBeatEffects(beat, item.state);
+      const on = (conn: Connection | null, target: string, next: SimulationState) => {
+        const step: SituationStep = {
+          beatId: beat.id, next: target, label: conn?.label ?? '',
+          replies: ((conn as any)?.route ?? []).filter((st: any) => st.choice).map((st: any) => String(st.choice.text ?? '')),
+        };
+        const at = parents.length;
+        parents.push({ parent: me, step });
+        push(target, next, at, step);
+      };
+      if (this.isTerminalBeat(beat)) {
+        if (['endScreen', 'aiSummary'].includes(beat.type)) {
+          result.endings.add(beat.id);
+          if (beat.type === 'endScreen' && beat.getParameters().showRestart !== false) {
+            const after = this.stateAfterReplay(beat, state);
+            const link = this.linkWhenAllHidden(beat, after);
+            if (link) on(null, link, after);
+            else if (beat.getParameters().reset === true && hashState(after) !== hashState(this.seededInitialState())) on(null, startBeatId, after);
+          }
+        } else if (this.loopsOnItself(beat)) result.traps.add(beat.id);
+        else result.stops.add(beat.id);
+        continue;
+      }
+      const connections = this.getConnections(beat);
+      if (connections.length === 0) { result.stops.add(beat.id); continue; }
+      if (beat.type === 'conditionBeat') {
+        const yes = this.conditionBeatResult(beat, state);
+        const taken = (yes
+          ? connections.find((c) => c.label?.toLowerCase() === 'true' || c.label?.toLowerCase() === 'yes')
+          : connections.find((c) => c.label?.toLowerCase() === 'false' || c.label?.toLowerCase() === 'no')) ?? connections[0];
+        on(taken, taken.targetId, this.followLink(taken, state, []  as SimulatedStep[]));
+      } else if (this.isChoiceBeat(beat) || this.hasTimedExit(beat)) {
+        const offered = connections.filter((c) => this.choiceOffered(beat, c, state));
+        if (offered.length === 0) {
+          const link = this.linkWhenAllHidden(beat, state);
+          if (link) on(null, link, state); else result.stops.add(beat.id);
+          continue;
+        }
+        connections.forEach((conn, i) => {
+          if (!offered.includes(conn) || this.isNeverDrawn(beat, conn)) return;
+          const next = this.applyChoiceEffects(beat, cloneState(state), i, conn);
+          this.applyEffectsList(conn.effects, next);
+          on(conn, conn.targetId, next);
+        });
+      } else {
+        const only = connections[0];
+        const next = cloneState(state);
+        this.applyEffectsList(only.effects, next);
+        on(only, only.targetId, next);
+      }
+    }
+    result.routeTo = (beatId: string) => {
+      const steps: SituationStep[] = [];
+      for (let at = result.routes.get(beatId) ?? -1; at >= 0; at = parents[at].parent) if (parents[at].step.next) steps.unshift(parents[at].step);
+      return steps;
+    };
+    return result;
   }
 
   /** analyzeRaw without freezing the UI: same slices and progress as analyzeAsync. */

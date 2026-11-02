@@ -682,3 +682,31 @@ describe('a running total past its last threshold', () => {
     expect(story(true).some((p) => p.outcome.beatId === 'end')).toBe(true);
   });
 });
+
+describe('searching situations (experiment)', () => {
+  const build = () => {
+    const st = new Story({ title: 'T', author: 'T', firstBeatId: 'hub' });
+    st.addBeat(createTestBeat({ id: 'hub', name: 'hub', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'Again', target: 'hub', effects: [{ type: 'incrementCounter', target: 'laps', value: 1 }] },
+      { id: 'b', text: 'Leave', target: 'end', conditions: [{ type: 'counter', variableName: 'laps', operator: '>=', value: 3 }] },
+      { id: 'c', text: 'Stop', target: 'stop' },
+    ] } } as any));
+    st.addBeat(createTestBeat({ id: 'end', name: 'end', type: 'endScreen', parameters: { message: 'e', showRestart: false } } as any));
+    st.addBeat(createTestBeat({ id: 'stop', name: 'stop', type: 'infoText', parameters: { text: 't' } } as any));
+    st.addBeat(createTestBeat({ id: 'lost', name: 'lost', type: 'infoText', parameters: { text: 't' } } as any));
+    return st;
+  };
+
+  it('finishes on a loop, finds what a gate opens, and remembers one way there', () => {
+    const r = new StateSimulationAnalyzer(build()).exploreSituations();
+    expect(r.complete).toBe(true);
+    expect([...r.perBeat.keys()].sort()).toEqual(['end', 'hub', 'stop']);
+    expect([...r.endings]).toEqual(['end']);
+    expect([...r.stops]).toEqual(['stop']);
+    expect(r.routeTo!('end').map((step) => step.label)).toEqual(['Again', 'Again', 'Again', 'Leave']);
+  });
+
+  it('says when it stopped at its cap', () => {
+    expect(new StateSimulationAnalyzer(build()).exploreSituations({ maxSituations: 1 }).complete).toBe(false);
+  });
+});
