@@ -238,3 +238,29 @@ describe('generated stories spell names as declared', () => {
     expect(out.beats[3].parameters.choices[0].effects[0].target).toBe('savedScreenshots');
   });
 });
+
+describe('a reply only some states show, in a story too large to explore fully', () => {
+  it('the search goes looking for a state that shows it', () => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'flag' });
+    const add = (b: any) => story.addBeat(createTestBeat(b));
+    // Nearly every way sets the flag; the state without it is rare in a large story.
+    add({ id: 'flag', name: 'flag', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'A', target: 'q0', effects: [{ type: 'setVariable', target: 'seen', value: true }] },
+      { id: 'b', text: 'B', target: 'q0' },
+    ] } });
+    for (let i = 0; i < 12; i++) {
+      add({ id: `q${i}`, name: `q${i}`, type: 'multiChoice', parameters: { question: 'q', choices: ['x', 'y', 'z'].map((id) => ({
+        id, text: id, target: i === 11 ? 'scene' : `q${i + 1}`, effects: [{ type: 'incrementCounter', target: id, value: 1 }],
+      })) } });
+    }
+    add({ id: 'scene', name: 'scene', type: 'dialogTree', parameters: { dialogTree: { id: 'r', speaker: 'N', text: 't', choices: [
+      { id: 'hidden', text: 'so?', target: 'end' },
+      { id: 'n', text: '', continue: true, conditions: [{ type: 'variable', variableName: 'seen', operator: '==', value: true }], target: 'end' },
+    ] } } });
+    add({ id: 'end', name: 'end', type: 'endScreen', parameters: { message: 'e', showRestart: false } });
+    const a = new StateSimulationAnalyzer(story, { maxPaths: 40, maxDepth: 40, maxExpansions: 300, maxFrontier: 20, maxCoveragePaths: 200, maxCoverageExpansions: 5000 } as any);
+    const paths = a.analyzeRaw();
+    expect(a.shownReplies.has('scene|hidden')).toBe(true);
+    expect(detectStoryWarnings({ paths, story, shownReplies: a.shownReplies }).filter((w) => w.code === 'reply-hidden-by-next-line')).toEqual([]);
+  });
+});

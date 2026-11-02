@@ -866,7 +866,7 @@ export class StateSimulationAnalyzer {
       if (coverage) {
         // Finish paths carrying something uncovered, then go to whichever
         // waiting branch is nearest to a beat still uncovered.
-        if (covered.size + stopsFound.size !== distanceFor) {
+        if (covered.size + stopsFound.size + this.shownReplies.size !== distanceFor) {
           // What decides the gates on the way to the beats uncovered when the
           // pass starts. A running score nothing there asks about multiplies
           // the states without opening anything: the budget went on those and
@@ -875,7 +875,7 @@ export class StateSimulationAnalyzer {
             distance = this.distanceToUncovered(covered, stopsFound);
             relevant = this.stateThatDecidesGates(distance);
           }
-          distanceFor = covered.size + stopsFound.size;
+          distanceFor = covered.size + stopsFound.size + this.shownReplies.size;
           distance = this.distanceToUncovered(covered, stopsFound);
           stack.push(...buckets.flat());
           buckets = [];
@@ -1229,7 +1229,26 @@ export class StateSimulationAnalyzer {
       const links = this.getConnections(b) as any[];
       return links.length > 1 && links.some((c) => c.sceneEnds && !stopsFound.has(`${b.id}|${c.label || c.targetId}`));
     };
-    let level = beats.filter((b) => !covered.has(b.id) || stopToFind(b)).map((b) => b.id);
+    // And a reply beside gated next lines that nothing has shown yet: it shows
+    // only in some states, and the search should try to find one.
+    const replyToFind = (b: Beat) => {
+      if (b.type !== 'dialogTree' || !covered.has(b.id)) return false;
+      let waiting = false;
+      const seen = new Set<any>();
+      const walk = (node: any): void => {
+        if (!node || seen.has(node) || waiting) return;
+        seen.add(node);
+        const choices: any[] = Array.isArray(node.choices) ? node.choices.filter(Boolean) : [];
+        const steps = choices.filter((c) => c.continue === true);
+        if (steps.length > 0 && steps.every((c) => Array.isArray(c.conditions) && c.conditions.length > 0)) {
+          if (choices.some((c) => !c.continue && String(c.text ?? '').trim() && !this.shownReplies.has(`${b.id}|${c.id}`))) waiting = true;
+        }
+        for (const c of choices) walk(c.dialogNode);
+      };
+      walk(b.getParameters().dialogTree);
+      return waiting;
+    };
+    let level = beats.filter((b) => !covered.has(b.id) || stopToFind(b) || replyToFind(b)).map((b) => b.id);
     level.forEach((id) => distance.set(id, 0));
     for (let d = 1; level.length > 0; d++) {
       const next: string[] = [];

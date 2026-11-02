@@ -42,6 +42,7 @@ Playing Birka V18 on the engine showed where Path Analysis disagreed, now fixed:
 - **Fewer cut-off paths:** a lap around a loop that changes nothing a gate ahead reads now ends as back at a menu instead of running to the depth limit.
 - **Fewer misspelled names:** typing a new name close to an existing one offers "Did you mean …?" in every name dropdown. Generated stories use the declared spelling when a name differs from it only in capitals.
 - **Check with AI keeps what it found:** two checks of the same words found different things (39 beats between them, 26 in common). A re-check now adds to the list. A finding only an earlier check saw is marked "From an earlier check" and stays until it's dismissed or the words it quotes leave the beat.
+- **Reply hidden by a next line is surer:** the search now looks for a state that shows such a reply, instead of hoping to meet one. On Birka V18 the doubtful warnings fell from 4 to 2.
 - **Large stories no longer depend on search order:** the coverage pass compares states only by what the gates still ahead of a beat read, returns to a menu for a choice leading to something uncovered, and gives every distance a turn, so beats that can never open can't starve storylines further off. Birka V18: 344 beats reached at a quarter of the budget, the base budget and four times it, including everything 1,500 engine games reached; about 12 seconds.
 
 **Files modified:** `analysis/StateSimulationAnalyzer.ts`, `analysis/StoryWarnings.ts`, `debug/storyWarningLabels.ts`, tests
