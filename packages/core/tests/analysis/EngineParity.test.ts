@@ -2,7 +2,9 @@
  * The simulator against the real engine: a scripted player plays each template
  * and fixture at random, and everything it meets must be what Path Analysis
  * says. Choices, dialog, items, variables, counters, roles and feelings go
- * through the engine's own code here, so a simulator that drifts fails this.
+ * through the engine's own code here, and timers really run out (the engine's
+ * own TimerManager, on a clock this test turns), so a simulator that drifts
+ * fails this.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -42,6 +44,21 @@ function buildStory(project: any): Story {
 
 const unanswered = new Set<string>();
 
+/** The clock: the intervals TimerManager has running, turned by hand. */
+const running = new Map<number, () => void>();
+let nextInterval = 1;
+let timersFired = 0;
+
+/** Sometimes the player just waits: every running timer ticks until it runs out. */
+function maybeLetTimersRunOut(random: () => number): boolean {
+  if (running.size === 0 || random() > 0.4) return false;
+  for (const [id, tick] of [...running]) {
+    for (let i = 0; i < 100000 && running.has(id); i++) tick();
+    timersFired++;
+  }
+  return true;
+}
+
 interface Game { seq: string[]; end: 'ending' | 'stop' | 'stuck' | 'crash'; }
 
 async function play(project: any, random: () => number): Promise<Game> {
@@ -62,6 +79,8 @@ async function play(project: any, random: () => number): Promise<Game> {
   }
   const choose = async (choices: any[]) => {
     if (++same > 60) { stopWith('stuck'); return new Promise(() => {}); }
+    // Waiting: as the renderer does when a timer interrupts a question.
+    if (maybeLetTimersRunOut(random)) return '__timer_interrupt__';
     return choices[Math.floor(random() * choices.length)].id;
   };
   const impl: any = {
@@ -81,11 +100,13 @@ async function play(project: any, random: () => number): Promise<Game> {
     if (/^(render|show|play|wait|present)/.test(p)) {
       return async () => {
         if (++calls > 3000) { unanswered.add(`${cur}:${p}`); stopWith('stuck'); await new Promise(() => {}); }
+        maybeLetTimersRunOut(random);
         return undefined;
       };
     }
     return () => undefined;
   } });
+  running.clear();
   const engine: any = new StoryEngine(renderer as any, { mockMode: true });
   await engine.loadStory(story);
   const done = engine.start().then(() => 'stop' as const, () => 'crash' as const);
@@ -96,21 +117,26 @@ async function play(project: any, random: () => number): Promise<Game> {
 
 describe('the simulator matches the engine', () => {
   const realTimeout = globalThis.setTimeout;
+  let realConsole: Pick<Console, 'log' | 'warn' | 'error'>;
   beforeEach(() => {
-    vi.stubGlobal('window', { setInterval: vi.fn().mockReturnValue(1), clearInterval: vi.fn() });
+    running.clear();
+    vi.stubGlobal('window', {
+      setInterval: (fn: () => void) => { const id = nextInterval++; running.set(id, fn); return id; },
+      clearInterval: (id: number) => { running.delete(id); },
+    });
     (globalThis as any).setTimeout = (f: any, _ms?: number, ...a: any[]) => setImmediate(f, ...a);
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Not spies: they would keep every line the engine logs, and that adds up.
+    realConsole = { log: console.log, warn: console.warn, error: console.error };
+    console.log = console.warn = console.error = () => {};
   });
   afterEach(() => {
     (globalThis as any).setTimeout = realTimeout;
-    vi.restoreAllMocks();
+    Object.assign(console, realConsole);
     vi.unstubAllGlobals();
   });
 
   it.each(sources())('%s', async (_name, project) => {
-    const paths = new StateSimulationAnalyzer(buildStory(project), { maxDepth: 300 }).analyzeRaw();
+    const paths = new StateSimulationAnalyzer(buildStory(project), { maxDepth: Math.max(300, (project.story ?? project).beats.length * 2) }).analyzeRaw();
     const played = new Set(paths.flatMap((p) => p.steps.map((s) => s.beatId)));
     const stopsAt = (type: string[]) => new Set(paths.filter((p) => type.includes(p.outcome.type)).map((p) => p.outcome.beatId));
     const endings = stopsAt(['ending']);
@@ -127,4 +153,21 @@ describe('the simulator matches the engine', () => {
     }
     expect([...problems, ...unanswered]).toEqual([]);
   }, 180000);
+
+  it('lets a timer run out, and the simulator knows both ways on', async () => {
+    const project = { story: { metadata: { firstBeatId: 'dodge' }, beats: [
+      { id: 'dodge', name: 'Dodge', type: 'infoText', parameters: { text: 'Quick!' }, connections: [{ targetId: 'safe' }], defaultTarget: 'hit', defaultTargetDelay: 3 },
+      { id: 'safe', name: 'Safe', type: 'endScreen', parameters: { message: 's' } },
+      { id: 'hit', name: 'Hit', type: 'endScreen', parameters: { message: 'h' } },
+    ] } };
+    let seed = 7;
+    const random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+    const reached = new Set<string>();
+    timersFired = 0;
+    for (let g = 0; g < 40; g++) (await play(project, random)).seq.forEach((id) => reached.add(id));
+    expect(timersFired).toBeGreaterThan(0);
+    expect(reached).toEqual(new Set(['dodge', 'safe', 'hit']));
+    const simulated = new StateSimulationAnalyzer(buildStory(project), { maxDepth: 10 }).analyzeRaw();
+    expect(simulated.map((p) => p.outcome.beatId).sort()).toEqual(['hit', 'safe']);
+  });
 });
