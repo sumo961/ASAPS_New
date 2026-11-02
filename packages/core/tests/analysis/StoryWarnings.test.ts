@@ -130,3 +130,24 @@ describe('StoryWarnings', () => {
     expect(warnings.some(w => w.code === 'requires-unfulfillable')).toBe(false);
   });
 });
+
+describe('a keypad on a menu with other ways on', () => {
+  const build = (leave: boolean) => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'menu' });
+    story.addBeat(createTestBeat({ id: 'menu', name: 'Menu', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'Folder', target: 'pad' },
+      ...(leave ? [{ id: 'b', text: 'Leave', target: 'end' }] : []),
+    ] } } as any));
+    story.addBeat(createTestBeat({ id: 'pad', name: 'Pad', type: 'keypad', parameters: { prompt: 'p', correctCode: '1', maxAttempts: 2, failTarget: 'menu' }, connections: [{ targetId: 'end' }] } as any));
+    story.addBeat(createTestBeat({ id: 'end', name: 'End', type: 'endScreen', parameters: { message: 'e' } } as any));
+    return detectStoryWarnings({ paths: [], story }).map((w) => w.code);
+  };
+
+  it('is no trap when the player can leave another way', () => {
+    expect(build(true)).not.toContain('keypad-softlock-loop');
+  });
+
+  it('is a trap when the only way out is the code', () => {
+    expect(build(false)).toContain('keypad-softlock-loop');
+  });
+});

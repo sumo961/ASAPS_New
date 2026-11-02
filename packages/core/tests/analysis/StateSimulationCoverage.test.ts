@@ -646,3 +646,16 @@ describe('a loop that keeps a running total', () => {
     expect(types(story(true))).toContain('ending');
   });
 });
+
+describe('a branch a Condition Check never takes', () => {
+  it('says what the check asks', () => {
+    const st = new Story({ title: 'T', author: 'T', firstBeatId: 'gate' });
+    st.addBeat(createTestBeat({ id: 'gate', name: 'BrokeCheck', type: 'conditionBeat', parameters: { conditionType: 'counter', variableName: 'Money', operator: '<=', value: 0, trueTarget: 'dead', falseTarget: 'on' } } as any));
+    for (const id of ['dead', 'on']) st.addBeat(createTestBeat({ id, name: id, type: 'endScreen', parameters: { message: id, showRestart: false } } as any));
+    const paths = new StateSimulationAnalyzer(st, { maxPaths: 10, maxDepth: 5 }).analyzeRaw();
+    const played = new Set(paths.flatMap((p) => p.steps.map((x) => x.beatId)));
+    const on = new ReachabilityAnalyzer(st, { playedBeats: played }).analyze().unreachableBeats.find((u) => u.beatId === 'on');
+    expect(on?.reason).toBe('neverOffered');
+    expect(on?.details).toContain('Money <= 0');
+  });
+});

@@ -786,8 +786,12 @@ export class ReachabilityAnalyzer {
         if (this.config.playedBeats && reachedParents.length > 0) {
           const names = [...new Set(reachedParents.map((i) => `"${i.sourceBeatName}"`))].join(', ');
           reason = 'neverOffered';
+          const checker = reachedParents.map((i) => this.story.getBeat(i.sourceBeatId)).find((b) => b?.type === 'conditionBeat');
+          const asked = checker ? (checker.getParameters() as any).condition : null;
           const gates = [...new Set(reachedParents.flatMap((i) => conditionsIn(i.connection.condition).map((c) => describeGate(c, (id) => this.story.getBeat(id)?.name ?? id))))];
-          details = gates.length > 0
+          details = asked
+            ? `"${checker!.name}" checks ${describeGate(asked, (id) => this.story.getBeat(id)?.name ?? id)}, and on every way of playing the answer sends players the other way, so this branch never runs`
+            : gates.length > 0
             ? `${names} links here, but it needs ${gates.join(' and ')}, and no way of playing has that there`
             : `${names} links here, but no way of playing takes that link: the choice or line leading here is never on offer`;
         } else if (hasImpossibleCondition) {

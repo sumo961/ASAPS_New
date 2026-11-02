@@ -57,6 +57,27 @@ const LOGIC_LABEL: Record<string, string> = {
   dialog_line_without_exit: 'Line without exit',
 };
 
+/** Lines under a reply no playthrough had on screen, as `beatId|text`. */
+function linesUnderHiddenReplies(story: Story, shown: ReadonlySet<string>, played: ReadonlySet<string>): Set<string> {
+  const out = new Set<string>();
+  const under = (beatId: string, node: any): void => {
+    if (!node) return;
+    out.add(`${beatId}|${node.text}`);
+    for (const c of node.choices ?? []) under(beatId, c?.dialogNode);
+  };
+  for (const beat of story.getAllBeats()) {
+    if (beat.type !== 'dialogTree' || !played.has(beat.id)) continue;
+    const walk = (node: any): void => {
+      for (const c of node?.choices ?? []) {
+        if (c && !c.continue && String(c.text ?? '').trim() && c.dialogNode && !shown.has(`${beat.id}|${c.id}`)) under(beat.id, c.dialogNode);
+        else walk(c?.dialogNode);
+      }
+    };
+    walk((beat.getParameters() as any).dialogTree);
+  }
+  return out;
+}
+
 const RANK: Record<ProblemSeverity, number> = { error: 0, warning: 1, note: 2 };
 
 /**
@@ -77,12 +98,15 @@ export function collectProblems(story: Story, simulation: StorySimulation): Prob
 
   const { analyzer, paths, playedBeats } = simulation;
   for (const w of detectStoryWarnings({ paths, story, shownReplies: analyzer.shownReplies, searchLimited: analyzer.searchLimited })) {
-    add(w.severity === 'error' ? 'error' : 'warning', storyWarningLabel(w.code), w.beatId, w.message);
+    // A cast that doesn't take leaves the player playing on: worth checking, not a stop.
+    add(w.severity === 'error' && w.code !== 'role' ? 'error' : 'warning', storyWarningLabel(w.code), w.beatId, w.message);
   }
 
   const logic = storyLogicValidation(story, simulation);
   for (const issue of logic.issues) {
-    add(issue.type === 'error' ? 'error' : issue.type === 'warning' ? 'warning' : 'note',
+    // A line under a reply no way of playing shows is said by the hidden reply.
+    if (issue.category === 'dialog_line_without_exit' && linesUnderHiddenReplies(story, analyzer.shownReplies, playedBeats).has(`${issue.beatId}|${issue.problematicText}`)) continue;
+    add(issue.type === 'error' ? 'error' : issue.type === 'warning' && issue.category !== 'undescribed_item' ? 'warning' : 'note',
       LOGIC_LABEL[issue.category] ?? 'Story logic', issue.beatId, issue.message);
   }
 
@@ -126,6 +150,21 @@ export function collectProblems(story: Story, simulation: StorySimulation): Prob
     const behind = countBehind(u.beatId);
     const severity: ProblemSeverity = u.reason === 'orphaned' && behind === 0 && story.getBeat(u.beatId)?.type !== 'endScreen' ? 'note' : 'warning';
     add(severity, u.reason === 'orphaned' ? 'Nothing links here' : 'Never on offer', u.beatId, u.details, behind);
+  }
+
+  // Told once: an unlinked setup beat is both, and what's behind it belongs to the setup.
+  for (const p of [...out.values()]) {
+    if (p.label !== storyWarningLabel('setup-unreached')) continue;
+    const unlinked = out.get(`Nothing links here|${p.beatId}`);
+    if (unlinked) { p.behindIt = Math.max(p.behindIt, unlinked.behindIt); out.delete(unlinked.id); }
+  }
+  // A fault on a beat nobody reaches can wait: no player meets it until the
+  // beat is linked in. What says why it's unreached keeps its place.
+  const aboutBeingUnreached = new Set(['Nothing links here', 'Never on offer', storyWarningLabel('setup-unreached')]);
+  for (const p of out.values()) {
+    if (playedBeats.has(p.beatId) || aboutBeingUnreached.has(p.label)) continue;
+    p.severity = 'note';
+    p.message = `${p.message} (No way of playing reaches this beat yet.)`;
   }
 
   return [...out.values()].sort((a, b) =>

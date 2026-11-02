@@ -353,6 +353,20 @@ function detectDialogShape(beat: Beat, shownReplies?: ReadonlySet<string>, playe
 // Keypad detection
 // ============================================================================
 
+/** From `start`, can a player reach an ending or a stop without passing `avoid`? */
+function canLeaveWithout(start: string, avoid: string, story: Story): boolean {
+  const seen = new Set<string>([avoid, start]);
+  const todo = [start];
+  while (todo.length > 0) {
+    const beat = story.getBeat(todo.pop()!);
+    if (!beat) continue;
+    const links = analysisLinks(beat);
+    if (beat.type === 'endScreen' || beat.type === 'aiSummary' || links.length === 0) return true;
+    for (const c of links) if (!seen.has(c.targetId)) { seen.add(c.targetId); todo.push(c.targetId); }
+  }
+  return false;
+}
+
 function detectKeypadWarnings(
   keypad: Beat,
   story: Story,
@@ -379,7 +393,9 @@ function detectKeypadWarnings(
   // or a declared `requires`).
   if (failTarget && !isProperlyGated) {
     const loops = traceReachesSelf(failTarget, keypad.id, story, new Set(), 0);
-    if (loops.cycles) {
+    // Coming back round is only a trap if nothing else leads out: a wrong code
+    // that returns to a menu with other ways on leaves the keypad optional.
+    if (loops.cycles && !canLeaveWithout(failTarget, keypad.id, story)) {
       if (maxAttempts > 0) {
         out.push({
           code: 'keypad-softlock-loop',
