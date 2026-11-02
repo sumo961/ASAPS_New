@@ -25,6 +25,7 @@ export type StoryWarningCode =
   | 'counter-text'                    // a counter checked against, or set to, text
   | 'wordless-reply'                  // a Dialog Tree reply button with no words
   | 'line-never-plays'                // a next line behind one that always plays
+  | 'reply-nowhere'                   // a reply with no next line and no exit: picking it ends the scene
   | 'role';                           // cast roles: unknown role, non-candidate cast, recast, used before cast, bare AI partner
 
 export interface StoryWarning {
@@ -144,6 +145,16 @@ function detectDialogShape(beat: Beat): StoryWarning[] {
         message: `After the line "${preview(node)}", ${wordless.length === 1 ? 'a reply has' : `${wordless.length} replies have`} no words, so players see a blank button. Give ${wordless.length === 1 ? 'it' : 'them'} words, or make ${wordless.length === 1 ? 'it a next line' : 'them next lines'} ("Then another character speaks").`,
         detail: { nodeId: node.id, count: wordless.length },
       });
+    }
+    for (const c of choices) {
+      if (!c.continue && String(c.text ?? '').trim() && !c.target && !c.dialogNode) {
+        const onward = (beat as any).connections?.length > 0 || beat.defaultTarget;
+        out.push({
+          code: 'reply-nowhere', severity: onward ? 'warn' : 'error', beatId: beat.id, beatName: beat.name,
+          message: `The reply "${String(c.text).trim().slice(0, 50)}" has no next line and no exit, so picking it ends the scene${onward ? '' : ' and the story stops there'}. Give it an exit or a next line.`,
+          detail: { nodeId: node.id, choiceId: c.id },
+        });
+      }
     }
     const steps = choices.filter((c) => c.continue === true);
     const firstAlways = steps.findIndex((c) => !(Array.isArray(c.conditions) && c.conditions.length > 0));

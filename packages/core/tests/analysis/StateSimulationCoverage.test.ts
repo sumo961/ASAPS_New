@@ -324,3 +324,63 @@ describe('long scenes and large stories', () => {
     expect(analyzer.truncated).toBe(false);
   });
 });
+
+describe('Dialog Tree routes follow the runtime', () => {
+  const run = (dialogTree: any) => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'd' });
+    story.addBeat(createTestBeat({ id: 'd', name: 'D', type: 'dialogTree', parameters: { dialogTree } } as any));
+    for (const id of ['a', 'b']) story.addBeat(createTestBeat({ id, name: id, type: 'endScreen', parameters: { text: id } } as any));
+    return new StateSimulationAnalyzer(story, { maxPaths: 50, maxDepth: 10 }).analyzeRaw();
+  };
+  const ends = (paths: any[]) => paths.map((p) => `${p.outcome.beatId}:${p.outcome.type}`).sort();
+
+  it('a reply that goes nowhere stops the story', () => {
+    expect(ends(run({ id: 'r', speaker: 'N', text: 't', choices: [
+      { id: 'x', text: 'Nowhere' },
+      { id: 'y', text: 'On', target: 'a' },
+    ] }))).toEqual(['a:ending', 'd:deadEnd']);
+  });
+
+  it('a next line behind one that always plays never plays', () => {
+    expect(ends(run({ id: 'r', speaker: 'N', text: 't', choices: [
+      { id: 'x', text: '', continue: true, target: 'a' },
+      { id: 'y', text: '', continue: true, target: 'b' },
+    ] }))).toEqual(['a:ending']);
+  });
+
+  it('a first next line with no exit stops the story, whatever follows it', () => {
+    expect(ends(run({ id: 'r', speaker: 'N', text: 't', choices: [
+      { id: 'x', text: '', continue: true, dialogNode: { id: 'n', speaker: 'N', text: 'end', choices: [] } },
+      { id: 'y', text: '', continue: true, target: 'b' },
+      { id: 'z', text: 'Reply', target: 'b' },
+    ] }))).toEqual(['d:ending']);
+  });
+
+  it('a later next line plays only when the earlier one does not', () => {
+    const paths = run({ id: 'r', speaker: 'N', text: 't', choices: [
+      { id: 'x', text: '', continue: true, conditions: [{ type: 'visitedBeat', beatId: 'b' }], target: 'b' },
+      { id: 'y', text: '', continue: true, target: 'a' },
+    ] });
+    expect(ends(paths)).toEqual(['a:ending']);
+  });
+
+  it('every reply hidden stops the story; a line with an open reply does not', () => {
+    expect(ends(run({ id: 'r', speaker: 'N', text: 't', choices: [
+      { id: 'x', text: 'Gated', conditions: [{ type: 'visitedBeat', beatId: 'b' }], target: 'a' },
+    ] }))).toEqual(['d:deadEnd']);
+  });
+});
+
+describe('Every choice hidden', () => {
+  it('skips the beat by its own link, as the runtime does, without any choice effects', () => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'm' });
+    story.addBeat(createTestBeat({ id: 'm', name: 'M', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'x', text: 'Give', target: 'a', conditions: [{ type: 'inventory', item: 'Gold', operator: 'contains' }], effects: [{ type: 'setCounter', target: 'n', value: 1 }] },
+      { id: 'y', text: 'Keep', target: 'b', conditions: [{ type: 'inventory', item: 'Gold', operator: 'contains' }] },
+    ] }, connections: [{ targetId: 'a', label: 'Give' }, { targetId: 'b', label: 'Keep' }] } as any));
+    for (const id of ['a', 'b']) story.addBeat(createTestBeat({ id, name: id, type: 'endScreen', parameters: { text: id } } as any));
+    const paths = new StateSimulationAnalyzer(story, { maxPaths: 10, maxDepth: 5 }).analyzeRaw();
+    expect(paths.map((p) => p.outcome.beatId)).toEqual(['a']);
+    expect(paths[0].finalState.counters.get('n')).toBeUndefined();
+  });
+});

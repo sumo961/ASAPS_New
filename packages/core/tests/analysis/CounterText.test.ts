@@ -96,6 +96,16 @@ describe('Story Warnings', () => {
     expect(dead[0].message).toContain('Dead');
   });
 
+  it('names a reply that goes nowhere, and only that one', () => {
+    const found = warningsFor([{ id: 'd', name: 'D', type: 'dialogTree', parameters: { dialogTree: {
+      id: 'root', speaker: 'N', text: 'First', choices: [
+        { id: 'a', text: 'Nowhere' }, { id: 'b', text: 'On', target: 'd' },
+      ] } } }]).filter((w) => w.code === 'reply-nowhere');
+    expect(found).toHaveLength(1);
+    expect(found[0].severity).toBe('error');
+    expect(found[0].message).toContain('Nowhere');
+  });
+
   it('a conditional next line before a fallback is fine', () => {
     const found = warningsFor([{ id: 'd', name: 'D', type: 'dialogTree', parameters: { dialogTree: {
       id: 'root', speaker: 'N', text: 'First', choices: [

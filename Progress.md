@@ -16,6 +16,16 @@ Story Logic Phase 1: **Check with AI** in the Debug window reads each beat next 
 
 **Files modified:** `engine/variableValues.ts`, `engine/StoryContext.ts`, `analysis/StateSimulationAnalyzer.ts`, `analysis/ReachabilityAnalyzer.ts`, `analysis/StoryWarnings.ts`, `normalize/normalizeStory.ts`, `Inspector.tsx`, `SchemaFormGenerator.tsx`, `ChoiceConditionsEditor.tsx`, `RequirementsEditor.tsx`, `counterRangeAnalysis.ts`, prompts, `core-beats.json`, `tests/analysis/CounterText.test.ts`
 
+### Simulator checked against real play
+Playing Birka V18 on the engine showed where Path Analysis disagreed, now fixed:
+- A next line behind one that always plays no longer counts as a route; a later next line plays only when the earlier ones don't, and replies aren't offered while a next line plays.
+- A reply with no next line and no exit, a line with no way on and a line whose replies can all be hidden now show as places the scene ends, even when the beat has other exits.
+- A Multi Choice (or similar) with every choice hidden follows the beat's own link, as the engine does, instead of reporting a dead end. A link to a missing beat now shows as a stop.
+- Story Warnings: new **Reply goes nowhere**.
+- **Still open:** on a story of this size the simulator can miss a deep route within its budget (11 beats of Birka's "alone" storyline in one run), and which ones varies with the order it explores.
+
+**Files modified:** `analysis/StateSimulationAnalyzer.ts`, `analysis/StoryWarnings.ts`, `debug/storyWarningLabels.ts`, tests
+
 ### Projects open where you left them
 - A project opens in the editor and on the beat it was left with (Flowchart, Visual Editor, Script, Knowledge Graph). A project never opened on this machine opens on the full flowchart. If the beat is gone, or can't be edited visually, it opens on the flowchart.
 - This also fixes opening onto a blank "No Beat Selected" page: the editor tab was remembered across all projects, while the selected beat was not. Kept per project in localStorage (`utils/projectUiState.ts`), never in the project file.

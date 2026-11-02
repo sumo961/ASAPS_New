@@ -183,6 +183,9 @@ function removeItem(state: SimulationState, bag: string, item: string, quantity:
   else (state.itemCounts ??= new Map()).set(`${bag}\u0001${item}`, left);
 }
 
+/** Target of a route that ends the story: no beat has this id. */
+const STORY_STOPS = '__story_stops__';
+
 /**
  * Create a hash of the simulation state for cycle detection
  * Only includes variables/counters/inventory, not visitedBeats (which changes every step)
@@ -766,7 +769,10 @@ export class StateSimulationAnalyzer {
       // Get current beat
       const beat = this.getBeat(frame.beatId);
       if (!beat) {
-        continue; // Invalid beat, skip this branch
+        // The player stops here: a scene that ends with nowhere to go, or a
+        // link to a beat that doesn't exist (the runtime stops with an error).
+        if (frame.path.length > 0) paths.push(this.buildPath(frame.path, frame.decisions, frame.state, 'deadEnd'));
+        continue;
       }
       seenBeats.add(beat.id);
 
@@ -868,7 +874,12 @@ export class StateSimulationAnalyzer {
           if (this.choiceOffered(beat, connections[i], newState)) offered.push(i);
         }
         if (offered.length === 0) {
-          paths.push(this.buildPath(newPath, frame.decisions, newState, 'deadEnd'));
+          const on = this.linkWhenAllHidden(beat, newState);
+          if (on) {
+            enqueue({ beatId: on, state: newState, path: newPath, decisions: frame.decisions, visitedStates: newVisitedStates, takenChoicesPerBeat: frame.takenChoicesPerBeat });
+          } else {
+            paths.push(this.buildPath(newPath, frame.decisions, newState, 'deadEnd'));
+          }
           continue;
         }
 
@@ -1001,7 +1012,12 @@ export class StateSimulationAnalyzer {
         let lone = newState;
         if (this.isChoiceBeat(beat)) {
           if (!this.choiceOffered(beat, connections[0], newState)) {
-            paths.push(this.buildPath(newPath, frame.decisions, newState, 'deadEnd'));
+            const on = this.linkWhenAllHidden(beat, newState);
+            if (on) {
+              enqueue({ beatId: on, state: newState, path: newPath, decisions: frame.decisions, visitedStates: newVisitedStates, takenChoicesPerBeat: frame.takenChoicesPerBeat });
+            } else {
+              paths.push(this.buildPath(newPath, frame.decisions, newState, 'deadEnd'));
+            }
             continue;
           }
           lone = this.applyChoiceEffects(beat, cloneState(newState), 0, connections[0]);
@@ -1093,7 +1109,9 @@ export class StateSimulationAnalyzer {
     // walk every analyzer shares. Requirement redirects are not a way on
     // here: they are taken before the beat shows (requirementRedirect).
     let connections = analysisLinks(beat).filter((c) => c.label !== EXTRA_LINK.requiresFallback);
-    const routes = beat.type === 'dialogTree' ? this.dialogRoutes(beat) : [];
+    const allRoutes = beat.type === 'dialogTree' ? this.dialogRoutes(beat) : [];
+    // A beat linked by hand with a tree that exits nowhere goes by its links.
+    const routes = allRoutes.every((c: any) => c.sceneEnds) && (beat as any).connections?.length > 0 ? [] : allRoutes;
     if (routes.length > 0) {
       // Each way through the tree is its own route: two replies whose lines
       // end at the same exit set different things (the beat's own list
@@ -1104,6 +1122,8 @@ export class StateSimulationAnalyzer {
       // of a reply that happens to share their target.
       const extras = connections.filter((c) => !own.has(`${c.targetId}\u0000${c.label ?? ''}`));
       connections = [...routes, ...extras.map((c) => ({ ...c, route: [] }) as Connection)];
+      // Nothing but stops: the beat has no way on at all.
+      if (connections.every((c: any) => c.sceneEnds && c.targetId === STORY_STOPS)) return [];
     } else if (beat.type === 'chooseCharacter') {
       // Every option casts someone, linked or not (ChooseCharacterBeat).
       const extras = connections.filter((c) => !beat.getConnections().some((o) => o.targetId === c.targetId && o.label === c.label));
@@ -1128,7 +1148,7 @@ export class StateSimulationAnalyzer {
     const conditional = (conn: Connection): boolean => {
       const own: any = conn.condition;
       if (Array.isArray(own) ? own.length > 0 : !!own) return true;
-      return ((conn as any).route ?? []).some((st: any) => Array.isArray(st?.choice?.conditions) && st.choice.conditions.length > 0);
+      return ((conn as any).route ?? []).some((st: any) => st?.unless || Array.isArray(st?.choice?.conditions) && st.choice.conditions.length > 0);
     };
     const alwaysTo = new Set(connections.filter((c) => !conditional(c)).map((c) => c.targetId));
     const seenTargets = new Set<string>();
@@ -1163,19 +1183,45 @@ export class StateSimulationAnalyzer {
         if (changes(route)) out.push({ targetId: beat.id, label, route } as any);
       } else out.push({ targetId: target, label, route } as any);
     };
+    // Where the story goes when the scene ends without an exit (the beat's own
+    // link); with none, a target no beat has: the player stops there.
+    const after = (beat as any).defaultTarget || (beat as any).connections?.[0]?.targetId || STORY_STOPS;
+    const stop = (label: string, route: Array<any>) => {
+      if (out.length < 200) { out.push({ targetId: after, label, route, sceneEnds: true } as any); }
+    };
     const onRoute = new Set<any>();
-    const walk = (node: any, route: Array<{ choice?: any; node?: any }>, depth: number): void => {
+    const conditionsOf = (c: any): any[] => (Array.isArray(c?.conditions) ? c.conditions.filter(Boolean) : []);
+    const walk = (node: any, route: Array<any>, depth: number): void => {
       // Any depth: a long scene nests a level per line, and missing its exit
       // made the whole beat look like an ending.
       if (!node || typeof node !== 'object' || onRoute.has(node) || out.length >= 200) return;
       onRoute.add(node);
       // A line with its own exit ends the conversation there (its replies are never shown).
       if (typeof node.target === 'string' && node.target) { exit(node.target, `[NPC exit] ${node.speaker || 'NPC'}`, route); return; }
-      for (const choice of Array.isArray(node.choices) ? node.choices : []) {
-        if (!choice) continue;
-        const taken = [...route, { choice }];
+      const all: any[] = (Array.isArray(node.choices) ? node.choices : []).filter((c: any) => c && c.visible !== false);
+      const follow = (choice: any, before: any[]) => {
+        const taken = [...before, { choice }];
         if (typeof choice.target === 'string' && choice.target) exit(choice.target, choice.text || 'Choice', taken);
         else if (choice.dialogNode) walk(choice.dialogNode, [...taken, { node: choice.dialogNode }], depth + 1);
+        else stop(choice.text || 'Choice', taken); // A reply that goes nowhere ends the scene.
+      };
+      // As the runtime: the first next line whose conditions hold plays, and
+      // while one does the replies aren't offered.
+      const shut: any[][] = [];
+      let always = false;
+      for (const step of all.filter((c) => c.continue === true)) {
+        follow(step, shut.length > 0 ? [...route, { unless: [...shut] }] : route);
+        const conds = conditionsOf(step);
+        if (conds.length === 0) { always = true; break; }
+        shut.push(conds);
+      }
+      if (!always) {
+        const replies = all.filter((c) => c.continue !== true);
+        const held = shut.length > 0 ? [...route, { unless: [...shut] }] : route;
+        for (const reply of replies) follow(reply, held);
+        // Every reply can be hidden, or there are none: the line ends the scene.
+        const open = replies.some((c) => conditionsOf(c).length === 0);
+        if (!open) stop(`[Scene ends] ${node.speaker || 'NPC'}`, [...route, { unless: [...shut, ...replies.map(conditionsOf)] }]);
       }
       onRoute.delete(node);
     };
@@ -1249,6 +1295,18 @@ export class StateSimulationAnalyzer {
   }
 
   /**
+   * Every choice hidden: the runtime skips the beat and follows its own link
+   * (Beat.getNextBeat), without applying any choice's effects. A Dialog Tree's
+   * routes already say where its scene ends.
+   */
+  private linkWhenAllHidden(beat: Beat, state: SimulationState): string | null {
+    if (beat.type === 'dialogTree') return null;
+    const links: Connection[] = (beat as any).connections ?? [];
+    const met = links.find((c) => c.condition && this.evaluateCondition(c.condition as any, state));
+    return met?.targetId ?? links.find((c) => !c.condition)?.targetId ?? beat.defaultTarget ?? null;
+  }
+
+  /**
    * Is this choice on screen in this state? Its conditions (one or a list)
    * must all hold, as the beats filter them. In a Dialog Tree that is every
    * reply on the way to the exit.
@@ -1262,6 +1320,10 @@ export class StateSimulationAnalyzer {
       const target = connection.targetId === beat.id ? '__self__' : connection.targetId;
       for (const step of (connection as any).route ?? this.dialogPathTo(tree, target, connection.label)) {
         if (Array.isArray(step.choice?.conditions)) conds.push(...step.choice.conditions);
+        // Closed while an earlier next line, or a reply, is on screen instead.
+        for (const list of step.unless ?? []) {
+          if (list.every((c: any) => !c || this.evaluateCondition(c, state))) return false;
+        }
       }
     }
     return conds.every((c) => !c || this.evaluateCondition(c, state));
