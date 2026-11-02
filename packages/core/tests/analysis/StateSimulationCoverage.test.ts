@@ -384,3 +384,44 @@ describe('Every choice hidden', () => {
     expect(paths[0].finalState.counters.get('n')).toBeUndefined();
   });
 });
+
+describe('finding gated routes in a large story', () => {
+  it('tries an early flag a late gate needs, past running scores that multiply the states', () => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'flag' });
+    const add = (b: any) => story.addBeat(createTestBeat(b));
+    // An early flag, then many questions that each move a score no gate reads.
+    add({ id: 'flag', name: 'flag', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'wake', target: 'q0', effects: [{ type: 'setVariable', target: 'wake', value: 1 }] },
+      { id: 'b', text: 'alone', target: 'q0', effects: [{ type: 'setVariable', target: 'alone', value: 1 }] },
+    ] } });
+    for (let i = 0; i < 14; i++) {
+      add({ id: `q${i}`, name: `q${i}`, type: 'multiChoice', parameters: { question: 'q', choices: [
+        { id: 'a', text: 'x', target: i === 13 ? 'gate' : `q${i + 1}`, effects: [{ type: 'incrementCounter', target: 'x', value: 1 }] },
+        { id: 'b', text: 'y', target: i === 13 ? 'gate' : `q${i + 1}`, effects: [{ type: 'incrementCounter', target: 'y', value: 1 }] },
+        { id: 'c', text: 'z', target: i === 13 ? 'gate' : `q${i + 1}`, effects: [{ type: 'incrementCounter', target: 'z', value: 1 }] },
+      ] } });
+    }
+    add({ id: 'gate', name: 'gate', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'w', target: 'e1', conditions: [{ type: 'variable', variableName: 'wake', operator: '==', value: '1' }] },
+      { id: 'b', text: 'l', target: 'e2', conditions: [{ type: 'variable', variableName: 'alone', operator: '==', value: '1' }] },
+    ] } });
+    for (const id of ['e1', 'e2']) add({ id, name: id, type: 'endScreen', parameters: { text: id } });
+    const paths = new StateSimulationAnalyzer(story, { maxPaths: 300, maxDepth: 40, maxExpansions: 2000, maxCoveragePaths: 300, maxCoverageExpansions: 3000 } as any).analyzeRaw();
+    const ends = new Set(paths.map((p) => p.outcome.beatId));
+    expect(ends.has('e1')).toBe(true);
+    expect(ends.has('e2')).toBe(true);
+  });
+
+  it('goes back to a menu for a choice leading to what is still uncovered', () => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'hub' });
+    const add = (b: any) => story.addBeat(createTestBeat(b));
+    add({ id: 'hub', name: 'hub', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'A', target: 'seen' },
+      { id: 'b', text: 'B', target: 'door', conditions: [{ type: 'visitedBeat', beatId: 'seen' }] },
+    ] } });
+    add({ id: 'seen', name: 'seen', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'hub' }] });
+    add({ id: 'door', name: 'door', type: 'endScreen', parameters: { text: 'd' } });
+    const ends = new StateSimulationAnalyzer(story, { maxPaths: 50, maxDepth: 20 }).analyzeRaw().map((p) => p.outcome.beatId);
+    expect(ends).toContain('door');
+  });
+});

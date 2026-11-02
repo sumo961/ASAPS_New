@@ -684,8 +684,9 @@ export class StateSimulationAnalyzer {
     let countedPaths = 0;
     let distance = new Map<string, number>();
     let distanceFor = -1;
+    let turn = 0;
     let buckets: Array<Array<(typeof stack)[number]>> = [];
-    const askedVisits = this.beatsAskedAboutByVisited();
+    let relevant: (beatId: string, state: SimulationState) => string = (_id, state) => hashState(state);
     const enqueue = (f: (typeof stack)[number]) => {
       if (coverage || stack.length < cap) { stack.push(f); return; }
       if (!seenBeats.has(f.beatId) && !admittedNew.has(f.beatId)) { admittedNew.add(f.beatId); stack.push(f); return; }
@@ -735,6 +736,14 @@ export class StateSimulationAnalyzer {
         // Finish paths carrying something uncovered, then go to whichever
         // waiting branch is nearest to a beat still uncovered.
         if (covered.size !== distanceFor) {
+          // What decides the gates on the way to the beats uncovered when the
+          // pass starts. A running score nothing there asks about multiplies
+          // the states without opening anything: the budget went on those and
+          // never tried the early flag a late choice needs.
+          if (distanceFor < 0) {
+            distance = this.distanceToUncovered(covered);
+            relevant = this.stateThatDecidesGates(distance);
+          }
           distanceFor = covered.size;
           distance = this.distanceToUncovered(covered);
           stack.push(...buckets.flat());
@@ -747,13 +756,20 @@ export class StateSimulationAnalyzer {
           if (Number.isFinite(rank)) (buckets[rank] ??= []).push(f);
         }
         stack.length = 0;
-        const nearest = buckets.find((b) => b && b.length > 0);
+        // Paths carrying something uncovered first. Then each distance takes
+        // its turn: always the nearest let beats that can never open (they are
+        // near, behind a gate nothing meets) starve whole storylines further off.
+        let nearest = buckets[0]?.length ? buckets[0] : undefined;
+        for (let tried = 0; !nearest && tried <= buckets.length; tried++) {
+          turn = turn + 1 >= buckets.length ? 1 : turn + 1;
+          if (buckets[turn]?.length) nearest = buckets[turn];
+        }
         if (!nearest) break;
         frame = nearest.pop()!;
-        // The same beat in the same state plays the same from here, so it only
-        // goes on if finishing it would put something uncovered on a path.
-        const asked = [...askedVisits].filter((id) => frame.state.visitedBeats.has(id)).sort().join(',');
-        const key = `${frame.beatId}|${hashState(frame.state)}|${asked}`;
+        // The same beat with the same answers to those gates opens the same
+        // things from here, so it only goes on if finishing it would put
+        // something uncovered on a path.
+        const key = `${frame.beatId}|${relevant(frame.beatId, frame.state)}`;
         if (coverageSeen.has(key) && frame.path.every((step) => covered.has(step.beatId)) && covered.has(frame.beatId)) continue;
         coverageSeen.add(key);
       } else {
@@ -884,7 +900,11 @@ export class StateSimulationAnalyzer {
         }
 
         // Find options we haven't taken yet on THIS path
-        const availableOptions = offered.filter((i) => !takenHere.has(i));
+        // (Looking for what's uncovered, a choice leading there is open again:
+        // players can return to a menu, and which route got here first decides
+        // nothing.)
+        const availableOptions = offered.filter((i) => !takenHere.has(i)
+          || (coverage && (distance.get(connections[i].targetId) ?? Infinity) < Infinity));
 
         // If all options have been taken at this beat on this path,
         // we need to check if any option NOW leads somewhere different
@@ -1069,6 +1089,86 @@ export class StateSimulationAnalyzer {
       level = next;
     }
     return distance;
+  }
+
+  /**
+   * A summary of a state at a beat: only what the conditions still ahead of
+   * that beat, on the way to something uncovered, read. Past its last gate a
+   * flag can't open anything, however it was set. A condition it can't name
+   * (feelings, timers) brings the whole state in.
+   */
+  private stateThatDecidesGates(distance: Map<string, number>): (beatId: string, state: SimulationState) => string {
+    const reads = new Map<string, Set<string>>();
+    const next = new Map<string, string[]>();
+    const noteOf = (c: any): string[] => {
+      if (!c) return [];
+      const name = c.variableName || c.variable || c.left;
+      switch (c.type) {
+        case 'variable': return name ? [`v\u0001${name}`] : [];
+        case 'counter': return name ? [`c\u0001${this.counterKey(c.character, name)}`] : [];
+        case 'counterCompare':
+          return [`c\u0001${this.counterKey(c.character, c.counter1 || '')}`, `c\u0001${this.counterKey(c.character, c.counter2 || '')}`];
+        case 'inventory': {
+          const item = String(c.item || c.value || c.right || '');
+          const out = item ? [`i\u0001${item}`] : [];
+          if (c.compareVariable) out.push(`v\u0001${String(c.compareVariable).replace(/^\$/, '')}`);
+          if (typeof c.quantityValue === 'string') out.push(`v\u0001${c.quantityValue.replace(/^\$/, '')}`);
+          return out;
+        }
+        case 'visitedBeat': { const id = c.beatId || c.value; return id ? [`b\u0001${id}`] : []; }
+        default: return ['*'];
+      }
+    };
+    for (const beat of this.story.getAllBeats()) {
+      if (!distance.has(beat.id)) continue;
+      const own = new Set<string>();
+      const read = (list: any) => (Array.isArray(list) ? list : [list]).forEach((c) => noteOf(c).forEach((n) => own.add(n)));
+      const params: any = beat.getParameters();
+      for (const r of (beat as any).requires ?? []) read(r);
+      if (beat.type === 'conditionBeat') {
+        read(this.getCondition(beat));
+        read(params.moreConditions ?? []);
+      }
+      const links = this.getConnections(beat) as any[];
+      for (const conn of links) {
+        read(conn.condition ?? []);
+        for (const step of conn.route ?? []) {
+          read(step.choice?.conditions ?? []);
+          for (const list of step.unless ?? []) read(list);
+        }
+      }
+      reads.set(beat.id, own);
+      next.set(beat.id, links.map((c) => c.targetId).filter((id) => distance.has(id)));
+    }
+    const ahead = new Map<string, string[]>();
+    const aheadOf = (start: string): string[] => {
+      const known = ahead.get(start);
+      if (known) return known;
+      const names = new Set<string>();
+      const seen = new Set<string>([start]);
+      const todo = [start];
+      while (todo.length > 0) {
+        const id = todo.pop()!;
+        reads.get(id)?.forEach((n) => names.add(n));
+        for (const to of next.get(id) ?? []) if (!seen.has(to)) { seen.add(to); todo.push(to); }
+      }
+      const list = [...names].sort();
+      ahead.set(start, list);
+      return list;
+    };
+    return (beatId, state) => {
+      const names = aheadOf(beatId);
+      if (names.includes('*')) return hashState(state);
+      return names.map((n) => {
+        const name = n.slice(2);
+        switch (n[0]) {
+          case 'v': return `${n}=${state.variables.get(name)}`;
+          case 'c': return `${n}=${state.counters.get(name)}`;
+          case 'i': return `${n}=${itemQuantity(state, 'player', name)}`;
+          default: return state.visitedBeats.has(name) ? n : '';
+        }
+      }).join('|');
+    };
   }
 
   /** Every beat some visited-beat condition in the story asks about. */
