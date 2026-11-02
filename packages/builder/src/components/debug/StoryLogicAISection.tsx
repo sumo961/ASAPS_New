@@ -56,6 +56,11 @@ interface Props {
   onFindingCount?: (count: number) => void;
 }
 
+/** The state a finding describes. `state` only points into the check that found it. */
+function stateWords(f: StoryLogicFinding, c: StoryLogicCandidate | undefined): string {
+  return f.arrivingWith ?? (f.fromEarlierCheck ? '' : c?.arrivingStates[f.state] ?? '');
+}
+
 export const StoryLogicAISection: React.FC<Props> = (props) => {
   const aiOn = useAIFeatures();
   const { isConfigured } = useAI();
@@ -185,7 +190,7 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
     const c = byId.get(f.beatId);
     const finding: StoryLogicProblemFinding = {
       id: f.key, kind: 'story-logic', beatId: f.beatId, beatName: c?.name, quote: f.quote,
-      arrivingState: c?.arrivingStates[f.state] ?? '', message: f.why, suggestion: f.suggestion,
+      arrivingState: stateWords(f, c), message: f.why, suggestion: f.suggestion,
     };
     try {
       const validator = getAIValidator();
@@ -305,15 +310,16 @@ const Section: React.FC<Props> = ({ story, analyzer, arrivals, hubBeats, flagged
               <div className="flex items-center gap-2 mb-1">
                 <button type="button" onClick={() => onHighlightBeat?.(f.beatId)} className="font-medium text-blue-700 hover:underline">{c?.name || f.beatId}</button>
                 <span className="text-xs bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded">{KIND_LABEL[f.kind]}</span>
+                {f.fromEarlierCheck && <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded" title="An earlier check found this and the latest one didn't, or the beat hasn't been re-read since. Its words are still in the beat.">From an earlier check</span>}
                 {f.severity === 'problem' && <span className="text-xs bg-yellow-200 text-yellow-900 px-1.5 py-0.5 rounded">Problem</span>}
               </div>
               <p className="italic text-gray-800">"{f.quote}"</p>
               <p className="mt-1 text-gray-700">{f.why}</p>
-              <p className="mt-1 text-xs text-gray-500"><strong>Arriving with:</strong> {c?.arrivingStates[f.state]}</p>
+              <p className="mt-1 text-xs text-gray-500"><strong>Arriving with:</strong> {stateWords(f, c) || 'not recorded by that check'}</p>
               {f.suggestion && <p className="mt-1 text-xs text-gray-600"><strong>Suggestion:</strong> {f.suggestion}</p>}
               <div className="mt-2 flex flex-wrap gap-3 text-xs">
                 <button type="button" onClick={() => proposeFix(f)} disabled={thisFix?.status === 'loading' || thisFix?.status === 'applying'} className="underline text-purple-800 disabled:opacity-50">Propose a fix</button>
-                <button type="button" onClick={() => onHighlightPath?.(c?.statePaths[f.state] ?? [])} className="underline text-gray-700 inline-flex items-center gap-1"><Route className="w-3 h-3" /> Show this path</button>
+                {!f.fromEarlierCheck && <button type="button" onClick={() => onHighlightPath?.(c?.statePaths[f.state] ?? [])} className="underline text-gray-700 inline-flex items-center gap-1"><Route className="w-3 h-3" /> Show this path</button>}
                 <button type="button" onClick={() => onHighlightBeat?.(f.beatId)} className="underline text-gray-700">Go to beat</button>
                 <button type="button" onClick={() => onStoreChange(dismissFinding(storeRef.current, f.key))} className="underline text-gray-700 inline-flex items-center gap-1"><X className="w-3 h-3" /> Not a problem</button>
               </div>

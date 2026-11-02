@@ -26,6 +26,10 @@ export interface StoryLogicFinding {
   why: string;
   severity: 'problem' | 'worth a look';
   suggestion: string;
+  /** The arriving state in words, kept: `state` only means something in its own check. */
+  arrivingWith?: string;
+  /** Set when shown: found by an earlier check, not by the latest. */
+  fromEarlierCheck?: boolean;
 }
 
 export interface StoryLogicStore {
@@ -33,7 +37,14 @@ export interface StoryLogicStore {
   /** Finding keys marked "Not a problem". */
   dismissed: string[];
   /** Per beat: the key it was checked under and what was found (often nothing). */
-  checked: Record<string, { key: string; findings: StoryLogicFinding[] }>;
+  checked: Record<string, {
+    key: string;
+    findings: StoryLogicFinding[];
+    /** Found on this beat by earlier checks and not by the latest. Checks of the
+     *  same words don't always find the same things, so a re-check adds to what
+     *  was found. Shown while the words they quote are still in the beat. */
+    earlier?: StoryLogicFinding[];
+  }>;
   /** What the last check used, as the provider reported it. */
   lastRun?: AISpend;
   /** Everything checks and fixes have used on this story. */

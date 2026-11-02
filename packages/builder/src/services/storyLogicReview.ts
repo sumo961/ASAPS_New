@@ -348,6 +348,7 @@ export function validateFindings(reply: string, batch: StoryLogicCandidate[]): V
       key, beatId: c.beatId, kind: f.kind as StoryLogicKind, quote: f.quote, state: f.state, why: f.why,
       severity: f.severity === 'problem' ? 'problem' : 'worth a look',
       suggestion: typeof f.suggestion === 'string' ? f.suggestion : '',
+      arrivingWith: c.arrivingStates[f.state],
     });
   }
   return { findings, dropped };
@@ -399,22 +400,47 @@ export async function runStoryLogicCheck(
 
 /** Add checked results to a store, dropping beats no longer among the story's. */
 export function mergeChecked(store: StoryLogicStore | null | undefined, checked: StoryLogicStore['checked']): StoryLogicStore {
-  return { ...store, version: 1, dismissed: store?.dismissed ?? [], checked: { ...(store?.checked ?? {}), ...checked } };
+  const merged: StoryLogicStore['checked'] = { ...(store?.checked ?? {}) };
+  for (const [beatId, entry] of Object.entries(checked)) {
+    const before = store?.checked?.[beatId];
+    const found = new Set(entry.findings.map((f) => f.key));
+    const earlier = new Map<string, StoryLogicFinding>();
+    for (const f of [...(before?.earlier ?? []), ...(before?.findings ?? []), ...(entry.earlier ?? [])]) {
+      if (!found.has(f.key)) earlier.set(f.key, f);
+    }
+    merged[beatId] = { key: entry.key, findings: entry.findings, ...(earlier.size > 0 ? { earlier: [...earlier.values()] } : {}) };
+  }
+  return { ...store, version: 1, dismissed: store?.dismissed ?? [], checked: merged };
 }
 
 export function dismissFinding(store: StoryLogicStore | null | undefined, key: string): StoryLogicStore {
   return { ...store, version: 1, checked: store?.checked ?? {}, dismissed: [...new Set([...(store?.dismissed ?? []), key])] };
 }
 
-/** Findings to show: those of beats unchanged since checked, not dismissed; problems first. */
+/**
+ * Findings to show: what the latest check of an unchanged beat found, and what
+ * any check found whose quote is still in the beat's words. Not dismissed;
+ * problems first.
+ */
 export function visibleFindings(candidates: StoryLogicCandidate[], store: StoryLogicStore | null | undefined): StoryLogicFinding[] {
   if (!store) return [];
   const dismissed = new Set(store.dismissed);
   const out: StoryLogicFinding[] = [];
   for (const c of candidates) {
     const entry = store.checked[c.beatId];
-    if (entry?.key !== c.cacheKey) continue;
-    out.push(...entry.findings.filter((f) => !dismissed.has(f.key)));
+    if (!entry) continue;
+    const current = entry.key === c.cacheKey;
+    const stillQuoted = (f: StoryLogicFinding) => c.words.some((w) => norm(w).includes(norm(f.quote)));
+    const shown = new Set<string>();
+    const show = (f: StoryLogicFinding, fromEarlierCheck: boolean) => {
+      if (dismissed.has(f.key) || shown.has(f.key)) return;
+      shown.add(f.key);
+      out.push(fromEarlierCheck ? { ...f, fromEarlierCheck } : f);
+    };
+    if (current) entry.findings.forEach((f) => show(f, false));
+    else entry.findings.filter(stillQuoted).forEach((f) => show(f, true));
+    (entry.earlier ?? []).filter(stillQuoted).forEach((f) => show(f, true));
   }
-  return out.sort((a, b) => Number(b.severity === 'problem') - Number(a.severity === 'problem'));
+  return out.sort((a, b) => Number(b.severity === 'problem') - Number(a.severity === 'problem')
+    || Number(!!a.fromEarlierCheck) - Number(!!b.fromEarlierCheck));
 }

@@ -296,3 +296,47 @@ describe('what a check costs', () => {
     expect(estimateRunCost(e, p)).toBeCloseTo(0.2 + 2 + 0.5 + 0.2);
   });
 });
+
+describe('findings across checks', () => {
+  const candidate = (over: Partial<StoryLogicCandidate> = {}): StoryLogicCandidate => ({
+    beatId: 'b', beatName: 'B', beatType: 'infoText', words: ['The knife is here.', 'She smiled.'], arrivingStates: ['no items'],
+    pathCount: 1, statePaths: [[]], cacheKey: 'k1', ...over,
+  } as any);
+  const finding = (quote: string, why = 'w') => ({ key: findingKey('b', 'dangling-reference', quote), beatId: 'b', kind: 'dangling-reference' as const, quote, state: 0, why, severity: 'problem' as const, suggestion: '', arrivingWith: 'no items' });
+  const knife = finding('The knife');
+  const smile = finding('She smiled');
+
+  it('a re-check adds to what was found, marking what only an earlier check saw', () => {
+    let store = mergeChecked(null, { b: { key: 'k1', findings: [knife] } });
+    store = mergeChecked(store, { b: { key: 'k2', findings: [smile] } });
+    const shown = visibleFindings([candidate({ cacheKey: 'k2' })], store);
+    expect(shown.map((f) => [f.quote, !!f.fromEarlierCheck])).toEqual([['She smiled', false], ['The knife', true]]);
+  });
+
+  it('keeps a finding through many checks, once', () => {
+    let store = mergeChecked(null, { b: { key: 'k1', findings: [knife] } });
+    for (const key of ['k2', 'k3', 'k4']) store = mergeChecked(store, { b: { key, findings: [] } });
+    store = mergeChecked(store, { b: { key: 'k5', findings: [knife] } });
+    const shown = visibleFindings([candidate({ cacheKey: 'k5' })], store);
+    expect(shown).toHaveLength(1);
+    expect(shown[0].fromEarlierCheck).toBeUndefined();
+  });
+
+  it('lets a finding go once its words have left the beat', () => {
+    let store = mergeChecked(null, { b: { key: 'k1', findings: [knife] } });
+    store = mergeChecked(store, { b: { key: 'k2', findings: [] } });
+    expect(visibleFindings([candidate({ cacheKey: 'k2', words: ['She smiled.'] })], store)).toEqual([]);
+  });
+
+  it('stays dismissed', () => {
+    let store = mergeChecked(null, { b: { key: 'k1', findings: [knife] } });
+    store = dismissFinding(mergeChecked(store, { b: { key: 'k2', findings: [] } }), knife.key);
+    expect(visibleFindings([candidate({ cacheKey: 'k2' })], store)).toEqual([]);
+  });
+
+  it('shows earlier findings while a beat waits to be read again', () => {
+    const store = mergeChecked(null, { b: { key: 'k1', findings: [knife] } });
+    const shown = visibleFindings([candidate({ cacheKey: 'changed-states' })], store);
+    expect(shown.map((f) => f.fromEarlierCheck)).toEqual([true]);
+  });
+});
