@@ -157,6 +157,72 @@ export function buildClustersFromBeats(beats: any[]): any[] {
 }
 
 /**
+ * A generator that writes `savedscreenshot` for the declared `savedScreenshot`
+ * means the same thing, but at runtime they are two values and the check never
+ * sees the set. Use the declared spelling. Closer calls than capitals are left
+ * for Story Warnings: they may be different things.
+ */
+function repairDeclaredNameCase(story: any): NormalizeChange[] {
+  const declared = new Map<string, string>();
+  const declare = (name: unknown) => { if (typeof name === 'string' && name.trim()) declared.set(name.trim().toLowerCase(), name.trim()); };
+  for (const v of Array.isArray(story.variables) ? story.variables : []) declare(typeof v === 'string' ? v : v?.name);
+  for (const c of Array.isArray(story.characters) ? story.characters : []) {
+    for (const d of Array.isArray(c?.counters) ? c.counters : []) declare(d?.name);
+  }
+  if (declared.size === 0 || !Array.isArray(story.beats)) return [];
+  const out: NormalizeChange[] = [];
+  const correct = (name: unknown): string | null => {
+    if (typeof name !== 'string') return null;
+    const right = declared.get(name.trim().toLowerCase());
+    return right && right !== name ? right : null;
+  };
+  const walk = (node: any, beatId: string): void => {
+    if (Array.isArray(node)) { node.forEach((v) => walk(v, beatId)); return; }
+    if (!node || typeof node !== 'object') return;
+    const fix = (key: string) => {
+      const right = correct(node[key]);
+      if (right) {
+        out.push({ beatId, path: key, kind: 'normalized', from: node[key], to: right, note: 'Spelled as declared' });
+        node[key] = right;
+      }
+    };
+    if (node.type === 'variable' || node.type === 'counter') { fix('variableName'); fix('variable'); fix('left'); }
+    if (node.type === 'setVariable' || node.type === 'setCounter' || node.type === 'incrementCounter') fix('target');
+    for (const k of Object.keys(node)) {
+      const v = node[k];
+      if (typeof v === 'string' && v.includes('{')) {
+        // Text that shows a value, written $ + {name}.
+        const next = v.replace(/\$\{([^}@]+)\}/g, (m, n) => { const right = correct(n); return right ? '$' + `{${right}}` : m; });
+        if (next !== v) { out.push({ beatId, path: k, kind: 'normalized', from: v.slice(0, 60), to: next.slice(0, 60), note: 'Spelled as declared' }); node[k] = next; }
+      } else if (v && typeof v === 'object') walk(v, beatId);
+    }
+  };
+  story.beats = story.beats.map((raw: any) => {
+    const beat = { ...raw };
+    for (const k of ['parameters', 'connections', 'requires']) if (beat[k]) beat[k] = structuredClone(beat[k]);
+    walk(beat.parameters, beat.id);
+    walk(beat.connections, beat.id);
+    walk(beat.requires, beat.id);
+    if (beat.type === 'setVariable' || beat.type === 'inputText') {
+      const p = beat.parameters ?? {};
+      for (const k of ['name', 'variable', 'variableName', 'counter']) {
+        const right = correct(p[k]);
+        if (right) { out.push({ beatId: beat.id, path: `parameters.${k}`, kind: 'normalized', from: p[k], to: right, note: 'Spelled as declared' }); p[k] = right; }
+      }
+    }
+    if (beat.type === 'conditionBeat' && beat.parameters) {
+      const p = beat.parameters;
+      for (const k of ['variableName', 'variable', 'left']) {
+        const right = (p.conditionType === 'variable' || p.conditionType === 'counter') ? correct(p[k]) : null;
+        if (right) { out.push({ beatId: beat.id, path: `parameters.${k}`, kind: 'normalized', from: p[k], to: right, note: 'Spelled as declared' }); p[k] = right; }
+      }
+    }
+    return beat;
+  });
+  return out;
+}
+
+/**
  * A generator that compares or sets a "counter" with text means a variable:
  * a counter holds a number, and the check could never match. Rewrite those to
  * their variable forms, so what was generated does what it says.
@@ -260,6 +326,9 @@ export function normalizeStory(
     }
     story.beats = out;
   }
+
+  // Step 2b — names that differ from a declared one only in capitals
+  allChanges.push(...repairDeclaredNameCase(story));
 
   // Step 3 — clusters: auto-create from per-beat cluster strings if missing
   if (opts.autoCreateClusters && Array.isArray(story.beats)) {

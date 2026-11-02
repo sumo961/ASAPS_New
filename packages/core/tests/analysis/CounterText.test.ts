@@ -202,3 +202,39 @@ describe('what conditions read against what the story sets', () => {
     expect(w[0].message).toContain('never showed');
   });
 });
+
+describe('generated stories spell names as declared', () => {
+  const story = () => ({
+    variables: [{ name: 'savedScreenshot', type: 'boolean' }],
+    characters: [{ id: 'c', name: 'C', counters: [{ name: 'Trust', value: 0 }] }],
+    beats: [
+      { id: 'm', type: 'multiChoice', name: 'M', parameters: { question: 'Saved: \${savedscreenshot}', choices: [
+        { id: 'a', text: 'A', target: 'g', effects: [{ type: 'setVariable', target: 'savedscreenshot', value: true }, { type: 'incrementCounter', target: 'trust', value: 1 }] },
+        { id: 'b', text: 'B', target: 'g', conditions: [{ type: 'inventory', item: 'savedscreenshot', operator: 'contains' }] },
+      ] } },
+      { id: 'g', type: 'conditionBeat', name: 'G', parameters: { conditionType: 'variable', variableName: 'SAVEDSCREENSHOT', operator: '==', value: true, trueTarget: 'm', falseTarget: 'm' } },
+      { id: 's', type: 'setVariable', name: 'S', parameters: { type: 'variable', name: 'savedSCREENSHOT', value: true } },
+      { id: 'o', type: 'multiChoice', name: 'O', parameters: { question: 'q', choices: [{ id: 'x', text: 'X', target: 'g', effects: [{ type: 'setVariable', target: 'savedScreenshots', value: true }] }] } },
+    ],
+  });
+
+  it('corrects capitals everywhere a name is read, set or shown', () => {
+    const raw = story();
+    const before = JSON.stringify(raw);
+    const { story: out, report } = normalizeStory(raw, { beatTypes: {} } as any);
+    const [m, g, s] = out.beats;
+    expect(m.parameters.choices[0].effects[0].target).toBe('savedScreenshot');
+    expect(m.parameters.choices[0].effects[1].target).toBe('Trust');
+    expect(m.parameters.question).toContain('\${savedScreenshot}');
+    expect(g.parameters.variableName).toBe('savedScreenshot');
+    expect(s.parameters.name).toBe('savedScreenshot');
+    expect(report.changes.some((c) => c.note === 'Spelled as declared')).toBe(true);
+    expect(JSON.stringify(raw)).toBe(before);
+  });
+
+  it('leaves items and closer calls alone', () => {
+    const { story: out } = normalizeStory(story(), { beatTypes: {} } as any);
+    expect(out.beats[0].parameters.choices[1].conditions[0].item).toBe('savedscreenshot');
+    expect(out.beats[3].parameters.choices[0].effects[0].target).toBe('savedScreenshots');
+  });
+});

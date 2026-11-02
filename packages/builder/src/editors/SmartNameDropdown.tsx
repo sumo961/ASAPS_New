@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { looksLikeSameName } from '@asaps/core';
 
 export interface DropdownOption {
   name: string;
@@ -42,8 +43,12 @@ export const SmartNameDropdown: React.FC<SmartNameDropdownProps> = ({
   }
 
   if (isCustom || forceCustom) {
+    // A new name this close to one that exists is usually that one, mistyped:
+    // a variable isn't checked when it's written, so the slip goes unnoticed.
+    const similar = value ? options.find((o) => o.name !== value && looksLikeSameName(o.name, value)) : undefined;
     return (
-      <div className={`flex gap-1 items-center ${className}`}>
+      <div className={`flex flex-col gap-0.5 ${className}`}>
+      <div className="flex gap-1 items-center">
         <input
           type="text"
           value={value || ''}
@@ -62,6 +67,20 @@ export const SmartNameDropdown: React.FC<SmartNameDropdownProps> = ({
         >
           &times;
         </button>
+      </div>
+      {similar && (
+        <button
+          type="button"
+          onClick={() => {
+            setForceCustom(false);
+            onChange(similar.name);
+          }}
+          className="text-left text-xs text-amber-700 hover:underline"
+          title="Use the existing name. Ignore this if you do mean a new one."
+        >
+          Did you mean "{similar.displayName || similar.name}"?
+        </button>
+      )}
       </div>
     );
   }

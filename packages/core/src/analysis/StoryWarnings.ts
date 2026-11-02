@@ -142,7 +142,7 @@ function nameDistance(a: string, b: string, limit: number): number {
  * or two in a longer name. Names told apart by a number (score1, score2) are
  * meant to be different.
  */
-function looksLikeSameName(a: string, b: string): boolean {
+export function looksLikeSameName(a: string, b: string): boolean {
   const [x, y] = [a.trim().toLowerCase(), b.trim().toLowerCase()];
   if (x === y) return true;
   if (x.replace(/\d+/g, '') === y.replace(/\d+/g, '')) return false;
