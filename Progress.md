@@ -32,6 +32,7 @@ Playing Birka V18 on the engine showed where Path Analysis disagreed, now fixed:
 - **Warnings:** new **Every choice hidden**. A beat that is never on offer now names the condition it needs. Reachability's "only reachable via conditional paths" list and branch warnings for beats that were played are gone.
 - **Display:** the Tree says how many beats appear only after Replay; the Preview groups those states as "after an end screen's Replay".
 - **Tripwire:** `tests/analysis/EngineParity.test.ts` plays every template and a fixture on the real engine with a scripted player; anything the engine does that Path Analysis doesn't know about fails it.
+- **Start as if… is browsable:** for a beat with conditions of its own, the Preview groups start states by which of them are met (which opening plays) and shows three per group with "Show more".
 - **Large stories no longer depend on search order:** the coverage pass compares states only by what the gates still ahead of a beat read, returns to a menu for a choice leading to something uncovered, and gives every distance a turn, so beats that can never open can't starve storylines further off. Birka V18: 344 beats reached at a quarter of the budget, the base budget and four times it, including everything 1,500 engine games reached; about 12 seconds.
 
 **Files modified:** `analysis/StateSimulationAnalyzer.ts`, `analysis/StoryWarnings.ts`, `debug/storyWarningLabels.ts`, tests

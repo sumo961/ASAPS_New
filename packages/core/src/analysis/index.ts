@@ -73,7 +73,7 @@ export type {
 } from './PathTree';
 
 // Reachability analysis
-export { ReachabilityAnalyzer } from './ReachabilityAnalyzer';
+export { ReachabilityAnalyzer, describeGate } from './ReachabilityAnalyzer';
 export type {
   ReachabilityResult,
   UnreachableBeat,

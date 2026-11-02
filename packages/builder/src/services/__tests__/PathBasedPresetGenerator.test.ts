@@ -477,6 +477,21 @@ describe('PathBasedPresetGenerator', () => {
     });
   });
 
+  it('groups states by which of the beat\'s own conditions are met', () => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'start' });
+    story.addBeat(createTestBeat({ id: 'start', name: 'Start', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'A', target: 'door' }, { id: 'b', text: 'B', target: 'scene' },
+    ] } }));
+    story.addBeat(createTestBeat({ id: 'door', name: 'The door', type: 'infoText', parameters: { text: 'd' }, connections: [{ targetId: 'scene' }] }));
+    story.addBeat(createTestBeat({ id: 'scene', name: 'Scene', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'x', text: 'Knock', target: 'end', conditions: [{ type: 'visitedBeat', beatId: 'door' }] },
+      { id: 'y', text: 'Leave', target: 'end' },
+    ] } }));
+    story.addBeat(createTestBeat({ id: 'end', name: 'End', type: 'endScreen', parameters: { message: 'E' } }));
+    const groups = generatePathPresets(story, 'scene').presets.map((p) => p.outcomeGroup).sort();
+    expect(groups).toEqual(['With a visit to "The door"', "With none of this beat's conditions met"]);
+  });
+
   it('simulates a story once, however many beats it is asked about', () => {
     const story = new Story({ title: 'T', author: 'T', firstBeatId: 'start' });
     story.addBeat(createTestBeat({ id: 'start', name: 'Start', type: 'titleScreen', parameters: { title: 'T' }, connections: [{ targetId: 'middle' }] }));

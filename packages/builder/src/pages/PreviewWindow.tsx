@@ -45,6 +45,8 @@ import {
 } from '@asaps/core';
 
 // Design canvas when the project sets none (Project Settings → canvas).
+/** Start states shown per group before "Show more". */
+const PRESETS_SHOWN = 3;
 const DEFAULT_STAGE_WIDTH = 1024;
 const DEFAULT_STAGE_HEIGHT = 768;
 
@@ -507,6 +509,7 @@ export const PreviewWindow: React.FC = () => {
   const [totalPathCount, setTotalPathCount] = useState(0);
   const [isGeneratingPresets, setIsGeneratingPresets] = useState(false);
   const [presetProgress, setPresetProgress] = useState<SimulationProgress | null>(null);
+  const [expandedPresetGroups, setExpandedPresetGroups] = useState<Set<string>>(new Set());
   // Input text values modal state
   const [showInputTextModal, setShowInputTextModal] = useState(false);
   // The AI provider rejected the key (401/403) — shown over the stage until
@@ -3100,9 +3103,9 @@ export const PreviewWindow: React.FC = () => {
                       return (
                       <div key={outcome}>
                         <div className="px-3 py-1 bg-gray-50 text-xs font-medium text-gray-600 border-t border-gray-200">
-                          → {outcome} ({presets.length} {presets.length === 1 ? 'state' : 'states'} from {groupPathCount} {groupPathCount === 1 ? 'path' : 'paths'})
+                          {outcome.startsWith('With ') ? outcome : `→ ${outcome}`} ({presets.length} {presets.length === 1 ? 'state' : 'states'} from {groupPathCount} {groupPathCount === 1 ? 'path' : 'paths'})
                         </div>
-                        {presets.map((genPreset, idx) => {
+                        {(expandedPresetGroups.has(outcome) ? presets : presets.slice(0, PRESETS_SHOWN)).map((genPreset, idx) => {
                           const { variables, counters, inventory } = genPreset.preset.state;
                           const varCount = Object.keys(variables).length;
                           const counterCount = Object.keys(counters).length;
@@ -3192,6 +3195,18 @@ export const PreviewWindow: React.FC = () => {
                             </button>
                           );
                         })}
+                        {presets.length > PRESETS_SHOWN && (
+                          <button
+                            onClick={() => setExpandedPresetGroups((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(outcome)) next.delete(outcome); else next.add(outcome);
+                              return next;
+                            })}
+                            className="w-full px-3 py-1.5 text-left text-xs text-blue-600 hover:bg-gray-100"
+                          >
+                            {expandedPresetGroups.has(outcome) ? 'Show fewer' : `Show ${presets.length - PRESETS_SHOWN} more`}
+                          </button>
+                        )}
                       </div>
                       );
                     })

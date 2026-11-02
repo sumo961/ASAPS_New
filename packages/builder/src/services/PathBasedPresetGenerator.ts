@@ -8,6 +8,7 @@
 
 import { rolesReferencedIn } from '../utils/rolePreview';
 import { simulateStory, simulateStoryAsync } from './storySimulation';
+import { describeGate } from '@asaps/core';
 import { StoryContext, type Story, type StatePreset } from '@asaps/core';
 import {
   StateSimulationAnalyzer,
@@ -169,7 +170,9 @@ function presetsFromAnalysis(
   // differ in what nothing from here on reads (hundreds → a handful).
   const totalPaths = presets.length;
   const relevant = relevantState(story, targetBeatId);
-  const uniquePresets = condenseByRelevance(deduplicatePresets(presets, relevant.visitedAhead), relevant);
+  const uniquePresets = groupByOwnConditions(
+    story, targetBeat, condenseByRelevance(deduplicatePresets(presets, relevant.visitedAhead), relevant), relevant.context,
+  );
 
   return {
     targetBeatId,
@@ -473,6 +476,44 @@ function condenseByRelevance(presets: GeneratedPreset[], relevant: { conditions:
     else seen.set(key, p);
   }
   return Array.from(seen.values());
+}
+
+/**
+ * For a beat with conditions of its own, what tells its states apart for an
+ * author is which of them are met: which opening plays, which replies show.
+ * Those become the groups, in place of where the path ended up.
+ */
+function groupByOwnConditions(story: Story, beat: any, presets: GeneratedPreset[], context: StoryContext): GeneratedPreset[] {
+  const own: any[] = [];
+  const seen = new Set<string>();
+  const collect = (o: any): void => {
+    if (Array.isArray(o)) { o.forEach(collect); return; }
+    if (!o || typeof o !== 'object') return;
+    if (o.type && (o.type === 'visitedBeat' || typeof o.operator === 'string')) {
+      const k = JSON.stringify(o);
+      if (!seen.has(k)) { seen.add(k); own.push(o); }
+    }
+    Object.values(o).forEach(collect);
+  };
+  collect(beat.getParameters?.());
+  if (own.length === 0) return presets;
+  const negative = (c: any) => c.operator === 'not' || c.operator === '!=' || c.checkType === 'notHas';
+  const nameOf = (id: string) => story.getBeat(id)?.name?.trim() ?? id;
+  return presets.map((p) => {
+    const { variables, counters, inventory, inventoryQuantities, affect, visitedBeats } = p.preset.state;
+    context.loadSimulationState((affect ?? {}) as any, variables, counters,
+      inventory.map((name) => ({ name, quantity: inventoryQuantities?.[name] ?? 1 })));
+    const met = own.filter((c) => !negative(c)).filter((c) => {
+      if (c.type === 'visitedBeat') return visitedBeats.includes(c.beatId || c.variableName || c.left);
+      try { return context.checkCondition(c); } catch { return false; }
+    });
+    return {
+      ...p,
+      outcomeGroup: met.length > 0
+        ? `With ${met.map((c) => describeGate(c, nameOf)).join(' and ')}`
+        : "With none of this beat's conditions met",
+    };
+  });
 }
 
 /**

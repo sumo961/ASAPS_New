@@ -117,7 +117,7 @@ function conditionsIn(condition: unknown): any[] {
 }
 
 /** A condition in words: "Gold in the player's bag", "a visit to \"Talk to Skuli\"". */
-function describeGate(c: any, beatName: (id: string) => string): string {
+export function describeGate(c: any, beatName: (id: string) => string): string {
   const name = c.variableName || c.variable || c.left;
   const negative = c.operator === 'not' || c.operator === '!=' || c.checkType === 'notHas';
   switch (c.type) {
