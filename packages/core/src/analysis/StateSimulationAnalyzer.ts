@@ -468,8 +468,8 @@ export class StateSimulationAnalyzer {
       maxBeatRevisits: config.maxBeatRevisits ?? 1,
       maxFrontier: config.maxFrontier ?? 4000,
       maxExpansions: config.maxExpansions ?? 300000,
-      maxCoveragePaths: config.maxCoveragePaths ?? 5000,
-      maxCoverageExpansions: config.maxCoverageExpansions ?? 150000,
+      maxCoveragePaths: config.maxCoveragePaths ?? 10000,
+      maxCoverageExpansions: config.maxCoverageExpansions ?? 300000,
     };
   }
 
@@ -810,8 +810,8 @@ export class StateSimulationAnalyzer {
       return true;
     };
     const maxExpansions = this.config.maxExpansions ?? 300000;
-    const coveragePaths = this.config.maxCoveragePaths ?? 5000;
-    const coverageExpansions = this.config.maxCoverageExpansions ?? 150000;
+    const coveragePaths = this.config.maxCoveragePaths ?? 10000;
+    const coverageExpansions = this.config.maxCoverageExpansions ?? 300000;
     const pathLimit = this.config.maxPaths;
     let coverageStart = 0;
     for (;;) {
@@ -1271,13 +1271,31 @@ export class StateSimulationAnalyzer {
   private stateThatDecidesGates(distance: Map<string, number>): (beatId: string, state: SimulationState) => string {
     const reads = new Map<string, Set<string>>();
     const next = new Map<string, string[]>();
+    // The values a counter is compared with. Past all of them, more of the same
+    // opens nothing: 41 and 90 play alike if nothing checks above 40.
+    const limits = new Map<string, { low: number; high: number } | null>();
+    const directions = this.counterDirections();
+    const noteLimit = (name: string, value: unknown) => {
+      const n = typeof value === 'number' ? value : Number(value ?? 0);
+      if (!Number.isFinite(n)) { limits.set(name, null); return; }
+      if (limits.get(name) === null) return;
+      const known = limits.get(name);
+      limits.set(name, known ? { low: Math.min(known.low, n), high: Math.max(known.high, n) } : { low: n, high: n });
+    };
     const noteOf = (c: any): string[] => {
       if (!c) return [];
       const name = c.variableName || c.variable || c.left;
       switch (c.type) {
         case 'variable': return name ? [`v\u0001${name}`] : [];
-        case 'counter': return name ? [`c\u0001${this.counterKey(c.character, name)}`] : [];
+        case 'counter': {
+          if (!name) return [];
+          const key = this.counterKey(c.character, name);
+          noteLimit(key, c.value ?? c.right);
+          return [`c\u0001${key}`];
+        }
         case 'counterCompare':
+          limits.set(this.counterKey(c.character, c.counter1 || ''), null);
+          limits.set(this.counterKey(c.character, c.counter2 || ''), null);
           return [`c\u0001${this.counterKey(c.character, c.counter1 || '')}`, `c\u0001${this.counterKey(c.character, c.counter2 || '')}`];
         case 'inventory': {
           const item = String(c.item || c.value || c.right || '');
@@ -1334,7 +1352,16 @@ export class StateSimulationAnalyzer {
         const name = n.slice(2);
         switch (n[0]) {
           case 'v': return `${n}=${state.variables.get(name)}`;
-          case 'c': return `${n}=${state.counters.get(name)}`;
+          case 'c': {
+            const value = state.counters.get(name) ?? 0;
+            const limit = limits.get(name);
+            // Only past the last threshold in the one direction it ever moves:
+            // climbing toward a threshold still matters, and so does coming back.
+            const way = directions.get(name);
+            if (limit && way === 'up' && value > limit.high) return `${n}=above`;
+            if (limit && way === 'down' && value < limit.low) return `${n}=below`;
+            return `${n}=${value}`;
+          }
           case 'i': return `${n}=${itemQuantity(state, 'player', name)}`;
           default: return state.visitedBeats.has(name) ? n : '';
         }
@@ -1583,6 +1610,40 @@ export class StateSimulationAnalyzer {
   /** A screen that moves on by itself when its time runs out: the button and the wait are two ways on. */
   private hasTimedExit(beat: Beat): boolean {
     return (beat.defaultTargetDelay ?? 0) > 0 && defaultTargetIsLive(beat);
+  }
+
+  /** Counters every change moves one way. Anything else that sets one rules it out. */
+  private counterDirections(): Map<string, 'up' | 'down' | 'both'> {
+    const out = new Map<string, 'up' | 'down' | 'both'>();
+    const note = (name: string, way: 'up' | 'down' | 'both') => {
+      const known = out.get(name);
+      out.set(name, !known || known === way ? way : 'both');
+    };
+    const change = (name: string, by: unknown) => {
+      const n = Number(by ?? 1);
+      note(name, !Number.isFinite(n) ? 'both' : n >= 0 ? 'up' : 'down');
+    };
+    const walk = (o: any): void => {
+      if (Array.isArray(o)) { o.forEach(walk); return; }
+      if (!o || typeof o !== 'object') return;
+      if (o.type === 'incrementCounter' && o.target) change(this.counterKey(o.character, o.target), o.value);
+      if (o.type === 'setCounter' && o.target) note(this.counterKey(o.character, o.target), 'both');
+      if (typeof o.counter === 'string' && o.counter) note(o.counter, 'both');
+      for (const v of Object.values(o)) if (v && typeof v === 'object') walk(v);
+    };
+    for (const beat of this.story.getAllBeats()) {
+      const params: any = beat.getParameters();
+      walk(params);
+      walk(beat.connections);
+      if (beat.type === 'setVariable' && params.type === 'counter' && params.name) {
+        const key = this.counterKey(params.character, params.name);
+        if (params.operation === 'add' || params.operation === 'change') change(key, params.value);
+        else if (params.operation === 'subtract') change(key, -Number(params.value ?? 1));
+        else note(key, 'both');
+      }
+      if (beat.type === 'inputText' && params.counter) note(params.counter, 'both');
+    }
+    return out;
   }
 
   /** A Dialog Tree with a reply or line that returns to its first line. */

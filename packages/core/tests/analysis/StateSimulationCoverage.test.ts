@@ -659,3 +659,26 @@ describe('a branch a Condition Check never takes', () => {
     expect(on?.details).toContain('Money <= 0');
   });
 });
+
+describe('a running total past its last threshold', () => {
+  const story = (down: boolean) => {
+    const st = new Story({ title: 'T', author: 'T', firstBeatId: 'hub' });
+    st.addBeat(createTestBeat({ id: 'hub', name: 'hub', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'Again', target: 'hub', effects: [{ type: 'incrementCounter', target: 'laps', value: 1 }] },
+      ...(down ? [{ id: 'c', text: 'Back', target: 'hub', effects: [{ type: 'incrementCounter', target: 'laps', value: -1 }] }] : []),
+      { id: 'b', text: 'Leave', target: 'end', conditions: [{ type: 'counter', variableName: 'laps', operator: '>=', value: 3 }] },
+    ] } } as any));
+    st.addBeat(createTestBeat({ id: 'end', name: 'end', type: 'endScreen', parameters: { message: 'e', showRestart: false } } as any));
+    return new StateSimulationAnalyzer(st, { maxPaths: 300, maxDepth: 60 }).analyzeRaw();
+  };
+
+  it('stops the laps once only climbing is possible, but still climbs to the threshold', () => {
+    const paths = story(false);
+    expect(paths.some((p) => p.outcome.beatId === 'end')).toBe(true);
+    expect(paths.some((p) => p.outcome.type === 'depthLimit')).toBe(false);
+  });
+
+  it('still reaches the threshold when the total can also come back down', () => {
+    expect(story(true).some((p) => p.outcome.beatId === 'end')).toBe(true);
+  });
+});
