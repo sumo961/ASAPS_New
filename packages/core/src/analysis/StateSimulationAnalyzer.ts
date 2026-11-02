@@ -564,27 +564,58 @@ export class StateSimulationAnalyzer {
     interface Item { beatId: string; state: SimulationState; parent: number; via: SituationStep | null }
     const parents: Array<{ parent: number; step: SituationStep }> = [];
     const seen = new Set<string>();
-    const queue: Item[] = [];
+    // The rest wait by how near they are to something still to find, and each
+    // distance takes its turn: beats that can never open sit near a gate nothing
+    // meets, and always taking the nearest would starve everything further off.
+    const stopsFound = new Set<string>();
     const fresh: Item[] = [];
-    let head = 0;
+    const buckets: Item[][] = [];
+    const far: Item[] = [];
+    let waiting = 0;
+    let turn = 0;
+    let distance = new Map<string, number>();
+    let distanceFor = -1;
+    const refreshDistance = () => {
+      const size = result.perBeat.size + stopsFound.size + this.shownReplies.size;
+      if (size === distanceFor) return;
+      distanceFor = size;
+      distance = this.distanceToUncovered(new Set(result.perBeat.keys()), stopsFound);
+    };
+    const file = (item: Item) => {
+      const d = distance.get(item.beatId);
+      if (d === undefined) far.push(item); else (buckets[d] ??= []).push(item);
+      waiting++;
+    };
+    const take = (): Item | undefined => {
+      for (let tried = 0; tried < buckets.length; tried++) {
+        turn = turn + 1 >= buckets.length ? 0 : turn + 1;
+        const item = buckets[turn]?.pop();
+        if (item) { waiting--; return item; }
+      }
+      const item = far.pop();
+      if (item) waiting--;
+      return item;
+    };
     const push = (beatId: string, state: SimulationState, parent: number, via: SituationStep | null) => {
-      if (!this.getBeat(beatId) && parent >= 0) { result.stops.add(parents[parent].step.beatId); return; }
+      if (!this.getBeat(beatId) && parent >= 0) {
+        const from = parents[parent].step;
+        result.stops.add(from.beatId);
+        stopsFound.add(`${from.beatId}|${from.label || beatId}`);
+        return;
+      }
       const key = `${beatId}|${keyOf(beatId, state)}`;
       if (seen.has(key)) return;
       seen.add(key);
       // Beats nobody has played yet go first: reach before thoroughness.
       if (!result.perBeat.has(beatId)) fresh.push({ beatId, state, parent, via });
-      else queue.push({ beatId, state, parent, via });
+      else file({ beatId, state, parent, via });
     };
     for (const state of this.initialStates()) push(startBeatId, cloneState(state), -1, null);
-    while (fresh.length > 0 || head < queue.length) {
+    while (fresh.length > 0 || waiting > 0) {
       if (result.situations >= maxSituations) { result.complete = false; break; }
-      let item = fresh.pop();
-      if (!item) {
-        item = queue[head];
-        queue[head] = undefined as unknown as Item; // What's played needn't stay in memory.
-        head++;
-      }
+      refreshDistance();
+      const item = fresh.pop() ?? take();
+      if (!item) break;
       const beat = this.getBeat(item.beatId);
       if (!beat) continue;
       result.situations++;
