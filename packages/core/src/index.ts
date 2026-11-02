@@ -24,3 +24,4 @@ export * from './kg';
 // Package info
 export const version = '2.0.0';
 export const name = 'ASAPS Core';
+export { counterComparisonValue, isTextForCounter } from './engine/variableValues';

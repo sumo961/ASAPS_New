@@ -12,6 +12,7 @@ import { RoleHolderConditionFields } from './RoleHolderConditionFields';
 import React from 'react';
 import { VariableValueInput, valueForPickedVariable } from './VariableValueInput';
 import { Plus, Trash2, ShieldCheck } from 'lucide-react';
+import { isTextForCounter } from '@asaps/core';
 import type { Beat } from '@asaps/core';
 import type { StateRequirement, Condition } from '@asaps/core';
 import { SmartNameDropdown } from './SmartNameDropdown';
@@ -389,14 +390,25 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
                   <option value="==">=</option>
                   <option value="!=">≠</option>
                 </select>
-                <input
-                  type="number"
-                  value={(cond as any).value ?? 0}
-                  onChange={e =>
-                    updateCondition(idx, { value: parseInt(e.target.value, 10) || 0 } as any)
-                  }
-                  className="w-16 px-2 py-1 border border-gray-300 rounded text-xs"
-                />
+                {isTextForCounter((cond as any).value) ? (
+                  <button
+                    type="button"
+                    title={`A counter holds a number, so it never matches the text "${String((cond as any).value)}"`}
+                    onClick={() => updateCondition(idx, { type: 'variable' } as any)}
+                    className="px-1.5 py-1 border border-red-300 bg-red-50 text-red-800 rounded text-xs"
+                  >
+                    Text: change to variable
+                  </button>
+                ) : (
+                  <input
+                    type="number"
+                    value={(cond as any).value ?? 0}
+                    onChange={e =>
+                      updateCondition(idx, { value: parseInt(e.target.value, 10) || 0 } as any)
+                    }
+                    className="w-16 px-2 py-1 border border-gray-300 rounded text-xs"
+                  />
+                )}
               </div>
             )}
 

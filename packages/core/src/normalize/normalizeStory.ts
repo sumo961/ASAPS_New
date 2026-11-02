@@ -24,6 +24,7 @@ import type {
   ValidationIssue,
 } from './types';
 import { normalizeBeat } from './normalizeBeat';
+import { isTextForCounter } from '../engine/variableValues';
 import { validateBeat } from './validateBeat';
 
 export interface NormalizeStoryOptions {
@@ -155,6 +156,43 @@ export function buildClustersFromBeats(beats: any[]): any[] {
   return out;
 }
 
+/**
+ * A generator that compares or sets a "counter" with text means a variable:
+ * a counter holds a number, and the check could never match. Rewrite those to
+ * their variable forms, so what was generated does what it says.
+ */
+function repairCounterText(beat: any): NormalizeChange[] {
+  const out: NormalizeChange[] = [];
+  const note = (path: string, from: string, to: string) =>
+    out.push({ beatId: beat?.id, path, kind: 'coerced' as NormalizeChange['kind'], from, to, note: 'A counter holds a number; text belongs in a variable' });
+  const walk = (node: any, path: string): void => {
+    if (Array.isArray(node)) { node.forEach((v, i) => walk(v, `${path}[${i}]`)); return; }
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'counter' && isTextForCounter(node.value ?? node.right)) {
+      node.type = 'variable';
+      note(`${path}.type`, 'counter', 'variable');
+    }
+    if (node.type === 'setCounter' && isTextForCounter(node.value)) {
+      node.type = 'setVariable';
+      note(`${path}.type`, 'setCounter', 'setVariable');
+    }
+    for (const k of Object.keys(node)) walk(node[k], path ? `${path}.${k}` : k);
+  };
+  if (!beat?.parameters) return out;
+  // normalizeBeat copies only the top level; the story as it arrived stays untouched.
+  const p = (beat.parameters = structuredClone(beat.parameters));
+  if (beat.type === 'conditionBeat' && p.conditionType === 'counter' && isTextForCounter(p.value)) {
+    p.conditionType = 'variable';
+    note('parameters.conditionType', 'counter', 'variable');
+  }
+  if (beat.type === 'setVariable' && p.type === 'counter' && isTextForCounter(p.value) && !String(p.value).trim().startsWith('=')) {
+    p.type = 'variable';
+    note('parameters.type', 'counter', 'variable');
+  }
+  walk(p, 'parameters');
+  return out;
+}
+
 export function normalizeStory(
   rawStory: any,
   schema: BeatSchema,
@@ -212,7 +250,8 @@ export function normalizeStory(
   if (Array.isArray(story.beats)) {
     const out = [];
     for (const rawBeat of story.beats) {
-      const { beat, changes } = normalizeBeat(rawBeat, schema);
+      const { beat, changes: beatChanges } = normalizeBeat(rawBeat, schema);
+      const changes = [...beatChanges, ...repairCounterText(beat)];
       if (changes.length > 0) {
         beatsNormalized++;
         allChanges.push(...changes);

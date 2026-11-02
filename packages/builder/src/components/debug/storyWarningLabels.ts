@@ -7,6 +7,9 @@ const LABELS: Record<StoryWarning['code'], string> = {
   'keypad-ungated': 'Keypad has no clue before it',
   'requires-unfulfillable': 'Requirement can never be met',
   'requires-violated-on-path': 'Requirement not met on some paths',
+  'counter-text': 'Counter used with text',
+  'wordless-reply': 'Reply without words',
+  'line-never-plays': 'Next line never plays',
   'role': 'Role',
 };
 

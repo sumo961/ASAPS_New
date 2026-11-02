@@ -14,6 +14,7 @@
  * not per path. That makes "unsatisfiable" a strong claim (no path at all)
  * and "satisfiable" a weak one — exactly the asymmetry a fix proposal wants.
  */
+import { isTextForCounter } from '@asaps/core';
 
 export interface CounterRange {
   min: number;
@@ -146,6 +147,8 @@ export function readCounterCondition(beat: any): CounterCondition | null {
   if (typeof counterName !== 'string' || !counterName) return null;
   const operator = nestedCond?.operator || p.operator || '>=';
   const raw = nestedCond?.value ?? p.value ?? 0;
+  // Text is no threshold: Story Warnings reports a counter checked against it.
+  if (isTextForCounter(raw)) return null;
   const value = Number(raw);
   return {
     counterName,

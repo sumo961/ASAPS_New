@@ -3,6 +3,7 @@ import { normalizeRoles } from '../engine/roles';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
 import { analysisLinks, EXTRA_LINK } from './analysisLinks';
+import { isTextForCounter } from '../engine/variableValues';
 import { StoryContext, PLAYTHROUGH_VARIABLE } from '../engine/StoryContext';
 
 /**
@@ -484,6 +485,16 @@ export class ReachabilityAnalyzer {
             condition,
             isSatisfiable: true,
             reason: 'Invalid condition format'
+          };
+        }
+
+        if (isTextForCounter(requiredValue)) {
+          if (operator === '!=') return { condition, isSatisfiable: true };
+          return {
+            condition,
+            isSatisfiable: false,
+            reason: `"${counterName}" is checked as a counter, and a counter holds a number, so it can never match the text "${requiredValue}"`,
+            suggestedFix: `If "${counterName}" holds text, change this check to a Variable check`,
           };
         }
 

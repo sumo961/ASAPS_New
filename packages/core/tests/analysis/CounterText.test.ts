@@ -1,0 +1,127 @@
+/**
+ * A counter holds a number, so text never matches it. The engine and the
+ * simulator must give the same answer, the warning names the mistake, and
+ * generated stories get a variable check instead.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { StoryContext } from '../../src/engine/StoryContext';
+import { StateSimulationAnalyzer } from '../../src/analysis/StateSimulationAnalyzer';
+import { detectStoryWarnings } from '../../src/analysis/StoryWarnings';
+import { Story } from '../../src/engine/Story';
+import { normalizeStory } from '../../src/normalize/normalizeStory';
+import { createTestBeat } from '../test-utils';
+
+beforeEach(() => vi.stubGlobal('window', { setInterval: vi.fn().mockReturnValue(1), clearInterval: vi.fn() }));
+afterEach(() => vi.unstubAllGlobals());
+
+const OPS = ['==', '!=', '>', '<', '>=', '<='] as const;
+
+function gateStory(operator: string, value: unknown) {
+  const story = new Story({ title: 'T', author: 'T', firstBeatId: 'gate' });
+  story.addBeat(createTestBeat({ id: 'gate', name: 'Gate', type: 'conditionBeat', parameters: {
+    conditionType: 'counter', variableName: 'path', operator, value, trueTarget: 'yes', falseTarget: 'no',
+  } } as any));
+  for (const id of ['yes', 'no']) story.addBeat(createTestBeat({ id, name: id, type: 'endScreen', parameters: { text: id } } as any));
+  return story;
+}
+
+function simulatedEnd(operator: string, value: unknown) {
+  const r: any = new StateSimulationAnalyzer(gateStory(operator, value), { maxPaths: 10, maxDepth: 5 }).analyze();
+  return r.outcomes.map((o: any) => o.endingBeatId);
+}
+
+describe('counter compared with a value', () => {
+  it('text never matches a counter in the engine', () => {
+    const ctx: any = new (StoryContext as any)();
+    const check = (operator: string) => ctx.checkCondition({ type: 'counter', variableName: 'path', operator, value: 'stay' });
+    expect(OPS.map(check)).toEqual([false, true, false, false, false, false]);
+  });
+
+  it('an empty value still reads as 0, and number text as the number', () => {
+    const ctx: any = new (StoryContext as any)();
+    ctx.setCounter('path', 5);
+    expect(ctx.checkCondition({ type: 'counter', variableName: 'path', operator: '==', value: '5' })).toBe(true);
+    ctx.setCounter('path', 0);
+    for (const value of [undefined, null, '', ' ', NaN]) {
+      expect(ctx.checkCondition({ type: 'counter', variableName: 'path', operator: '==', value } as any)).toBe(true);
+    }
+  });
+
+  it.each([...OPS.map((op) => [op, 'stay']), ...OPS.map((op) => [op, 0]), ...OPS.map((op) => [op, 3])])(
+    'the simulator takes the branch the engine takes: %s %s', (operator, value) => {
+      const engine = (new (StoryContext as any)() as any).checkCondition({ type: 'counter', variableName: 'path', operator, value });
+      expect(simulatedEnd(operator as string, value)).toEqual([engine ? 'yes' : 'no']);
+    });
+});
+
+describe('Story Warnings', () => {
+  const warningsFor = (beats: any[]) => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: beats[0].id });
+    for (const b of beats) story.addBeat(createTestBeat(b));
+    return detectStoryWarnings({ paths: [], story });
+  };
+
+  it('names a Condition beat that checks a counter against text, once', () => {
+    const story = gateStory('==', 'stay');
+    const found = detectStoryWarnings({ paths: [], story }).filter((w) => w.code === 'counter-text');
+    expect(found).toHaveLength(1);
+    expect(found[0].beatId).toBe('gate');
+    expect(found[0].message).toContain('never true');
+  });
+
+  it('stays quiet for a number', () => {
+    expect(detectStoryWarnings({ paths: [], story: gateStory('==', 3) }).filter((w) => w.code === 'counter-text')).toEqual([]);
+  });
+
+  it('finds choice conditions and effects that use text', () => {
+    const found = warningsFor([{ id: 'm', name: 'M', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'A', target: 'm', conditions: [{ type: 'counter', variableName: 'x', operator: '!=', value: 'no' }] },
+      { id: 'b', text: 'B', target: 'm', effects: [{ type: 'setCounter', target: 'y', value: 'word' }] },
+    ] } }]).filter((w) => w.code === 'counter-text');
+    expect(found.map((w) => w.detail?.name).sort()).toEqual(['x', 'y']);
+    expect(found.find((w) => w.detail?.name === 'x')?.message).toContain('always true');
+  });
+
+  it('finds blank reply buttons and next lines that never play, but not next lines', () => {
+    const found = warningsFor([{ id: 'd', name: 'D', type: 'dialogTree', parameters: { dialogTree: {
+      id: 'root', speaker: 'N', text: 'First', choices: [
+        { id: 'c1', text: '', continue: true, dialogNode: { id: 'n1', speaker: 'N', text: 'Plays', choices: [
+          { id: 'blank', text: '', conditions: [{ type: 'visitedBeat', beatId: 'd' }], dialogNode: { id: 'n3', speaker: 'N', text: 'x', choices: [] } },
+        ] } },
+        { id: 'c2', text: '', continue: true, dialogNode: { id: 'n2', speaker: 'N', text: 'Dead', choices: [] } },
+      ] } } }]);
+    expect(found.filter((w) => w.code === 'wordless-reply').map((w) => w.detail?.count)).toEqual([1]);
+    const dead = found.filter((w) => w.code === 'line-never-plays');
+    expect(dead).toHaveLength(1);
+    expect(dead[0].message).toContain('Dead');
+  });
+
+  it('a conditional next line before a fallback is fine', () => {
+    const found = warningsFor([{ id: 'd', name: 'D', type: 'dialogTree', parameters: { dialogTree: {
+      id: 'root', speaker: 'N', text: 'First', choices: [
+        { id: 'c1', text: '', continue: true, conditions: [{ type: 'visitedBeat', beatId: 'd' }], dialogNode: { id: 'n1', speaker: 'N', text: 'A', choices: [] } },
+        { id: 'c2', text: '', continue: true, dialogNode: { id: 'n2', speaker: 'N', text: 'B', choices: [] } },
+      ] } } }]);
+    expect(found.filter((w) => w.code === 'line-never-plays' || w.code === 'wordless-reply')).toEqual([]);
+  });
+});
+
+describe('generated stories', () => {
+  it('turn a counter used with text into a variable, leaving the input alone', () => {
+    const raw = { beats: [
+      { id: 'g', type: 'conditionBeat', name: 'G', parameters: { conditionType: 'counter', variableName: 'path', operator: '==', value: 'stay', trueTarget: 'm', falseTarget: 'm' } },
+      { id: 'm', type: 'multiChoice', name: 'M', parameters: { question: 'q', choices: [
+        { id: 'a', text: 'A', target: 'g', conditions: [{ type: 'counter', variableName: 'path', operator: '==', value: 'sail' }], effects: [{ type: 'setCounter', target: 'path', value: 'stay' }] },
+        { id: 'b', text: 'B', target: 'g', conditions: [{ type: 'counter', variableName: 'score', operator: '>=', value: 2 }] },
+      ] } },
+    ] };
+    const before = JSON.stringify(raw);
+    const { story } = normalizeStory(raw, { beatTypes: {} } as any);
+    expect(JSON.stringify(raw)).toBe(before);
+    const [g, m] = story.beats;
+    expect(g.parameters.conditionType).toBe('variable');
+    expect(m.parameters.choices[0].conditions[0].type).toBe('variable');
+    expect(m.parameters.choices[0].effects[0].type).toBe('setVariable');
+    expect(m.parameters.choices[1].conditions[0].type).toBe('counter');
+  });
+});

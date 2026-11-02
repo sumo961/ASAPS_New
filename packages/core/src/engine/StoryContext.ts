@@ -6,7 +6,7 @@ import { resolveCharacterKey, resolveCharacter } from '../utils/characterRef';
 import { normalizeRoles, isRoleRef, stripRolePrefix, fallbackHolder, PLAYER_ROLE_ID, type CastRole } from './roles';
 import { resolveCharacterWithVariant, findCharacterVariant } from '../utils/characterVariant';
 import { modulateEmotionDelta } from './PersonalityTraits';
-import { coerceToDeclaredType, alignForComparison, type DeclaredVariableType } from './variableValues';
+import { coerceToDeclaredType, alignForComparison, counterComparisonValue, type DeclaredVariableType } from './variableValues';
 import {
   createSensorService,
   MockSensorService,
@@ -2386,12 +2386,7 @@ export class StoryContext extends EventEmitter {
         leftValue = ctrOwner
           ? this.getCharacterCounter(ctrOwner, varName)
           : this.getCounter(varName);
-        // Ensure rightValue is numeric for counter comparisons (guards against undefined/NaN)
-        if (rightValue === undefined || rightValue === null || Number.isNaN(Number(rightValue))) {
-          rightValue = 0;
-        } else {
-          rightValue = Number(rightValue);
-        }
+        rightValue = counterComparisonValue(rightValue);
         console.log(`[StoryContext] Counter check: "${varName}"${ctrOwner ? ` @${ctrOwner}` : ''} = ${leftValue}, comparing ${condition.operator} ${rightValue}`);
         break;
       }

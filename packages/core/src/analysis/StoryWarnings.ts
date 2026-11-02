@@ -14,6 +14,7 @@ import type { SimulatedPath, SimulatedStep, SimulationState } from './StateSimul
 import type { StateRequirement, Condition } from '../types';
 import { analyzeRoleFindings } from './roleFindings';
 import { analysisLinks } from './analysisLinks';
+import { isTextForCounter } from '../engine/variableValues';
 
 export type StoryWarningCode =
   | 'keypad-softlock-loop'            // failTarget eventually leads back to the keypad with no state change
@@ -21,6 +22,9 @@ export type StoryWarningCode =
   | 'keypad-ungated'                  // no prerequisite check ancestor; player can always succeed
   | 'requires-unfulfillable'          // beat declares requires but no ancestor provides the state
   | 'requires-violated-on-path'       // a specific path reaches the gated beat without satisfying requires
+  | 'counter-text'                    // a counter checked against, or set to, text
+  | 'wordless-reply'                  // a Dialog Tree reply button with no words
+  | 'line-never-plays'                // a next line behind one that always plays
   | 'role';                           // cast roles: unknown role, non-candidate cast, recast, used before cast, bare AI partner
 
 export interface StoryWarning {
@@ -74,7 +78,86 @@ export function detectStoryWarnings(cfg: DetectConfig): StoryWarning[] {
     });
   }
 
+  // 4. Mistakes only a read of the beat shows: the simulator plays them as written.
+  for (const beat of story.getAllBeats()) {
+    warnings.push(...detectCounterText(beat));
+    if (beat.type === 'dialogTree') warnings.push(...detectDialogShape(beat));
+  }
+
   return warnings;
+}
+
+// ============================================================================
+// Counters and text
+// ============================================================================
+
+function detectCounterText(beat: Beat): StoryWarning[] {
+  const out: StoryWarning[] = [];
+  const params = beat.getParameters() as any;
+  const seen = new Set<string>();
+  const add = (message: string, detail: Record<string, any>) => {
+    if (seen.has(message)) return;
+    seen.add(message);
+    out.push({ code: 'counter-text', severity: 'error', beatId: beat.id, beatName: beat.name, message, detail });
+  };
+  const check = (name: string, operator: string, value: unknown) => {
+    const outcome = operator === '!=' ? 'always true' : 'never true';
+    add(`Checks the counter "${name}" ${operator} "${String(value)}", but a counter holds a number, so this is ${outcome}. If "${name}" holds text, change the check to Variable.`, { name, value });
+  };
+  const walk = (node: any): void => {
+    if (Array.isArray(node)) { node.forEach(walk); return; }
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'counter' && isTextForCounter(node.value ?? node.right)) {
+      check(node.variableName || node.variable || node.left || '?', node.operator || '==', node.value ?? node.right);
+    }
+    if ((node.type === 'setCounter' || node.type === 'incrementCounter') && isTextForCounter(node.value)) {
+      add(`Sets the counter "${node.target}" to the text "${node.value}", but a counter holds a number, so it gets 0. If "${node.target}" holds text, use Set Variable.`, { name: node.target, value: node.value });
+    }
+    for (const k of Object.keys(node)) walk(node[k]);
+  };
+  walk(params);
+  walk((beat as any).requires);
+  walk(beat.connections);
+  if (beat.type === 'setVariable' && params.type === 'counter' && isTextForCounter(params.value) && !String(params.value).trim().startsWith('=')) {
+    add(`Sets the counter "${params.name}" to the text "${params.value}", but a counter holds a number, so it gets 0. If "${params.name}" holds text, change the type to Variable.`, { name: params.name, value: params.value });
+  }
+  return out;
+}
+
+// ============================================================================
+// Dialog Tree shape
+// ============================================================================
+
+function detectDialogShape(beat: Beat): StoryWarning[] {
+  const out: StoryWarning[] = [];
+  const tree = (beat.getParameters() as any).dialogTree;
+  const onRoute = new Set<any>();
+  const preview = (node: any) => String(node?.text ?? '').trim().slice(0, 50);
+  const walk = (node: any): void => {
+    if (!node || typeof node !== 'object' || onRoute.has(node)) return;
+    onRoute.add(node);
+    const choices: any[] = Array.isArray(node.choices) ? node.choices.filter(Boolean) : [];
+    const wordless = choices.filter((c) => !c.continue && c.id !== 'auto_continue' && !String(c.text ?? '').trim());
+    if (wordless.length > 0) {
+      out.push({
+        code: 'wordless-reply', severity: 'warn', beatId: beat.id, beatName: beat.name,
+        message: `After the line "${preview(node)}", ${wordless.length === 1 ? 'a reply has' : `${wordless.length} replies have`} no words, so players see a blank button. Give ${wordless.length === 1 ? 'it' : 'them'} words, or make ${wordless.length === 1 ? 'it a next line' : 'them next lines'} ("Then another character speaks").`,
+        detail: { nodeId: node.id, count: wordless.length },
+      });
+    }
+    const steps = choices.filter((c) => c.continue === true);
+    const firstAlways = steps.findIndex((c) => !(Array.isArray(c.conditions) && c.conditions.length > 0));
+    for (const dead of firstAlways >= 0 ? steps.slice(firstAlways + 1) : []) {
+      out.push({
+        code: 'line-never-plays', severity: 'warn', beatId: beat.id, beatName: beat.name,
+        message: `The next line "${preview(dead.dialogNode) || 'without text'}" never plays: the one before it has no condition, so it always plays instead.`,
+        detail: { nodeId: node.id, choiceId: dead.id },
+      });
+    }
+    for (const c of choices) walk(c.dialogNode);
+  };
+  walk(tree);
+  return out;
 }
 
 // ============================================================================

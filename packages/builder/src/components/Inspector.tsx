@@ -1,5 +1,6 @@
 import { supportsVisualEditor } from '../utils/visualBeatTypes';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { isTextForCounter } from '@asaps/core';
 import { Beat, synthesizeEffectsFromLegacyParams, suggestDurationSeconds, DEFAULT_TARGET_TIMEOUT_TYPES, isMultiChoiceLike, normalizeRoles, linesMoveOnByThemselves, normalizeDialogTreeLayoutTemplate } from '@asaps/core';
 import { VariableValueInput } from '../editors/VariableValueInput';
 import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe, ShieldCheck, Maximize2, Minimize2 } from 'lucide-react';
@@ -2233,7 +2234,18 @@ export const Inspector: React.FC<InspectorProps> = ({
                       </label>
                       <select
                         value={localBeat.parameters?.conditionType || 'counter'}
-                        onChange={(e) => handleParameterChange('conditionType', e.target.value)}
+                        onChange={(e) => {
+                          // A counter holds a number: text kept from another type could never match.
+                          const nextType = e.target.value;
+                          const stale = nextType === 'counter' && isTextForCounter(localBeat.parameters?.value);
+                          handleParametersChange({
+                            conditionType: nextType,
+                            ...(stale ? { value: 0 } : {}),
+                            ...(localBeat.parameters?.condition
+                              ? { condition: { ...localBeat.parameters.condition, type: nextType, ...(stale ? { value: 0 } : {}) } }
+                              : {}),
+                          });
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       >
                         <option value="counter">Counter</option>
@@ -2262,6 +2274,23 @@ export const Inspector: React.FC<InspectorProps> = ({
                     {/* Counter Condition */}
                     {localBeat.parameters?.conditionType === 'counter' && (
                       <>
+                        {isTextForCounter(localBeat.parameters?.value) && (
+                          <div className="p-2 rounded border border-red-200 bg-red-50 text-xs text-red-800">
+                            This compares a counter with the text "{String(localBeat.parameters.value)}". A counter holds a number, so the text never matches.
+                            <button
+                              type="button"
+                              className="block mt-1 underline font-medium"
+                              onClick={() => handleParametersChange({
+                                conditionType: 'variable',
+                                ...(localBeat.parameters?.condition
+                                  ? { condition: { ...localBeat.parameters.condition, type: 'variable' } }
+                                  : {}),
+                              })}
+                            >
+                              Change to Variable
+                            </button>
+                          </div>
+                        )}
                         <CounterOwnerPicker
                           label="Counter"
                           counters={availableCounters}
@@ -2295,7 +2324,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                           </label>
                           <input
                             type="number"
-                            value={localBeat.parameters?.value ?? localBeat.parameters?.val ?? 0}
+                            value={isTextForCounter(localBeat.parameters?.value) ? '' : (localBeat.parameters?.value ?? localBeat.parameters?.val ?? 0)}
                             onChange={(e) => handleParameterChange('value', parseInt(e.target.value))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           />

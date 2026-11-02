@@ -15,7 +15,7 @@
  */
 
 import type { Story } from '../engine/Story';
-import { alignForComparison } from '../engine/variableValues';
+import { alignForComparison, counterComparisonValue, isTextForCounter } from '../engine/variableValues';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
 import { analysisLinks, isChoiceBeatType, EXTRA_LINK } from './analysisLinks';
@@ -1781,11 +1781,13 @@ export class StateSimulationAnalyzer {
       case 'variable': {
         if (!varName) return false;
 
-        const currentValue = type === 'counter'
-          ? (state.counters.get(this.counterKey((condition as any).character, varName)) ?? 0)
-          : (state.variables.get(varName) ?? 0);
-
-        return this.compareValues(currentValue, operator, compareValue);
+        if (type === 'counter') {
+          const counter = state.counters.get(this.counterKey((condition as any).character, varName)) ?? 0;
+          // As the runtime: text is never equal to or ordered with a number.
+          if (isTextForCounter(compareValue)) return operator === '!=';
+          return this.compareValues(counter, operator, counterComparisonValue(compareValue));
+        }
+        return this.compareValues(state.variables.get(varName) ?? 0, operator, compareValue);
       }
 
       case 'inventory': {

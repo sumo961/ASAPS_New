@@ -171,6 +171,7 @@ const BEAT_TYPE_GUIDE = `
 - dialogNode (nested): NPC responds, conversation continues
 - 🚨 Every node must lead somewhere: at least one choice, or a node "target" (NPC AUTO-EXIT below). A node with no choices and no target ends the scene the instant its line appears, so nobody reads it, and the app reports it as broken. Give a closing NPC line "target": the next beat.
 - Connections: Multiple → based on dialog choices leading to beat targets
+- COUNTERS HOLD NUMBERS: to track a word ("sail", "stay"), use a setVariable effect and a { "type": "variable" } condition, never a "counter" condition or setCounter with text.
 - COUNTER EFFECTS: Choices can modify counters
   { "id": "c1", "text": "I'll help you!", "target": "beat_5", "effects": [{ "type": "incrementCounter", "target": "trust", "value": 5 }] }
 - SOUND EFFECTS: Choices can play a sound when selected

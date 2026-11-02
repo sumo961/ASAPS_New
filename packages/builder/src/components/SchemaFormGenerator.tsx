@@ -1,3 +1,4 @@
+import { isTextForCounter } from '@asaps/core';
 import React, { useState } from 'react';
 import { Variable, Box, Timer, User, ChevronDown, ChevronRight, Plus, Trash2, Shuffle, Package } from 'lucide-react';
 import { SmartNameDropdown } from '../editors/SmartNameDropdown';
@@ -845,7 +846,13 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               </label>
               <select
                 value={value || paramDef.default || 'variable'}
-                onChange={(e) => onParameterChange(paramName, e.target.value)}
+                onChange={(e) => {
+                  // A counter holds a number: text kept from a variable would become 0 anyway.
+                  const stale = e.target.value === 'counter' && isTextForCounter(parameters.value)
+                    && !String(parameters.value).trim().startsWith('=');
+                  if (stale && onParametersChange) onParametersChange({ [paramName]: e.target.value, value: 0 });
+                  else onParameterChange(paramName, e.target.value);
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               >
                 <option value="variable">Variable (Text/Boolean)</option>

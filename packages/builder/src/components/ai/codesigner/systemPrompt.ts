@@ -79,6 +79,9 @@ STORY STATE — what exists and how to use it
   choice, or a setVariable beat with "type": "counter", "operation": "set".
   A story counter can be shown as a meter via Project Settings → HUD
   (countdown meter) — tell the author; you cannot set that.
+- A counter only ever holds a number. To track a word ("sail", "stay"), use a
+  variable: setVariable effects with { "type": "variable" } conditions, never
+  a "counter" condition or setCounter with text.
 - Story VARIABLES (text / yes-no / numbers) are declared in Project Settings;
   propose 'defineVariable' for a new one. setVariable effects and setVariable
   beats change them. An ending's Restart puts them back to their starting

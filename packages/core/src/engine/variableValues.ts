@@ -58,3 +58,24 @@ export function alignForComparison(left: unknown, right: unknown): [unknown, unk
   }
   return [left, right];
 }
+
+/**
+ * The value a counter is compared with. A counter holds a number, so a value
+ * that reads as a number is one, and an empty value is 0 (what the editors
+ * show for it). Text stays text and so never equals the counter: `==` and the
+ * ordering operators are false, `!=` is true.
+ */
+export function counterComparisonValue(value: unknown): unknown {
+  if (value === undefined || value === null) return 0;
+  if (typeof value === 'number') return Number.isNaN(value) ? 0 : value;
+  if (typeof value === 'string') {
+    if (value.trim() === '') return 0;
+    return parseNumber(value) ?? value;
+  }
+  return Number(value) || 0;
+}
+
+/** True for a value no counter can ever hold: text that is not a number. */
+export function isTextForCounter(value: unknown): value is string {
+  return typeof counterComparisonValue(value) === 'string';
+}

@@ -8,6 +8,14 @@ Story Logic Phase 1: **Check with AI** in the Debug window reads each beat next 
 ### Templates
 - **The Last Ferry:** Check with AI caught two choices mentioning things the player had never read. The child's cut now appears in "Halfway" (the AI fix accepted in a test copy). Tomas now writes in his notebook during the argument, seen on every route, and a new beat "The notebook" shows the page when the player asks to see it, which used to have no visible result.
 
+### Counters and text
+- **Engine fix:** a counter checked against text (`folkertPath == "stay"`) was always compared with 0, so it could be true whatever the player did. Text now never matches a counter: `==` and the ordering operators are false, `!=` is true. An empty value still reads as 0. Stories relying on the old result play differently; none of the templates do.
+- **Debug tools:** the simulator gives the engine's answer for every operator, and Reachability says why such a check can't match instead of "never modified".
+- **Prevention:** switching a Condition Check or Set Variable to Counter resets leftover text to 0. A text value already there shows a red note with **Change to Variable** (Condition Check, choice conditions, Requirements). Generated stories get a variable check or effect instead, and the generation prompts and schema say counters hold numbers.
+- **Story Warnings:** new entries for a counter used with text, a reply without words (a blank button), and a next line that never plays because the one before it always does.
+
+**Files modified:** `engine/variableValues.ts`, `engine/StoryContext.ts`, `analysis/StateSimulationAnalyzer.ts`, `analysis/ReachabilityAnalyzer.ts`, `analysis/StoryWarnings.ts`, `normalize/normalizeStory.ts`, `Inspector.tsx`, `SchemaFormGenerator.tsx`, `ChoiceConditionsEditor.tsx`, `RequirementsEditor.tsx`, `counterRangeAnalysis.ts`, prompts, `core-beats.json`, `tests/analysis/CounterText.test.ts`
+
 ### Projects open where you left them
 - A project opens in the editor and on the beat it was left with (Flowchart, Visual Editor, Script, Knowledge Graph). A project never opened on this machine opens on the full flowchart. If the beat is gone, or can't be edited visually, it opens on the flowchart.
 - This also fixes opening onto a blank "No Beat Selected" page: the editor tab was remembered across all projects, while the selected beat was not. Kept per project in localStorage (`utils/projectUiState.ts`), never in the project file.

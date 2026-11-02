@@ -12,6 +12,7 @@
  */
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
+import { isTextForCounter } from '@asaps/core';
 import type { Beat, Condition } from '@asaps/core';
 import { SmartNameDropdown } from './SmartNameDropdown';
 import { summarizeConditions } from '../utils/conditionSummary';
@@ -223,6 +224,18 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
                     );
                   }
                   const numeric = gate === 'counter' || varType === 'number';
+                  if (gate === 'counter' && isTextForCounter(cond.value)) {
+                    return (
+                      <button
+                        type="button"
+                        title={`A counter holds a number, so it never matches the text "${String(cond.value)}"`}
+                        onClick={() => update(i, { type: 'variable' } as Partial<Condition>)}
+                        className="px-1.5 py-1 border border-red-300 bg-red-50 text-red-800 rounded text-xs"
+                      >
+                        "{String(cond.value)}" is text: change to variable
+                      </button>
+                    );
+                  }
                   return (
                     <input
                       type={numeric ? 'number' : 'text'}
