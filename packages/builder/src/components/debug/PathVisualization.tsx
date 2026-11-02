@@ -71,7 +71,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
       if (!simulation) throw new Error('no simulation');
       const rawPaths = simulation.paths;
       const tree = buildPathTree(rawPaths, story);
-      const warnings = detectStoryWarnings({ paths: rawPaths, story, shownReplies: simulation.analyzer.shownReplies });
+      const warnings = detectStoryWarnings({ paths: rawPaths, story, shownReplies: simulation.analyzer.shownReplies, searchLimited: simulation.analyzer.searchLimited });
       return { pathTreeResult: tree, storyWarnings: warnings };
     } catch (error) {
       console.error('[PathVisualization] Path tree / warnings error:', error);

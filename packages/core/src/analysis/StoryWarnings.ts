@@ -49,6 +49,8 @@ export interface DetectConfig {
   story: Story;
   /** Replies some playthrough had on screen (StateSimulationAnalyzer.shownReplies). */
   shownReplies?: ReadonlySet<string>;
+  /** The search ran out of budget: what it didn't see may still happen. */
+  searchLimited?: boolean;
 }
 
 /**
@@ -111,7 +113,7 @@ export function detectStoryWarnings(cfg: DetectConfig): StoryWarning[] {
   const played = new Set(paths.flatMap((p) => p.steps.map((step) => step.beatId)));
   for (const beat of story.getAllBeats()) {
     warnings.push(...detectCounterText(beat));
-    if (beat.type === 'dialogTree') warnings.push(...detectDialogShape(beat, cfg.shownReplies, played));
+    if (beat.type === 'dialogTree') warnings.push(...detectDialogShape(beat, cfg.shownReplies, played, cfg.searchLimited));
   }
 
   return warnings;
@@ -284,7 +286,7 @@ function detectCounterText(beat: Beat): StoryWarning[] {
 // Dialog Tree shape
 // ============================================================================
 
-function detectDialogShape(beat: Beat, shownReplies?: ReadonlySet<string>, played?: ReadonlySet<string>): StoryWarning[] {
+function detectDialogShape(beat: Beat, shownReplies?: ReadonlySet<string>, played?: ReadonlySet<string>, searchLimited?: boolean): StoryWarning[] {
   const out: StoryWarning[] = [];
   const tree = (beat.getParameters() as any).dialogTree;
   const onRoute = new Set<any>();
@@ -326,7 +328,9 @@ function detectDialogShape(beat: Beat, shownReplies?: ReadonlySet<string>, playe
           code: 'reply-hidden-by-next-line', severity: 'warn', beatId: beat.id, beatName: beat.name,
           message: always
             ? `After the line "${preview(node)}", the replies ${named} never show: a next line with no condition plays instead.`
-            : `After the line "${preview(node)}", the replies ${named} never showed on any way of playing: one of the next lines always plays instead.`,
+            : searchLimited
+              ? `After the line "${preview(node)}", the search never saw the replies ${named}: a next line played instead every time. It didn't try every way through this story, so check them.`
+              : `After the line "${preview(node)}", the replies ${named} never showed on any way of playing: one of the next lines always plays instead.`,
           detail: { nodeId: node.id, always },
         });
       }
