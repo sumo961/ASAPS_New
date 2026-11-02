@@ -37,7 +37,10 @@ const running = new WeakMap<Story, { promise: Promise<StorySimulation>; signal: 
  * and a small budget exhausts before they are dequeued.
  */
 function newAnalyzer(story: Story): StateSimulationAnalyzer {
-  return new StateSimulationAnalyzer(story, { maxDepth: 300 });
+  // Long enough for a playthrough through every beat twice: a long linear story
+  // was cut off short, and a bigger limit only costs time on endless loops.
+  const maxDepth = Math.max(300, story.getAllBeats().length * 2);
+  return new StateSimulationAnalyzer(story, { maxDepth });
 }
 
 function finish(story: Story, analyzer: StateSimulationAnalyzer, paths: SimulatedPath[], startTime: number): StorySimulation {

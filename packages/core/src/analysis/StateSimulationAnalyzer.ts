@@ -18,6 +18,7 @@ import type { Story } from '../engine/Story';
 import { alignForComparison, counterComparisonValue, isTextForCounter } from '../engine/variableValues';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
+import { defaultTargetIsLive } from '../beats/Beat';
 import { analysisLinks, isChoiceBeatType, EXTRA_LINK } from './analysisLinks';
 import { StoryContext, PLAYTHROUGH_VARIABLE, type SerializedStoryState } from '../engine/StoryContext';
 import {
@@ -985,7 +986,7 @@ export class StateSimulationAnalyzer {
           visitedStates: newVisitedStates,
           takenChoicesPerBeat: frame.takenChoicesPerBeat,
         });
-      } else if (this.isChoiceBeat(beat) && connections.length > 1) {
+      } else if ((this.isChoiceBeat(beat) || this.hasTimedExit(beat)) && connections.length > 1) {
         // CHOICE BEAT: Create branches only for options NOT YET TAKEN at this beat
         // This prevents exponential explosion in hub-and-spoke patterns
 
@@ -1517,6 +1518,11 @@ export class StateSimulationAnalyzer {
       }
     }
     return true;
+  }
+
+  /** A screen that moves on by itself when its time runs out: the button and the wait are two ways on. */
+  private hasTimedExit(beat: Beat): boolean {
+    return (beat.defaultTargetDelay ?? 0) > 0 && defaultTargetIsLive(beat);
   }
 
   /** A Dialog Tree with a reply or line that returns to its first line. */

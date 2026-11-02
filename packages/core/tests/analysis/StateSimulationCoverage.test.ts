@@ -593,3 +593,16 @@ describe('only an end screen is an ending', () => {
     expect(types).toContain('stuck');
   });
 });
+
+describe('a screen with a timed exit', () => {
+  it('has two ways on: the button, and letting the time run out', () => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'dodge' });
+    const dodge = createTestBeat({ id: 'dodge', name: 'Dodge', type: 'infoText', parameters: { text: 'Quick!' }, connections: [{ targetId: 'safe' }] } as any);
+    dodge.defaultTarget = 'hit';
+    dodge.defaultTargetDelay = 3;
+    story.addBeat(dodge);
+    for (const id of ['safe', 'hit']) story.addBeat(createTestBeat({ id, name: id, type: 'endScreen', parameters: { message: id } } as any));
+    const ends = new StateSimulationAnalyzer(story, { maxPaths: 10, maxDepth: 5 }).analyzeRaw().map((p) => p.outcome.beatId).sort();
+    expect(ends).toEqual(['hit', 'safe']);
+  });
+});
