@@ -353,7 +353,7 @@ describe('Dialog Tree routes follow the runtime', () => {
       { id: 'x', text: '', continue: true, dialogNode: { id: 'n', speaker: 'N', text: 'end', choices: [] } },
       { id: 'y', text: '', continue: true, target: 'b' },
       { id: 'z', text: 'Reply', target: 'b' },
-    ] }))).toEqual(['d:ending']);
+    ] }))).toEqual(['d:deadEnd']);
   });
 
   it('a later next line plays only when the earlier one does not', () => {
@@ -542,5 +542,23 @@ describe('reachable means played', () => {
 
   it('without played beats Reachability still means linked', () => {
     expect(new ReachabilityAnalyzer(story()).analyze().reachableBeats.has('gated')).toBe(true);
+  });
+});
+
+describe('only an end screen is an ending', () => {
+  const end = (beat: any) => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: beat.id });
+    story.addBeat(createTestBeat(beat));
+    return new StateSimulationAnalyzer(story, { maxPaths: 10, maxDepth: 5 }).analyzeRaw().map((p) => p.outcome.type);
+  };
+  it('an end screen is', () => {
+    expect(end({ id: 'e', name: 'e', type: 'endScreen', parameters: { message: 'm' } })).toEqual(['ending']);
+  });
+  it('a scene with no way on is a dead end', () => {
+    expect(end({ id: 'd', name: 'd', type: 'dialogTree', parameters: { dialogTree: { id: 'r', speaker: 'N', text: 't', choices: [] } } })).toEqual(['deadEnd']);
+    expect(end({ id: 't', name: 't', type: 'infoText', parameters: { text: 't' } })).toEqual(['deadEnd']);
+  });
+  it('a scene whose reply returns to its start is a cycle', () => {
+    expect(end({ id: 'd', name: 'd', type: 'dialogTree', parameters: { dialogTree: { id: 'r', speaker: 'N', text: 't', choices: [{ id: 'c', text: 'Again', target: '__self__' }] } } })).toEqual(['cycle']);
   });
 });

@@ -906,7 +906,10 @@ export class StateSimulationAnalyzer {
 
       // Check for terminal beat
       if (this.isTerminalBeat(beat)) {
-        paths.push(this.buildPath(newPath, frame.decisions, newState, 'ending'));
+        // Only an end screen is an ending. A beat that simply has no way on is a
+        // stop, and a scene whose last reply goes back to its start is a loop.
+        const authored = ['endScreen', 'aiSummary'].includes(beat.type);
+        paths.push(this.buildPath(newPath, frame.decisions, newState, authored ? 'ending' : this.loopsOnItself(beat) ? 'cycle' : 'deadEnd'));
         noteReplay(beat, newPath, frame.decisions, newState);
         continue;
       }
@@ -1459,6 +1462,19 @@ export class StateSimulationAnalyzer {
     if (!Array.isArray(more) || more.length === 0) return first;
     const rest = more.map((c: Condition) => this.evaluateCondition(c, state));
     return params.conditionsMatch === 'any' ? first || rest.some(Boolean) : first && rest.every(Boolean);
+  }
+
+  /** A Dialog Tree with a reply or line that returns to its first line. */
+  private loopsOnItself(beat: Beat): boolean {
+    if (beat.type !== 'dialogTree') return false;
+    const seen = new Set<any>();
+    const walk = (node: any): boolean => {
+      if (!node || typeof node !== 'object' || seen.has(node)) return false;
+      seen.add(node);
+      if (node.target === '__self__') return true;
+      return (Array.isArray(node.choices) ? node.choices : []).some((c: any) => c?.target === '__self__' || walk(c?.dialogNode));
+    };
+    return walk(beat.getParameters().dialogTree);
   }
 
   /**
