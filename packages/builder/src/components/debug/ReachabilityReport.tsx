@@ -397,7 +397,7 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
           {expandedSections.has('orphaned') && (
             <div className="px-4 pb-3">
               <div className="bg-orange-50 border border-orange-200 rounded p-2 mb-3 text-xs text-orange-800">
-                Orphaned beats have no incoming connections but may still be reachable via defaultTarget
+                Nothing links to these beats, so no player reaches them unless you link them in.
               </div>
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {filteredOrphaned.length > 0 ? (
