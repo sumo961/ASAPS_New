@@ -23,7 +23,6 @@ import { PathTreeView } from './PathTreeView';
 import { backwardTargets, type BackwardTarget } from './backwardTargets';
 import { END_TYPE_HELP, END_TYPE_LABEL, END_TYPE_STYLE } from './debugWording';
 import { SearchLimitNote } from './SimulationGate';
-import { storyWarningLabel } from './storyWarningLabels';
 import { usePersistedState } from '../../utils/persistedState';
 import { simulateStory } from '../../services/storySimulation';
 
@@ -31,6 +30,34 @@ interface PathVisualizationProps {
   story: Story;
   onHighlightPath?: (beatIds: string[]) => void;
 }
+
+/** Forward's list: what needs fixing, then endings, then where the search stopped. */
+type OutcomeGroupName = 'fix' | 'endings' | 'search';
+const OUTCOME_GROUP_TITLE: Record<OutcomeGroupName, string> = { fix: 'Needs fixing', endings: 'Endings', search: 'Search notes' };
+const outcomeGroup = (endType: string): OutcomeGroupName =>
+  endType === 'ending' ? 'endings' : endType === 'deadEnd' || endType === 'stuck' ? 'fix' : 'search';
+const ORDER: OutcomeGroupName[] = ['fix', 'endings', 'search'];
+function sortOutcomes<T extends { endType: string }>(outcomes: T[]): T[] {
+  return [...outcomes].sort((a, b) => ORDER.indexOf(outcomeGroup(a.endType)) - ORDER.indexOf(outcomeGroup(b.endType)));
+}
+
+/** One row for where the search stopped: not faults in the story. */
+const SearchNotesToggle: React.FC<{ outcomes: Array<{ endType: string; endingBeatName: string; pathVariations?: unknown[] }>; open: boolean; onToggle: () => void }> = ({ outcomes, open, onToggle }) => {
+  const summary = (type: string, label: string) => {
+    const list = outcomes.filter((o) => o.endType === type);
+    if (list.length === 0) return null;
+    const count = list.reduce((sum, o) => sum + (o.pathVariations?.length ?? 1), 0);
+    const top = [...list].sort((a, b) => (b.pathVariations?.length ?? 1) - (a.pathVariations?.length ?? 1)).slice(0, 2).map((o) => o.endingBeatName.trim());
+    return `${count.toLocaleString()} ${count === 1 ? 'path' : 'paths'} ${label}, mostly around ${top.join(', ')}`;
+  };
+  const lines = [summary('cycle', 'back to a menu'), summary('depthLimit', 'cut off')].filter(Boolean);
+  return (
+    <button type="button" onClick={onToggle} className="w-full px-4 py-2 text-left text-xs text-gray-600 bg-gray-50 hover:bg-gray-100">
+      <span className="font-medium text-gray-500">{open ? 'Hide' : 'Show'} search notes</span> (where the search stopped, not faults in the story)
+      {lines.map((l) => <div key={l}>{l}</div>)}
+    </button>
+  );
+};
 
 export const PathVisualization: React.FC<PathVisualizationProps> = ({
   story,
@@ -41,6 +68,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
   const [viewMode, setViewMode] = usePersistedState<'forward' | 'backward' | 'tree'>('asaps_ui_path_view', 'forward');
   const [selectedBackwardBeat, setSelectedBackwardBeat] = useState<string | null>(null);
   const [backwardSearch, setBackwardSearch] = useState('');
+  const [showSearchNotes, setShowSearchNotes] = useState(false);
   const [expandedBackwardPath, setExpandedBackwardPath] = useState<number | null>(null);
 
   // One simulation of the story, shared with Story Logic (storySimulation):
@@ -115,13 +143,13 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
   // Filter outcomes by query
   const filteredOutcomes = useMemo(() => {
     if (!analysisResult) return [];
-    if (!queryInput.trim() || !queryEngine) return analysisResult.outcomes;
+    if (!queryInput.trim() || !queryEngine) return sortOutcomes(analysisResult.outcomes);
 
     const parsed = queryEngine.parseQuery(queryInput);
-    if (!parsed) return analysisResult.outcomes;
+    if (!parsed) return sortOutcomes(analysisResult.outcomes);
 
     const result = queryEngine.query(parsed);
-    return result.matchingOutcomes;
+    return sortOutcomes(result.matchingOutcomes);
   }, [analysisResult, queryInput, queryEngine]);
 
   // Get suggested queries
@@ -372,15 +400,13 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
                 <div className="bg-blue-50 p-2 rounded">
                   <div className="text-xs text-blue-700">Outcomes</div>
                   <div className="text-xl font-bold text-blue-700">
-                    {analysisResult.outcomes.length}
+                    {endingCount + deadEndCount + stuckCount}
                   </div>
                   {hasNonEnding && (
                     <div className="text-[10px] text-blue-600 mt-0.5 leading-tight" title="Only endings (End Screen, AI Summary) finish the story. A cycle comes back round with nothing new to find, a dead end has no way on, and a depth limit is a path the analysis stopped following because it grew very long.">
                       {endingCount} ending{endingCount !== 1 ? 's' : ''}
                       {deadEndCount > 0 && ` + ${deadEndCount} dead end${deadEndCount !== 1 ? 's' : ''}`}
                       {stuckCount > 0 && ` + ${stuckCount} stuck in a loop`}
-                      {cycleCount > 0 && ` + ${cycleCount} back to a menu`}
-                      {depthLimitCount > 0 && ` + ${depthLimitCount} cut off`}
                     </div>
                   )}
                 </div>
@@ -474,8 +500,19 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
                   : [];
                 const constraintStrings = getFilteredConstraints(allConstraintStrings);
                 const keyDecisions = extractKeyDecisions(outcome.representativePath);
+                const group = outcomeGroup(outcome.endType);
+                const startsGroup = index === 0 || outcomeGroup(filteredOutcomes[index - 1].endType) !== group;
+                if (group === 'search' && !showSearchNotes) {
+                  return startsGroup ? (
+                    <SearchNotesToggle key="search-notes" outcomes={filteredOutcomes} open={false} onToggle={() => setShowSearchNotes(true)} />
+                  ) : null;
+                }
 
                 return (
+                  <React.Fragment key={index}>
+                  {startsGroup && (group === 'search'
+                    ? <SearchNotesToggle outcomes={filteredOutcomes} open onToggle={() => setShowSearchNotes(false)} />
+                    : <div className="px-4 py-1 text-xs font-medium text-gray-500 bg-gray-50">{OUTCOME_GROUP_TITLE[group]}</div>)}
                   <div
                     key={index}
                     className={`transition-colors ${
@@ -567,6 +604,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
                       </div>
                     )}
                   </div>
+                  </React.Fragment>
                 );
               })
             ) : analysisResult ? (
@@ -591,10 +629,6 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
       {/* Tree View */}
       {viewMode === 'tree' && (
         <div className="flex-1 overflow-y-auto px-4 py-3">
-          {/* Story warnings summary */}
-          {storyWarnings.length > 0 && (
-            <StoryWarningsSummary warnings={storyWarnings} />
-          )}
           {pathTreeResult ? (
             <PathTreeView
               treeResult={pathTreeResult}
@@ -882,43 +916,3 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
 };
 
 // ============================================================================
-// StoryWarningsSummary — collapsible banner listing all detected soft-locks
-// and authoring problems.
-// ============================================================================
-
-const StoryWarningsSummary: React.FC<{ warnings: StoryWarning[] }> = ({ warnings }) => {
-  const [expanded, setExpanded] = useState(true);
-  const errors = warnings.filter(w => w.severity === 'error');
-  const warns = warnings.filter(w => w.severity !== 'error');
-  const bg = errors.length > 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200';
-  const accent = errors.length > 0 ? 'text-red-700' : 'text-amber-700';
-
-  return (
-    <div className={`mb-2 rounded border ${bg}`}>
-      <button
-        onClick={() => setExpanded(e => !e)}
-        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium ${accent}`}
-      >
-        <AlertTriangle className="w-4 h-4" />
-        <span>
-          {errors.length > 0 && `${errors.length} error${errors.length > 1 ? 's' : ''}`}
-          {errors.length > 0 && warns.length > 0 && ', '}
-          {warns.length > 0 && `${warns.length} warning${warns.length > 1 ? 's' : ''}`}
-        </span>
-        <ChevronRight className={`w-3 h-3 ml-auto transition-transform ${expanded ? 'rotate-90' : ''}`} />
-      </button>
-      {expanded && (
-        <ul className="px-3 pb-2 space-y-1 text-xs">
-          {warnings.map((w, i) => (
-            <li key={i} className={`pl-2 border-l-2 ${w.severity === 'error' ? 'border-red-400' : 'border-amber-400'}`}>
-              <div className={`font-medium ${w.severity === 'error' ? 'text-red-800' : 'text-amber-800'}`}>
-                {storyWarningLabel(w.code)}: {w.beatName}
-              </div>
-              <div className="text-gray-700 ml-0.5">{w.message}</div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-};

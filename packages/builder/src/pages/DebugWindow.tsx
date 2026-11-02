@@ -11,24 +11,25 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bug, GitBranch, AlertCircle, FileText } from 'lucide-react';
+import { AlertTriangle, Bug, GitBranch, AlertCircle, FileText } from 'lucide-react';
 import { Story, BeatTypeRegistry } from '@asaps/core';
 import { ReachabilityReport } from '../components/debug/ReachabilityReport';
 import { PathVisualization } from '../components/debug/PathVisualization';
 import { LogicValidationReport } from '../components/debug/LogicValidationReport';
 import { SimulationGate } from '../components/debug/SimulationGate';
+import { ProblemsPanel } from '../components/debug/ProblemsPanel';
 import type { DebugMessage, DebugStoryContext } from '../services/DebugWindowManager';
 import type { SerializedStoryData } from '../services/PreviewWindowManager';
 import { usePersistedState } from '../utils/persistedState';
 import type { StoryLogicStore } from '../types/storyLogic';
 import type { AIFixSuggestion } from '../types/generationReview';
 
-type Tab = 'reachability' | 'paths' | 'logic';
+type Tab = 'problems' | 'reachability' | 'paths' | 'logic';
 
 export const DebugWindow: React.FC = () => {
   const [storyData, setStoryData] = useState<SerializedStoryData | null>(null);
   const [context, setContext] = useState<DebugStoryContext | undefined>(undefined);
-  const [activeTab, setActiveTab] = usePersistedState<Tab>('asaps_ui_debug_tab', 'reachability');
+  const [activeTab, setActiveTab] = usePersistedState<Tab>('asaps_ui_debug_tab_v2', 'problems');
   const [storyLogic, setStoryLogic] = useState<StoryLogicStore | null>(null);
   const [fixResult, setFixResult] = useState<{ findingId: string; ok: boolean; error?: string } | null>(null);
 
@@ -184,6 +185,18 @@ export const DebugWindow: React.FC = () => {
       {/* Tabs */}
       <div className="flex border-b">
         <button
+          onClick={() => setActiveTab('problems')}
+          className={`px-4 py-2.5 font-medium transition-colors border-b-2 flex items-center gap-2 ${
+            activeTab === 'problems'
+              ? 'text-blue-600 border-blue-600'
+              : 'text-gray-600 border-transparent hover:text-gray-800'
+          }`}
+          title="Everything the debug tools found wrong, in one list."
+        >
+          <AlertTriangle className="w-4 h-4" />
+          Problems
+        </button>
+        <button
           onClick={() => setActiveTab('reachability')}
           className={`px-4 py-2.5 font-medium transition-colors border-b-2 flex items-center gap-2 ${
             activeTab === 'reachability'
@@ -224,6 +237,9 @@ export const DebugWindow: React.FC = () => {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
         <SimulationGate story={story}>
+        {activeTab === 'problems' && (
+          <ProblemsPanel story={story} onHighlightBeat={handleHighlightBeat} />
+        )}
         {activeTab === 'reachability' && (
           <ReachabilityReport story={story} onHighlightBeat={handleHighlightBeat} />
         )}

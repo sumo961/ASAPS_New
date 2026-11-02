@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { useAIFeatures } from '../../utils/aiFeatures';
-import { Sparkles, AlertTriangle, Info, CheckCircle, FileText, Package, GitMerge, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react';
+import { Sparkles, AlertTriangle, CheckCircle, GitMerge, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react';
 import type { Story } from '@asaps/core';
-import { validateStoryLogic, type LogicIssue, type LogicValidationResult } from '../../utils/storyLogicValidator';
-import { arrivalKey, arrivesDifferently, describeArrivalDifferences, type BeatArrival, type SimulationState } from '@asaps/core';
+import { arrivalKey, describeArrivalDifferences, type BeatArrival, type SimulationState } from '@asaps/core';
 import { simulateStory } from '../../services/storySimulation';
+import { storyLogicValidation } from './problems';
 import { StoryLogicAISection } from './StoryLogicAISection';
 import type { StoryLogicStore } from '../../types/storyLogic';
 import type { AIFixSuggestion } from '../../types/generationReview';
@@ -82,25 +82,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
   }, [story]);
   const arrivals = useMemo<Map<string, BeatArrival[]> | null>(() => simulation?.arrivals() ?? null, [simulation]);
 
-  const validation = useMemo(() => {
-    const storyData = {
-      beats: allBeats.map(beat => ({
-        id: beat.id,
-        name: beat.name,
-        type: beat.type,
-        parameters: beat.getParameters(),
-        connections: beat.getConnections()  // Include connections for hub detection
-      }))
-    };
-    const states = arrivals
-      ? new Map([...arrivals].map(([id, list]) => {
-          // Each state once (the same state can come from different starts).
-          const unique = new Map(list.map((a) => [arrivalKey(a.state), a.state]));
-          return [id, { states: [...unique.values()], differs: arrivesDifferently(list) }];
-        }))
-      : undefined;
-    return validateStoryLogic(storyData, { arrivals: states });
-  }, [allBeats, arrivals]);
+  const validation = useMemo(() => storyLogicValidation(story, simulation), [story, simulation]);
 
   const hubAnalysis = useMemo<HubAnalysis[]>(() => {
     const names = new Map<string, string>(
@@ -130,7 +112,6 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
   }, [validation.hubBeats, validation.pathAnalysis, allBeats, arrivals, simulation, story]);
 
   const warnings = validation.issues.filter(i => i.type === 'warning');
-  const infos = validation.issues.filter(i => i.type === 'info');
 
   const toggleHub = (hubId: string) => {
     setExpandedHubs(prev => {
@@ -144,56 +125,15 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
     });
   };
 
-  const getCategoryIcon = (category: LogicIssue['category']) => {
-    switch (category) {
-      case 'hub_state_assumption':
-        return <GitMerge className="w-4 h-4" />;
-      case 'undescribed_item':
-        return <Package className="w-4 h-4" />;
-      case 'ungated_state_reference':
-      case 'dialog_line_without_exit':
-        return <FileText className="w-4 h-4" />;
-      default:
-        return <AlertTriangle className="w-4 h-4" />;
-    }
-  };
-
-  const getCategoryLabel = (category: LogicIssue['category']) => {
-    switch (category) {
-      case 'hub_state_assumption':
-        return 'Hub State Assumption';
-      case 'undescribed_item':
-        return 'Undescribed Item';
-      case 'ungated_state_reference':
-        return 'Ungated State Reference';
-      case 'missing_condition_gate':
-        return 'Missing Condition Gate';
-      case 'narrative_inconsistency':
-        return 'Narrative Inconsistency';
-      case 'dialog_line_without_exit':
-        return 'Line Without Exit';
-      default:
-        return category;
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Summary: each figure jumps to its section */}
       <div className="bg-gray-50 rounded-lg p-4">
         <h3 className="text-lg font-semibold mb-3">Story Logic Summary</h3>
-        <div className={`grid ${aiOn ? 'grid-cols-4' : 'grid-cols-3'} gap-4 text-sm`}>
+        <div className={`grid ${aiOn ? 'grid-cols-2' : 'grid-cols-1'} gap-4 text-sm`}>
           <div className="flex items-center gap-2">
             <GitMerge className="w-4 h-4 text-blue-500" />
             <SummaryJump target="story-logic-hubs" disabled={hubAnalysis.length === 0}>Different states: {validation.hubBeats.length}</SummaryJump>
-          </div>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-yellow-500" />
-            <SummaryJump target={warnings.some((w) => w.category !== 'hub_state_assumption') ? 'story-logic-other-warnings' : 'story-logic-hubs'} disabled={warnings.length === 0}>Warnings: {warnings.length}</SummaryJump>
-          </div>
-          <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 text-blue-500" />
-            <SummaryJump target="story-logic-infos" disabled={infos.length === 0}>Info: {infos.length}</SummaryJump>
           </div>
           {aiOn && (
             <div className="flex items-center gap-2">
@@ -340,59 +280,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
         </div>
       )}
 
-      {/* Other Warnings (hub_state_assumption shown inline above) */}
-      {(() => {
-        const otherWarnings = warnings.filter(w => w.category !== 'hub_state_assumption');
-        if (otherWarnings.length === 0) return null;
-        return (
-          <div id="story-logic-other-warnings">
-            <h4 className="font-semibold mb-3 flex items-center gap-2 text-yellow-700">
-              <AlertTriangle className="w-4 h-4" />
-              Other Warnings ({otherWarnings.length})
-            </h4>
-            <div className="space-y-3">
-              {otherWarnings.map((issue, index) => (
-                <div
-                  key={`${issue.beatId}-${index}`}
-                  className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="text-yellow-600 mt-0.5">
-                      {getCategoryIcon(issue.category)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <button
-                          onClick={() => onHighlightBeat?.(issue.beatId)}
-                          className="font-medium text-yellow-800 hover:underline"
-                        >
-                          {issue.beatName || issue.beatId}
-                        </button>
-                        <span className="text-xs bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded">
-                          {getCategoryLabel(issue.category)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-yellow-700 mb-2">{issue.message}</p>
-                      {issue.problematicText && (
-                        <p className="text-xs text-yellow-600 mb-2">
-                          <strong>{issue.category === 'dialog_line_without_exit' ? 'The line:' : 'Detected patterns:'}</strong> {issue.problematicText}
-                        </p>
-                      )}
-                      {issue.suggestedFix && (
-                        <p className="text-xs text-yellow-600 bg-yellow-100 p-2 rounded">
-                          <strong>💡 Suggested fix:</strong> {issue.suggestedFix}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* AI findings: under the keyword warnings */}
+      {/* AI findings */}
       {simulation && arrivals && onStoryLogicChange && (
         <div id="story-logic-ai">
         <StoryLogicAISection
@@ -413,47 +301,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
         </div>
       )}
 
-      {/* Info */}
-      {infos.length > 0 && (
-        <div id="story-logic-infos">
-          <h4 className="font-semibold mb-3 flex items-center gap-2 text-blue-700">
-            <Info className="w-4 h-4" />
-            Info ({infos.length})
-          </h4>
-          <div className="space-y-2">
-            {infos.map((issue, index) => (
-              <div
-                key={`${issue.beatId}-${index}`}
-                className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm"
-              >
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-blue-500 mt-0.5" />
-                  <div>
-                    <button
-                      onClick={() => onHighlightBeat?.(issue.beatId)}
-                      className="font-medium text-blue-800 hover:underline"
-                    >
-                      {issue.beatName || issue.beatId}
-                    </button>
-                    <span className="text-blue-600">: {issue.message}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Help Text */}
-      <div className="text-xs text-gray-500 p-3 bg-gray-50 rounded-lg">
-        <strong>About Story Logic Validation:</strong>
-        <ul className="mt-1 space-y-1 list-disc list-inside">
-          <li><strong>Hub State Assumption:</strong> Text that assumes the player has something (a key, the evidence) where some of the states players arrive in hold nothing by that name</li>
-          <li><strong>Undescribed Item:</strong> Items picked up via pickProp should be described in the following beat (what does the letter say? what does the photo show?)</li>
-          <li><strong>Ungated State Reference:</strong> Text that assumes something no way in holds by that name (or, for a beat Path Analysis never reaches, that no condition checks first)</li>
-          <li><strong>Line Without Exit:</strong> A Dialog Tree line with no replies and no exit link ends the scene: players read it, click Continue, and the story goes on by the beat's own link (or stops, if the beat has none). Give it an exit link or replies so the scene says where it goes</li>
-        </ul>
-      </div>
+      <p className="text-xs text-gray-500">Warnings from these checks are in the Problems tab.</p>
     </div>
   );
 };

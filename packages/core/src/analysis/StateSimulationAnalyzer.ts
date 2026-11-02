@@ -734,6 +734,7 @@ export class StateSimulationAnalyzer {
     const stopsFound = new Set<string>();
     let buckets: Array<Array<(typeof stack)[number]>> = [];
     let relevant: (beatId: string, state: SimulationState) => string = (_id, state) => hashState(state);
+    const pathState = this.stateThatDecidesGates(new Map(this.story.getAllBeats().map((b) => [b.id, 0])));
     const enqueue = (f: (typeof stack)[number]) => {
       // A route that stops the story has nothing left to explore, so it needs no
       // place in the queue. Queued, it was lost whenever the budget ran out first,
@@ -818,9 +819,18 @@ export class StateSimulationAnalyzer {
         const spent = paths.length >= pathLimit || expansions >= maxExpansions;
         if (spent) this.truncated = true;
         if (stack.length === 0 && !this.truncated) {
-          // Every path was explored.
-          if (startReplays()) continue;
-          break;
+          // Every path was explored, each menu choice taken once per path. A
+          // beat linked from the start but still unreached may only open after
+          // going round a menu again, so the coverage pass looks for it too.
+          for (; countedPaths < paths.length; countedPaths++) {
+            for (const step of paths[countedPaths].steps) covered.add(step.beatId);
+            const last = paths[countedPaths].steps[paths[countedPaths].steps.length - 1];
+            if (last && paths[countedPaths].outcome.type === 'deadEnd') stopsFound.add(`${last.beatId}|${last.decisionMade}`);
+          }
+          if (!this.distanceToUncovered(covered, stopsFound).has(startBeatId)) {
+            if (startReplays()) continue;
+            break;
+          }
         }
         if (spent || stack.length === 0) {
           // Breadth first reaches everything in a small story and only the
@@ -922,7 +932,10 @@ export class StateSimulationAnalyzer {
       // We include takenChoicesPerBeat in the key because different choices taken
       // means different paths are still available (e.g., DABC vs ABCD)
       const takenChoicesKey = this.hashTakenChoices(frame.takenChoicesPerBeat);
-      const stateKey = `${beat.id}|${hashState(frame.state)}|${takenChoicesKey}`;
+      // Back at a beat with nothing changed that a gate ahead reads: another lap
+      // can't open anything. A running total nobody asks about used to make every
+      // lap look new, until the path was cut off at the depth limit.
+      const stateKey = `${beat.id}|${pathState(beat.id, frame.state)}|${takenChoicesKey}`;
       if (frame.visitedStates.has(stateKey)) {
         // This is a non-productive loop (same beat + same state + same choices = no progress)
         paths.push(this.buildPath(frame.path, frame.decisions, frame.state, 'cycle'));
@@ -1972,8 +1985,12 @@ export class StateSimulationAnalyzer {
     if ((connection as any)?.option) return (connection as any).option;
     if (!Array.isArray(list)) return undefined;
     if (!connection) return list[index];
-    const target = connection.targetId === beat.id ? '__self__' : connection.targetId;
-    const same = list.filter((c) => c && (c.target ?? c.targetId) === target);
+    // A choice staying on its beat: '__self__', or the beat's own id.
+    const onSelf = connection.targetId === beat.id;
+    const same = list.filter((c) => {
+      const to = c && (c.target ?? c.targetId);
+      return to === connection.targetId || (onSelf && to === '__self__');
+    });
     const labelled = same.find((c) => [c.text, c.name, c.location, c.locationName, c.id].includes(connection.label));
     return labelled ?? same[0] ?? (connection.targetId === beat.id ? undefined : list[index]);
   }

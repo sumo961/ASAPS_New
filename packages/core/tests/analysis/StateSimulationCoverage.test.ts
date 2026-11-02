@@ -625,3 +625,24 @@ describe('stops in a story too large to explore fully', () => {
     expect(paths.some((p) => p.outcome.beatId === 'scene' && p.outcome.type === 'deadEnd')).toBe(true);
   });
 });
+
+describe('a loop that keeps a running total', () => {
+  const story = (gate: boolean) => {
+    const st = new Story({ title: 'T', author: 'T', firstBeatId: 'hub' });
+    st.addBeat(createTestBeat({ id: 'hub', name: 'hub', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'Again', target: 'hub', effects: [{ type: 'incrementCounter', target: 'laps', value: 1 }] },
+      { id: 'b', text: 'Leave', target: 'end', ...(gate ? { conditions: [{ type: 'counter', variableName: 'laps', operator: '>=', value: 3 }] } : {}) },
+    ] } } as any));
+    st.addBeat(createTestBeat({ id: 'end', name: 'end', type: 'endScreen', parameters: { message: 'e', showRestart: false } } as any));
+    return st;
+  };
+  const types = (st: Story) => new StateSimulationAnalyzer(st, { maxPaths: 200, maxDepth: 40 }).analyzeRaw().map((p) => p.outcome.type);
+
+  it('is not followed to the depth limit when nothing reads the total', () => {
+    expect(types(story(false))).not.toContain('depthLimit');
+  });
+
+  it('is still followed when a gate ahead reads it', () => {
+    expect(types(story(true))).toContain('ending');
+  });
+});
