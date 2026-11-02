@@ -727,9 +727,23 @@ export class StateSimulationAnalyzer {
     let distance = new Map<string, number>();
     let distanceFor = -1;
     let turn = 0;
+    // The ways a scene can stop the story that a path has already shown.
+    const stopsFound = new Set<string>();
     let buckets: Array<Array<(typeof stack)[number]>> = [];
     let relevant: (beatId: string, state: SimulationState) => string = (_id, state) => hashState(state);
     const enqueue = (f: (typeof stack)[number]) => {
+      // A route that stops the story has nothing left to explore, so it needs no
+      // place in the queue. Queued, it was lost whenever the budget ran out first,
+      // and a stop on a beat other paths had passed through was never reported.
+      if (!this.getBeat(f.beatId) && f.path.length > 0) {
+        const last = f.path[f.path.length - 1];
+        const stopKey = `stop|${last.beatId}|${last.decisionMade}`;
+        if (!coverageSeen.has(stopKey) || (!coverage && stack.length < cap)) {
+          coverageSeen.add(stopKey);
+          paths.push(this.buildPath(f.path, f.decisions, f.state, 'deadEnd'));
+        }
+        return;
+      }
       if (coverage || stack.length < cap) { stack.push(f); return; }
       if (!seenBeats.has(f.beatId) && !admittedNew.has(f.beatId)) { admittedNew.add(f.beatId); stack.push(f); return; }
       if (seenBeatStates.size < cap * 4) {
@@ -820,6 +834,8 @@ export class StateSimulationAnalyzer {
       }
       for (; countedPaths < paths.length; countedPaths++) {
         for (const step of paths[countedPaths].steps) covered.add(step.beatId);
+        const last = paths[countedPaths].steps[paths[countedPaths].steps.length - 1];
+        if (last && paths[countedPaths].outcome.type === 'deadEnd') stopsFound.add(`${last.beatId}|${last.decisionMade}`);
       }
       if (coverage && (paths.length - coverageStart >= coveragePaths || expansions >= coverageExpansions)) {
         // Stopped by the budget, not because nothing was left to try.
@@ -837,22 +853,24 @@ export class StateSimulationAnalyzer {
       if (coverage) {
         // Finish paths carrying something uncovered, then go to whichever
         // waiting branch is nearest to a beat still uncovered.
-        if (covered.size !== distanceFor) {
+        if (covered.size + stopsFound.size !== distanceFor) {
           // What decides the gates on the way to the beats uncovered when the
           // pass starts. A running score nothing there asks about multiplies
           // the states without opening anything: the budget went on those and
           // never tried the early flag a late choice needs.
           if (distanceFor < 0) {
-            distance = this.distanceToUncovered(covered);
+            distance = this.distanceToUncovered(covered, stopsFound);
             relevant = this.stateThatDecidesGates(distance);
           }
-          distanceFor = covered.size;
-          distance = this.distanceToUncovered(covered);
+          distanceFor = covered.size + stopsFound.size;
+          distance = this.distanceToUncovered(covered, stopsFound);
           stack.push(...buckets.flat());
           buckets = [];
         }
         for (const f of stack) {
-          const rank = f.path.some((step) => !covered.has(step.beatId))
+          // A route that ends the story has no beat to measure a distance to,
+          // and each one is a finding: it finishes at once.
+          const rank = !this.getBeat(f.beatId) || f.path.some((step) => !covered.has(step.beatId))
             ? 0
             : 1 + (distance.get(f.beatId) ?? Number.POSITIVE_INFINITY);
           if (Number.isFinite(rank)) (buckets[rank] ??= []).push(f);
@@ -1176,7 +1194,7 @@ export class StateSimulationAnalyzer {
    * Get a beat by ID (cached)
    */
   /** Links to the nearest beat on no finished path yet, for every beat that can get to one. */
-  private distanceToUncovered(covered: Set<string>): Map<string, number> {
+  private distanceToUncovered(covered: Set<string>, stopsFound: Set<string>): Map<string, number> {
     const incoming = new Map<string, string[]>();
     const beats = this.story.getAllBeats();
     for (const beat of beats) {
@@ -1188,7 +1206,14 @@ export class StateSimulationAnalyzer {
       }
     }
     const distance = new Map<string, number>();
-    let level = beats.filter((b) => !covered.has(b.id)).map((b) => b.id);
+    // Also what to look for: a reply or line that stops the story, on a beat
+    // already reached by another way. Each is a finding in its own right.
+    const stopToFind = (b: Beat) => {
+      if (b.type !== 'dialogTree') return false;
+      const links = this.getConnections(b) as any[];
+      return links.length > 1 && links.some((c) => c.sceneEnds && !stopsFound.has(`${b.id}|${c.label || c.targetId}`));
+    };
+    let level = beats.filter((b) => !covered.has(b.id) || stopToFind(b)).map((b) => b.id);
     level.forEach((id) => distance.set(id, 0));
     for (let d = 1; level.length > 0; d++) {
       const next: string[] = [];

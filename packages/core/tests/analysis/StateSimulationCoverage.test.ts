@@ -606,3 +606,22 @@ describe('a screen with a timed exit', () => {
     expect(ends).toEqual(['hit', 'safe']);
   });
 });
+
+describe('stops in a story too large to explore fully', () => {
+  it('the coverage pass still reports a reply that goes nowhere', () => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'q0' });
+    const add = (b: any) => story.addBeat(createTestBeat(b));
+    for (let i = 0; i < 14; i++) {
+      add({ id: `q${i}`, name: `q${i}`, type: 'multiChoice', parameters: { question: 'q', choices: ['a', 'b', 'c'].map((id) => ({
+        id, text: id, target: i === 13 ? 'scene' : `q${i + 1}`, effects: [{ type: 'incrementCounter', target: id, value: 1 }],
+      })) } });
+    }
+    add({ id: 'scene', name: 'scene', type: 'dialogTree', parameters: { dialogTree: { id: 'r', speaker: 'N', text: 't', choices: [
+      { id: 'on', text: 'On', target: 'end' },
+      { id: 'no', text: 'so?', dialogNode: { id: 'n', speaker: 'N', text: 'nothing after this', choices: [] } },
+    ] } } });
+    add({ id: 'end', name: 'end', type: 'endScreen', parameters: { message: 'e', showRestart: false } });
+    const paths = new StateSimulationAnalyzer(story, { maxPaths: 50, maxDepth: 40, maxExpansions: 2000, maxFrontier: 5, maxCoveragePaths: 200, maxCoverageExpansions: 5000 } as any).analyzeRaw();
+    expect(paths.some((p) => p.outcome.beatId === 'scene' && p.outcome.type === 'deadEnd')).toBe(true);
+  });
+});
