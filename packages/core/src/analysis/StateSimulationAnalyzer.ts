@@ -698,6 +698,56 @@ export class StateSimulationAnalyzer {
     };
 
     const firstFrames = [...stack];
+    // Replay: an end screen's button goes on by the screen's own link, or to
+    // the first beat. Once the story has been explored, a last pass plays on
+    // from there, for what only a replay reaches.
+    const replays: Array<(typeof stack)[number]> = [];
+    const replayKeys = new Set<string>();
+    const replaysPerEnding = new Map<string, number>();
+    let replaying = false;
+    const noteReplay = (beat: Beat, path: SimulatedStep[], decisions: SimulatedPath['decisions'], state: SimulationState) => {
+      const params = beat.getParameters();
+      if (beat.type !== 'endScreen' || params.showRestart === false) return;
+      const next = this.stateAfterReplay(beat, state);
+      const link = this.linkWhenAllHidden(beat, next);
+      const target = link ?? startBeatId;
+      // With no link of its own the button restarts the story. That only counts
+      // when the author chose what carries over ("keep across restarts"): state
+      // merely left behind by reset off must not make an ending look reachable
+      // in a run that can't reach it.
+      if (!link && (params.reset !== true || hashState(next) === hashState(this.seededInitialState()))) return;
+      const key = `${beat.id}|${target}|${hashState(next)}`;
+      if (replayKeys.has(key) || (replaysPerEnding.get(beat.id) ?? 0) >= 100) return;
+      replayKeys.add(key);
+      replaysPerEnding.set(beat.id, (replaysPerEnding.get(beat.id) ?? 0) + 1);
+      const replayPath = [...path];
+      replayPath[replayPath.length - 1] = { ...replayPath[replayPath.length - 1], decisionMade: 'Replay' };
+      const frame = {
+        beatId: target,
+        state: next,
+        path: replayPath,
+        decisions: [...decisions, { beatId: beat.id, beatName: beat.name, choiceMade: 'Replay', alternatives: [] }],
+        visitedStates: new Set<string>(),
+        takenChoicesPerBeat: new Map<string, Set<number>>(),
+      };
+      if (replaying) stack.push(frame); else replays.push(frame);
+    };
+    const startReplays = (): boolean => {
+      if (replaying || replays.length === 0) return false;
+      for (; countedPaths < paths.length; countedPaths++) {
+        for (const step of paths[countedPaths].steps) covered.add(step.beatId);
+      }
+      replaying = true;
+      coverage = true;
+      coverageStart = paths.length;
+      coverageSeen.clear();
+      buckets = [];
+      stack.length = 0;
+      stack.push(...replays);
+      expansions = 0;
+      distanceFor = -1;
+      return true;
+    };
     const maxExpansions = this.config.maxExpansions ?? 300000;
     const coveragePaths = this.config.maxCoveragePaths ?? 5000;
     const coverageExpansions = this.config.maxCoverageExpansions ?? 150000;
@@ -707,7 +757,11 @@ export class StateSimulationAnalyzer {
       if (!coverage) {
         const spent = paths.length >= pathLimit || expansions >= maxExpansions;
         if (spent) this.truncated = true;
-        if (stack.length === 0 && !this.truncated) break; // Every path was explored.
+        if (stack.length === 0 && !this.truncated) {
+          // Every path was explored.
+          if (startReplays()) continue;
+          break;
+        }
         if (spent || stack.length === 0) {
           // Breadth first reaches everything in a small story and only the
           // first few choices of a large one: a 400-beat story spent 20000
@@ -724,7 +778,10 @@ export class StateSimulationAnalyzer {
       for (; countedPaths < paths.length; countedPaths++) {
         for (const step of paths[countedPaths].steps) covered.add(step.beatId);
       }
-      if (coverage && (paths.length - coverageStart >= coveragePaths || expansions >= coverageExpansions)) break;
+      if (coverage && (paths.length - coverageStart >= coveragePaths || expansions >= coverageExpansions)) {
+        if (startReplays()) continue;
+        break;
+      }
       expansions++;
       if (expansions % 250 === 0) yield { expansions, beatsReached: seenBeats.size };
       // Use BFS (shift) instead of DFS (pop) to ensure fair coverage
@@ -764,7 +821,10 @@ export class StateSimulationAnalyzer {
           turn = turn + 1 >= buckets.length ? 1 : turn + 1;
           if (buckets[turn]?.length) nearest = buckets[turn];
         }
-        if (!nearest) break;
+        if (!nearest) {
+          if (startReplays()) continue;
+          break;
+        }
         frame = nearest.pop()!;
         // The same beat with the same answers to those gates opens the same
         // things from here, so it only goes on if finishing it would put
@@ -841,6 +901,7 @@ export class StateSimulationAnalyzer {
       // Check for terminal beat
       if (this.isTerminalBeat(beat)) {
         paths.push(this.buildPath(newPath, frame.decisions, newState, 'ending'));
+        noteReplay(beat, newPath, frame.decisions, newState);
         continue;
       }
 
@@ -1392,6 +1453,45 @@ export class StateSimulationAnalyzer {
     if (!Array.isArray(more) || more.length === 0) return first;
     const rest = more.map((c: Condition) => this.evaluateCondition(c, state));
     return params.conditionsMatch === 'any' ? first || rest.some(Boolean) : first && rest.every(Boolean);
+  }
+
+  /**
+   * The state a Replay leaves, as StoryContext.restartPlaythrough: what the
+   * end screen resets goes back to the story's start, what is marked "keep
+   * across restarts" stays, and the playthrough count goes up.
+   */
+  private stateAfterReplay(beat: Beat, state: SimulationState): SimulationState {
+    const p = beat.getParameters();
+    const next = cloneState(state);
+    if (p.reset === true) {
+      const fresh = this.seededInitialState();
+      const all = [p.resetVariables, p.resetCounters, p.resetInventory, p.resetTimers, p.resetFictionalTime, p.resetVisitedTracking, p.resetHistory, p.resetCharacters].every((v) => v !== false);
+      if (all || p.resetVariables !== false) {
+        const keep = new Set<string>(((this.story as any).getSettings?.()?.variables ?? []).filter((d: any) => d?.keepOnRestart).map((d: any) => d.name));
+        next.variables = new Map(fresh.variables);
+        for (const [name, value] of state.variables) if (keep.has(name)) next.variables.set(name, value);
+      }
+      if (all || p.resetCounters !== false) {
+        const keep = new Set<string>();
+        for (const c of this.characters()) for (const d of Array.isArray(c?.counters) ? c.counters : []) if (d?.keepOnRestart) keep.add(this.counterKey(c.id, d.name));
+        next.counters = new Map(fresh.counters);
+        for (const [name, value] of state.counters) if (keep.has(name)) next.counters.set(name, value);
+      }
+      if (all || p.resetInventory !== false) {
+        next.inventory = fresh.inventory;
+        next.itemCounts = fresh.itemCounts;
+      }
+      if (all || p.resetVisitedTracking !== false) next.visitedBeats = new Set();
+      const keepsCast = this.characters().some((c) => c?.keepVariantOnRestart)
+        || ((this.story as any).getSettings?.()?.roles ?? []).some((r: any) => r?.keepOnRestart);
+      if ((all || p.resetCharacters !== false) && !keepsCast) {
+        next.runtime = fresh.runtime;
+        next.pendingRuntime = undefined;
+      }
+    }
+    const run = Number(state.variables.get(PLAYTHROUGH_VARIABLE));
+    if (Number.isFinite(run)) next.variables.set(PLAYTHROUGH_VARIABLE, run + 1);
+    return next;
   }
 
   /**

@@ -425,3 +425,61 @@ describe('finding gated routes in a large story', () => {
     expect(ends).toContain('door');
   });
 });
+
+describe('Replay', () => {
+  const build = (end: any, extra: any[] = []) => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'start' });
+    story.addBeat(createTestBeat({ id: 'start', name: 'start', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'A', target: 'end', effects: [{ type: 'setVariable', target: 'flag', value: 'yes' }] },
+      { id: 'b', text: 'B', target: 'gate', conditions: [{ type: 'variable', variableName: 'flag', operator: '==', value: 'yes' }] },
+    ] } } as any));
+    story.addBeat(createTestBeat({ id: 'end', name: 'end', type: 'endScreen', ...end } as any));
+    story.addBeat(createTestBeat({ id: 'gate', name: 'gate', type: 'endScreen', parameters: { message: 'g', showRestart: false } } as any));
+    for (const b of extra) story.addBeat(createTestBeat(b));
+    return story;
+  };
+  const after = { id: 'after', name: 'after', type: 'infoText', parameters: { text: 't' } };
+  const reached = (story: Story) => {
+    const paths = new StateSimulationAnalyzer(story, { maxPaths: 100, maxDepth: 30 }).analyzeRaw();
+    return { paths, seen: new Set(paths.flatMap((p) => p.steps.map((x) => x.beatId))) };
+  };
+
+  it("follows an end screen's own link, keeping the ending on its path", () => {
+    const { paths, seen } = reached(build({ parameters: { message: 'e', reset: true }, connections: [{ targetId: 'after' }] }, [after]));
+    expect(seen.has('after')).toBe(true);
+    expect(paths.some((p) => p.outcome.beatId === 'end' && p.outcome.type === 'ending')).toBe(true);
+    const via = paths.find((p) => p.steps.some((x) => x.beatId === 'after'))!;
+    expect(via.decisions.at(-1)?.choiceMade).toBe('Replay');
+  });
+
+  it('does not follow it when the screen has no replay button', () => {
+    const { seen } = reached(build({ parameters: { message: 'e', showRestart: false }, connections: [{ targetId: 'after' }] }, [after]));
+    expect(seen.has('after')).toBe(false);
+  });
+
+  it('with reset off and a link, what was set stays and opens gates on the way round', () => {
+    const linked = { id: 'after', name: 'after', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'start' }] };
+    expect(reached(build({ parameters: { message: 'e', reset: false }, connections: [{ targetId: 'after' }] }, [linked])).seen.has('gate')).toBe(true);
+  });
+
+  it('with reset off and no link, leftovers do not count as a way in', () => {
+    expect(reached(build({ parameters: { message: 'e', reset: false } })).seen.has('gate')).toBe(false);
+  });
+
+  it('with everything reset, it does not', () => {
+    expect(reached(build({ parameters: { message: 'e', reset: true } })).seen.has('gate')).toBe(false);
+  });
+
+  it('a variable marked keep across restarts survives the reset', () => {
+    const story = build({ parameters: { message: 'e', reset: true } });
+    story.setSettings({ variables: [{ name: 'flag', type: 'string', defaultValue: 'no', keepOnRestart: true }] });
+    expect(reached(story).seen.has('gate')).toBe(true);
+  });
+
+  it('adds no paths when everything was already on one', () => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'start' });
+    story.addBeat(createTestBeat({ id: 'start', name: 'start', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] } as any));
+    story.addBeat(createTestBeat({ id: 'end', name: 'end', type: 'endScreen', parameters: { message: 'e', reset: true }, connections: [{ targetId: 'start' }] } as any));
+    expect(reached(story).paths).toHaveLength(1);
+  });
+});

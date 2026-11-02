@@ -22,6 +22,7 @@ Playing Birka V18 on the engine showed where Path Analysis disagreed, now fixed:
 - A reply with no next line and no exit, a line with no way on and a line whose replies can all be hidden now show as places the scene ends, even when the beat has other exits.
 - A Multi Choice (or similar) with every choice hidden follows the beat's own link, as the engine does, instead of reporting a dead end. A link to a missing beat now shows as a stop.
 - Story Warnings: new **Reply goes nowhere**.
+- **Replay:** Path Analysis follows an end screen's Replay button once the story is explored: by the screen's own link, with what its reset settings leave. With no link it counts only when something marked "keep across restarts" survives the reset; state merely left behind by reset off doesn't make an ending look reachable. The ending stays recorded as an ending.
 - **Large stories no longer depend on search order:** the coverage pass compares states only by what the gates still ahead of a beat read, returns to a menu for a choice leading to something uncovered, and gives every distance a turn, so beats that can never open can't starve storylines further off. Birka V18: 344 beats reached at a quarter of the budget, the base budget and four times it, including everything 1,500 engine games reached; about 12 seconds.
 
 **Files modified:** `analysis/StateSimulationAnalyzer.ts`, `analysis/StoryWarnings.ts`, `debug/storyWarningLabels.ts`, tests
