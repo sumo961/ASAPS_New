@@ -25,6 +25,9 @@ export type StoryWarningCode =
   | 'counter-text'                    // a counter checked against, or set to, text
   | 'wordless-reply'                  // a Dialog Tree reply button with no words
   | 'line-never-plays'                // a next line behind one that always plays
+  | 'name-mismatch'                   // a condition reads a name nothing sets; a very similar name is set
+  | 'setup-unreached'                 // what a played beat checks is only ever set on beats nobody reaches
+  | 'reply-hidden-by-next-line'       // a reply beside next lines: shown only when none of them plays
   | 'choices-all-hidden'              // no choice on offer: the beat is skipped by its own link
   | 'reply-nowhere'                   // a reply with no next line and no exit: picking it ends the scene
   | 'role';                           // cast roles: unknown role, non-candidate cast, recast, used before cast, bare AI partner
@@ -44,6 +47,8 @@ export interface DetectConfig {
   /** Paths from StateSimulationAnalyzer.analyzeRaw(). Used for violation checks. */
   paths: SimulatedPath[];
   story: Story;
+  /** Replies some playthrough had on screen (StateSimulationAnalyzer.shownReplies). */
+  shownReplies?: ReadonlySet<string>;
 }
 
 /**
@@ -100,13 +105,142 @@ export function detectStoryWarnings(cfg: DetectConfig): StoryWarning[] {
     });
   }
 
+  warnings.push(...detectStateWiring(story, paths));
+
   // 4. Mistakes only a read of the beat shows: the simulator plays them as written.
+  const played = new Set(paths.flatMap((p) => p.steps.map((step) => step.beatId)));
   for (const beat of story.getAllBeats()) {
     warnings.push(...detectCounterText(beat));
-    if (beat.type === 'dialogTree') warnings.push(...detectDialogShape(beat));
+    if (beat.type === 'dialogTree') warnings.push(...detectDialogShape(beat, cfg.shownReplies, played));
   }
 
   return warnings;
+}
+
+// ============================================================================
+// What conditions read against what the story sets
+// ============================================================================
+
+/** Edit distance, stopping early: names further than `limit` apart don't matter. */
+function nameDistance(a: string, b: string, limit: number): number {
+  if (Math.abs(a.length - b.length) > limit) return limit + 1;
+  let row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) {
+      next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    row = next;
+  }
+  return row[b.length];
+}
+
+/**
+ * Two names meant to be one: the same but for capitals, or a slip of a letter
+ * or two in a longer name. Names told apart by a number (score1, score2) are
+ * meant to be different.
+ */
+function looksLikeSameName(a: string, b: string): boolean {
+  const [x, y] = [a.trim().toLowerCase(), b.trim().toLowerCase()];
+  if (x === y) return true;
+  if (x.replace(/\d+/g, '') === y.replace(/\d+/g, '')) return false;
+  return Math.min(x.length, y.length) >= 6 && nameDistance(x, y, 2) <= 2;
+}
+
+function detectStateWiring(story: Story, paths: SimulatedPath[]): StoryWarning[] {
+  type Kind = 'value' | 'item';
+  const reads = new Map<string, { kind: Kind; name: string; beats: Set<string> }>();
+  const sets = new Map<string, Set<string>>();
+  const key = (kind: Kind, name: string) => `${kind}\u0001${name.trim()}`;
+  const noteSet = (kind: Kind, name: unknown, beatId: string) => {
+    if (typeof name !== 'string' || !name.trim()) return;
+    const k = key(kind, name);
+    if (!sets.has(k)) sets.set(k, new Set());
+    sets.get(k)!.add(beatId);
+  };
+  const playerBag = (o: any) => !o.character || o.character === 'player';
+  for (const beat of story.getAllBeats()) {
+    const params = beat.getParameters() as any;
+    const walk = (o: any): void => {
+      if (Array.isArray(o)) { o.forEach(walk); return; }
+      if (!o || typeof o !== 'object') return;
+      if (o.type === 'variable' || o.type === 'counter') {
+        const name = o.variableName || o.variable || o.left;
+        if (typeof name === 'string' && name.trim() && !o.character) {
+          const k = key('value', name);
+          if (!reads.has(k)) reads.set(k, { kind: 'value', name: name.trim(), beats: new Set() });
+          reads.get(k)!.beats.add(beat.id);
+        }
+      } else if (o.type === 'inventory' && playerBag(o)) {
+        const name = o.item || o.value || o.right;
+        if (typeof name === 'string' && name.trim()) {
+          const k = key('item', name);
+          if (!reads.has(k)) reads.set(k, { kind: 'item', name: name.trim(), beats: new Set() });
+          reads.get(k)!.beats.add(beat.id);
+        }
+      }
+      if (o.type === 'setVariable' || o.type === 'setCounter' || o.type === 'incrementCounter') noteSet('value', o.target, beat.id);
+      if (o.type === 'addInventory' && playerBag(o)) noteSet('item', o.target, beat.id);
+      noteSet('value', o.counter, beat.id);
+      if (typeof o.variable === 'string' && o.type !== 'variable' && o.type !== 'counter') noteSet('value', o.variable, beat.id);
+      for (const v of Object.values(o)) if (v && typeof v === 'object') walk(v);
+    };
+    walk(params);
+    walk((beat as any).requires);
+    walk(beat.connections);
+    if (beat.type === 'setVariable') noteSet('value', params.name, beat.id);
+    if (beat.type === 'inputText') noteSet('value', params.variable ?? params.variableName, beat.id);
+    if (beat.type === 'addRemoveInventory' && params.action !== 'remove' && playerBag(params)) noteSet('item', params.item, beat.id);
+    if (beat.type === 'pickProp') for (const prop of params.props ?? []) noteSet('item', prop?.item ?? prop?.name, beat.id);
+  }
+  // What the story starts with counts as set: nothing is missing there.
+  const starts = new Set<string>();
+  for (const c of story.getCharacters?.() ?? [] as any[]) {
+    for (const d of (c as any)?.counters ?? []) if (d?.name) starts.add(key('value', d.name));
+    if ((c as any)?.role === 'player') for (const it of (c as any)?.inventory ?? []) if (it?.name) starts.add(key('item', it.name));
+  }
+
+  const out: StoryWarning[] = [];
+  const nameOf = (id: string) => story.getBeat(id)?.name?.trim() || id;
+  const firstOf = (ids: Set<string>) => [...ids].sort((a, b) => nameOf(a).localeCompare(nameOf(b)))[0];
+  const what = (kind: Kind) => (kind === 'item' ? 'item' : 'name');
+
+  for (const [k, read] of reads) {
+    if (sets.has(k) || starts.has(k)) continue;
+    const similar = [...sets.keys()]
+      .filter((s) => s.startsWith(`${read.kind}\u0001`))
+      .map((s) => s.slice(s.indexOf('\u0001') + 1))
+      .find((s) => s !== read.name && looksLikeSameName(s, read.name));
+    if (!similar) continue;
+    const at = firstOf(read.beats);
+    out.push({
+      code: 'name-mismatch', severity: 'error', beatId: at, beatName: nameOf(at),
+      message: `Checks the ${what(read.kind)} "${read.name}", which nothing in the story sets, but "${similar}" is set on "${nameOf(firstOf(sets.get(key(read.kind, similar))!))}". If they are meant to be the same, make the spelling match: until then this check never sees it.`,
+      detail: { read: read.name, set: similar },
+    });
+  }
+
+  // Needs the playthroughs: without them nothing is known about who is reached.
+  if (paths.length > 0) {
+    const played = new Set(paths.flatMap((p) => p.steps.map((s) => s.beatId)));
+    for (const [k, read] of reads) {
+      const setters = sets.get(k);
+      if (!setters || starts.has(k)) continue;
+      const readers = [...read.beats].filter((id) => played.has(id));
+      if (readers.length === 0 || [...setters].some((id) => played.has(id))) continue;
+      // A Set Variable beat is the likeliest one meant as the setup.
+      const ordered = [...setters].sort((a, b) =>
+        Number(story.getBeat(b)?.type === 'setVariable') - Number(story.getBeat(a)?.type === 'setVariable')
+        || nameOf(a).localeCompare(nameOf(b)));
+      const names = ordered.slice(0, 3).map((id) => `"${nameOf(id)}"`).join(', ') + (ordered.length > 3 ? ` and ${ordered.length - 3} more` : '');
+      out.push({
+        code: 'setup-unreached', severity: 'error', beatId: ordered[0], beatName: nameOf(ordered[0]),
+        message: `"${nameOf(firstOf(new Set(readers)))}" checks ${read.name}, but it is only set on ${names}, and no way of playing reaches ${ordered.length === 1 ? 'that beat' : 'those beats'}. It never changes from its start. Link the beat into the story, or set it somewhere players do reach.`,
+        detail: { name: read.name, setters: ordered },
+      });
+    }
+  }
+  return out;
 }
 
 // ============================================================================
@@ -150,7 +284,7 @@ function detectCounterText(beat: Beat): StoryWarning[] {
 // Dialog Tree shape
 // ============================================================================
 
-function detectDialogShape(beat: Beat): StoryWarning[] {
+function detectDialogShape(beat: Beat, shownReplies?: ReadonlySet<string>, played?: ReadonlySet<string>): StoryWarning[] {
   const out: StoryWarning[] = [];
   const tree = (beat.getParameters() as any).dialogTree;
   const onRoute = new Set<any>();
@@ -178,6 +312,25 @@ function detectDialogShape(beat: Beat): StoryWarning[] {
       }
     }
     const steps = choices.filter((c) => c.continue === true);
+    const replies = choices.filter((c) => !c.continue && String(c.text ?? '').trim());
+    if (steps.length > 0 && replies.length > 0) {
+      const always = steps.some((c) => !(Array.isArray(c.conditions) && c.conditions.length > 0));
+      // A reply beside gated lines is often meant as the fallback. It is only a
+      // problem when no way of playing ever shows it.
+      const unseen = always ? replies : shownReplies && played?.has(beat.id)
+        ? replies.filter((c) => !shownReplies.has(`${beat.id}|${c.id}`))
+        : [];
+      if (unseen.length > 0) {
+        const named = unseen.map((c) => `"${String(c.text).trim().slice(0, 40)}"`).join(', ');
+        out.push({
+          code: 'reply-hidden-by-next-line', severity: 'warn', beatId: beat.id, beatName: beat.name,
+          message: always
+            ? `After the line "${preview(node)}", the replies ${named} never show: a next line with no condition plays instead.`
+            : `After the line "${preview(node)}", the replies ${named} never showed on any way of playing: one of the next lines always plays instead.`,
+          detail: { nodeId: node.id, always },
+        });
+      }
+    }
     const firstAlways = steps.findIndex((c) => !(Array.isArray(c.conditions) && c.conditions.length > 0));
     for (const dead of firstAlways >= 0 ? steps.slice(firstAlways + 1) : []) {
       out.push({

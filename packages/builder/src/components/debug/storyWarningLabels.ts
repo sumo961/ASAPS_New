@@ -12,6 +12,9 @@ const LABELS: Record<StoryWarning['code'], string> = {
   'line-never-plays': 'Next line never plays',
   'reply-nowhere': 'Reply goes nowhere',
   'choices-all-hidden': 'Every choice hidden',
+  'name-mismatch': 'Name spelled differently',
+  'setup-unreached': 'Setup never played',
+  'reply-hidden-by-next-line': 'Reply hidden by a next line',
   'role': 'Role',
 };
 

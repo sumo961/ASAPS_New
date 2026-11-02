@@ -129,6 +129,12 @@ export function beatScript(
     // are tried in order, and one with no conditions always plays.
     let gatedBefore = false;
     let alwaysPlays = false;
+    // Replies only show when no next line plays: the engine prefers the line.
+    const steps = choices.filter((c) => c?.continue);
+    const replyNote = steps.length === 0 ? ''
+      : steps.some((c) => gatesOf(c.conditions, beatName) === '')
+        ? ' [this reply never shows: a next line always plays instead]'
+        : ' [this reply shows only if none of the next lines plays]';
     for (const c of choices) {
       if (c?.continue) {
         const gate = gatesOf(c.conditions, beatName);
@@ -140,7 +146,7 @@ export function beatScript(
         walk(c.dialogNode, nested ? depth + 1 : depth);
         continue;
       }
-      if (typeof c?.text === 'string' && c.text.trim()) reply(depth, c);
+      if (typeof c?.text === 'string' && c.text.trim()) reply(depth, { ...c, text: `${c.text}${replyNote}` });
       // Not a next line, so the player gets a button for it, with no words on it.
       else if (c?.dialogNode) reply(depth, { ...c, text: '(a button with no label)' });
       walk(c?.dialogNode, depth + 1);

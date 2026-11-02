@@ -24,6 +24,7 @@ Reading a script:
 - "[shown only if X]" and "[next line only if X]" are gates. A gated line or reply reaches only players who meet the gate: judge it only against them. Arriving states don't list visited beats, so assume a "visited" gate holds for whoever reads that line.
 - Sibling "[next line only if …]" branches are tried in order and the first that matches plays; "[otherwise, next line]" plays only when none did. A player covered by an earlier branch never reads the later ones, so a line under "otherwise" is no problem for them.
 - "[this next line never plays…]" marks a line no player reaches: do not judge its words, but the dead line can be reported.
+- "[this reply never shows…]" and "[this reply shows only if none of the next lines plays]" mean what they say: a player who gets a next line never sees that reply or anything under it. Judge them only against states where it can show.
 - A gate that is itself broken, such as a condition with no beat chosen, can be reported.
 
 Report a finding only where a beat's words do not hold for at least one listed arriving state:

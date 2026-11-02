@@ -452,6 +452,8 @@ export class StateSimulationAnalyzer {
   public truncated = false;
   /** The search for unreached beats ran out of budget: "unreachable" then means "not found". */
   public searchLimited = false;
+  /** Dialog Tree replies some playthrough had on screen, as `beatId|choiceId`. */
+  public shownReplies = new Set<string>();
 
   constructor(story: Story, config: SimulationAnalysisConfig = {}) {
     this.story = story;
@@ -710,6 +712,7 @@ export class StateSimulationAnalyzer {
     let expansions = 0;
     this.truncated = false;
     this.searchLimited = false;
+    this.shownReplies = new Set();
     // Past the cap: one branch per beat nobody has reached yet, and one per
     // (beat, variables/counters) combination not seen before — a choice's
     // variable can decide a gate much later (Late Light: "declined" at the
@@ -1634,7 +1637,13 @@ export class StateSimulationAnalyzer {
         }
       }
     }
-    return conds.every((c) => !c || this.evaluateCondition(c, state));
+    const offered = conds.every((c) => !c || this.evaluateCondition(c, state));
+    if (offered) {
+      for (const step of (connection as any).route ?? []) {
+        if (step.choice?.id && !step.choice.continue) this.shownReplies.add(`${beat.id}|${step.choice.id}`);
+      }
+    }
+    return offered;
   }
 
   /**

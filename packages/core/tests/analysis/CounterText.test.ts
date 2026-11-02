@@ -135,3 +135,70 @@ describe('generated stories', () => {
     expect(m.parameters.choices[1].conditions[0].type).toBe('counter');
   });
 });
+
+describe('what conditions read against what the story sets', () => {
+  const build = (beats: any[], settings?: any) => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: beats[0].id });
+    if (settings) story.setSettings(settings);
+    for (const b of beats) story.addBeat(createTestBeat(b));
+    return story;
+  };
+  const menu = (cond: any, effects: any[] = []) => ({ id: 'm', name: 'Menu', type: 'multiChoice', parameters: { question: 'q', choices: [
+    { id: 'a', text: 'A', target: 'e', effects }, { id: 'b', text: 'B', target: 'e', conditions: [cond] },
+  ] } });
+  const end = { id: 'e', name: 'End', type: 'endScreen', parameters: { message: 'e', showRestart: false } };
+  const codes = (story: Story, paths: any[] = []) => detectStoryWarnings({ paths, story });
+  const variable = (name: string) => ({ type: 'variable', variableName: name, operator: '==', value: true });
+
+  it('catches a name that differs only in capitals', () => {
+    const w = codes(build([menu(variable('savedScreenshot'), [{ type: 'setVariable', target: 'savedscreenshot', value: true }]), end])).filter((x) => x.code === 'name-mismatch');
+    expect(w).toHaveLength(1);
+    expect(w[0].message).toContain('savedscreenshot');
+  });
+
+  it('catches an item spelled nearly the same', () => {
+    const w = codes(build([menu({ type: 'inventory', item: 'Greater Sword', operator: 'contains' }, [{ type: 'addInventory', target: 'Great Sword' }]), end])).filter((x) => x.code === 'name-mismatch');
+    expect(w.map((x) => x.detail?.set)).toEqual(['Great Sword']);
+  });
+
+  it('leaves alone numbered names, short names and names that are set', () => {
+    for (const [read, set] of [['score1', 'score2'], ['hat', 'hit'], ['trust', 'trust']]) {
+      const w = codes(build([menu(variable(read), [{ type: 'setVariable', target: set, value: 1 }]), end])).filter((x) => x.code === 'name-mismatch');
+      expect(w).toEqual([]);
+    }
+  });
+
+  it('names a setup beat nobody reaches when a played beat checks what it sets', () => {
+    const story = build([
+      menu({ type: 'counter', variableName: 'Money', operator: '>', value: 0 }), end,
+      { id: 'setup', name: 'MoneyStart', type: 'setVariable', parameters: { type: 'counter', name: 'Money', value: 100, operation: 'set' } },
+    ]);
+    const paths = new StateSimulationAnalyzer(story, { maxPaths: 10, maxDepth: 5 }).analyzeRaw();
+    const w = codes(story, paths).filter((x) => x.code === 'setup-unreached');
+    expect(w.map((x) => x.beatName)).toEqual(['MoneyStart']);
+    expect(w[0].message).toContain('checks Money');
+    expect(codes(story).some((x) => x.code === 'setup-unreached')).toBe(false);
+  });
+
+  it('says when a reply beside next lines can never show, not when it is a fallback', () => {
+    const scene = (conditions?: any[]) => ({ id: 'd', name: 'D', type: 'dialogTree', parameters: { dialogTree: { id: 'r', speaker: 'N', text: 'First', choices: [
+      { id: 'x', text: 'so?', target: 'e' },
+      { id: 'n', text: '', continue: true, ...(conditions ? { conditions } : {}), target: 'e' },
+    ] } } });
+    const hidden = (st: Story) => {
+      const a = new StateSimulationAnalyzer(st, { maxPaths: 10, maxDepth: 5 });
+      const paths = a.analyzeRaw();
+      return detectStoryWarnings({ paths, story: st, shownReplies: a.shownReplies }).filter((x) => x.code === 'reply-hidden-by-next-line');
+    };
+    expect(hidden(build([scene(), end]))[0].message).toContain('never show');
+    // The flag is never set: the reply is what players get.
+    expect(hidden(build([scene([variable('flag')]), end]))).toEqual([]);
+    // The flag is always set first: the reply can't be reached.
+    const setFlag = { id: 'first', name: 'First', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'A', target: 'd', effects: [{ type: 'setVariable', target: 'flag', value: true }] },
+    ] } };
+    const w = hidden(build([setFlag, scene([variable('flag')]), end]));
+    expect(w).toHaveLength(1);
+    expect(w[0].message).toContain('never showed');
+  });
+});
