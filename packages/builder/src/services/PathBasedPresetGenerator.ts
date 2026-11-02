@@ -147,7 +147,7 @@ function presetsFromAnalysis(
   const targetBeatId = targetBeat.id;
 
   // Find paths that pass through the target beat
-  const pathsToTarget = findPathsToTarget(analysisResult.outcomes, targetBeatId);
+  const pathsToTarget = findPathsToTarget([...analysisResult.outcomes, ...(analysisResult.replayOutcomes ?? [])], targetBeatId);
 
   // Generate presets from the paths
   const presets = pathsToTarget.map((pathInfo, index) => {

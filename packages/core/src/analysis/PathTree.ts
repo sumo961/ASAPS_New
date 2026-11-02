@@ -154,7 +154,10 @@ function nextId(): string {
 let characterNames = new Map<string, string>();
 const characterLabel = (ref: string): string => characterNames.get(ref) ?? ref;
 
-export function buildPathTree(paths: SimulatedPath[], story: Story): PathTreeResult {
+export function buildPathTree(allPaths: SimulatedPath[], story: Story): PathTreeResult {
+  // The tree is one playthrough: a Replay back to the start would turn the
+  // first beat into a hub with the whole story under it.
+  const paths = allPaths.filter((p) => !p.viaReplay);
   nodeIdCounter = 0;
   characterNames = new Map(
     (((story as any).getCharacters?.() ?? []) as any[])

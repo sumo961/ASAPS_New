@@ -109,6 +109,8 @@ export interface ConstraintPathResult {
   outcomes: OutcomeGroup[];
   totalOutcomes: number;
   totalConstraintSets: number;  // Sum of constraint sets across all outcomes
+  /** Paths that went on through an end screen's Replay, kept out of the counts above. */
+  replayOutcomes?: OutcomeGroup[];
   reachableBeats: string[];        // All beats reachable from start
   unreachableBeats: string[];      // Beats that cannot be reached
   uniqueEndings: string[];         // Unique ending beat IDs

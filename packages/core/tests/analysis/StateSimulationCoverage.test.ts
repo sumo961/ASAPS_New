@@ -452,6 +452,34 @@ describe('Replay', () => {
     expect(via.decisions.at(-1)?.choiceMade).toBe('Replay');
   });
 
+  it('keeps replays out of the outcome counts and the tree, but tells them apart', () => {
+    const story = build({ parameters: { message: 'e', reset: true }, connections: [{ targetId: 'after' }] },
+      [{ ...after, connections: [{ targetId: 'start' }] }]);
+    const analyzer = new StateSimulationAnalyzer(story, { maxPaths: 100, maxDepth: 30 });
+    const paths = analyzer.analyzeRaw();
+    const result = analyzer.resultFromPaths(paths);
+    expect(paths.some((p) => p.viaReplay)).toBe(true);
+    expect(result.outcomes.every((o) => (o.pathVariations ?? []).every((v: any) => !v.simulatedPath?.viaReplay))).toBe(true);
+    expect(result.replayOutcomes?.length).toBeGreaterThan(0);
+    expect(result.totalConstraintSets).toBe(paths.filter((p) => !p.viaReplay).length);
+    const tree = buildPathTree(paths, story);
+    expect(tree.root?.type).not.toBe('hub');
+  });
+
+  it('the beat after a reset ending arrives with the reset state', () => {
+    const { paths } = reached(build({ parameters: { message: 'e', reset: true }, connections: [{ targetId: 'after' }] }, [after]));
+    const via = paths.find((p) => p.viaReplay)!;
+    const i = via.steps.findIndex((x) => x.beatId === 'after');
+    expect(via.steps[i - 1].stateAfter.variables.get('flag')).toBeUndefined();
+  });
+
+  it('after a reset-off ending it arrives with what was left', () => {
+    const { paths } = reached(build({ parameters: { message: 'e', reset: false }, connections: [{ targetId: 'after' }] }, [after]));
+    const via = paths.find((p) => p.viaReplay)!;
+    const i = via.steps.findIndex((x) => x.beatId === 'after');
+    expect(via.steps[i - 1].stateAfter.variables.get('flag')).toBe('yes');
+  });
+
   it('does not follow it when the screen has no replay button', () => {
     const { seen } = reached(build({ parameters: { message: 'e', showRestart: false }, connections: [{ targetId: 'after' }] }, [after]));
     expect(seen.has('after')).toBe(false);

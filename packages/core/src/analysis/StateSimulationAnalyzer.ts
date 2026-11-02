@@ -94,6 +94,8 @@ export interface SimulatedPath {
     type: PathEndType;
   };
   finalState: SimulationState;
+  /** Went on through an end screen's Replay: more than one playthrough. */
+  viaReplay?: boolean;
 }
 
 /**
@@ -182,6 +184,9 @@ function removeItem(state: SimulationState, bag: string, item: string, quantity:
   } else if (left === 1) state.itemCounts?.delete(`${bag}\u0001${item}`);
   else (state.itemCounts ??= new Map()).set(`${bag}\u0001${item}`, left);
 }
+
+/** How a path going on past an end screen records that decision. */
+const REPLAY_DECISION = 'Replay';
 
 /** Target of a route that ends the story: no beat has this id. */
 const STORY_STOPS = '__story_stops__';
@@ -721,12 +726,13 @@ export class StateSimulationAnalyzer {
       replayKeys.add(key);
       replaysPerEnding.set(beat.id, (replaysPerEnding.get(beat.id) ?? 0) + 1);
       const replayPath = [...path];
-      replayPath[replayPath.length - 1] = { ...replayPath[replayPath.length - 1], decisionMade: 'Replay' };
+      // The next beat arrives with what the reset left, not what the ending saw.
+      replayPath[replayPath.length - 1] = { ...replayPath[replayPath.length - 1], decisionMade: REPLAY_DECISION, stateAfter: cloneState(next) };
       const frame = {
         beatId: target,
         state: next,
         path: replayPath,
-        decisions: [...decisions, { beatId: beat.id, beatName: beat.name, choiceMade: 'Replay', alternatives: [] }],
+        decisions: [...decisions, { beatId: beat.id, beatName: beat.name, choiceMade: REPLAY_DECISION, alternatives: [] }],
         visitedStates: new Set<string>(),
         takenChoicesPerBeat: new Map<string, Set<number>>(),
       };
@@ -2172,6 +2178,7 @@ export class StateSimulationAnalyzer {
     return {
       steps,
       decisions,
+      ...(decisions.some((d) => d.choiceMade === REPLAY_DECISION) ? { viaReplay: true } : {}),
       outcome: {
         beatId: lastStep?.beatId || '',
         beatName: lastStep?.beatName || 'Unknown',
@@ -2197,10 +2204,7 @@ export class StateSimulationAnalyzer {
     };
   }
 
-  /**
-   * Build ConstraintPathResult from simulated paths
-   */
-  private buildResult(paths: SimulatedPath[], startTime: number): ConstraintPathResult {
+  private groupOutcomes(paths: SimulatedPath[]): OutcomeGroup[] {
     // Group paths by outcome (how and where they end): a path cut off at the
     // depth limit must not join a dead end or cycle on the same beat.
     const outcomeMap = new Map<string, SimulatedPath[]>();
@@ -2259,6 +2263,17 @@ export class StateSimulationAnalyzer {
         maxPathLength: Math.max(...groupPaths.map(p => p.steps.length)),
       });
     }
+    return outcomes;
+  }
+
+  /**
+   * Build ConstraintPathResult from simulated paths
+   */
+  private buildResult(paths: SimulatedPath[], startTime: number): ConstraintPathResult {
+    // One playthrough at a time: paths that went on through an end screen's
+    // Replay are told apart, or each ending counts every run after it too.
+    const outcomes = this.groupOutcomes(paths.filter((p) => !p.viaReplay));
+    const replayOutcomes = this.groupOutcomes(paths.filter((p) => p.viaReplay));
 
     // Calculate reachability using graph traversal (not just what paths explored)
     // This ensures we don't report false "unreachable" beats
@@ -2274,7 +2289,8 @@ export class StateSimulationAnalyzer {
     return {
       outcomes,
       totalOutcomes: outcomes.length,
-      totalConstraintSets: paths.length,
+      totalConstraintSets: outcomes.reduce((sum, o) => sum + (o.pathVariations?.length ?? 0), 0),
+      replayOutcomes,
       reachableBeats,
       unreachableBeats,
       uniqueEndings,

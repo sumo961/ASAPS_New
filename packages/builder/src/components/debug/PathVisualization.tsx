@@ -410,6 +410,10 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
                   <Clock className="w-3 h-3" />
                   {analysisResult.analysisTime.toFixed(0)}ms
                 </span>
+                {(() => {
+                  const replayed = (analysisResult.replayOutcomes ?? []).reduce((sum, o) => sum + (o.pathVariations?.length ?? 0), 0);
+                  return replayed > 0 ? <span>+{replayed} paths after an end screen's Replay</span> : null;
+                })()}
                 {analysisResult.unreachableBeats.length > 0 && (
                   <span className="flex items-center gap-1 text-yellow-700">
                     <AlertTriangle className="w-3 h-3" />
@@ -487,9 +491,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium text-gray-900 truncate">
-                            {outcome.endType === 'ending'
-                              ? getBeatName(outcome.endingBeatId)
-                              : `Outcome ${index + 1}`}
+                            {getBeatName(outcome.endingBeatId)}
                           </span>
                           {getEndTypeBadge(outcome.endType)}
                           {outcome.constraintSets.length > 1 && (
