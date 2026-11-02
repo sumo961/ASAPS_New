@@ -163,7 +163,7 @@ describe('formatLogicValidationResult', () => {
       ]),
     );
     const out = formatLogicValidationResult(r);
-    expect(out).toMatch(/Hub Beats.*: 1/);
+    expect(out).toMatch(/states: 1/);
     expect(out).toMatch(/Warnings \(1\)/);
     expect(out).toContain('[hub]');
   });

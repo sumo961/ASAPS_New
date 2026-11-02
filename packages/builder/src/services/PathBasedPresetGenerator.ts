@@ -7,6 +7,7 @@
  */
 
 import { rolesReferencedIn } from '../utils/rolePreview';
+import { simulateStory, simulateStoryAsync } from './storySimulation';
 import { StoryContext, type Story, type StatePreset } from '@asaps/core';
 import {
   StateSimulationAnalyzer,
@@ -89,25 +90,13 @@ export function generatePathPresets(
     };
   }
 
-  const cached = analyses.get(story);
-  if (cached) return presetsFromAnalysis(story, targetBeat, cached.analyzer, cached.result, startTime);
-  const analyzer = presetAnalyzer(story);
-  const result = analyzer.analyze();
-  analyses.set(story, { analyzer, result });
-  return presetsFromAnalysis(story, targetBeat, analyzer, result, startTime);
+  const simulation = simulateStory(story);
+  return presetsFromAnalysis(story, targetBeat, simulation.analyzer, simulation.result(), startTime);
 }
 
 /**
- * One simulation per story: choosing another start beat (or the editor's
- * "Show as" for another dialog) reads the same paths instead of simulating
- * the whole story again. Keyed by the Story object — callers build a new
- * one when the story changes.
- */
-const analyses = new WeakMap<Story, { analyzer: StateSimulationAnalyzer; result: ReturnType<StateSimulationAnalyzer['analyze']> }>();
-
-/**
- * generatePathPresets without freezing the UI: the path simulation runs in
- * frame-sized slices and reports progress between them.
+ * generatePathPresets without freezing the UI: the story's one simulation
+ * (storySimulation) runs in frame-sized slices and reports progress.
  */
 export async function generatePathPresetsAsync(
   story: Story,
@@ -120,21 +109,9 @@ export async function generatePathPresetsAsync(
   if (!targetBeat) {
     return { targetBeatId, targetBeatName: 'Unknown', presets: [], totalPaths: 0, analysisTime: performance.now() - startTime };
   }
-  const cached = analyses.get(story);
-  if (cached) return presetsFromAnalysis(story, targetBeat, cached.analyzer, cached.result, startTime);
-  const analyzer = presetAnalyzer(story);
-  const analysisResult = await analyzer.analyzeAsync(onProgress, signal);
-  analyses.set(story, { analyzer, result: analysisResult });
-  return presetsFromAnalysis(story, targetBeat, analyzer, analysisResult, startTime);
-}
-
-function presetAnalyzer(story: Story): StateSimulationAnalyzer {
-  return new StateSimulationAnalyzer(story, {
-    // The simulation is bounded by its own queue/step caps now (a 76-beat
-    // story takes ~1.5 s at any budget); 500 left late beats with no preset.
-    maxPaths: 20000,
-    maxDepth: 100,
-  });
+  const simulation = await simulateStoryAsync(story, onProgress);
+  if (signal?.aborted) throw new DOMException('Path analysis cancelled', 'AbortError');
+  return presetsFromAnalysis(story, targetBeat, simulation.analyzer, simulation.result(), startTime);
 }
 
 function presetsFromAnalysis(
@@ -240,7 +217,7 @@ function findPathsToTarget(
           result.push({
             path,
             stepIndex,
-            outcomeGroup: outcome.endingBeatName || 'Unknown Ending',
+            outcomeGroup: (variation as any).simulatedPath?.viaReplay ? "after an end screen's Replay" : outcome.endingBeatName || 'Unknown Ending',
             pathIndexInGroup,
             totalInGroup: paths.length,
           });
@@ -270,7 +247,7 @@ function findPathsToTarget(
               finalState: variation.finalState,
             },
             stepIndex,
-            outcomeGroup: outcome.endingBeatName || 'Unknown Ending',
+            outcomeGroup: (variation as any).simulatedPath?.viaReplay ? "after an end screen's Replay" : outcome.endingBeatName || 'Unknown Ending',
             pathIndexInGroup,
             totalInGroup: paths.length,
           });

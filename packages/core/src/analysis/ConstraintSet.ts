@@ -67,7 +67,7 @@ export interface PathVariation {
  * ('cycle'), or cut off because it grew longer than the analysis follows
  * ('depthLimit' — not a fault in the story).
  */
-export type PathEndType = 'ending' | 'deadEnd' | 'cycle' | 'depthLimit';
+export type PathEndType = 'ending' | 'deadEnd' | 'stuck' | 'cycle' | 'depthLimit';
 
 /**
  * Represents an outcome group - paths that end at the same beat
@@ -111,6 +111,8 @@ export interface ConstraintPathResult {
   totalConstraintSets: number;  // Sum of constraint sets across all outcomes
   /** Paths that went on through an end screen's Replay, kept out of the counts above. */
   replayOutcomes?: OutcomeGroup[];
+  /** The search ran out of budget: an unreachable beat is one it did not find. */
+  searchLimited?: boolean;
   reachableBeats: string[];        // All beats reachable from start
   unreachableBeats: string[];      // Beats that cannot be reached
   uniqueEndings: string[];         // Unique ending beat IDs

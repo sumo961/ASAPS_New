@@ -21,6 +21,8 @@ import type {
 } from '@asaps/core';
 import { PathTreeView } from './PathTreeView';
 import { backwardTargets, type BackwardTarget } from './backwardTargets';
+import { END_TYPE_HELP, END_TYPE_LABEL, END_TYPE_STYLE } from './debugWording';
+import { SearchLimitNote } from './SimulationGate';
 import { storyWarningLabel } from './storyWarningLabels';
 import { usePersistedState } from '../../utils/persistedState';
 import { simulateStory } from '../../services/storySimulation';
@@ -207,18 +209,8 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
   };
 
   const getEndTypeBadge = (endType: string) => {
-    switch (endType) {
-      case 'ending':
-        return <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Ending</span>;
-      case 'deadEnd':
-        return <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Dead End</span>;
-      case 'cycle':
-        return <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Cycle</span>;
-      case 'depthLimit':
-        return <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full" title="The analysis stopped following this path because it grew very long. It is not a fault in the story.">Depth Limit</span>;
-      default:
-        return null;
-    }
+    const label = END_TYPE_LABEL[endType];
+    return label ? <span className={`text-xs px-2 py-0.5 rounded-full ${END_TYPE_STYLE[endType]}`} title={END_TYPE_HELP[endType]}>{label}</span> : null;
   };
 
   // Render key decisions (used in both forward and backward)
@@ -371,9 +363,11 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
             const cycleCount = analysisResult.outcomes.filter((o: any) => o.endType === 'cycle').length;
             const deadEndCount = analysisResult.outcomes.filter((o: any) => o.endType === 'deadEnd').length;
             const depthLimitCount = analysisResult.outcomes.filter((o: any) => o.endType === 'depthLimit').length;
-            const hasNonEnding = cycleCount > 0 || deadEndCount > 0 || depthLimitCount > 0;
+            const stuckCount = analysisResult.outcomes.filter((o: any) => o.endType === 'stuck').length;
+            const hasNonEnding = cycleCount > 0 || deadEndCount > 0 || depthLimitCount > 0 || stuckCount > 0;
             return (
             <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
+              {analysisResult.searchLimited && <SearchLimitNote />}
               <div className="grid grid-cols-4 gap-3 mb-3">
                 <div className="bg-blue-50 p-2 rounded">
                   <div className="text-xs text-blue-700">Outcomes</div>
@@ -383,9 +377,10 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
                   {hasNonEnding && (
                     <div className="text-[10px] text-blue-600 mt-0.5 leading-tight" title="Only endings (End Screen, AI Summary) finish the story. A cycle comes back round with nothing new to find, a dead end has no way on, and a depth limit is a path the analysis stopped following because it grew very long.">
                       {endingCount} ending{endingCount !== 1 ? 's' : ''}
-                      {cycleCount > 0 && ` + ${cycleCount} cycle${cycleCount !== 1 ? 's' : ''}`}
                       {deadEndCount > 0 && ` + ${deadEndCount} dead end${deadEndCount !== 1 ? 's' : ''}`}
-                      {depthLimitCount > 0 && ` + ${depthLimitCount} at the depth limit`}
+                      {stuckCount > 0 && ` + ${stuckCount} stuck in a loop`}
+                      {cycleCount > 0 && ` + ${cycleCount} back to a menu`}
+                      {depthLimitCount > 0 && ` + ${depthLimitCount} cut off`}
                     </div>
                   )}
                 </div>
@@ -638,8 +633,8 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
                   : [
                       ['Endings', targets.endings],
                       ['Dead ends: the story stops here', targets.deadEnds],
-                      ['Loops: the player can go round without getting out', targets.loops],
-                      ['End screens no playthrough reaches', targets.neverReached],
+                      ['Stuck in a loop: the player can never get out', targets.loops],
+                      ['End screens no way of playing reaches', targets.neverReached],
                     ];
                 return groups.filter(([, list]) => list.length > 0).map(([title, list]) => (
                   <div key={title}>

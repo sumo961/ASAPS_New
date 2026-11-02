@@ -198,7 +198,7 @@ describe('path analysis follows the engine', () => {
     expect(terminals(tree.root).map(n => n.endType)).toEqual(['depthLimit']);
   });
 
-  it('the path tree keeps a cycle a cycle', () => {
+  it('the path tree keeps a trap a trap', () => {
     const s = story([
       { id: 'hub', type: 'multiChoice', parameters: { question: '?', choices: [
         { id: 'a', text: 'Look left', target: 'left' }, { id: 'b', text: 'Look right', target: 'right' },
@@ -207,11 +207,11 @@ describe('path analysis follows the engine', () => {
       { id: 'right', type: 'infoText', parameters: { text: 'R' }, connections: [{ targetId: 'hub' }] },
     ]);
     const paths = new StateSimulationAnalyzer(s).analyzeRaw();
-    expect(paths.every(p => p.outcome.type === 'cycle')).toBe(true);
-    // The tree folds the loop into a hub; with no way out, it ends as a cycle.
+    expect(paths.every(p => p.outcome.type === 'stuck')).toBe(true);
+    // The tree folds the loop into a hub; with no way out, the player is stuck.
     const root = buildPathTree(paths, s).root;
     expect(root.type).toBe('hub');
-    expect(root.endType).toBe('cycle');
+    expect(root.endType).toBe('stuck');
   });
 });
 
@@ -567,7 +567,29 @@ describe('only an end screen is an ending', () => {
     expect(end({ id: 'd', name: 'd', type: 'dialogTree', parameters: { dialogTree: { id: 'r', speaker: 'N', text: 't', choices: [] } } })).toEqual(['deadEnd']);
     expect(end({ id: 't', name: 't', type: 'infoText', parameters: { text: 't' } })).toEqual(['deadEnd']);
   });
-  it('a scene whose reply returns to its start is a cycle', () => {
-    expect(end({ id: 'd', name: 'd', type: 'dialogTree', parameters: { dialogTree: { id: 'r', speaker: 'N', text: 't', choices: [{ id: 'c', text: 'Again', target: '__self__' }] } } })).toEqual(['cycle']);
+  it('a scene whose reply returns to its start traps the player', () => {
+    expect(end({ id: 'd', name: 'd', type: 'dialogTree', parameters: { dialogTree: { id: 'r', speaker: 'N', text: 't', choices: [{ id: 'c', text: 'Again', target: '__self__' }] } } })).toEqual(['stuck']);
+  });
+
+  it('a menu the path came back to, with a way out, is not a trap', () => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'hub' });
+    story.addBeat(createTestBeat({ id: 'hub', name: 'hub', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'Look', target: 'room' }, { id: 'b', text: 'Leave', target: 'end' },
+    ] } } as any));
+    story.addBeat(createTestBeat({ id: 'room', name: 'room', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'hub' }] } as any));
+    story.addBeat(createTestBeat({ id: 'end', name: 'end', type: 'endScreen', parameters: { message: 'e' } } as any));
+    const types = new StateSimulationAnalyzer(story, { maxPaths: 10, maxDepth: 10 }).analyzeRaw().map((p) => p.outcome.type);
+    expect(types).toContain('ending');
+    expect(types).not.toContain('stuck');
+  });
+
+  it('a menu whose every choice comes back is a trap', () => {
+    const story = new Story({ title: 'T', author: 'T', firstBeatId: 'hub' });
+    story.addBeat(createTestBeat({ id: 'hub', name: 'hub', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'A', target: 'r1' }, { id: 'b', text: 'B', target: 'r2' },
+    ] } } as any));
+    for (const id of ['r1', 'r2']) story.addBeat(createTestBeat({ id, name: id, type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'hub' }] } as any));
+    const types = new StateSimulationAnalyzer(story, { maxPaths: 10, maxDepth: 10 }).analyzeRaw().map((p) => p.outcome.type);
+    expect(types).toContain('stuck');
   });
 });

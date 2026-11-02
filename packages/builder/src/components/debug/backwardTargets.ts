@@ -24,8 +24,8 @@ export function backwardTargets(
   result: Pick<ConstraintPathResult, 'outcomes'> | null,
   beats: ReadonlyArray<{ id: string; name: string; type: string }>,
 ): BackwardTargets {
-  const groups: Record<'ending' | 'deadEnd' | 'cycle', Map<string, BackwardTarget>> = {
-    ending: new Map(), deadEnd: new Map(), cycle: new Map(),
+  const groups: Record<'ending' | 'deadEnd' | 'stuck', Map<string, BackwardTarget>> = {
+    ending: new Map(), deadEnd: new Map(), stuck: new Map(),
   };
   for (const o of result?.outcomes ?? []) {
     const group = groups[o.endType as keyof typeof groups];
@@ -36,7 +36,7 @@ export function backwardTargets(
   return {
     endings: [...groups.ending.values()].sort(byName),
     deadEnds: [...groups.deadEnd.values()].sort(byName),
-    loops: [...groups.cycle.values()].sort(byName),
+    loops: [...groups.stuck.values()].sort(byName),
     neverReached: beats
       .filter((b) => (b.type === 'endScreen' || b.type === 'aiSummary') && !groups.ending.has(b.id))
       .map(label).sort(byName),

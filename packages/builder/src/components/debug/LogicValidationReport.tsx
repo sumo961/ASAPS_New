@@ -185,7 +185,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
         <div className={`grid ${aiOn ? 'grid-cols-4' : 'grid-cols-3'} gap-4 text-sm`}>
           <div className="flex items-center gap-2">
             <GitMerge className="w-4 h-4 text-blue-500" />
-            <SummaryJump target="story-logic-hubs" disabled={hubAnalysis.length === 0}>Hub Beats: {validation.hubBeats.length}</SummaryJump>
+            <SummaryJump target="story-logic-hubs" disabled={hubAnalysis.length === 0}>Different states: {validation.hubBeats.length}</SummaryJump>
           </div>
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-yellow-500" />
@@ -209,10 +209,10 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
         <div id="story-logic-hubs">
           <h4 className="font-semibold mb-3 flex items-center gap-2">
             <GitMerge className="w-4 h-4 text-blue-500" />
-            Hub Beat Analysis ({hubAnalysis.length})
+            Beats reached in different states ({hubAnalysis.length})
           </h4>
           <p className="text-sm text-gray-600 mb-3">
-            Hub beats are reached in different states: with or without an item, a variable set or not, someone's trust higher or lower. Check that each one's text holds for every way in.
+            These beats are reached in different states: with or without an item, a variable set or not, someone's trust higher or lower. Check that each one's text holds for every way in.
           </p>
 
           <div className="space-y-2">

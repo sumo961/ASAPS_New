@@ -482,7 +482,7 @@ describe('PathBasedPresetGenerator', () => {
     story.addBeat(createTestBeat({ id: 'start', name: 'Start', type: 'titleScreen', parameters: { title: 'T' }, connections: [{ targetId: 'middle' }] }));
     story.addBeat(createTestBeat({ id: 'middle', name: 'Middle', type: 'infoText', parameters: { text: 'M' }, connections: [{ targetId: 'end' }] }));
     story.addBeat(createTestBeat({ id: 'end', name: 'End', type: 'endScreen', parameters: { message: 'E' } }));
-    const spy = vi.spyOn(StateSimulationAnalyzer.prototype, 'analyze');
+    const spy = vi.spyOn(StateSimulationAnalyzer.prototype, 'analyzeRaw');
     try {
       expect(generatePathPresets(story, 'middle').presets.length).toBeGreaterThan(0);
       expect(generatePathPresets(story, 'end').presets.length).toBeGreaterThan(0);

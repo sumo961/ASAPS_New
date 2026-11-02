@@ -11,6 +11,7 @@ const LABELS: Record<StoryWarning['code'], string> = {
   'wordless-reply': 'Reply without words',
   'line-never-plays': 'Next line never plays',
   'reply-nowhere': 'Reply goes nowhere',
+  'choices-all-hidden': 'Every choice hidden',
   'role': 'Role',
 };
 

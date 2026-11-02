@@ -119,6 +119,8 @@ export interface PathTreeResult {
   totalRawPaths: number;
   totalTreeNodes: number;
   uniqueEndings: string[];
+  /** Beats played only after an end screen's Replay: not in this one-playthrough tree. */
+  replayOnlyBeats: string[];
   flatPaths: SimulatedPath[];
 
   getStateAt(beatId: string, pathIndex: number): SimulationState | null;
@@ -172,7 +174,7 @@ export function buildPathTree(allPaths: SimulatedPath[], story: Story): PathTree
     };
     return {
       root: empty, totalRawPaths: 0, totalTreeNodes: 1,
-      uniqueEndings: [], flatPaths: paths,
+      uniqueEndings: [], replayOnlyBeats: [], flatPaths: paths,
       getStateAt: () => null,
     };
   }
@@ -208,6 +210,10 @@ export function buildPathTree(allPaths: SimulatedPath[], story: Story): PathTree
     totalRawPaths: paths.length,
     totalTreeNodes: totalNodes,
     uniqueEndings: [...uniqueEndings],
+    replayOnlyBeats: (() => {
+      const inTree = new Set(paths.flatMap((p) => p.steps.map((s) => s.beatId)));
+      return [...new Set(allPaths.filter((p) => p.viaReplay).flatMap((p) => p.steps.map((s) => s.beatId)))].filter((id) => !inTree.has(id));
+    })(),
     flatPaths: paths,
     getStateAt(beatId: string, pathIndex: number): SimulationState | null {
       if (pathIndex < 0 || pathIndex >= paths.length) return null;
@@ -620,7 +626,7 @@ function buildHubNode(
   // A hub with no way out, where every path only comes back round, ends the
   // way Forward mode labels it: as a cycle.
   const hubPaths = [...hubTrie.pathIndices];
-  const onlyCycles = !hubExitNode && hubPaths.length > 0 && hubPaths.every(pi => paths[pi]?.outcome.type === 'cycle');
+  const onlyCycles = !hubExitNode && hubPaths.length > 0 && hubPaths.every(pi => paths[pi]?.outcome.type === 'cycle' || paths[pi]?.outcome.type === 'stuck');
 
   return {
     id: nextId(),
@@ -633,7 +639,7 @@ function buildHubNode(
     pathCount: hubTrie.pathIndices.size,
     representativePathIndex: hubPaths[0] ?? -1,
     pathIndices: hubPaths,
-    ...(onlyCycles ? { endType: 'cycle' as const } : {}),
+    ...(onlyCycles ? { endType: hubPaths.some((pi) => paths[pi]?.outcome.type === 'stuck') ? 'stuck' as const : 'cycle' as const } : {}),
   };
 }
 

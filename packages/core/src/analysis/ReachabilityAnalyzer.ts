@@ -112,6 +112,23 @@ export interface ReachabilityConfig {
  * why unreachable beats cannot be reached (impossible conditions, missing
  * connections, etc.)
  */
+function conditionsIn(condition: unknown): any[] {
+  return (Array.isArray(condition) ? condition : [condition]).filter(Boolean);
+}
+
+/** A condition in words: "Gold in the player's bag", "a visit to \"Talk to Skuli\"". */
+function describeGate(c: any, beatName: (id: string) => string): string {
+  const name = c.variableName || c.variable || c.left;
+  const negative = c.operator === 'not' || c.operator === '!=' || c.checkType === 'notHas';
+  switch (c.type) {
+    case 'inventory': return negative ? `not having ${c.item || c.value || c.right}` : `${c.item || c.value || c.right} in the player's bag`;
+    case 'visitedBeat': return `${negative ? 'no visit' : 'a visit'} to "${beatName(c.beatId || c.value)}"`;
+    case 'variable':
+    case 'counter': return `${name} ${c.operator || '=='} ${c.value ?? c.right}`;
+    default: return `a ${c.type} condition`;
+  }
+}
+
 export class ReachabilityAnalyzer {
   private story: Story;
   private config: Required<Omit<ReachabilityConfig, 'playedBeats'>> & Pick<ReachabilityConfig, 'playedBeats'>;
@@ -178,8 +195,13 @@ export class ReachabilityAnalyzer {
       this.analyzeConditionBeats(allBeats, reachableBeats);
     }
 
-    // Step 6: Generate warnings
-    const warnings = this.generateWarnings(reachableBeats);
+    // Step 6: Generate warnings. With played beats the simulation has already
+    // settled it: a beat that was played is no longer in question for sitting
+    // behind a condition, and a branch only counts if its target went unplayed.
+    const warnings = played ? [] : this.generateWarnings(reachableBeats);
+    if (played) {
+      this.conditionBeatWarnings = this.conditionBeatWarnings.filter((w) => !played.has(w.targetBeatId));
+    }
 
     console.log(`[ReachabilityAnalyzer] Analysis complete. ${reachableBeats.size}/${totalBeats} beats reachable, ${this.brokenConnections.length} broken connections, ${this.conditionBeatWarnings.length} condition warnings`);
 
@@ -764,7 +786,10 @@ export class ReachabilityAnalyzer {
         if (this.config.playedBeats && reachedParents.length > 0) {
           const names = [...new Set(reachedParents.map((i) => `"${i.sourceBeatName}"`))].join(', ');
           reason = 'neverOffered';
-          details = `${names} links here, but no way of playing takes that link: the choice or line leading here is never on offer`;
+          const gates = [...new Set(reachedParents.flatMap((i) => conditionsIn(i.connection.condition).map((c) => describeGate(c, (id) => this.story.getBeat(id)?.name ?? id))))];
+          details = gates.length > 0
+            ? `${names} links here, but it needs ${gates.join(' and ')}, and no way of playing has that there`
+            : `${names} links here, but no way of playing takes that link: the choice or line leading here is never on offer`;
         } else if (hasImpossibleCondition) {
           reason = 'impossibleCondition';
           details = 'All paths to this beat have impossible conditions';

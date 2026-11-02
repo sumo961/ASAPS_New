@@ -11,7 +11,7 @@ const beats = [
 const outcomes: any[] = [
   { endType: 'ending', endingBeatId: 'e1', endingBeatName: 'Win' },
   { endType: 'deadEnd', endingBeatId: 's', endingBeatName: 'Stop' },
-  { endType: 'cycle', endingBeatId: 'l', endingBeatName: 'Loop' },
+  { endType: 'stuck', endingBeatId: 'l', endingBeatName: 'Loop' },
   { endType: 'depthLimit', endingBeatId: 'x', endingBeatName: 'Orphan' },
 ];
 

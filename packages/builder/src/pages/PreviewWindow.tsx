@@ -5,6 +5,9 @@
  * and renders the preview. It auto-reloads when the story changes.
  */
 
+import { cancelSimulation } from '../services/storySimulation';
+import { simulationProgressShort } from '../components/debug/debugWording';
+import type { SimulationProgress } from '@asaps/core';
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech, Download, Mic, MicOff, MessagesSquare } from 'lucide-react';
 import { Story, StoryEngine, Beat, BeatTypeRegistry, findSpeakerCharacter } from '@asaps/core';
@@ -20,7 +23,7 @@ import { resolveLayoutMode } from '../utils/projectLayoutMode';
 import type { PreviewMessage, SerializedStoryData } from '../services/PreviewWindowManager';
 import type { Asset } from '../components/assets/AssetManager';
 import type { Character } from '../types/character';
-import { generatePathPresets, groupPresetsByOutcome, type GeneratedPreset, type InputTextBeatInfo } from '../services/PathBasedPresetGenerator';
+import { generatePathPresetsAsync, groupPresetsByOutcome, type GeneratedPreset, type InputTextBeatInfo } from '../services/PathBasedPresetGenerator';
 import { InputTextValuesModal } from '../components/preview/InputTextValuesModal';
 import { getSavedAIConfig } from '../hooks/useAI';
 import { getTTSService, WebSpeechProvider, OpenAITTSProvider, ElevenLabsProvider, CustomTTSProvider, LocalTTSProvider } from '../services/tts';
@@ -503,6 +506,7 @@ export const PreviewWindow: React.FC = () => {
   const [generatedPresets, setGeneratedPresets] = useState<GeneratedPreset[]>([]);
   const [totalPathCount, setTotalPathCount] = useState(0);
   const [isGeneratingPresets, setIsGeneratingPresets] = useState(false);
+  const [presetProgress, setPresetProgress] = useState<SimulationProgress | null>(null);
   // Input text values modal state
   const [showInputTextModal, setShowInputTextModal] = useState(false);
   // The AI provider rejected the key (401/403) — shown over the stage until
@@ -1018,14 +1022,18 @@ export const PreviewWindow: React.FC = () => {
     }
 
     setIsGeneratingPresets(true);
+    setPresetProgress(null);
 
-    // Run in a timeout to avoid blocking UI
-    setTimeout(() => {
+    // The story's one simulation, in slices: the window stays usable.
+    let current = true;
+    const signal = { aborted: false };
+    void (async () => {
       try {
-        const result = generatePathPresets(story, startBeatId);
+        const result = await generatePathPresetsAsync(story, startBeatId, (p) => { if (current) setPresetProgress(p); }, signal);
+        if (!current) return;
         setGeneratedPresets(result.presets);
         setTotalPathCount(result.totalPaths);
-        console.log('[PreviewWindow] Generated', result.presets.length, 'unique states from', result.totalPaths, 'paths for beat:', startBeatId);
+        console.log('[PreviewWindow] Generated', result.presets.length, 'states that change what happens from here from', result.totalPaths, 'paths for beat:', startBeatId);
 
         // Preserve the author's chosen state across story edits — the core
         // expert loop is edit → verify, and wiping the selection on every
@@ -1048,13 +1056,19 @@ export const PreviewWindow: React.FC = () => {
           return null;
         });
       } catch (error) {
+        if (!current || (error as any)?.name === 'AbortError') return;
         console.error('[PreviewWindow] Failed to generate presets:', error);
         setGeneratedPresets([]);
         setTotalPathCount(0);
       } finally {
-        setIsGeneratingPresets(false);
+        if (current) setIsGeneratingPresets(false);
       }
-    }, 0);
+    })();
+    return () => {
+      current = false;
+      signal.aborted = true;
+      cancelSimulation(story);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [story, startBeatId]);
 
@@ -1071,9 +1085,9 @@ export const PreviewWindow: React.FC = () => {
     }
 
     setIsGeneratingPresets(true);
-    setTimeout(() => {
+    void (async () => {
       try {
-        const result = generatePathPresets(story, startBeatId);
+        const result = await generatePathPresetsAsync(story, startBeatId, setPresetProgress);
         setGeneratedPresets(result.presets);
         setTotalPathCount(result.totalPaths);
         if (result.presets.length === 1) {
@@ -1092,7 +1106,7 @@ export const PreviewWindow: React.FC = () => {
       } finally {
         setIsGeneratingPresets(false);
       }
-    }, 0);
+    })();
   };
 
   // Group presets by outcome for display
@@ -3013,7 +3027,7 @@ export const PreviewWindow: React.FC = () => {
                 <Database className="w-3 h-3" />
                 <span className="max-w-40 truncate">
                   {isGeneratingPresets ? (
-                    'Analyzing...'
+                    presetProgress ? simulationProgressShort(presetProgress, story?.getAllBeats().length ?? 0) : 'Playing through…'
                   ) : selectedPreset ? (
                     selectedPreset.name.replace(/^.*? - /, '') // Show just the path part
                   ) : generatedPresets.length > 0 ? (

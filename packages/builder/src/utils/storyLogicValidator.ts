@@ -479,7 +479,7 @@ export function validateStoryLogic(story: any, options: StoryLogicOptions = {}):
           issues.push({
             type: 'warning',
             category: 'hub_state_assumption',
-            message: `Hub beat '${beat.name || beat.id}' has text that assumes player state but can be reached from ${incomingCount} different paths without condition checks. Players may reach this with different states.`,
+            message: `Beat '${beat.name || beat.id}' has text that assumes player state but can be reached from ${incomingCount} different paths without condition checks. Players may reach this with different states.`,
             beatId: beat.id,
             beatName: beat.name,
             beatType: beat.type,
@@ -518,7 +518,7 @@ export function formatLogicValidationResult(result: LogicValidationResult): stri
   const lines: string[] = [];
 
   lines.push(`=== Story Logic Validation ===`);
-  lines.push(`Hub Beats (multiple incoming paths): ${result.hubBeats.length}`);
+  lines.push(`Beats reached in different states: ${result.hubBeats.length}`);
   if (result.hubBeats.length > 0) {
     lines.push(`  ${result.hubBeats.join(', ')}`);
   }

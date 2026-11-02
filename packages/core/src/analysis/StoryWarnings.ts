@@ -25,6 +25,7 @@ export type StoryWarningCode =
   | 'counter-text'                    // a counter checked against, or set to, text
   | 'wordless-reply'                  // a Dialog Tree reply button with no words
   | 'line-never-plays'                // a next line behind one that always plays
+  | 'choices-all-hidden'              // no choice on offer: the beat is skipped by its own link
   | 'reply-nowhere'                   // a reply with no next line and no exit: picking it ends the scene
   | 'role';                           // cast roles: unknown role, non-candidate cast, recast, used before cast, bare AI partner
 
@@ -76,6 +77,26 @@ export function detectStoryWarnings(cfg: DetectConfig): StoryWarning[] {
     warnings.push({
       code: 'role', severity: f.problem === 'unknown-role' || f.problem === 'not-candidate' ? 'error' : 'warn',
       beatId: f.beatId, beatName: f.beatName || f.beatId, message: f.message, detail: { problem: f.problem, role: f.role },
+    });
+  }
+
+  // Paths that arrived at a choice with nothing to choose.
+  const skipped = new Map<string, Beat>();
+  for (const path of paths) {
+    for (const step of path.steps) {
+      if (step.allChoicesHidden && !skipped.has(step.beatId)) {
+        const beat = story.getBeat(step.beatId);
+        if (beat) skipped.set(step.beatId, beat);
+      }
+    }
+  }
+  for (const beat of skipped.values()) {
+    const first = beat.connections?.find((c) => !c.condition)?.targetId ?? beat.defaultTarget;
+    const on = first ? story.getBeat(first)?.name ?? first : null;
+    warnings.push({
+      code: 'choices-all-hidden', severity: 'warn', beatId: beat.id, beatName: beat.name,
+      message: `Some players reach this beat with every choice hidden by its conditions. They never see the question: the story moves straight on${on ? ` to "${on}"` : ''}. Add a choice with no condition, or check the conditions.`,
+      detail: { target: first },
     });
   }
 

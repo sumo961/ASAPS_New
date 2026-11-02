@@ -3,6 +3,7 @@ import { ChevronRight, ChevronDown, GitBranch, RotateCw, MapPin, Flag, AlertTria
 import type { PathTreeNode, PathTreeBranch, PathTreeResult, HubOption, ConditionAnnotation, StateSummary, ChoiceVariant, StoryWarning, Story, Condition, BeatRef } from '@asaps/core';
 import { isChoiceBeatType } from '@asaps/core';
 import { storyWarningLabel } from './storyWarningLabels';
+import { END_TYPE_HELP, END_TYPE_LABEL, END_TYPE_STYLE } from './debugWording';
 
 interface PathTreeViewProps {
   treeResult: PathTreeResult;
@@ -345,6 +346,11 @@ export const PathTreeView: React.FC<PathTreeViewProps> = ({ treeResult, onHighli
         <span>{treeResult.totalRawPaths.toLocaleString()} total paths</span>
         <span className="text-gray-300">|</span>
         <span>{treeResult.totalTreeNodes} tree nodes</span>
+        {treeResult.replayOnlyBeats.length > 0 && (
+          <span title={treeResult.replayOnlyBeats.map((id) => story?.getBeat(id)?.name ?? id).join(', ')}>
+            {treeResult.replayOnlyBeats.length} more only after an end screen's Replay
+          </span>
+        )}
         <span className="text-gray-300">|</span>
         <span>{treeResult.uniqueEndings.length} endings</span>
         {total > 0 && (
@@ -690,25 +696,12 @@ const TreeNodeView: React.FC<TreeNodeViewProps> = ({
           </span>
         )}
         {/* Terminal nodes other than endings: say how the path stopped. */}
-        {(node.type === 'deadEnd' || node.type === 'hub') && node.endType === 'cycle' && (
+        {(node.type === 'deadEnd' || (node.type === 'hub' && node.endType === 'cycle')) && node.endType && (
           <span
-            className="px-1.5 py-0.5 text-xs rounded bg-purple-100 text-purple-700 flex-shrink-0"
-            title="Every way on comes back round with nothing new to find, e.g. a hub where every choice was already tried and none leads further."
+            className={`px-1.5 py-0.5 text-xs rounded flex-shrink-0 ${END_TYPE_STYLE[node.endType]}`}
+            title={END_TYPE_HELP[node.endType]}
           >
-            Cycle
-          </span>
-        )}
-        {node.type === 'deadEnd' && node.endType === 'depthLimit' && (
-          <span
-            className="px-1.5 py-0.5 text-xs rounded bg-orange-100 text-orange-700 flex-shrink-0"
-            title="The analysis stopped following this path because it grew very long. It is not a fault in the story."
-          >
-            Depth Limit
-          </span>
-        )}
-        {node.type === 'deadEnd' && node.endType !== 'cycle' && node.endType !== 'depthLimit' && (
-          <span className="px-1.5 py-0.5 text-xs rounded bg-red-100 text-red-600 flex-shrink-0">
-            Dead End
+            {END_TYPE_LABEL[node.endType]}
           </span>
         )}
       </div>
@@ -1393,7 +1386,7 @@ const VisitCard: React.FC<VisitCardProps> = ({
 // ============================================================================
 
 const NodeTypeIcon: React.FC<{ type: PathTreeNode['type']; endType?: PathTreeNode['endType'] }> = ({ type, endType }) => {
-  if (type === 'deadEnd' && endType === 'cycle') return <RotateCw className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />;
+  if (type === 'deadEnd' && (endType === 'cycle' || endType === 'stuck')) return <RotateCw className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />;
   if (type === 'deadEnd' && endType === 'depthLimit') return <AlertTriangle className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />;
   switch (type) {
     case 'hub':

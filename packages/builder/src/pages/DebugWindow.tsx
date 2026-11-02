@@ -16,6 +16,7 @@ import { Story, BeatTypeRegistry } from '@asaps/core';
 import { ReachabilityReport } from '../components/debug/ReachabilityReport';
 import { PathVisualization } from '../components/debug/PathVisualization';
 import { LogicValidationReport } from '../components/debug/LogicValidationReport';
+import { SimulationGate } from '../components/debug/SimulationGate';
 import type { DebugMessage, DebugStoryContext } from '../services/DebugWindowManager';
 import type { SerializedStoryData } from '../services/PreviewWindowManager';
 import { usePersistedState } from '../utils/persistedState';
@@ -222,6 +223,7 @@ export const DebugWindow: React.FC = () => {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
+        <SimulationGate story={story}>
         {activeTab === 'reachability' && (
           <ReachabilityReport story={story} onHighlightBeat={handleHighlightBeat} />
         )}
@@ -239,6 +241,7 @@ export const DebugWindow: React.FC = () => {
             fixResult={fixResult}
           />
         )}
+        </SimulationGate>
       </div>
 
       {/* Footer */}

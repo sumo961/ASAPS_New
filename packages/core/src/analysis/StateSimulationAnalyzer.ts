@@ -75,6 +75,8 @@ export interface SimulatedStep {
   connectionTaken?: string; // Label of connection taken
   decisionMade?: string;    // For choice beats
   conditionResult?: boolean; // For condition beats
+  /** Every choice was hidden, so the beat was skipped by its own link. */
+  allChoicesHidden?: boolean;
 }
 
 /**
@@ -248,6 +250,10 @@ export interface SimulationProgress {
   expansions: number;
   /** Distinct beats the simulation has reached so far. */
   beatsReached: number;
+  /** Paths finished so far. */
+  pathsFound: number;
+  /** What it is doing: trying every way, looking for what's still unreached, following Replay. */
+  phase: 'exploring' | 'unreached' | 'replay';
 }
 
 /** Let the event loop run (paint, input) before the next slice of work. */
@@ -443,6 +449,8 @@ export class StateSimulationAnalyzer {
    *  not explored (every reachable beat still was, as far as the budget
    *  allowed). */
   public truncated = false;
+  /** The search for unreached beats ran out of budget: "unreachable" then means "not found". */
+  public searchLimited = false;
 
   constructor(story: Story, config: SimulationAnalysisConfig = {}) {
     this.story = story;
@@ -508,6 +516,29 @@ export class StateSimulationAnalyzer {
       step = run.next();
     }
     return this.buildResult(step.value, startTime);
+  }
+
+  /** analyzeRaw without freezing the UI: same slices and progress as analyzeAsync. */
+  public async analyzeRawAsync(
+    onProgress?: (progress: SimulationProgress) => void,
+    signal?: { aborted: boolean },
+    sliceMs = 12
+  ): Promise<SimulatedPath[]> {
+    const firstBeatId = this.story.getFirstBeatId();
+    if (!firstBeatId) return [];
+    const run = this.explorePaths(firstBeatId, this.initialStates());
+    let sliceStart = performance.now();
+    let step = run.next();
+    while (!step.done) {
+      if (performance.now() - sliceStart >= sliceMs) {
+        onProgress?.(step.value);
+        await yieldToEventLoop();
+        if (signal?.aborted) throw new DOMException('Path analysis cancelled', 'AbortError');
+        sliceStart = performance.now();
+      }
+      step = run.next();
+    }
+    return step.value;
   }
 
   /**
@@ -677,6 +708,7 @@ export class StateSimulationAnalyzer {
     const seenBeats = new Set<string>();
     let expansions = 0;
     this.truncated = false;
+    this.searchLimited = false;
     // Past the cap: one branch per beat nobody has reached yet, and one per
     // (beat, variables/counters) combination not seen before — a choice's
     // variable can decide a gate much later (Late Light: "declined" at the
@@ -789,11 +821,13 @@ export class StateSimulationAnalyzer {
         for (const step of paths[countedPaths].steps) covered.add(step.beatId);
       }
       if (coverage && (paths.length - coverageStart >= coveragePaths || expansions >= coverageExpansions)) {
+        // Stopped by the budget, not because nothing was left to try.
+        this.searchLimited = true;
         if (startReplays()) continue;
         break;
       }
       expansions++;
-      if (expansions % 250 === 0) yield { expansions, beatsReached: seenBeats.size };
+      if (expansions % 250 === 0) yield { expansions, beatsReached: seenBeats.size, pathsFound: paths.length, phase: replaying ? 'replay' : coverage ? 'unreached' : 'exploring' };
       // Use BFS (shift) instead of DFS (pop) to ensure fair coverage
       // across all branches at each level. DFS can exhaust the maxPaths
       // budget on the first few branches of a wide choice beat,
@@ -911,9 +945,9 @@ export class StateSimulationAnalyzer {
       // Check for terminal beat
       if (this.isTerminalBeat(beat)) {
         // Only an end screen is an ending. A beat that simply has no way on is a
-        // stop, and a scene whose last reply goes back to its start is a loop.
+        // stop, and a scene whose last reply goes back to its start traps the player.
         const authored = ['endScreen', 'aiSummary'].includes(beat.type);
-        paths.push(this.buildPath(newPath, frame.decisions, newState, authored ? 'ending' : this.loopsOnItself(beat) ? 'cycle' : 'deadEnd'));
+        paths.push(this.buildPath(newPath, frame.decisions, newState, authored ? 'ending' : this.loopsOnItself(beat) ? 'stuck' : 'deadEnd'));
         noteReplay(beat, newPath, frame.decisions, newState);
         continue;
       }
@@ -966,6 +1000,7 @@ export class StateSimulationAnalyzer {
         if (offered.length === 0) {
           const on = this.linkWhenAllHidden(beat, newState);
           if (on) {
+            newPath[newPath.length - 1] = { ...newPath[newPath.length - 1], allChoicesHidden: true };
             enqueue({ beatId: on, state: newState, path: newPath, decisions: frame.decisions, visitedStates: newVisitedStates, takenChoicesPerBeat: frame.takenChoicesPerBeat });
           } else {
             paths.push(this.buildPath(newPath, frame.decisions, newState, 'deadEnd'));
@@ -1002,7 +1037,7 @@ export class StateSimulationAnalyzer {
           // anywhere new: a loop the player can leave by the same choices
           // (a cycle — not a dead end, the choices are still on screen).
           if (conditionGatedOptions.length === 0) {
-            paths.push(this.buildPath(newPath, frame.decisions, newState, 'cycle'));
+            paths.push(this.buildPath(newPath, frame.decisions, newState, this.isTrap(beat) ? 'stuck' : 'cycle'));
             continue;
           }
 
@@ -1011,7 +1046,7 @@ export class StateSimulationAnalyzer {
           const reexploreKey = `reexplore:${beat.id}:${stateHash}`;
           if (frame.visitedStates.has(reexploreKey)) {
             // Already re-explored with this exact state: a cycle
-            paths.push(this.buildPath(newPath, frame.decisions, newState, 'cycle'));
+            paths.push(this.buildPath(newPath, frame.decisions, newState, this.isTrap(beat) ? 'stuck' : 'cycle'));
             continue;
           }
           newVisitedStates.add(reexploreKey);
@@ -1108,6 +1143,7 @@ export class StateSimulationAnalyzer {
           if (!this.choiceOffered(beat, connections[0], newState)) {
             const on = this.linkWhenAllHidden(beat, newState);
             if (on) {
+              newPath[newPath.length - 1] = { ...newPath[newPath.length - 1], allChoicesHidden: true };
               enqueue({ beatId: on, state: newState, path: newPath, decisions: frame.decisions, visitedStates: newVisitedStates, takenChoicesPerBeat: frame.takenChoicesPerBeat });
             } else {
               paths.push(this.buildPath(newPath, frame.decisions, newState, 'deadEnd'));
@@ -1466,6 +1502,21 @@ export class StateSimulationAnalyzer {
     if (!Array.isArray(more) || more.length === 0) return first;
     const rest = more.map((c: Condition) => this.evaluateCondition(c, state));
     return params.conditionsMatch === 'any' ? first || rest.some(Boolean) : first && rest.every(Boolean);
+  }
+
+  /** Come back to a beat with nothing new, and no link from here gets out: an ending or stop is out of reach. */
+  private isTrap(start: Beat): boolean {
+    const seen = new Set<string>([start.id]);
+    const todo = [start];
+    while (todo.length > 0) {
+      const beat = todo.pop()!;
+      for (const conn of this.getConnections(beat)) {
+        const next = this.getBeat(conn.targetId);
+        if (!next || this.isTerminalBeat(next)) return false;
+        if (!seen.has(next.id)) { seen.add(next.id); todo.push(next); }
+      }
+    }
+    return true;
   }
 
   /** A Dialog Tree with a reply or line that returns to its first line. */
@@ -2314,6 +2365,7 @@ export class StateSimulationAnalyzer {
       totalOutcomes: outcomes.length,
       totalConstraintSets: outcomes.reduce((sum, o) => sum + (o.pathVariations?.length ?? 0), 0),
       replayOutcomes,
+      searchLimited: this.searchLimited,
       reachableBeats,
       unreachableBeats,
       uniqueEndings,

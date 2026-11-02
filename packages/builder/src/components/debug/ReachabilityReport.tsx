@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { AlertCircle, CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronRight, Search, Unlink, GitBranch } from 'lucide-react';
 import { Story, ReachabilityAnalyzer } from '@asaps/core';
 import { simulateStory } from '../../services/storySimulation';
+import { SearchLimitNote } from './SimulationGate';
 import type { ReachabilityResult, UnreachableBeat } from '@asaps/core';
 
 interface ReachabilityReportProps {
@@ -33,8 +34,7 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
   const analysis = useMemo<ReachabilityResult>(() => {
     // The same answer as Path Analysis: reachable means some way of playing
     // gets there, not just that a link exists.
-    const playedBeats = new Set(simulateStory(story).paths.flatMap((p) => p.steps.map((step) => step.beatId)));
-    const analyzer = new ReachabilityAnalyzer(story, { playedBeats });
+    const analyzer = new ReachabilityAnalyzer(story, { playedBeats: simulateStory(story).playedBeats });
     return analyzer.analyze();
   }, [story]);
 
@@ -162,12 +162,14 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
                 </div>
               </div>
               <div className="bg-orange-50 p-3 rounded">
-                <div className="text-xs text-orange-700">Orphaned</div>
+                <div className="text-xs text-orange-700">Nothing links here</div>
                 <div className="text-2xl font-bold text-orange-700">
                   {analysis.analysis.orphanedCount}
                 </div>
               </div>
             </div>
+
+            {simulateStory(story).analyzer.searchLimited && <SearchLimitNote />}
 
             {/* Broken connections alert */}
             {analysis.brokenConnections && analysis.brokenConnections.length > 0 && (
@@ -385,7 +387,7 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
                 <ChevronRight className="w-4 h-4" />
               )}
               <AlertCircle className="w-4 h-4 text-orange-600" />
-              <span className="font-medium">Orphaned Beats</span>
+              <span className="font-medium">Nothing links here</span>
             </div>
             <span className="text-sm text-gray-600">
               {filteredOrphaned.length}/{analysis.orphanedBeats.length}
