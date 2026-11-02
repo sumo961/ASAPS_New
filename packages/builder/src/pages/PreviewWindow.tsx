@@ -1033,7 +1033,7 @@ export const PreviewWindow: React.FC = () => {
         if (!current) return;
         setGeneratedPresets(result.presets);
         setTotalPathCount(result.totalPaths);
-        console.log('[PreviewWindow] Generated', result.presets.length, 'states that change what happens from here from', result.totalPaths, 'paths for beat:', startBeatId);
+        console.log('[PreviewWindow] Generated', result.presets.length, 'unique states from', result.totalPaths, 'paths for beat:', startBeatId);
 
         // Preserve the author's chosen state across story edits — the core
         // expert loop is edit → verify, and wiping the selection on every
@@ -3062,7 +3062,7 @@ export const PreviewWindow: React.FC = () => {
                       </button>
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {totalPathCount} {totalPathCount === 1 ? 'path' : 'paths'} → {generatedPresets.length} unique {generatedPresets.length === 1 ? 'state' : 'states'}
+                      {totalPathCount} {totalPathCount === 1 ? 'path' : 'paths'} → {generatedPresets.length} {generatedPresets.length === 1 ? 'state that changes' : 'states that change'} what happens from here
                     </div>
                   </div>
 
