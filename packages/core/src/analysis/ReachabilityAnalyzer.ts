@@ -27,7 +27,7 @@ export interface UnreachableBeat {
   beatId: string;
   beatName: string;
   beatType: string;
-  reason: 'noIncoming' | 'impossibleCondition' | 'unreachableParent' | 'orphaned' | 'unreachableConditionTarget';
+  reason: 'noIncoming' | 'impossibleCondition' | 'unreachableParent' | 'orphaned' | 'unreachableConditionTarget' | 'neverOffered';
   details: string;
   blockingConditions?: ConditionAnalysis[];
   incomingConnections?: Array<{
@@ -97,6 +97,12 @@ export interface ReachabilityConfig {
   analyzeConditions?: boolean; // Analyze condition satisfiability (default: true)
   detectOrphans?: boolean; // Detect beats with no incoming connections (default: true)
   suggestFixes?: boolean; // Generate fix suggestions (default: true)
+  /**
+   * Beats on a simulated playthrough. Given, they decide what is reachable:
+   * a beat that is linked but that no way of playing gets to is unreachable.
+   * Without it, reachable means linked from the start.
+   */
+  playedBeats?: ReadonlySet<string>;
 }
 
 /**
@@ -108,7 +114,7 @@ export interface ReachabilityConfig {
  */
 export class ReachabilityAnalyzer {
   private story: Story;
-  private config: Required<ReachabilityConfig>;
+  private config: Required<Omit<ReachabilityConfig, 'playedBeats'>> & Pick<ReachabilityConfig, 'playedBeats'>;
   private counterModifications: Map<string, { min: number; max: number }>;
   private variableValues: Map<string, Set<any>>;
   /** Variables with a Project Settings default: they never start unset. */
@@ -122,7 +128,8 @@ export class ReachabilityAnalyzer {
     this.config = {
       analyzeConditions: config.analyzeConditions ?? true,
       detectOrphans: config.detectOrphans ?? true,
-      suggestFixes: config.suggestFixes ?? true
+      suggestFixes: config.suggestFixes ?? true,
+      playedBeats: config.playedBeats,
     };
     this.counterModifications = new Map();
     this.variableValues = new Map();
@@ -152,7 +159,11 @@ export class ReachabilityAnalyzer {
     }
 
     // Step 2: Find all reachable beats via BFS (also detects broken connections)
-    const reachableBeats = this.findReachableBeats();
+    const linkedBeats = this.findReachableBeats();
+    const played = this.config.playedBeats;
+    const reachableBeats = played
+      ? new Set([...linkedBeats].filter((id) => played.has(id)))
+      : linkedBeats;
 
     // Step 3: Analyze unreachable beats
     const unreachableBeats = this.analyzeUnreachableBeats(allBeats, reachableBeats);
@@ -749,7 +760,12 @@ export class ReachabilityAnalyzer {
           }
         }
 
-        if (hasImpossibleCondition) {
+        const reachedParents = incomingConnections.filter((i) => reachableBeats.has(i.sourceBeatId));
+        if (this.config.playedBeats && reachedParents.length > 0) {
+          const names = [...new Set(reachedParents.map((i) => `"${i.sourceBeatName}"`))].join(', ');
+          reason = 'neverOffered';
+          details = `${names} links here, but no way of playing takes that link: the choice or line leading here is never on offer`;
+        } else if (hasImpossibleCondition) {
           reason = 'impossibleCondition';
           details = 'All paths to this beat have impossible conditions';
         } else if (allParentsUnreachable) {

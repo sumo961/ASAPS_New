@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { AlertCircle, CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronRight, Search, Unlink, GitBranch } from 'lucide-react';
 import { Story, ReachabilityAnalyzer } from '@asaps/core';
+import { simulateStory } from '../../services/storySimulation';
 import type { ReachabilityResult, UnreachableBeat } from '@asaps/core';
 
 interface ReachabilityReportProps {
@@ -15,6 +16,7 @@ export function unreachableReasonText(b: Pick<UnreachableBeat, 'reason' | 'detai
     case 'orphaned': return 'Nothing links to this beat';
     case 'impossibleCondition': return 'Every link to this beat has a condition that can never be met';
     case 'unreachableParent': return 'Every beat that links here is itself unreachable';
+    case 'neverOffered': return 'A beat links here, but no way of playing takes that link';
     case 'unreachableConditionTarget': return 'A condition beat never takes the branch to this beat';
     default: return 'No path from the start reaches this beat';
   }
@@ -29,7 +31,10 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
 
   // Run analysis
   const analysis = useMemo<ReachabilityResult>(() => {
-    const analyzer = new ReachabilityAnalyzer(story);
+    // The same answer as Path Analysis: reachable means some way of playing
+    // gets there, not just that a link exists.
+    const playedBeats = new Set(simulateStory(story).paths.flatMap((p) => p.steps.map((step) => step.beatId)));
+    const analyzer = new ReachabilityAnalyzer(story, { playedBeats });
     return analyzer.analyze();
   }, [story]);
 

@@ -511,3 +511,36 @@ describe('Replay', () => {
     expect(reached(story).paths).toHaveLength(1);
   });
 });
+
+describe('reachable means played', () => {
+  const story = () => {
+    const st = new Story({ title: 'T', author: 'T', firstBeatId: 'menu' });
+    st.addBeat(createTestBeat({ id: 'menu', name: 'Menu', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'A', target: 'end' },
+      { id: 'b', text: 'B', target: 'gated', conditions: [{ type: 'visitedBeat', beatId: 'orphan' }] },
+    ] } } as any));
+    st.addBeat(createTestBeat({ id: 'end', name: 'End', type: 'endScreen', parameters: { message: 'e', showRestart: false } } as any));
+    st.addBeat(createTestBeat({ id: 'gated', name: 'Gated', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'after' }] } as any));
+    st.addBeat(createTestBeat({ id: 'after', name: 'After', type: 'endScreen', parameters: { message: 'a', showRestart: false } } as any));
+    st.addBeat(createTestBeat({ id: 'orphan', name: 'Orphan', type: 'infoText', parameters: { text: 't' } } as any));
+    return st;
+  };
+
+  it('Path Analysis and Reachability give the same answer, with the reason', () => {
+    const s = story();
+    const analyzer = new StateSimulationAnalyzer(s, { maxPaths: 50, maxDepth: 10 });
+    const paths = analyzer.analyzeRaw();
+    const result = analyzer.resultFromPaths(paths);
+    const played = new Set(paths.flatMap((p) => p.steps.map((x) => x.beatId)));
+    const reach = new ReachabilityAnalyzer(s, { playedBeats: played }).analyze();
+    expect(result.reachableBeats.sort()).toEqual(['end', 'menu']);
+    expect([...reach.reachableBeats].sort()).toEqual(result.reachableBeats);
+    expect(reach.unreachableBeats.map((u) => u.beatId).sort()).toEqual([...result.unreachableBeats].sort());
+    const why = Object.fromEntries(reach.unreachableBeats.map((u) => [u.beatId, u.reason]));
+    expect(why).toEqual({ gated: 'neverOffered', after: 'unreachableParent', orphan: 'orphaned' });
+  });
+
+  it('without played beats Reachability still means linked', () => {
+    expect(new ReachabilityAnalyzer(story()).analyze().reachableBeats.has('gated')).toBe(true);
+  });
+});

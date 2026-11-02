@@ -2275,9 +2275,12 @@ export class StateSimulationAnalyzer {
     const outcomes = this.groupOutcomes(paths.filter((p) => !p.viaReplay));
     const replayOutcomes = this.groupOutcomes(paths.filter((p) => p.viaReplay));
 
-    // Calculate reachability using graph traversal (not just what paths explored)
-    // This ensures we don't report false "unreachable" beats
-    const { reachableBeats, unreachableBeats } = this.calculateReachability();
+    // Reachable means on a playthrough (Replay included): a beat that is linked
+    // but that no way of playing gets to is unreachable, as in Reachability.
+    const played = new Set(paths.flatMap((p) => p.steps.map((step) => step.beatId)));
+    const allIds = this.story.getAllBeats().map((b) => b.id);
+    const reachableBeats = allIds.filter((id) => played.has(id));
+    const unreachableBeats = allIds.filter((id) => !played.has(id));
 
     // Unique endings
     const uniqueEndings = Array.from(new Set(
@@ -2296,55 +2299,6 @@ export class StateSimulationAnalyzer {
       uniqueEndings,
       statesExplored: paths.length,
       analysisTime: performance.now() - startTime,
-    };
-  }
-
-  /**
-   * Calculate reachability using simple graph traversal
-   * This is more accurate than using path simulation results because
-   * the simulation may not explore all branches (e.g., failing conditions)
-   */
-  private calculateReachability(): { reachableBeats: string[]; unreachableBeats: string[] } {
-    const firstBeatId = this.story.getFirstBeatId();
-    if (!firstBeatId) {
-      const allBeats = this.story.getAllBeats();
-      return {
-        reachableBeats: [],
-        unreachableBeats: allBeats.map(b => b.id),
-      };
-    }
-
-    const reachable = new Set<string>();
-    const queue: string[] = [firstBeatId];
-
-    while (queue.length > 0) {
-      const beatId = queue.shift()!;
-      if (reachable.has(beatId)) continue;
-
-      const beat = this.getBeat(beatId);
-      if (!beat) continue;
-
-      reachable.add(beatId);
-
-      // Add all connected beats (regardless of conditions - they're structurally reachable)
-      const connections = this.getConnections(beat);
-      for (const conn of connections) {
-        if (!reachable.has(conn.targetId)) {
-          queue.push(conn.targetId);
-        }
-      }
-    }
-
-    // Get all beats in story
-    const allBeats = this.story.getAllBeats();
-    const allBeatIds = new Set(allBeats.map(b => b.id));
-
-    // Unreachable = all - reachable
-    const unreachableBeats = Array.from(allBeatIds).filter(id => !reachable.has(id));
-
-    return {
-      reachableBeats: Array.from(reachable),
-      unreachableBeats,
     };
   }
 
