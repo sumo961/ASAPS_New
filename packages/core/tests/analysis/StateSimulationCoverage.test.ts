@@ -480,6 +480,15 @@ describe('Replay', () => {
     expect(via.steps[i - 1].stateAfter.variables.get('flag')).toBe('yes');
   });
 
+  it('Backward uses one playthrough when it can, and Replay for what only a replay reaches', () => {
+    const story = build({ parameters: { message: 'e', reset: true }, connections: [{ targetId: 'after' }] }, [{ ...after, connections: [{ targetId: 'start' }] }]);
+    const analyzer = new StateSimulationAnalyzer(story, { maxPaths: 100, maxDepth: 30 });
+    const paths = analyzer.analyzeRaw();
+    expect(analyzer.analyzeBackward('end', paths).requirements.every((r: any) => !r.decisions?.some((d: any) => d.choiceMade === 'Replay'))).toBe(true);
+    expect(analyzer.analyzeBackward('end', paths).minimumSteps).toBe(2);
+    expect(analyzer.analyzeBackward('after', paths).requirements.length).toBeGreaterThan(0);
+  });
+
   it('does not follow it when the screen has no replay button', () => {
     const { seen } = reached(build({ parameters: { message: 'e', showRestart: false }, connections: [{ targetId: 'after' }] }, [after]));
     expect(seen.has('after')).toBe(false);

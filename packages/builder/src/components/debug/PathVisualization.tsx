@@ -20,6 +20,7 @@ import type {
   StoryWarning,
 } from '@asaps/core';
 import { PathTreeView } from './PathTreeView';
+import { backwardTargets, type BackwardTarget } from './backwardTargets';
 import { storyWarningLabel } from './storyWarningLabels';
 import { usePersistedState } from '../../utils/persistedState';
 import { simulateStory } from '../../services/storySimulation';
@@ -37,6 +38,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
   const [selectedOutcome, setSelectedOutcome] = useState<number | null>(null);
   const [viewMode, setViewMode] = usePersistedState<'forward' | 'backward' | 'tree'>('asaps_ui_path_view', 'forward');
   const [selectedBackwardBeat, setSelectedBackwardBeat] = useState<string | null>(null);
+  const [backwardSearch, setBackwardSearch] = useState('');
   const [expandedBackwardPath, setExpandedBackwardPath] = useState<number | null>(null);
 
   // One simulation of the story, shared with Story Logic (storySimulation):
@@ -85,21 +87,22 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
     return m;
   }, [storyWarnings]);
 
-  // Get endings for backward analysis
-  const endings = useMemo(() => {
-    return simulationAnalyzer ? simulationAnalyzer.getEndings() : [];
-  }, [simulationAnalyzer]);
+  // What the Backward view offers
+  const targets = useMemo(
+    () => backwardTargets(analysisResult ?? null, story.getAllBeats()),
+    [analysisResult, story],
+  );
 
   // Run backward analysis when a beat is selected
   const backwardResult = useMemo<BackwardAnalysisResult | null>(() => {
     if (!selectedBackwardBeat || !simulationAnalyzer) return null;
     try {
-      return simulationAnalyzer.analyzeBackward(selectedBackwardBeat);
+      return simulationAnalyzer.analyzeBackward(selectedBackwardBeat, simulation?.paths);
     } catch (error) {
       console.error('[PathVisualization] Backward analysis error:', error);
       return null;
     }
-  }, [simulationAnalyzer, selectedBackwardBeat]);
+  }, [simulationAnalyzer, simulation, selectedBackwardBeat]);
 
   // Query engine for filtering outcomes
   const queryEngine = useMemo(() => {
@@ -352,7 +355,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
             ? 'All possible outcomes from story start'
             : viewMode === 'tree'
             ? 'Story structure as a collapsed decision tree'
-            : 'All paths to reach a specific ending'}
+            : 'All paths to reach a specific beat'}
         </p>
       </div>
 
@@ -620,37 +623,49 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
         <>
           {/* Target Selection */}
           <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
-            <div className="text-sm text-gray-700 mb-2">Select target beat:</div>
-            <div className="space-y-2">
-              <div className="flex flex-wrap gap-1">
-                {endings.slice(0, 10).map((ending) => (
-                  <button
-                    key={ending.beatId}
-                    onClick={() => {
-                      setSelectedBackwardBeat(ending.beatId);
-                      setExpandedBackwardPath(null);
-                      onHighlightPath?.([]);
-                    }}
-                    className={`text-xs px-2 py-1 rounded transition-colors ${
-                      selectedBackwardBeat === ending.beatId
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                    }`}
-                  >
-                    {ending.beatName}
-                  </button>
-                ))}
-                {endings.length > 10 && (
-                  <span className="text-xs text-gray-500 px-2 py-1">
-                    +{endings.length - 10} more
-                  </span>
-                )}
-              </div>
-              {endings.length === 0 && (
-                <div className="text-xs text-gray-500">
-                  No ending beats found.
-                </div>
-              )}
+            <input
+              type="search"
+              value={backwardSearch}
+              onChange={(e) => setBackwardSearch(e.target.value)}
+              placeholder="Find any beat by name…"
+              className="w-full px-3 py-1.5 mb-2 border border-gray-300 rounded text-sm"
+            />
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {(() => {
+                const search = backwardSearch.trim().toLowerCase();
+                const groups: Array<[string, BackwardTarget[]]> = search
+                  ? [['Matching beats', targets.all.filter((t) => t.beatName.toLowerCase().includes(search))]]
+                  : [
+                      ['Endings', targets.endings],
+                      ['Dead ends: the story stops here', targets.deadEnds],
+                      ['Loops: the player can go round without getting out', targets.loops],
+                      ['End screens no playthrough reaches', targets.neverReached],
+                    ];
+                return groups.filter(([, list]) => list.length > 0).map(([title, list]) => (
+                  <div key={title}>
+                    <div className="text-xs text-gray-500 mb-1">{title} ({list.length})</div>
+                    <div className="flex flex-wrap gap-1">
+                      {list.map((target) => (
+                        <button
+                          key={target.beatId}
+                          onClick={() => {
+                            setSelectedBackwardBeat(target.beatId);
+                            setExpandedBackwardPath(null);
+                            onHighlightPath?.([]);
+                          }}
+                          className={`text-xs px-2 py-1 rounded transition-colors ${
+                            selectedBackwardBeat === target.beatId
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                          }`}
+                        >
+                          {target.beatName}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ));
+              })()}
             </div>
           </div>
 
@@ -863,7 +878,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
             </>
           )}
           {viewMode === 'backward' && !backwardResult && (
-            <>Select an ending to analyze paths</>
+            <>Select a beat to analyze paths</>
           )}
         </div>
       </div>

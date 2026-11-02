@@ -532,7 +532,8 @@ export class StateSimulationAnalyzer {
    * Analyze paths backward from a target beat
    * Returns result compatible with BackwardAnalysisResult
    */
-  public analyzeBackward(targetBeatId: string): BackwardAnalysisResult {
+  /** Pass `simulated` (analyzeRaw) to read paths already found instead of simulating again. */
+  public analyzeBackward(targetBeatId: string, simulated?: SimulatedPath[]): BackwardAnalysisResult {
     const startTime = performance.now();
 
     const targetBeat = this.getBeat(targetBeatId);
@@ -560,12 +561,15 @@ export class StateSimulationAnalyzer {
       };
     }
 
-    const allPaths = this.exploreAllPaths(firstBeatId, this.initialStates());
+    const allPaths = simulated ?? this.exploreAllPaths(firstBeatId, this.initialStates());
 
-    // Filter paths that visit the target beat
-    const pathsToTarget = allPaths.filter(path =>
+    // Filter paths that visit the target beat: within one playthrough if it
+    // can be done, through a Replay only for a beat nothing else reaches.
+    const visiting = allPaths.filter(path =>
       path.steps.some(step => step.beatId === targetBeatId)
     );
+    const oneRun = visiting.filter((path) => !path.viaReplay);
+    const pathsToTarget = oneRun.length > 0 ? oneRun : visiting;
 
     // Convert to PathRequirement format
     const requirements = this.convertPathsToRequirements(pathsToTarget, targetBeatId);
