@@ -1105,3 +1105,39 @@ describe('replays that carry values over (2026-11-03)', () => {
     expect(new StateSimulationAnalyzer(s).exploreSituations().perBeat.has('last')).toBe(true);
   });
 });
+
+describe('counters that move together (2026-11-03)', () => {
+  // Group 3's shape: the police check comes first, and police never trails anger.
+  const heat = (anger: number) => story([
+    { id: 'hub', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'j', text: 'Job', target: 'job' },
+      { id: 'q', text: 'Quit', target: 'end' },
+    ] } },
+    { id: 'job', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'police', effects: [
+      { type: 'incrementCounter', target: 'police', value: 10 }, { type: 'incrementCounter', target: 'anger', value: anger },
+    ] }] },
+    { id: 'police', type: 'conditionBeat', parameters: { conditionType: 'counter', condition: { type: 'counter', variableName: 'police', operator: '>=', value: 30 }, trueTarget: 'arrested', falseTarget: 'gang' } },
+    { id: 'gang', type: 'conditionBeat', parameters: { conditionType: 'counter', condition: { type: 'counter', variableName: 'anger', operator: '>=', value: 30 }, trueTarget: 'hit', falseTarget: 'hub' } },
+    { id: 'arrested', type: 'endScreen', parameters: { message: 'a', showRestart: false } },
+    { id: 'hit', type: 'endScreen', parameters: { message: 'h', showRestart: false } },
+    { id: 'end', type: 'endScreen', parameters: { message: 'e', showRestart: false } },
+  ]);
+
+  it('rules out a check the earlier one always gets to first', () => {
+    const s = heat(10);
+    const analyzer = new StateSimulationAnalyzer(s);
+    const search = analyzer.exploreSituations();
+    expect(search.perBeat.has('hit')).toBe(false);
+    expect(analyzer.counterRanges()!.reached.has('hit')).toBe(false);
+    const hit = new ReachabilityAnalyzer(s, { playedBeats: new Set(search.perBeat.keys()), ranges: analyzer.rangeFacts })
+      .analyze().unreachableBeats.find((u) => u.beatId === 'hit')!;
+    expect(hit.details).toContain('anger is never above police there');
+    expect(hit.details).toContain('police is at least 10 and below 30 there');
+  });
+
+  it('keeps it open when one climbs faster, and the search plays it', () => {
+    const s = heat(15);
+    expect(new StateSimulationAnalyzer(s).counterRanges()!.reached.has('hit')).toBe(true);
+    expect(new StateSimulationAnalyzer(s).exploreSituations().perBeat.has('hit')).toBe(true);
+  });
+});

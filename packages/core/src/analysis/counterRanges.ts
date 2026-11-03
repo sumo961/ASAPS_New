@@ -123,6 +123,39 @@ export function beatsOnLoops(ids: string[], next: (id: string) => string[]): Set
   return loops;
 }
 
+/** The values a − b takes for a in x and b in y. */
+export function gapOf(x: Range, y: Range): Range {
+  return [safe(x[0] - y[1], -Infinity), safe(x[1] - y[0], Infinity)];
+}
+
+/** NaN (∞ − ∞) means unbounded on that side. */
+export function safe(n: number, otherwise: number): number {
+  return Number.isNaN(n) ? otherwise : n;
+}
+
+/** Both at once; null when they don't overlap. */
+export function meet(x: Range, y: Range): Range | null {
+  const lo = Math.max(x[0], y[0]);
+  const hi = Math.min(x[1], y[1]);
+  return lo <= hi + 1e-9 * Math.max(1, Math.abs(hi)) ? [lo, Math.max(lo, hi)] : null;
+}
+
+/** Just under / over a value: where a strict check (< 30, > 0) leaves a range. */
+export function justBelow(t: number): number { return t - 1e-9 * Math.max(1, Math.abs(t)); }
+export function justAbove(t: number): number { return t + 1e-9 * Math.max(1, Math.abs(t)); }
+
+/** A range cut to the values for which `value op t` holds; null if none. */
+export function narrowTo(r: Range, op: string, t: number): Range | null {
+  switch (op) {
+    case '>=': return meet(r, [t, Infinity]);
+    case '>': return meet(r, [justAbove(t), Infinity]);
+    case '<=': return meet(r, [-Infinity, t]);
+    case '<': return meet(r, [-Infinity, justBelow(t)]);
+    case '==': return meet(r, [t, t]);
+    default: return r;
+  }
+}
+
 function shown(n: number): string {
   return String(Math.round(n * 10000) / 10000);
 }
@@ -131,6 +164,12 @@ function shown(n: number): string {
 export function describeRange(name: string, r: Range): string | null {
   const [lo, hi] = r;
   if (lo === hi) return `${name} is always ${shown(lo)} there`;
+  // Just under a round value: what a strict check left ("below 30").
+  const under = Number.isFinite(hi) && hi !== Math.round(hi) && Math.round(hi) - hi < 1e-6 * Math.max(1, Math.abs(hi));
+  const over = Number.isFinite(lo) && lo !== Math.round(lo) && lo - Math.round(lo) < 1e-6 * Math.max(1, Math.abs(lo)) && lo > Math.round(lo);
+  if (under && !Number.isFinite(lo)) return `${name} is below ${shown(Math.round(hi))} there`;
+  if (over && !Number.isFinite(hi)) return `${name} is above ${shown(Math.round(lo))} there`;
+  if (under && Number.isFinite(lo)) return `${name} is at least ${shown(lo)} and below ${shown(Math.round(hi))} there`;
   if (Number.isFinite(lo) && Number.isFinite(hi)) return `${name} is between ${shown(lo)} and ${shown(hi)} there`;
   if (Number.isFinite(lo)) return `${name} is at least ${shown(lo)} there`;
   if (Number.isFinite(hi)) return `${name} is at most ${shown(hi)} there`;

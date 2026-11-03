@@ -32,7 +32,7 @@ import {
 } from './ConstraintSet';
 import type { BackwardAnalysisResult, PathRequirement, DecisionPoint } from './BackwardAnalyzer';
 import { isMultiChoiceLike } from '../beats/MultiChoiceBeat';
-import { ANY, allOf, anyOf, applyChange, beatsOnLoops, changeFrom, compareRanges, describeRange, hull, not, type Change, type Range, type Verdict } from './counterRanges';
+import { ANY, allOf, anyOf, applyChange, beatsOnLoops, changeFrom, compareRanges, describeRange, gapOf, hull, meet, narrowTo, not, safe, type Change, type Range, type Verdict } from './counterRanges';
 
 // ============================================================================
 // Types
@@ -939,6 +939,95 @@ export class StateSimulationAnalyzer {
   private rangeKeys = new Set<string>();
   /** The beats on loops, from the first counterRanges run: later runs leave out more, never add. */
   private rangeLoops: Set<string> | null = null;
+  /** The counter pairs whose gap counterRanges follows: [a, b, key of a − b]. */
+  private rangePairs: Array<[string, string, string]> = [];
+  private rangePairCache: { order: string; pairs: Array<[string, string, string]> } | null = null;
+
+  /** Counters the conditions read, paired (at most 12 counters): their gaps are followed. */
+  private rangePairsFor(order: string[]): Array<[string, string, string]> {
+    const signature = order.join('\u0002');
+    if (this.rangePairCache?.order === signature) return this.rangePairCache.pairs;
+    const known = new Set(order);
+    const read = new Set<string>();
+    const walk = (o: any): void => {
+      if (Array.isArray(o)) { o.forEach(walk); return; }
+      if (!o || typeof o !== 'object') return;
+      if (o.type === 'counter') {
+        const name = o.variableName || o.variable || o.left;
+        if (name) read.add(this.counterKey(o.character, name));
+      } else if (o.type === 'counterCompare') {
+        read.add(this.counterKey(o.character, o.counter1 || ''));
+        read.add(this.counterKey(o.character, o.counter2 || ''));
+      }
+      for (const v of Object.values(o)) if (v && typeof v === 'object') walk(v);
+    };
+    for (const beat of this.story.getAllBeats()) walk([beat.getParameters(), (beat as any).requires, beat.connections]);
+    const names = [...read].filter((k) => known.has(k)).sort().slice(0, 12);
+    const pairs: Array<[string, string, string]> = [];
+    for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++) {
+      pairs.push([names[i], names[j], `\u0005${names[i]}\u0005${names[j]}`]);
+    }
+    this.rangePairCache = { order: signature, pairs };
+    return pairs;
+  }
+
+  /**
+   * The ranges of players for whom these conditions hold (or, `holding`
+   * false, for whom each fails): counters cut to what the check lets through,
+   * then each counter and gap tightened by the others. Null when nobody can.
+   */
+  private narrowRanges(at: AbsState, conditions: any[], holding: boolean): AbsState | null {
+    // Only counter checks cut anything: most choices have none.
+    if (!conditions.some((c) => c && (c.type === 'counter' || c.type === 'counterCompare'))) return at;
+    const ranges = new Map(at.ranges);
+    const flip: Record<string, string> = { '>=': '<', '>': '<=', '<=': '>', '<': '>=', '==': '!=', '!=': '==' };
+    let cut = false;
+    for (const c of conditions) {
+      if (!c || typeof c !== 'object') continue;
+      const op = holding ? c.operator : flip[c.operator];
+      if (!op) continue;
+      if (c.type === 'counter') {
+        const name = c.variableName || c.variable || c.left;
+        const raw = c.value ?? c.right;
+        if (!name || isTextForCounter(raw)) continue;
+        const v = counterComparisonValue(raw);
+        if ((op === '==' || op === '!=') && !(typeof v === 'number' && Number.isFinite(v))) continue;
+        const n = typeof v === 'number' ? v : Number(v) || 0;
+        const key = this.counterKey(c.character, name);
+        const r = narrowTo(ranges.get(key) ?? [0, 0], op, n);
+        if (!r) return null;
+        ranges.set(key, r);
+        cut = true;
+      } else if (c.type === 'counterCompare') {
+        const x = this.counterKey(c.character, c.counter1 || '');
+        const y = this.counterKey(c.character, c.counter2 || '');
+        const pair = this.rangePairs.find(([a, b]) => (a === x && b === y) || (a === y && b === x));
+        if (!pair) continue;
+        // x op y is (x − y) op 0; the pair may hold y − x.
+        const mirrored: Record<string, string> = { '>=': '<=', '>': '<', '<=': '>=', '<': '>', '==': '==', '!=': '!=' };
+        const r = narrowTo(ranges.get(pair[2]) ?? ANY, pair[0] === x ? op : mirrored[op], 0);
+        if (!r) return null;
+        ranges.set(pair[2], r);
+        cut = true;
+      }
+    }
+    if (!cut) return at;
+    // Each counter within what the others and the gaps allow, twice round.
+    for (let round = 0; round < 2; round++) {
+      for (const [a, b, k] of this.rangePairs) {
+        const ra = ranges.get(a) ?? [0, 0];
+        const rb = ranges.get(b) ?? [0, 0];
+        const d = ranges.get(k) ?? ANY;
+        const na = meet(ra, [safe(rb[0] + d[0], -Infinity), safe(rb[1] + d[1], Infinity)]);
+        const nb = meet(rb, [safe(ra[0] - d[1], -Infinity), safe(ra[1] - d[0], Infinity)]);
+        const nd = meet(d, gapOf(ra, rb));
+        if (!na || !nb || !nd) return null;
+        ranges.set(a, na); ranges.set(b, nb); ranges.set(k, nd);
+      }
+    }
+    return { facts: at.facts, ranges };
+  }
+
   /** How each step changes counters (counterRanges), for the counters in rangeCounterOrder. */
   private rangeCounterSteps = new Map<string, Map<string, Change>>();
   private rangeCounterOrder = '';
@@ -1313,6 +1402,11 @@ export class StateSimulationAnalyzer {
       this.rangeCounterSteps.clear();
     }
     const counterSteps = this.rangeCounterSteps;
+    // Pairs of counters the story's conditions read: how far apart they are is
+    // followed too ("PoliceAttention never below GangAnger"), so a check on one
+    // learns from a check on the other.
+    const pairs = this.rangePairsFor(order);
+    this.rangePairs = pairs;
     const typedBeat = (beat: Beat) => beat.type === 'inputText' || beat.type === 'keypad';
     const run = (p: number, facts: ReadonlyMap<string, unknown> | null, alt: boolean, step: (s: SimulationState) => SimulationState) => {
       const s = cloneState(base);
@@ -1361,6 +1455,17 @@ export class StateSimulationAnalyzer {
       if (change.size === 0) return { facts, ranges: from.ranges };
       const ranges = new Map(from.ranges);
       for (const [k, f] of change) ranges.set(k, applyChange(ranges.get(k) ?? [0, 0], f));
+      for (const [a, b, k] of pairs) {
+        const fa = change.get(a);
+        const fb = change.get(b);
+        if (fa === undefined && fb === undefined) continue;
+        // Both moved by a fixed amount (or not at all): the gap moves by the difference.
+        if ((fa === undefined || (fa !== null && fa.a === 1)) && (fb === undefined || (fb !== null && fb.a === 1))) {
+          const d = from.ranges.get(k) ?? ANY;
+          const shift = (fa?.b ?? 0) - (fb?.b ?? 0);
+          ranges.set(k, [d[0] + shift, d[1] + shift]);
+        } else ranges.set(k, gapOf(ranges.get(a) ?? [0, 0], ranges.get(b) ?? [0, 0]));
+      }
       return { facts, ranges };
     };
 
@@ -1423,6 +1528,7 @@ export class StateSimulationAnalyzer {
         const v = asNumber(s.counters.get(k));
         ranges.set(k, v !== null && Number.isFinite(v) ? [v, v] : ANY);
       }
+      for (const [a, b, k] of pairs) ranges.set(k, gapOf(ranges.get(a)!, ranges.get(b)!));
       arrive(start, { facts: new Map(track.map((k) => [k, readFact(s, k)])), ranges });
     }
     while (queue.length > 0 && fresh.size === 0 && !tooMany) {
@@ -1488,11 +1594,20 @@ export class StateSimulationAnalyzer {
       for (const n of list) for (const [k, r] of n.state.ranges) out.set(k, out.has(k) ? hull(out.get(k)!, r) : r);
       return out;
     };
+    const valueOf = (state: SimulationState, k: string) => {
+      const v = state.counters.get(k);
+      return typeof v === 'number' ? v : Number(v) || 0;
+    };
     const inRanges = (ranges: ReadonlyMap<string, Range>, state: SimulationState): boolean => {
-      for (const [k, v] of state.counters) {
-        const n = typeof v === 'number' ? v : Number(v) || 0;
+      for (const k of new Set([...state.counters.keys(), ...order])) {
+        const n = valueOf(state, k);
         const r = ranges.get(k) ?? [0, 0];
         if (!(n >= r[0] && n <= r[1])) return false;
+      }
+      for (const [a, b, k] of pairs) {
+        const n = valueOf(state, a) - valueOf(state, b);
+        const r = ranges.get(k) ?? ANY;
+        if (!(n >= r[0] - 1e-9 && n <= r[1] + 1e-9)) return false;
       }
       return true;
     };
@@ -1576,8 +1691,30 @@ export class StateSimulationAnalyzer {
           : c.type === 'counterCompare' ? [c.counter1, c.counter2] : [];
         for (const name of names) {
           if (!name) continue;
-          const w = describeRange(name, at.ranges.get(this.counterKey(c.character, name)) ?? [0, 0]);
+          const key = this.counterKey(c.character, name);
+          const w = describeRange(name, at.ranges.get(key) ?? [0, 0]);
           if (w && !words.includes(w)) words.push(w);
+          // What holds it there: another counter it never gets past, itself held.
+          if (c.type !== 'counter') continue;
+          const up = c.operator === '>=' || c.operator === '>';
+          const down = c.operator === '<=' || c.operator === '<';
+          for (const [a, b, k] of this.rangePairs) {
+            if (a !== key && b !== key) continue;
+            const other = a === key ? b : a;
+            const d = at.ranges.get(k) ?? ANY; // a − b
+            // key − other is at most m (up) or at least m (down).
+            const m = up ? (a === key ? d[1] : -d[0]) : down ? (a === key ? d[0] : -d[1]) : NaN;
+            const otherRange = at.ranges.get(other) ?? [0, 0];
+            // A counter that never moves there says nothing its own range doesn't.
+            if (!Number.isFinite(m) || !Number.isFinite(up ? otherRange[1] : otherRange[0]) || otherRange[0] === otherRange[1]) continue;
+            const amount = Math.round(Math.abs(m) * 10000) / 10000;
+            const rel = up
+              ? (amount === 0 ? `${name} is never above ${other}` : m > 0 ? `${name} is at most ${other} + ${amount}` : `${name} is at most ${other} − ${amount}`)
+              : (amount === 0 ? `${name} is never below ${other}` : m > 0 ? `${name} is at least ${other} + ${amount}` : `${name} is at least ${other} − ${amount}`);
+            const ow = describeRange(other, otherRange);
+            for (const x of [`${rel} there`, ow]) if (x && !words.includes(x)) words.push(x);
+            break;
+          }
         }
       }
       return words;
@@ -1603,7 +1740,7 @@ export class StateSimulationAnalyzer {
     if (terminal === undefined) this.rangeTerminal.set(beat.id, (terminal = this.isTerminalBeat(beat)));
     if (terminal) {
       if (beat.type === 'endScreen' && beat.getParameters().showRestart !== false && !this.rangeOneRun) {
-        const replay = probe(`${beat.id}\u0000replay`, beat, from, (s) => this.stateAfterReplay(beat, this.applyBeatEffects(beat, s)));
+        const replay = probe(`${beat.id}\u0000replay`, beat, after, (s) => this.stateAfterReplay(beat, s));
         const { targets, maybeNone } = hiddenLinks(replay);
         for (const t of targets) go(t, replay);
         if (maybeNone && beat.getParameters().reset === true) go(start, replay);
@@ -1613,9 +1750,10 @@ export class StateSimulationAnalyzer {
     let connections = this.rangeLinks.get(beat.id);
     if (!connections) this.rangeLinks.set(beat.id, (connections = this.getConnections(beat)));
     if (connections.length === 0) return out;
-    const along = (i: number, conn: Connection, choice: boolean) => probe(`${beat.id}\u0000${i}`, beat, from, (s) => {
-      const entered = this.applyBeatEffects(beat, s);
-      const next = choice ? this.applyChoiceEffects(beat, cloneState(entered), i, conn) : cloneState(entered);
+    // Leave by one link: from the state after the beat's own effects (cut to
+    // the players who take it), with the choice's and the link's effects.
+    const along = (i: number, conn: Connection, choice: boolean, at: AbsState) => probe(`${beat.id}\u0000c${i}`, beat, at, (s) => {
+      const next = choice ? this.applyChoiceEffects(beat, cloneState(s), i, conn) : cloneState(s);
       this.applyEffectsList(conn.effects, next);
       return next;
     });
@@ -1631,8 +1769,12 @@ export class StateSimulationAnalyzer {
       const yesLink = connections.find((c) => label(c) === 'true' || label(c) === 'yes') ?? connections[0];
       const noLink = connections.find((c) => label(c) === 'false' || label(c) === 'no') ?? connections[0];
       const asks = [asked, ...more].filter(Boolean);
-      for (const [link, possible] of [[yesLink, yes !== false], [noLink, yes !== true]] as const) {
-        if (possible) go(link.targetId, along(connections.indexOf(link), link, false));
+      const any = params.conditionsMatch === 'any' && more.length > 0;
+      // Who goes each way: all hold (or, matching any, all fail); one check, either way.
+      const yesWho = any ? after : this.narrowRanges(after, asks, true);
+      const noWho = any || asks.length === 1 ? this.narrowRanges(after, asks, false) : after;
+      for (const [link, possible, who] of [[yesLink, yes !== false, yesWho], [noLink, yes !== true, noWho]] as const) {
+        if (possible && who) go(link.targetId, along(connections.indexOf(link), link, false, who));
         else note?.shut(link.targetId, { conditions: asks, values: valuesOf(asks, after) });
       }
     } else if (this.isChoiceBeat(beat) || this.hasTimedExit(beat)) {
@@ -1641,22 +1783,24 @@ export class StateSimulationAnalyzer {
         for (const t of hiddenLinks(after).targets) go(t, after);
       }
       connections.forEach((conn, i) => {
-        const { offered, closure } = offers[i];
-        if (offered === false) {
+        const { offered, closure, conds } = offers[i];
+        const who = offered === false ? null : this.narrowRanges(after, conds, true);
+        if (!who) {
           if (closure) note?.shut(conn.targetId, { ...closure, values: valuesOf(closure.conditions, after) });
+          else if (offered !== false) note?.shut(conn.targetId, { conditions: conds, values: valuesOf(conds, after) });
           return;
         }
         if (this.isNeverDrawn(beat, conn)) return;
-        go(conn.targetId, along(i, conn, true));
+        go(conn.targetId, along(i, conn, true, who));
       });
     } else {
-      go(connections[0].targetId, along(0, connections[0], false));
+      go(connections[0].targetId, along(0, connections[0], false, after));
     }
     return out;
   }
 
   /** choiceOffered over ranges and tracked facts: certainly on screen, certainly not (and why), or it depends. */
-  private rangeOffered(beat: Beat, connection: Connection, at: AbsState): { offered: Verdict; closure?: Omit<RangeClosure, 'values'> } {
+  private rangeOffered(beat: Beat, connection: Connection, at: AbsState): { offered: Verdict; conds: any[]; closure?: Omit<RangeClosure, 'values'> } {
     const conds: any[] = [];
     const own: any = connection.condition;
     if (Array.isArray(own)) conds.push(...own); else if (own) conds.push(own);
@@ -1671,12 +1815,13 @@ export class StateSimulationAnalyzer {
     const ownVerdicts = conds.map((c) => ({ c, v: this.rangeVerdict(c, at) }));
     const earlier = unless.map((list) => ({ list, v: allOf(list.map((c) => this.rangeVerdict(c, at))) }));
     const offered = allOf([...ownVerdicts.map((x) => x.v), ...earlier.map((x) => not(x.v))]);
-    if (offered !== false) return { offered };
+    const all = conds.filter(Boolean);
+    if (offered !== false) return { offered, conds: all };
     const failing = ownVerdicts.filter((x) => x.v === false).map((x) => x.c);
     // Named with the other conditions of the way: together they are what can't all hold.
-    if (failing.length > 0) return { offered, closure: { conditions: conds.filter(Boolean), failing } };
+    if (failing.length > 0) return { offered, conds: all, closure: { conditions: all, failing } };
     const always = earlier.find((x) => x.v === true);
-    return { offered, closure: always ? { conditions: always.list, earlierLine: true } : undefined };
+    return { offered, conds: all, closure: always ? { conditions: always.list, earlierLine: true } : undefined };
   }
 
   /**

@@ -297,18 +297,23 @@ function detectRestartCarryOver(story: Story, played: ReadonlySet<string>): Stor
     .sort((a, b) => a.localeCompare(b));
   if (carried.length === 0) return [];
   const names = carried.slice(0, 3).join(', ') + (carried.length > 3 ? ` and ${carried.length - 3} more` : '');
-  const out: StoryWarning[] = [];
-  for (const beat of story.getAllBeats()) {
-    if (beat.type !== 'endScreen') continue;
+  const screens = story.getAllBeats().filter((beat) => {
+    if (beat.type !== 'endScreen') return false;
     const p = beat.getParameters() as any;
-    if (p.showRestart === false || p.reset === true) continue;
-    if (played.size > 0 && !played.has(beat.id)) continue;
-    out.push({
-      code: 'restart-keeps-values', severity: 'note', beatId: beat.id, beatName: beat.name,
-      message: `Restart here starts the story again without resetting anything: ${names} ${carried.length === 1 ? 'carries' : 'carry'} into the next run, so checks on ${carried.length === 1 ? 'it' : 'them'} can come out differently on a replay. If that's meant, leave it; otherwise turn on "Reset all values on restart" for this end screen.`,
-      detail: { carried },
-    });
-  }
+    return p.showRestart !== false && p.reset !== true && (played.size === 0 || played.has(beat.id));
+  }).sort((a, b) => a.name.localeCompare(b.name));
+  if (screens.length === 0) return [];
+  // Said once, on the first of them: it is one choice made the same way everywhere.
+  const quoted = screens.map((b) => `"${b.name}"`);
+  const where = screens.length === 1 ? quoted[0]
+    : screens.length <= 3 ? `${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}`
+      : `${quoted.slice(0, 2).join(', ')} and ${screens.length - 2} more end screens`;
+  const these = screens.length === 1 ? 'this end screen' : 'these end screens';
+  const out: StoryWarning[] = [{
+    code: 'restart-keeps-values', severity: 'note', beatId: screens[0].id, beatName: screens[0].name,
+    message: `Restart on ${where} starts the story again without resetting anything: ${names} ${carried.length === 1 ? 'carries' : 'carry'} into the next run, so checks on ${carried.length === 1 ? 'it' : 'them'} can come out differently on a replay. If that's meant, leave it; otherwise turn on "Reset all values on restart" for ${these}.`,
+    detail: { carried, endScreens: screens.map((b) => b.id) },
+  }];
   return out;
 }
 
