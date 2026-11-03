@@ -698,6 +698,7 @@ export class StateSimulationAnalyzer {
     };
     this.searchLimited = false;
     this.rangeFacts = null;
+    this.oneRunFacts = null;
     if (!startBeatId) return result;
     this.shownReplies = new Set();
     // Ranges first: what they rule out the search need not tell states apart for.
@@ -918,6 +919,12 @@ export class StateSimulationAnalyzer {
     const checksBegan = performance.now();
     this.rangeFacts = rangesHold && ranges ? yield* this.linkChecks(ranges, result) : null;
     this.linkCheckMs = performance.now() - checksBegan;
+    // Beats still open: are they out of reach within one playthrough?
+    this.oneRunFacts = null;
+    const facts = this.rangeFacts;
+    if (facts && !result.complete && [...facts.reached].some((id) => !result.perBeat.has(id))) {
+      this.oneRunFacts = this.counterRanges([], 60000, undefined, { oneRun: true });
+    }
     return result;
   }
 
@@ -935,6 +942,14 @@ export class StateSimulationAnalyzer {
   /** How each step changes counters (counterRanges), for the counters in rangeCounterOrder. */
   private rangeCounterSteps = new Map<string, Map<string, Change>>();
   private rangeCounterOrder = '';
+  /** counterRanges is working out one playthrough: Replays lead nowhere. */
+  private rangeOneRun = false;
+  /**
+   * The counter ranges within one playthrough (no Replay), worked out when the
+   * search left beats open: a beat out of reach here but open in rangeFacts
+   * can only be reached after replaying, with values carried over.
+   */
+  public oneRunFacts: CounterRangeFacts | null = null;
   /** isTerminalBeat per beat, for counterRanges (it builds the beat's links each time). */
   private rangeTerminal = new Map<string, boolean>();
   /** getConnections per beat, for counterRanges: it asks once per combination of facts. */
@@ -1232,9 +1247,14 @@ export class StateSimulationAnalyzer {
    * ruined" when no way has both). Null without a start, or when the
    * combinations run past `nodeCap`.
    */
-  public counterRanges(track: string[] = [], nodeCap = 60000, known?: CounterRangeFacts): CounterRangeFacts | null {
+  public counterRanges(track: string[] = [], nodeCap = 60000, known?: CounterRangeFacts, options: { oneRun?: boolean } = {}): CounterRangeFacts | null {
     const start = this.story.getFirstBeatId();
     if (!start) return null;
+    if (options.oneRun) {
+      // One playthrough: an end screen's Replay goes nowhere.
+      this.rangeOneRun = true;
+      try { return this.counterRanges(track, nodeCap, known); } finally { this.rangeOneRun = false; }
+    }
     const starts = this.initialStates();
     // The counters steps name, kept from earlier runs (the link checks run many).
     const keys = this.rangeKeys;
@@ -1414,7 +1434,8 @@ export class StateSimulationAnalyzer {
       for (const { to, state } of this.rangeSteps(beat, node.state, start, probe, undefined, known)) arrive(to, state);
     }
     if (fresh.size > 0) { fresh.forEach((k) => keys.add(k)); return undefined; }
-    if (track.length === 0 && !known) this.rangeLoops = onLoop;
+    // Kept from a run with Replays only: later runs may follow fewer links, never more.
+    if (track.length === 0 && !known && !this.rangeOneRun) this.rangeLoops = onLoop;
     if (tooMany) return null;
 
     // With everything settled: which links some way takes, and why the others stay shut.
@@ -1581,7 +1602,7 @@ export class StateSimulationAnalyzer {
     let terminal = this.rangeTerminal.get(beat.id);
     if (terminal === undefined) this.rangeTerminal.set(beat.id, (terminal = this.isTerminalBeat(beat)));
     if (terminal) {
-      if (beat.type === 'endScreen' && beat.getParameters().showRestart !== false) {
+      if (beat.type === 'endScreen' && beat.getParameters().showRestart !== false && !this.rangeOneRun) {
         const replay = probe(`${beat.id}\u0000replay`, beat, from, (s) => this.stateAfterReplay(beat, this.applyBeatEffects(beat, s)));
         const { targets, maybeNone } = hiddenLinks(replay);
         for (const t of targets) go(t, replay);

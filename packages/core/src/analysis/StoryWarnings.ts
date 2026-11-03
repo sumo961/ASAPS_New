@@ -15,6 +15,7 @@ import type { StateRequirement, Condition } from '../types';
 import { analyzeRoleFindings } from './roleFindings';
 import { analysisLinks } from './analysisLinks';
 import { isTextForCounter } from '../engine/variableValues';
+import { PLAYTHROUGH_VARIABLE } from '../engine/StoryContext';
 
 export type StoryWarningCode =
   | 'keypad-softlock-loop'            // failTarget eventually leads back to the keypad with no state change
@@ -30,11 +31,13 @@ export type StoryWarningCode =
   | 'reply-hidden-by-next-line'       // a reply beside next lines: shown only when none of them plays
   | 'choices-all-hidden'              // no choice on offer: the beat is skipped by its own link
   | 'reply-nowhere'                   // a reply with no next line and no exit: picking it ends the scene
+  | 'restart-keeps-values'            // an end screen's Restart resets nothing: checked values carry into the next run
   | 'role';                           // cast roles: unknown role, non-candidate cast, recast, used before cast, bare AI partner
 
 export interface StoryWarning {
   code: StoryWarningCode;
-  severity: 'warn' | 'error';
+  /** 'note': may well be meant (a Restart that keeps what players did). */
+  severity: 'warn' | 'error' | 'note';
   beatId: string;
   beatName: string;
   /** Human-readable explanation, includes context. */
@@ -137,6 +140,7 @@ export function detectStoryWarnings(cfg: DetectConfig): StoryWarning[] {
   }
 
   warnings.push(...detectStateWiring(story, evidence.played));
+  warnings.push(...detectRestartCarryOver(story, evidence.played));
 
   // 4. Mistakes only a read of the beat shows: the simulator plays them as written.
   const played = evidence.played;
@@ -178,8 +182,10 @@ export function looksLikeSameName(a: string, b: string): boolean {
   return Math.min(x.length, y.length) >= 6 && nameDistance(x, y, 2) <= 2;
 }
 
-function detectStateWiring(story: Story, played: ReadonlySet<string>): StoryWarning[] {
-  type Kind = 'value' | 'item';
+type Kind = 'value' | 'item';
+
+/** What conditions read (value or item, by name) and the beats that set each, and what the story starts with. */
+function stateWiring(story: Story) {
   const reads = new Map<string, { kind: Kind; name: string; beats: Set<string> }>();
   const sets = new Map<string, Set<string>>();
   const key = (kind: Kind, name: string) => `${kind}\u0001${name.trim()}`;
@@ -230,7 +236,11 @@ function detectStateWiring(story: Story, played: ReadonlySet<string>): StoryWarn
     for (const d of (c as any)?.counters ?? []) if (d?.name) starts.add(key('value', d.name));
     if ((c as any)?.role === 'player') for (const it of (c as any)?.inventory ?? []) if (it?.name) starts.add(key('item', it.name));
   }
+  return { reads, sets, starts, key };
+}
 
+function detectStateWiring(story: Story, played: ReadonlySet<string>): StoryWarning[] {
+  const { reads, sets, starts, key } = stateWiring(story);
   const out: StoryWarning[] = [];
   const nameOf = (id: string) => story.getBeat(id)?.name?.trim() || id;
   const firstOf = (ids: Set<string>) => [...ids].sort((a, b) => nameOf(a).localeCompare(nameOf(b)))[0];
@@ -269,6 +279,35 @@ function detectStateWiring(story: Story, played: ReadonlySet<string>): StoryWarn
         detail: { name: read.name, setters: ordered },
       });
     }
+  }
+  return out;
+}
+
+/**
+ * An end screen whose Restart resets nothing ("Reset all values on restart"
+ * off): what players changed carries into the next run, so a check can come
+ * out differently on a replay, or only open after several. Often meant (a
+ * New Game+); said as a note, naming what the story checks and changes.
+ */
+function detectRestartCarryOver(story: Story, played: ReadonlySet<string>): StoryWarning[] {
+  const { reads, sets } = stateWiring(story);
+  const carried = [...reads.entries()]
+    .filter(([k, r]) => sets.has(k) && r.name !== PLAYTHROUGH_VARIABLE)
+    .map(([, r]) => r.name)
+    .sort((a, b) => a.localeCompare(b));
+  if (carried.length === 0) return [];
+  const names = carried.slice(0, 3).join(', ') + (carried.length > 3 ? ` and ${carried.length - 3} more` : '');
+  const out: StoryWarning[] = [];
+  for (const beat of story.getAllBeats()) {
+    if (beat.type !== 'endScreen') continue;
+    const p = beat.getParameters() as any;
+    if (p.showRestart === false || p.reset === true) continue;
+    if (played.size > 0 && !played.has(beat.id)) continue;
+    out.push({
+      code: 'restart-keeps-values', severity: 'note', beatId: beat.id, beatName: beat.name,
+      message: `Restart here starts the story again without resetting anything: ${names} ${carried.length === 1 ? 'carries' : 'carry'} into the next run, so checks on ${carried.length === 1 ? 'it' : 'them'} can come out differently on a replay. If that's meant, leave it; otherwise turn on "Reset all values on restart" for this end screen.`,
+      detail: { carried },
+    });
   }
   return out;
 }

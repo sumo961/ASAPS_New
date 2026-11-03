@@ -111,6 +111,8 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
   const warningsByBeatId = useMemo(() => {
     const m = new Map<string, StoryWarning[]>();
     for (const w of storyWarnings) {
+      // Notes (a Restart that keeps values) are for Problems, not a mark on the tree.
+      if (w.severity === 'note') continue;
       if (!m.has(w.beatId)) m.set(w.beatId, []);
       m.get(w.beatId)!.push(w);
     }

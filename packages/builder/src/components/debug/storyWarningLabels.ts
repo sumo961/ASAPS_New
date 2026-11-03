@@ -15,6 +15,7 @@ const LABELS: Record<StoryWarning['code'], string> = {
   'name-mismatch': 'Name spelled differently',
   'setup-unreached': 'Setup never played',
   'reply-hidden-by-next-line': 'Reply hidden by a next line',
+  'restart-keeps-values': 'Restart keeps values',
   'role': 'Role',
 };
 

@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { StateSimulationAnalyzer } from '../../src/analysis/StateSimulationAnalyzer';
 import { ReachabilityAnalyzer } from '../../src/analysis/ReachabilityAnalyzer';
+import { detectStoryWarnings } from '../../src/analysis/StoryWarnings';
 import { buildPathTree, type PathTreeNode } from '../../src/analysis/PathTree';
 import { Story } from '../../src/engine/Story';
 import { createTestBeat } from '../test-utils';
@@ -1066,5 +1067,41 @@ describe('links that need several things at once (2026-11-03)', () => {
       stop('end'),
     ]);
     expect(new StateSimulationAnalyzer(s).counterRanges(['v\u0001name'])!.reached.has('secret')).toBe(true);
+  });
+});
+
+describe('replays that carry values over (2026-11-03)', () => {
+  const runs = (reset: boolean) => story([
+    { id: 'start', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'check', effects: [{ type: 'incrementCounter', target: 'runs', value: 1 }] }] },
+    { id: 'check', type: 'conditionBeat', parameters: { conditionType: 'counter', condition: { type: 'counter', variableName: 'runs', operator: '>=', value: 3 }, trueTarget: 'last', falseTarget: 'again' } },
+    { id: 'again', type: 'endScreen', parameters: { message: 'again', showRestart: true, reset }, connections: [{ targetId: 'start' }] },
+    { id: 'last', type: 'endScreen', parameters: { message: 'last', showRestart: false } },
+  ]);
+
+  it('says an end screen restarts without resetting what the story checks', () => {
+    const keeps = detectStoryWarnings({ story: runs(false) }).filter((w) => w.code === 'restart-keeps-values');
+    expect(keeps.map((w) => [w.beatId, w.severity])).toEqual([['again', 'note']]);
+    expect(keeps[0].message).toContain('runs carries into the next run');
+    expect(detectStoryWarnings({ story: runs(true) }).some((w) => w.code === 'restart-keeps-values')).toBe(false);
+  });
+
+  it('marks a beat only replays can reach, and says why', () => {
+    const s = runs(false);
+    const analyzer = new StateSimulationAnalyzer(s);
+    const search = analyzer.exploreSituations({ maxSituations: 3, maxAimed: 0 });
+    expect(search.perBeat.has('last')).toBe(false);
+    const last = new ReachabilityAnalyzer(s, {
+      playedBeats: new Set(search.perBeat.keys()),
+      searchLimited: analyzer.searchLimited,
+      ranges: analyzer.rangeFacts,
+      oneRun: analyzer.oneRunFacts,
+      gatesOnTheWay: (from, to) => analyzer.gatesOnTheWay(from, to, (search.arrivals.get(from) ?? []).map((a) => a.state)),
+    }).analyze().unreachableBeats.find((u) => u.beatId === 'last')!;
+    expect(last.unsure).toBe(true);
+    expect(last.afterReplays).toBe(true);
+    expect(last.details).toContain("Can't be reached in one playthrough. \"check\" checks runs >= 3, and in one playthrough runs is always 1 there.");
+    expect(last.details).toContain('"again" restarts the story without resetting');
+    // Played through, the replays do get there.
+    expect(new StateSimulationAnalyzer(s).exploreSituations().perBeat.has('last')).toBe(true);
   });
 });

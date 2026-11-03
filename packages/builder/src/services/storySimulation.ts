@@ -80,6 +80,7 @@ export function reachabilityOf(story: Story, simulation: StorySituations): Reach
     searchLimited: analyzer.searchLimited,
     gatesOnTheWay: (from, to) => analyzer.gatesOnTheWay(from, to, (search.arrivals.get(from) ?? []).map((a) => a.state)),
     ranges: analyzer.rangeFacts,
+    oneRun: analyzer.oneRunFacts,
   }).analyze();
 }
 

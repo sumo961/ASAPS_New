@@ -42,6 +42,11 @@ export interface UnreachableBeat {
    * link route leads here, so some way of playing it did not try may.
    */
   unsure?: boolean;
+  /**
+   * Out of reach within one playthrough: only values carried over a Replay
+   * could get players here (and the search didn't replay that often).
+   */
+  afterReplays?: boolean;
 }
 
 /**
@@ -122,6 +127,11 @@ export interface ReachabilityConfig {
    * beats outside them and links they shut are out on every way of playing.
    */
   ranges?: CounterRangeFacts | null;
+  /**
+   * The same within one playthrough (StateSimulationAnalyzer.oneRunFacts): a
+   * beat the search left open that is out of reach here needs Replays.
+   */
+  oneRun?: CounterRangeFacts | null;
 }
 
 /**
@@ -150,8 +160,8 @@ export function describeGate(c: any, beatName: (id: string) => string): string {
 
 export class ReachabilityAnalyzer {
   private story: Story;
-  private config: Required<Omit<ReachabilityConfig, 'playedBeats' | 'searchLimited' | 'gatesOnTheWay' | 'ranges'>>
-    & Pick<ReachabilityConfig, 'playedBeats' | 'searchLimited' | 'gatesOnTheWay' | 'ranges'>;
+  private config: Required<Omit<ReachabilityConfig, 'playedBeats' | 'searchLimited' | 'gatesOnTheWay' | 'ranges' | 'oneRun'>>
+    & Pick<ReachabilityConfig, 'playedBeats' | 'searchLimited' | 'gatesOnTheWay' | 'ranges' | 'oneRun'>;
   private counterModifications: Map<string, { min: number; max: number }>;
   private variableValues: Map<string, Set<any>>;
   /** Variables with a Project Settings default: they never start unset. */
@@ -174,6 +184,7 @@ export class ReachabilityAnalyzer {
       searchLimited: config.searchLimited,
       gatesOnTheWay: config.gatesOnTheWay,
       ranges: config.ranges,
+      oneRun: config.oneRun,
     };
     this.counterModifications = new Map();
     this.variableValues = new Map();
@@ -896,9 +907,10 @@ export class ReachabilityAnalyzer {
         }
 
         const reachedParents = incomingConnections.filter((i) => reachableBeats.has(i.sourceBeatId));
+        const replays = openLinked.has(beat.id) ? this.afterReplaysDetails(beat.id, reachedParents) : null;
         if (this.config.playedBeats && reachedParents.length > 0) {
           reason = 'neverOffered';
-          details = this.neverOfferedDetails(beat.id, reachedParents, openLinked.has(beat.id));
+          details = replays || this.neverOfferedDetails(beat.id, reachedParents, openLinked.has(beat.id));
         } else if (hasImpossibleCondition) {
           reason = 'impossibleCondition';
           details = 'All paths to this beat have impossible conditions';
@@ -915,6 +927,7 @@ export class ReachabilityAnalyzer {
         reason,
         details,
         ...(openLinked.has(beat.id) ? { unsure: true } : {}),
+        ...(openLinked.has(beat.id) && this.config.oneRun && !this.config.oneRun.reached.has(beat.id) ? { afterReplays: true } : {}),
         blockingConditions: blockingConditions.length > 0 ? blockingConditions : undefined,
         incomingConnections,
         suggestedFixes: suggestedFixes.length > 0 ? suggestedFixes : undefined
@@ -1062,6 +1075,46 @@ export class ReachabilityAnalyzer {
     return gates.length > 0
       ? withHints(`${names} links here, but it needs ${gates.join(' and ')}, and ${noWay} has that there`, conditions)
       : `${names} links here, but ${noWay} takes that link: the choice or line leading here is never on offer`;
+  }
+
+  /**
+   * A beat out of reach within one playthrough but not across Replays: the
+   * check that shuts it in one run, what it reads there, and the end screens
+   * that carry values into the next run. Null if not that.
+   */
+  private afterReplaysDetails(
+    beatId: string,
+    reachedParents: Array<{ sourceBeatId: string; sourceBeatName: string; connection: Connection }>,
+  ): string | null {
+    const oneRun = this.config.oneRun;
+    if (!oneRun || oneRun.reached.has(beatId)) return null;
+    const nameOf = (id: string) => this.story.getBeat(id)?.name ?? id;
+    let check = '';
+    for (const parent of reachedParents) {
+      const why = oneRun.closed(parent.sourceBeatId, beatId);
+      if (!why) continue;
+      const from = this.story.getBeat(parent.sourceBeatId);
+      const gates = why.conditions.map((c) => describeGate(c, nameOf)).join(' and ');
+      const values = why.values.length > 0 ? `, and in one playthrough ${why.values.join(' and ')}` : '';
+      check = from?.type === 'conditionBeat'
+        ? ` "${from.name}" checks ${gates}${values}.`
+        : ` "${from?.name ?? parent.sourceBeatId}" links here, but it needs ${gates}${values}.`;
+      break;
+    }
+    // The end screens players reach whose Restart resets nothing.
+    const played = this.config.playedBeats;
+    const keepers = this.story.getAllBeats().filter((b) => {
+      if (b.type !== 'endScreen' || (played && !played.has(b.id))) return false;
+      const p = b.getParameters() as any;
+      return p.showRestart !== false && p.reset !== true;
+    }).map((b) => `"${b.name}"`);
+    const listed = keepers.length <= 2 ? keepers.join(' and ')
+      : keepers.length === 3 ? `${keepers[0]}, ${keepers[1]} and ${keepers[2]}`
+        : `${keepers[0]}, ${keepers[1]} and ${keepers.length - 2} more`;
+    const carry = keepers.length > 0
+      ? `${listed} restart${keepers.length === 1 ? 's' : ''} the story without resetting, so values carry into the next run`
+      : 'values marked to keep across restarts carry into the next run';
+    return `Can't be reached in one playthrough.${check} Only replaying can get players here: ${carry}. The search did not replay that often, so it may be reachable that way.`;
   }
 
   /** A link the counter ranges shut, in words: the check, and the values that settle it. */

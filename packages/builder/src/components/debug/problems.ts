@@ -26,6 +26,8 @@ export interface Problem {
   behindIt: number;
   /** Unreached, but the search stopped before it could rule the beat out. */
   unsure?: boolean;
+  /** ...and within one playthrough it can't be reached: only replays could. */
+  afterReplays?: boolean;
 }
 
 /** Story Logic's checks over the story's one search. */
@@ -100,7 +102,7 @@ export function collectProblems(story: Story, simulation: StorySituations): Prob
   const { analyzer, playedBeats } = simulation;
   for (const w of detectStoryWarnings({ evidence: simulation.evidence, story, shownReplies: analyzer.shownReplies, searchLimited: analyzer.searchLimited })) {
     // A cast that doesn't take leaves the player playing on: worth checking, not a stop.
-    add(w.severity === 'error' && w.code !== 'role' ? 'error' : 'warning', storyWarningLabel(w.code), w.beatId, w.message);
+    add(w.severity === 'note' ? 'note' : w.severity === 'error' && w.code !== 'role' ? 'error' : 'warning', storyWarningLabel(w.code), w.beatId, w.message);
   }
 
   const logic = storyLogicValidation(story, simulation);
@@ -152,6 +154,7 @@ export function collectProblems(story: Story, simulation: StorySituations): Prob
     const severity: ProblemSeverity = u.reason === 'orphaned' && behind === 0 && story.getBeat(u.beatId)?.type !== 'endScreen' ? 'note' : 'warning';
     add(severity, u.reason === 'orphaned' ? 'Nothing links here' : 'Never on offer', u.beatId, u.details, behind);
     if (u.unsure) out.get(`Never on offer|${u.beatId}`)!.unsure = true;
+    if (u.afterReplays) out.get(`Never on offer|${u.beatId}`)!.afterReplays = true;
   }
 
   // Told once: an unlinked setup beat is both, and what's behind it belongs to the setup.
