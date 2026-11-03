@@ -405,7 +405,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
                     {endingCount + deadEndCount + stuckCount}
                   </div>
                   {hasNonEnding && (
-                    <div className="text-[10px] text-blue-600 mt-0.5 leading-tight" title="Only endings (End Screen, AI Summary) finish the story. A cycle comes back round with nothing new to find, a dead end has no way on, and a depth limit is a path the analysis stopped following because it grew very long.">
+                    <div className="text-[10px] text-blue-600 mt-0.5 leading-tight" title="Only endings (End Screen, AI Summary) finish the story. A dead end has no way on; stuck in a loop keeps coming back with no way out; back to a menu returned to a menu it had finished with; cut off is a path the analysis stopped following because it grew very long.">
                       {endingCount} ending{endingCount !== 1 ? 's' : ''}
                       {deadEndCount > 0 && ` + ${deadEndCount} dead end${deadEndCount !== 1 ? 's' : ''}`}
                       {stuckCount > 0 && ` + ${stuckCount} stuck in a loop`}

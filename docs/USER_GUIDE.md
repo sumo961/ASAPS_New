@@ -229,7 +229,8 @@ ASAPS Modern keeps every project you've ever started in a single, friendly **Pro
 
 The app checks your local browser storage for the last project you had open:
 
-- **In-session reloads** open it straight away — same flowchart, same selection, same place in your work. If you've already used ASAPS at least once during this browser/Electron session, refresh and you land directly back in the editor.
+- **In-session reloads** open it straight away — same flowchart, same selection, same place in your work.
+- **Every project opens where you left it**: in the same editor (Flowchart, Visual Editor, Script or Knowledge Graph) and on the beat you had selected. A project you've never opened on this computer opens on the full flowchart, and so does one whose beat is gone (or can't be shown in the Visual Editor). This is remembered on this computer, not in the project file. If you've already used ASAPS at least once during this browser/Electron session, refresh and you land directly back in the editor.
 - **On the first cold load of a session** (you just launched the browser, opened a new tab, or re-launched the Electron app), ASAPS still loads your last project so it's ready in the editor underneath, but it *also* pops open the Project Browser on top with a blue **CURRENTLY EDITING** banner offering a one-click **Continue editing →** button. Use it to dive straight back in, switch to a different project, or kick off something new.
 - **If no last project is found** (first time opening the app, or you cleared browser storage), ASAPS creates a fresh untitled project so you have somewhere to start.
 
@@ -469,7 +470,7 @@ See your entire system structure as a graph. Beats appear as boxes, connections 
 **Reading the arrows.** Every way a player can leave a beat is drawn, and the line tells you what kind of link it is:
 
 - **Solid grey** — an ordinary link or choice. A choice that only appears under certain conditions draws its conditions on the edge (dashed violet).
-- **Dashed teal "↺ Restart"** — where an End Screen's or AI Summary's **Play Again** button leads. Story state is reset along a restart link (if the beat's reset options say so), so it is treated as a fresh start, not a way on. The analysis tools and the "Start as if…" presets stop at these links too.
+- **Dashed teal "↺ Restart"** — where an End Screen's or AI Summary's **Play Again** button leads. Story state is reset along a restart link (if the beat's reset options say so), so it is treated as a fresh start, not a way on. The debug tools and the "Start as if…" presets count the end screen as an ending; they follow the Replay only to find what a second run can reach, and keep those paths apart (see [Path Analysis](#path-analysis)).
 - **Dashed green "after N s"** — a beat's *default target*, drawn only when it can actually fire: on a timed auto-advance, or as **"default"** when it is the beat's only exit. A default target that could never act is not drawn.
 - **Links a beat derives from one of its settings** — a keypad's **"Wrong code"**, an AI Condition's **"Fallback"**, an AR Scene's **"Skip / no anchor"** — appear as links like any other, even though you set them as fields in the Inspector.
 - **Random Target branches** are labelled *Random 1*, *Random 2*… with their weight when it isn't 1 (for example *Random 2 (×3)*).
@@ -2104,7 +2105,7 @@ While the story plays, the Preview's **Debug Info → Roles** card shows who pla
 
 **In the Flowchart**, a beat that decides who plays a role carries a **🎭 @role** badge, so you can see where the story chooses.
 
-**What gets checked.** Role problems appear in the review banner when a story arrives from the [Story Generator](#after-generation-the-review-banner) or Claude Desktop, and for any story — hand-written ones too — under **Debug → Story Warnings**:
+**What gets checked.** Role problems appear in the review banner when a story arrives from the [Story Generator](#after-generation-the-review-banner) or Claude Desktop, and for any story — hand-written ones too — in the Debug window's [Problems](#debug-problems) tab:
 - a reference to a role that doesn't exist;
 - casting someone who isn't on the role's list;
 - a role cast in more than one beat while **Can be recast later** is off (the later choice would replace the earlier one);
@@ -2784,6 +2785,7 @@ Not planning to use AI, or teaching a class that shouldn't? Open **Tools → App
 - the beat suggestions at the bottom of the Properties panel, **Develop character with AI** and the Character Manager's **Generate with AI** card, and the Dialog Tree's **AI Generate**
 - the AI translation buttons
 - **Ask AI** and the AI fixes in the [review banner](#after-generation-the-review-banner) (the rule-based proposals stay)
+- **Check with AI** in the Debug window's Story Logic tab (the keyword checks stay)
 - the **Build from a prompt** and **Co-write with AI** cards when you start a new project
 - the AI beat types in the Beat Types palette
 - the AI settings and on-the-fly translation in the HTML export (the exported story then carries no AI setup), and the suggested AI setup in Project Settings
@@ -3047,7 +3049,7 @@ A few things worth knowing:
 - **Ask AI** appears next to any finding ASAPS could not fix deterministically. It sends *only that problem and the handful of beats involved* to your configured model and asks for the smallest edit. Whatever comes back is checked by code before you see it — edits may only touch the beats the AI was shown, links must point at beats that exist, and on a simulated copy of the story the problem has to disappear without a new one appearing. If the answer fails any of that, you see why instead of a fix. What passes is shown as a before → after card; **Accept** applies it as one undo step, **Reject** discards it. The AI never edits the story on its own.
 
   ![An AI fix card: the model's reasoning, the exact edit as before → after, Accept and Reject](images/71-ask-ai-fix.png)
-- **Every decision is recorded.** Whatever you apply, skip or reject here — and every batch the Co-Designer proposes — goes into the project's **AI changes** log (**AI ▸ AI changes** in the header; `generation/ai-edits.json` in a folder project). It lists each proposal with its source, your decision, and a jump to the beats concerned, and it travels with the project through folders, zips and version control. Declined proposals are kept too: knowing what you turned down is part of the record of who wrote what.
+- **Every decision is recorded.** Whatever you apply, skip or reject here — and every batch the Co-Designer proposes, and every fix you apply or decline in Story Logic's [Check with AI](#check-with-ai) — goes into the project's **AI changes** log (**AI ▸ AI changes** in the header; `generation/ai-edits.json` in a folder project). It lists each proposal with its source (*Review*, *Ask AI*, *Co-Designer* or *Story Logic*), your decision, and a jump to the beats concerned, and it travels with the project through folders, zips and version control. Declined proposals are kept too: knowing what you turned down is part of the record of who wrote what.
 - **Endings that don't say where Restart leads** are listed as well (an End Screen or AI Summary showing a Restart button with no [restart target](#restart-target)). For an AI Summary the banner proposes restarting at the story's start — the start beat from Project Settings, otherwise the title screen; for an End Screen you pick the *Restart leads to* beat in the Inspector.
 - **Time checks that are decided before play starts** are listed too: a Condition Check on the story clock that compares against a time before the clock ever shows (the clock only moves forward), so one of its branches can never run — or a clock check in a story that never sets a clock. The row names the time it checks and the time the clock starts at; fix the time in the Inspector.
 - **Text that names a time the story clock doesn't show** is listed too: a beat that opens with a time ("01:30. The phone buzzes…", "At 6:00 the alarm goes off…") while the clock, visible on that beat, can show a time more than half an hour away on some way in. The row names both times. Set the clock just before that beat, or hide the clock on it with [**Time Display**](#per-beat-time-display) set to *None (hide on this beat)*.
@@ -3365,8 +3367,12 @@ When previewing from a beat other than the start, ASAPS Modern intelligently ana
 **Using Path Presets:**
 
 1. Select a beat in the flowchart and open the Preview window (starting **From "‹beat›"**)
-2. Click the **Start as if… (N)** button in the toolbar — *N* is the number of distinct states found. The menu is headed *How did the player arrive here?* and tells you how many paths collapsed into how many states
-3. Pick **Start fresh (no prior state)**, or browse the presets, grouped by the ending each path goes on to:
+2. Click the **Start as if… (N)** button in the toolbar — *N* is the number of distinct states found. The menu is headed *How did the player arrive here?* and tells you how many paths came down to how many states that change what happens from here
+3. Pick **Start fresh (no prior state)**, or browse the presets in their groups:
+   - **For a beat with conditions of its own** (lines or replies that only show sometimes, a Condition Check, a requirement), the groups say which of them are met, which is what decides how the beat plays: *With lantern in the player's bag*, *With lantern in the player's bag and trust > 5*, *With a visit to "The crypt"*, *With none of this beat's conditions met*
+   - **Otherwise** they're grouped by the ending each path goes on to (*→ The harbour*)
+   - States only a replay reaches sit in their own group, *→ after an end screen's Replay*
+   - Each group shows three states; **Show N more** opens the rest
    - Each preset shows its key state (a couple of variable, counter or item values, or a count) and the path taken
    - A badge indicates if the path includes typed input
 4. Select a preset to load that state; the preview restarts paused so you can look before you play
@@ -3457,16 +3463,84 @@ This is the quickest way to test the edge cases — "what if trust is already at
 
 ## Debug Tools
 
-Click the **Debug** button in the header to open the **Debug Tools** window. It opens in a separate browser/desktop window so you can keep your story canvas visible while you investigate. The window has three tabs:
+Click the **Debug** button in the header to open the **Debug Tools** window. It opens in a separate browser/desktop window so you can keep your story canvas visible while you investigate. The window has four tabs: **Problems**, **Reachability**, **Path Analysis** and **Story Logic**. It opens on **Problems** the first time, and after that on the tab you used last.
+
+Every tab works by playing your story the way players can: it follows every link the flowchart draws (every Free Layout button, a Set Timer's *time runs out* link, QR codes, requirement fallbacks, an end screen's Replay), only takes a choice when its conditions would show it, and keeps track of variables, counters, items, feelings and roles along the way. On a large story that takes a moment. The window stays usable and says how far it has got (*Playing through the story… Trying what players can do: 287 of 419 beats reached*). All four tabs read the same play-through, so they never disagree about what players can reach. Clicking a beat (or a path) in any tab highlights it in the main builder flowchart.
+
+<a id="debug-problems"></a>
+### Problems
+
+**Start here.** The Problems tab is one list of everything the debug tools found: Story Warnings, Story Logic's checks, broken links, dead ends, loops players can't get out of, and beats no one can reach. You don't have to visit each tool in turn to find out whether your story has a hole in it.
+
+The list comes in three groups:
+
+- **Errors: players get stuck or miss something** (red): a dead end without an end screen, a loop with no way out, a link to a beat that no longer exists, a check that can never see what it's looking for.
+- **Warnings: worth checking** (amber): something that probably isn't what you meant, such as a beat that is never on offer or a reply with no words.
+- **Notes: may be intended** (blue): things a story can do on purpose, such as a beat nothing links to yet, or a Restart that keeps values for a New Game+.
+
+Each entry names the problem and the beat (*Dead end: The cellar*) and says in a sentence what was found. **Click the name to highlight the beat** in the flowchart. When the same problem turns up several times on one beat, it is listed once with a count (×3) and **Show 2 more** for the rest. The search box at the top (*Search 12 problems…*) filters by problem, beat name or message.
+
+**Unreachable stretches are told once.** If a whole storyline can't be reached, you don't get thirty entries. You get its first beat, the one where the way in is missing, with how many more are behind it: *Nothing links here: The lighthouse, 14 more beats behind it*. Fix that one and the rest come back with it. The biggest stretches come first. There are two kinds:
+
+- **Nothing links here**: no beat links to it. A single beat with nothing behind it is a note (it may be a scene you haven't wired in yet); a stretch, or an end screen nobody can reach, is a warning.
+- **Never on offer**: a beat links to it, but no way of playing takes that link. The message says why: the condition players don't meet, the values they arrive with, and where the story sets it, for example *it needs wiardStatus == ruined, and players arrive there with wiardStatus unset, or with wiardStatus bound*, or *markFakeRole is set in "E3 - Mark DM Victor Mon" (to made or supplied or refused)*. A setter no one reaches is marked *not reached*.
+
+**Problems on beats nobody reaches wait their turn.** A fault on a beat no way of playing reaches yet is shown as a note, with *(No way of playing reaches this beat yet.)*: no player meets it until the beat is linked in. The entry that says why the beat is unreached keeps its place.
+
+When nothing turns up, the tab says **No problems found.** Problems is about structure and state. To check whether what a beat *says* holds for everyone who gets there, use [Check with AI](#check-with-ai) in Story Logic.
+
+<a id="story-warnings"></a>
+#### What the warnings mean
+
+These are the entries Problems can show beyond unreachable beats, dead ends, loops and broken links. Each one names the beat and says what was found.
+
+| Entry | What it means | Usual fix |
+|---|---|---|
+| **Keypad can trap the player** (error) | A Keypad's *Fail Target* leads back to the keypad, and nothing before it makes sure the player has found the code. With unlimited attempts, a player without the code can never leave. | Limit the attempts and send the last failure somewhere else, or guard the keypad with a condition or requirement that the code has been found. |
+| **Keypad has no clue before it** (warning) | Nothing checks that the player found the code before reaching the keypad, so a lucky guess (or reading the source) skips the puzzle. | Add a [requirement](#per-beat-requirements) or a condition on the way in, if the code is meant to be earned. |
+| **Requirement can never be met** (error or warning, as you set it) | A beat's requirement tests an item, variable or counter that no earlier beat gives or changes, or the requirement isn't finished. | Add the beat that sets it, or fix or remove the requirement. |
+| **Requirement not met on some paths** (warning) | Some ways of playing reach the beat without meeting its requirement. Those players are redirected to its fallback. | Check that this is intended; otherwise gate the routes that arrive unprepared. |
+| **Name spelled differently** (error) | A check reads a name nothing in the story sets, while a name very close to it is set (`hasLantern` and `hasLatern`). Until the spelling matches, the check never sees it. | Make the two spellings match. |
+| **Setup never played** (error) | A beat players do reach checks a value that is only set on beats nobody reaches, so it never changes from its start. | Link the setup beat into the story, or set the value somewhere players do reach. |
+| **Counter used with text** (error) | A check compares a counter with text (`folkertPath == "stay"`), or an effect sets a counter to text. A counter holds a number, so the check is always false (always true for *Not Equal*), and the effect sets 0. | If it holds a word, make it a variable: switch the check or effect to **Variable** ([see below](#counter-text-note)). |
+| **Every choice hidden** (warning) | Some players reach this beat with every choice hidden by its conditions. They never see the question: the story moves straight on by the beat's own link. | Add a choice with no condition, or check the conditions. |
+| **Reply goes nowhere** (warning, or error when the story stops there) | A Dialog Tree reply has no next line and no exit, so picking it ends the scene. | Give the reply an exit or a next line. |
+| **Reply hidden by a next line** (warning) | After a line, some replies never show, because a next line (*Then another character speaks*) plays instead every time. When the story is too large to try every way through, the message says so, and you should check by hand. | Put a condition on the next line, or move the replies. |
+| **Next line never plays** (warning) | Of two next lines under one line, the first has no condition, so it always plays and the second never does. | Give the first one a condition, or remove the second. |
+| **Reply without words** (warning) | A reply has no text, so players see a blank button. | Give it words, or make it a next line (*Then another character speaks*). |
+| **Line without exit** (warning) | A Dialog Tree line with no replies and no exit link. Players still read it: it stays on screen with a **Continue** button (or until the reading time is up, where lines move on by themselves), then the scene ends and the story goes on by the beat's own link, or stops there if the beat has none. The same happens when every reply under a line is hidden by its conditions. | Give the line an exit link (or replies) so the scene says where it goes. |
+| **Text assumes something** (warning or note) | The beat's words assume something some players may not have. See [Story Logic](#story-logic) below. | Check the text against the ways in. |
+| **Item not described** (note) | A Pick Prop item that no beat describes. | Describe it, if players should know what they picked up. |
+| **Restart keeps values** (note) | An end screen players reach restarts the story without resetting anything (its **Reset** is off), while the story checks values it changes, so those checks can come out differently on a replay. Told once, on the first such end screen, naming the others. | If that's your New Game+, leave it. Otherwise turn on **Reset** for those end screens ([reset options](#keep-across-restarts)). |
+| **Role** (warning) | A [role](#roles) problem: a role that doesn't exist, a character who isn't on a role's list, a role cast in two beats without *Can be recast later*, a role used before anything chooses who plays it, or an AI partner role with nothing to go on. | Add the role, tick the character, set a default, or tick *Can be recast later*. The message says which. |
+
+These are advice only: nothing changes at runtime. The checks explore the same routes players can take, including a replay when your story tests the built-in [playthrough](#keep-across-restarts). In Path Analysis's **Tree** view, a small warning triangle marks the branch that contains a beat with a warning; hover over it for the same explanation.
+
+<a id="search-limit"></a>
+#### When a story is too large to try every way through
+
+Problems, Reachability and Story Logic play your story with a fast search that looks at *situations* (a beat, plus the state that matters from there on) rather than at every whole path. Even so, a very large story can have more ways through than the search can try. When that happens, an amber note at the top says so: *This story is too large to try every way through, and the search stopped at its limit.*
+
+That doesn't make the answers guesses. Most unreachable beats are unreachable **for certain**, whatever players do: every link that leads to them has a condition that can never hold (a check of text against a counter, a value nothing sets, an item nothing gives, a range a counter can never reach there). The note says which are which:
+
+- If the search is sure of all of them, the note says *every unreachable beat here is unreachable whatever players do*.
+- A beat the search may simply have missed gets a small amber **may be reachable** mark. A way of playing it didn't try might still get there, so look at it yourself.
+- A beat that can't be reached within one playthrough, but might be after values carry over a Replay, gets **only after replays** instead, and says what shuts it in one run and which end screens carry values over.
+
+Every other unreachable beat in the list is certain.
 
 ### Reachability
 
 ![Debug Tools — Reachability tab](images/31-debug-reachability.png)
-*The Reachability tab shows total beats, how many are reachable from start, how many are orphaned, and any warnings detected. Click a beat to highlight it on the main flowchart.*
+*The Reachability tab shows total beats, how many are reachable from start, how many nothing links to, and any warnings detected. Click a beat to highlight it on the main flowchart.*
 
-Finds beats that can never be reached — orphaned content with no paths leading to it. It follows every link the flowchart draws, including every Free Layout button, a Set Timer's *time runs out* link, QR codes and requirement fallbacks. The summary cards count Total, Reachable, Unreachable, and Orphaned beats. Expand the *Reachable Beats* and *Warnings* sections to drill into the specifics. Each unreachable beat says why in a sentence (nothing links to it, every way in has a condition that can never be met, every beat that links to it is unreachable itself, or a Condition beat never takes the branch to it), followed by suggested fixes where the analysis has one. Clicking a beat in the list highlights it in the main builder flowchart.
+Reachability is the long version of the unreachable entries in Problems: every beat, sorted. The summary cards count **Total Beats**, **Reachable**, **Unreachable** and **Nothing links here**. Below them, expand *Reachable Beats*, *Broken Connections*, *Unreachable Beats*, *Nothing links here*, *Warnings* and *Unreachable Condition Branches* to drill into the specifics; the search box filters the beat lists by name.
 
-A beat also counts as unreachable when every way in is guarded by a condition that can never be true, such as a test of a variable that nothing in the story sets. A variable counts as set when anything in the story can set it: an effect on a choice or a Free Layout button, a dialog line, a link or a random branch, a Set Variable beat, or an input the player types. A variable with a default value in Project Settings counts as set too, and so does the built-in **playthrough**.
+A beat is reachable when some way of playing gets there. Linked isn't enough: a beat that is linked but never on offer counts as unreachable, and says which beat links to it. Each unreachable beat says why in a sentence (nothing links to it, every way in has a condition that can never be met, every beat that links to it is unreachable itself, a beat links here but no way of playing takes that link, or a Condition beat never takes the branch to it), followed by suggested fixes where the analysis has one. When a check always answers the same way, it says so with the values, for example *"BrokeDeathCheck" checks Money <= 0, and Money is always 0 there, so the answer always sends players the other way*.
+
+A variable counts as set when anything in the story can set it: an effect on a choice or a Free Layout button, a dialog line, a link or a random branch, a Set Variable beat, or an input the player types. A variable with a default value in Project Settings counts as set too, and so does the built-in **playthrough**. Text never matches a counter, so a counter checked against text can't open a way in.
+
+When the story is too large to try every way through, the [search-limit note](#search-limit) and its **may be reachable** / **only after replays** marks appear here too.
 
 ### Path Analysis
 
@@ -3474,48 +3548,56 @@ A beat also counts as unreachable when every way in is guarded by a condition th
 *The Path Analysis tab in Forward mode, showing every possible outcome from story start.*
 
 Enumerates the possible journeys through your story. Three modes:
-- **Forward** — all outcomes reachable from the start.
-- **Tree** — the full branching tree as a hierarchy.
-- **Backward** — given a target ending, which paths lead to it.
+- **Forward**: all outcomes reachable from the start.
+- **Tree**: the full branching tree as a hierarchy.
+- **Backward**: pick a beat, and see the paths that lead to it.
 
-The summary shows *Outcomes*, *Total Paths*, *Unique Endings*, *Reachable Beats*, and how long the analysis took. Each outcome can be expanded to inspect the specific beat sequence and decision points. The query box at the top lets you filter by state ("`adult > 7`", "`has axe`", "`visits beat-123`") so you can ask, "show me only the paths where the player ends up with the axe."
+Path Analysis follows whole paths, one by one, so it runs its own search the first time you open it (the other tabs share a faster one). It plays the story the way a player would: it follows every link the flowchart draws, lets a screen's timer run out as well as taking its button, only takes a choice when its conditions would show it, sends the player to a requirement's fallback when the requirement isn't met, and keeps track of how many of an item the player holds and which character holds what. Each outcome carries a label saying how the path ends:
 
-The analysis plays the story the way a player would: it follows every link the flowchart draws, only takes a choice when its conditions would show it, sends the player to a requirement's fallback when the requirement isn't met, and keeps track of how many of an item the player holds and which character holds what. Each outcome carries a label saying how the path ends:
+- **Ending** (green): it reaches an End Screen or an AI Summary. Only those two count as endings.
+- **Dead end** (red): the story stops here without an end screen: the beat has no way on.
+- **Stuck in a loop** (red): the player keeps coming back here and no way on gets out.
+- **Back to a menu** (purple): the path came back to a choice with nothing new to find, for example a hub where every choice has already been tried. The player can still leave by another choice, so it's a loop, not a trap.
+- **Cut off** (orange): the path grew so long that the analysis stopped following it. That's a limit of the analysis, not a fault in your story; hover over the badge for a reminder.
 
-- **Ending** — it reaches an End Screen or an AI Summary.
-- **Dead End** (red) — the player is stuck: the beat has no way on, or every choice is hidden by its conditions.
-- **Cycle** (purple) — the path comes back round to where it has already been, with nothing new to find, for example a hub where every choice has already been tried. The choices are still on screen, so the player can leave the way they came; it's a loop, not a trap.
-- **Depth Limit** (orange) — the path grew so long that the analysis stopped following it. That's a limit of the analysis, not a fault in your story; hover over the badge for a reminder.
+**Forward** sorts the outcomes into **Needs fixing** (dead ends and loops with no way out), then **Endings**, then the **Search notes** (back to a menu, cut off), folded into one line that says where they gather (*1,204 paths back to a menu, mostly around The market, The docks*). Click it to unfold them; they're where the search stopped, not faults in your story. The summary shows *Outcomes* (endings and problems only, with a breakdown such as *3 endings + 1 dead end*), *Total Paths*, *Unique Endings*, *Reachable Beats*, and how long the analysis took. Each outcome can be expanded to inspect the specific beat sequence and decision points. The query box at the top lets you filter by state ("`adult > 7`", "`has axe`", "`visits beat-123`") so you can ask, "show me only the paths where the player ends up with the axe."
 
-When some outcomes aren't endings, the *Outcomes* card breaks the count down (for example *3 endings + 2 cycles*, or *+ 1 at the depth limit*).
+**Replay.** Once the story is explored, Path Analysis also follows an end screen's Replay button, with whatever its [reset options](#keep-across-restarts) leave. Replay paths are kept apart from single playthroughs, so they don't inflate the counts: Forward adds a line such as *+12 paths after an end screen's Replay*, and the Tree's header says how many beats appear *only after an end screen's Replay* (hover over it for their names).
 
-In **Tree** mode the same labels mark where a branch stops: a hub with no way out, where every path only comes back round, shows **Cycle**, and a branch cut off for length shows **Depth Limit**. Each choice in the tree also says what it does: variables it sets (*brave = true*), items it takes away (*−lantern*), feelings it changes (*Tomas trust → player +0.3*) and who it casts in a role (*@confidant = Ingrid*). Conditions on feelings read as words too, for example *@confidant trust → player >= 0.5*.
+In **Tree** mode the same labels mark where a branch stops. Each choice in the tree also says what it does: variables it sets (*brave = true*), items it takes away (*−lantern*), feelings it changes (*Tomas trust → player +0.3*) and who it casts in a role (*@confidant = Ingrid*). Conditions on feelings read as words too, for example *@confidant trust → player >= 0.5*. A warning triangle marks a branch with a [warning](#story-warnings) on it.
 
-
-#### Story Warnings
-
-In **Tree** mode, a banner above the tree lists places where a player could get stuck or skip something you meant to be earned. It counts errors (red) and warnings (amber); click it to fold the list away. Each entry names the problem and the beat, followed by a sentence saying what the analysis found. In the tree itself, a small warning triangle marks the branch that contains the beat; hover over it for the same explanation.
-
-| Entry | What it means | Usual fix |
-|---|---|---|
-| **Keypad can trap the player** (error) | A Keypad's *Fail Target* leads back to the keypad, and nothing before it makes sure the player has found the code. With unlimited attempts, a player without the code can never leave. | Limit the attempts and send the last failure somewhere else, or guard the keypad with a condition or requirement that the code has been found. |
-| **Keypad has no clue before it** (warning) | Nothing checks that the player found the code before reaching the keypad, so a lucky guess (or reading the source) skips the puzzle. | Add a [requirement](#per-beat-requirements) or a condition on the way in, if the code is meant to be earned. |
-| **Requirement can never be met** (error or warning, as you set it) | A beat's requirement tests an item, variable or counter that no earlier beat gives or changes, or the requirement isn't finished. | Add the beat that sets it, or fix or remove the requirement. |
-| **Requirement not met on some paths** (warning) | Some of the simulated routes reach the beat without meeting its requirement. Those players are redirected to its fallback. | Check that this is intended; otherwise gate the routes that arrive unprepared. |
-| **Role** (error or warning) | A [role](#roles) problem: a role that doesn't exist or a character who isn't on a role's list (errors); a role cast in two beats without *Can be recast later*, a role used before anything chooses who plays it, or an AI partner role with nothing to go on (warnings). | Add the role, tick the character, set a default, or tick *Can be recast later* — the message says which. |
-
-These are advice only: nothing changes at runtime. The analysis explores the same routes as the rest of Path Analysis, including a replay when your story tests the built-in [playthrough](#keep-across-restarts).
+**Backward** lists the beats worth asking about: **Endings**, **Dead ends** (the story stops here), **Stuck in a loop** (the player can never get out) and **End screens no way of playing reaches**. To ask about any other beat, type its name in *Find any beat by name…*. Pick one to see how many paths lead there, the fewest steps it takes, the beats every path must visit, and each path with the state it needs.
 
 ### Story Logic
 
 ![Debug Tools — Story Logic tab](images/33-debug-story-logic.png)
 *The Story Logic tab: hub beats with how many states players arrive in and what differs, e.g. someone's trust and who plays a role.*
 
-Story Logic looks for places where your text might not hold for every player. It works from the same simulation as Path Analysis, so it knows the states players actually arrive in:
-- **Hub Beat Analysis** — beats that the way you take reaches in different states: with or without an item, a variable set or not, someone's trust higher or lower, a different character in a role. Each hub gets a card with how many states players arrive in; expand it to see what differs, in words (*with or without notebook*, *Tomas's trust → player 0 to 0.9*, *@confidant: Ingrid / Tomas*), the beat's text, and its ways in (click a beat name to highlight it on the flowchart). Differences the story starts with, such as a variant drawn at random, don't make a hub. A beat reached from several places, always in the same state, isn't a hub: its text holds for everyone. A beat Path Analysis never reaches counts as a hub when more than one beat links to it, and its card counts *ways in* instead of states.
-- **Warnings / Info** — text that assumes something the player may not have ("with the key", "the evidence you gathered…") is checked against every state players arrive in. If all of them hold something named like it (an item *Brass key*, a variable *hasKey*, a counter *clues* above 0), there's nothing to report. If only some do, you get a warning (*1 of the 2 states players arrive in hold nothing named like "key"*); if none do, an info note, since the story may track it under another name. For a beat Path Analysis never reaches, the check falls back to the links: it looks for a check on the way in (a Condition beat, a choice that only shows under conditions, or a requirement with a fallback; a requirement without a fallback doesn't stop anyone, the beat plays anyway). The list also flags Pick Prop items that no beat describes, and **Line Without Exit**: a Dialog Tree line with no replies and no exit link. Players still read such a line: it stays on screen with a **Continue** button (or until the reading time is up, where lines move on by themselves), then the scene ends and the story goes on by the beat's own link, or stops there if the beat has none. The same happens when every reply under a line is hidden by its conditions and the line has no exit link. Give the line an exit link (or replies) so the scene says where it goes.
+Story Logic looks for places where your text might not hold for every player. It works from the same play-through as the other tabs, so it knows the states players actually arrive in. The summary at the top counts **Different states** (and, with AI on, **AI findings**); click a figure to jump to its section.
 
-> Story Logic uses keyword patterns and the states Path Analysis finds; it doesn't use AI. It reads your text for familiar phrases, so it can miss an assumption worded differently, or flag one the story keeps under another name. Treat its findings as places worth a second look.
+- **Beats reached in different states**: beats that the way you take reaches in different states: with or without an item, a variable set or not, someone's trust higher or lower, a different character in a role. Each one gets a card with how many states players arrive in; expand it to see what differs, in words (*with or without notebook*, *Tomas's trust → player 0 to 0.9*, *@confidant: Ingrid / Tomas*), the beat's text, and its ways in (click a beat name to highlight it on the flowchart). Differences the story starts with, such as a variant drawn at random, don't count. A beat reached from several places, always in the same state, isn't listed: its text holds for everyone. A beat no way of playing reaches is listed when more than one beat links to it, and its card counts *ways in* instead of states.
+- **Text that assumes something** (listed in [Problems](#debug-problems) as *Text assumes something*): text that assumes something the player may not have ("with the key", "the evidence you gathered…") is checked against every state players arrive in. If all of them hold something named like it (an item *Brass key*, a variable *hasKey*, a counter *clues* above 0), there's nothing to report. If only some do, you get a warning (*1 of the 2 states players arrive in hold nothing named like "key"*); if none do, a note, since the story may track it under another name. For a beat no way of playing reaches, the check falls back to the links: it looks for a check on the way in (a Condition beat, a choice that only shows under conditions, or a requirement with a fallback; a requirement without a fallback doesn't stop anyone, the beat plays anyway).
+
+This keyword check reads your text for familiar phrases, so it can miss an assumption worded differently, or flag one the story keeps under another name. Treat what it finds as places worth a second look. For a closer reading, ask an AI.
+
+<a id="check-with-ai"></a>
+#### Check with AI
+
+With an AI provider set up, the **AI findings** section at the bottom of Story Logic has an AI read each beat that players reach in different states (and any the keyword check flags) next to the states players arrive in, and report where the words don't hold: a line that mentions a notebook some players never saw, a character who knows something they weren't told, a reply that promises what the next beat doesn't deliver. It's a reader, not an editor: **nothing changes without you**.
+
+1. Before it starts, the section says how many of the story's beats it will read, and what the check will roughly cost (*≈ $0.40, 3 requests*, or tokens for a model ASAPS has no price for). On a big story, **First pass: the N most players pass** checks just the beats most playthroughs go through.
+2. Click **Check with AI**. It works in requests of a few beats at a time (*Checking… request 2 of 3*); **Cancel** stops it and keeps what was checked.
+3. Each finding shows the beat, what kind of problem it is (*Assumes something missing*, *Contradicts earlier text*, *Knows too much*, *Feeling mismatch*, *Broken promise*, *Dangling reference*), the words it's about, why, the state players arrive *with* that breaks it, and a suggestion. Then:
+   - **Propose a fix**: asks the AI for the smallest edit. It's tried on a copy of the story first (nothing new may break) and shown as a before → after card. **Apply** makes the edit as one undo step in the main window; **Decline** throws it away.
+   - **Show this path**: highlights a way of playing that arrives in that state.
+   - **Go to beat**: highlights the beat.
+   - **Not a problem**: dismisses the finding.
+
+Every finding has to quote words really in the beat and point at a state players really arrive in; anything that doesn't is left out, and the section says how many (*2 findings were left out: not grounded in the beat's words or states*). After a check it shows what the check really used (*Last check: …*), and a running total for all checks and fixes on this story.
+
+**Results are kept with the project.** Run it again after editing and only beats whose words or states changed are read again (*Check these 4 with AI*); the rest keep their results. A finding an earlier check made that the latest one didn't is still shown, marked **From an earlier check**, until you dismiss it or the words it quotes leave the beat. Fixes you apply or decline are recorded in [AI ▸ AI changes](#after-generation-the-review-banner) with the source *Story Logic*.
+
+Check with AI appears only while **Show AI features** is on ([Working without AI](#working-without-ai)). Without a provider, it says how to set one up (**AI ▸ Configure AI**).
 
 <a id="verification-kits"></a>
 ## Verification Example Kits
@@ -3875,6 +3957,11 @@ The Condition Type dropdown groups the available checks into two families:
 - **Permission granted** — has the player granted a device permission (location, camera, …)? Useful for routing around denied sensors gracefully.
 
 Need two checks in one decision (*has the key OR trusts the player*)? Add them under **More conditions** — see [Compound Conditions](#compound-conditions).
+
+<a id="counter-text-note"></a>
+**Counters hold numbers; words go in variables.** A counter only ever holds a number, so checking one against a word (`folkertPath == "stay"`) can never match. To keep that from happening by accident, switching a Condition Check or a Set Variable/Counter beat to **Counter** sets any text left over from before back to 0. If a counter check already compares with text, a red note says so, with a **Change to Variable** button that turns it into a variable check. In choice conditions and Requirements the value itself turns into a red button (*"stay" is text: change to variable*) that does the same. The Debug window lists any that are left as [Counter used with text](#story-warnings).
+
+**"Did you mean …?"** When you type a new name in a name dropdown (**+ New...**) and it is very close to one that already exists (`hasLatern` next to `hasLantern`), a **Did you mean "hasLantern"?** link appears below it. Click it to use the existing name, or ignore it if you really do mean a new one. A misspelled name is easy to miss, because the check just never sees what it's looking for.
 
 ![Condition Type dropdown showing the Character affect group](images/26-condition-type-dropdown-affect.png)
 *The Condition Type dropdown. Classic checks at the top, the new Character affect group at the bottom. The runtime evaluates these the same way it evaluates "player has lantern" — it just checks a different slice of state.*

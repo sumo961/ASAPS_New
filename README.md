@@ -22,8 +22,21 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.154** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.154 is the large-project
+Current release: **v0.9.155** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.155 is the Problems release**:
+the Debug window opens on a Problems tab that lists everything its tools
+found in one place, worst first, and clicking a problem shows the beat.
+Checking a large story is much faster, and when it is too large to try every
+way through, the tools now say which unreachable beats are certain and why —
+"the check always answers the same way: Money is always 0 there", or "the
+police check always comes first". New notes catch misspelled names, setup
+beats nobody reaches, replies a next line hides and end screens whose Restart
+keeps everything. Story Logic can now Check with AI whether each beat's words
+hold for every way players arrive, with the real cost shown. A counter
+compared with text no longer counts as 0, and projects reopen on the beat you
+left.
+
+**v0.9.154 was the large-project
 release**: big stories stay responsive. Typing a beat's text while the
 flowchart is open no longer keeps the computer busy (it used to redraw the
 whole flowchart on every keystroke), and the flowchart now draws only the

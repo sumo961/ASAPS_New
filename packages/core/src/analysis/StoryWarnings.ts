@@ -311,7 +311,7 @@ function detectRestartCarryOver(story: Story, played: ReadonlySet<string>): Stor
   const these = screens.length === 1 ? 'this end screen' : 'these end screens';
   const out: StoryWarning[] = [{
     code: 'restart-keeps-values', severity: 'note', beatId: screens[0].id, beatName: screens[0].name,
-    message: `Restart on ${where} starts the story again without resetting anything: ${names} ${carried.length === 1 ? 'carries' : 'carry'} into the next run, so checks on ${carried.length === 1 ? 'it' : 'them'} can come out differently on a replay. If that's meant, leave it; otherwise turn on "Reset all values on restart" for ${these}.`,
+    message: `Restart on ${where} starts the story again without resetting anything: ${names} ${carried.length === 1 ? 'carries' : 'carry'} into the next run, so checks on ${carried.length === 1 ? 'it' : 'them'} can come out differently on a replay. If that's meant, leave it; otherwise turn on Reset in the settings of ${these}.`,
     detail: { carried, endScreens: screens.map((b) => b.id) },
   }];
   return out;

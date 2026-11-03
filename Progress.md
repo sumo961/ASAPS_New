@@ -1,9 +1,9 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.154, 2026-11-01)
+## 2026-11-03: The Problems release (v0.9.155)
 
 ### Overview
-Story Logic Phase 1: **Check with AI** in the Debug window reads each beat next to the states players arrive in and reports where its words don't hold. Run against a real model on The Last Ferry (2 findings, both true) and on Birka (224 beats, 26 findings: 18 true, 8 false alarms, all from two gaps now closed; the new prompt has not been re-run on a real model).
+Released as v0.9.155, the Problems release. The Debug window opens on a new **Problems** tab: one list of everything the debug tools found, errors first, each unreachable stretch told once by its first beat. Problems, Reachability and Story Logic now run on a faster search of situations (0.1–13 s on the six student stories where the path search took up to 54 s), and when a story is too large to try every way through they say which unreachable beats are certain and why — a check that always answers the same way ("Money is always 0 there"), conditions no way of playing has together, counters that move together ("GangAnger is at most PoliceAttention − 5"), or beats only replays reach. On the six student stories every unreachable beat is now certain (92 were uncertain). New notes and warnings: Restart keeps values, Name spelled differently, Setup never played, Reply hidden by a next line, Reply goes nowhere, Every choice hidden, Counter used with text. Story Logic gains **Check with AI** (Phase 1), which reads each beat next to the states players arrive in, shows real costs and keeps what earlier checks found. Fixed: a counter checked against text was compared with 0 in the engine; long Dialog Tree scenes were cut off in the debug tools; Path Analysis missed timed exits, Replay buttons and gated routes in large stories. Projects reopen on the beat you left.
 
 ### Templates
 - **The Last Ferry:** Check with AI caught two choices mentioning things the player had never read. The child's cut now appears in "Halfway" (the AI fix accepted in a test copy). Tomas now writes in his notebook during the argument, seen on every route, and a new beat "The notebook" shows the page when the player asks to see it, which used to have no visible result.
@@ -81,6 +81,7 @@ Playing Birka V18 on the engine showed where Path Analysis disagreed, now fixed:
 
 **Files modified:** packages/builder/src/services/storyLogicReview.ts (new), services/prompts/storyLogicReview.ts (new), types/storyLogic.ts (new), components/debug/StoryLogicAISection.tsx (new), components/debug/LogicValidationReport.tsx, pages/DebugWindow.tsx, services/DebugWindowManager.ts, services/AIService.ts, services/findingFixService.ts, App.tsx, utils/aiEditsLedger.ts, utils/projectZipManager.ts, storage/types.ts, storage/adapters/DirectoryAdapter.ts, contexts/PersistenceContext.tsx, types/aiEdits.ts, types/generationReview.ts, components/ai/AIEditsLogDialog.tsx; packages/core/src/persistence/DirectoryFormat.ts; tests
 
+### Faster search and certain answers
 
 **Problems, Reachability and Story Logic run on a faster search**
 - They now use a search of situations (a beat in a state that matters from there on) instead of whole paths. On the six student stories it takes 0.1–13 s where the path search took up to 54 s. Path Analysis and Start as if… keep the path search, which runs only when they are opened.
