@@ -25,14 +25,16 @@ export const ProblemsPanel: React.FC<{ story: Story; onHighlightBeat?: (beatId: 
     return (
       <div className="flex items-center gap-2 p-3 rounded border border-green-200 bg-green-50 text-sm text-green-800">
         <CheckCircle className="w-4 h-4" />
-        {simulation.analyzer.searchLimited ? 'No problems found, but this story is too large to try every way through.' : 'No problems found.'}
+        {!simulation.analyzer.searchLimited ? 'No problems found.'
+          : simulation.analyzer.searchLimitReason === 'replays' ? 'No problems found, but the search followed only a few replays of a Restart that keeps values.'
+            : 'No problems found, but this story is too large to try every way through.'}
       </div>
     );
   }
 
   return (
     <div className="space-y-4" data-testid="problems-panel">
-      {simulation.analyzer.searchLimited && <SearchLimitNote unsure={problems.filter((p) => p.unsure).length} afterReplays={problems.filter((p) => p.afterReplays).length} />}
+      {simulation.analyzer.searchLimited && <SearchLimitNote reason={simulation.analyzer.searchLimitReason} unsure={problems.filter((p) => p.unsure).length} afterReplays={problems.filter((p) => p.afterReplays).length} />}
       <div className="relative">
         <Search className="w-4 h-4 absolute left-2.5 top-2 text-gray-400" />
         <input
@@ -70,9 +72,9 @@ const ProblemRow: React.FC<{ problem: Problem; box: string; onHighlightBeat?: (b
       <button type="button" onClick={() => onHighlightBeat?.(p.beatId)} className="font-medium text-gray-900 hover:underline text-left">
         {p.label}: {p.beatName}
       </button>
-      {p.unsure && <MayBeReachable afterReplays={p.afterReplays} />}
+      {p.behindIt > 0 && <span className="font-medium text-gray-700">, {p.behindIt} more {p.behindIt === 1 ? 'beat' : 'beats'} behind it</span>}
       {p.more.length > 0 && <span className="ml-1 text-gray-500">×{p.more.length + 1}</span>}
-      {p.behindIt > 0 && <span className="ml-1 font-medium text-gray-700">, {p.behindIt} more {p.behindIt === 1 ? 'beat' : 'beats'} behind it</span>}
+      {p.unsure && <MayBeReachable afterReplays={p.afterReplays} />}
       <div className="text-gray-700 mt-0.5">{p.message}</div>
       {p.more.length > 0 && (
         <>

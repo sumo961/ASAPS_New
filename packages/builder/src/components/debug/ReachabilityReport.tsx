@@ -167,7 +167,7 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
               </div>
             </div>
 
-            {searchSituations(story).analyzer.searchLimited && <SearchLimitNote unsure={analysis.unreachableBeats.filter((b) => b.unsure).length} afterReplays={analysis.unreachableBeats.filter((b) => b.afterReplays).length} />}
+            {searchSituations(story).analyzer.searchLimited && <SearchLimitNote reason={searchSituations(story).analyzer.searchLimitReason} unsure={analysis.unreachableBeats.filter((b) => b.unsure).length} afterReplays={analysis.unreachableBeats.filter((b) => b.afterReplays).length} />}
 
             {/* Broken connections alert */}
             {analysis.brokenConnections && analysis.brokenConnections.length > 0 && (

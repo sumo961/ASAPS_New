@@ -146,7 +146,7 @@ function conditionsIn(condition: unknown): any[] {
 }
 
 /** A condition in words: "Gold in the player's bag", "a visit to \"Talk to Skuli\"". */
-export function describeGate(c: any, beatName: (id: string) => string): string {
+export function describeGate(c: any, beatName: (id: string) => string, characterName: (id: string) => string = (id) => id): string {
   const name = c.variableName || c.variable || c.left;
   const negative = c.operator === 'not' || c.operator === '!=' || c.checkType === 'notHas';
   switch (c.type) {
@@ -154,6 +154,10 @@ export function describeGate(c: any, beatName: (id: string) => string): string {
     case 'visitedBeat': return `${negative ? 'no visit' : 'a visit'} to "${beatName(c.beatId || c.value)}"`;
     case 'variable':
     case 'counter': return `${name} ${c.operator || '=='} ${c.value ?? c.right}`;
+    case 'roleHolder': {
+      const role = String(c.role || 'player').replace(/^@/, '');
+      return `${negative ? 'someone other than ' : ''}${characterName(String(c.character || '').replace(/^@/, ''))} as the ${role}`;
+    }
     default: return `a ${c.type} condition`;
   }
 }
@@ -173,6 +177,13 @@ export class ReachabilityAnalyzer {
   private settingBeat: string | null = null;
   private brokenConnections: BrokenConnection[] = [];
   private conditionBeatWarnings: ConditionBeatWarning[] = [];
+
+  /** A character by its id, as the story names them. */
+  private characterName = (id: string): string => {
+    const characters: any[] = (this.story as any).getCharacters?.() ?? [];
+    const c = characters.find((x) => x?.id === id || x?.name === id);
+    return c?.displayName || c?.name || id;
+  };
 
   constructor(story: Story, config: ReachabilityConfig = {}) {
     this.story = story;
@@ -1040,7 +1051,7 @@ export class ReachabilityAnalyzer {
     const asked = checker ? (checker.getParameters() as any).condition : null;
     if (asked) {
       return withHints(
-        `"${checker!.name}" checks ${describeGate(asked, nameOf)}, and on every way of playing${unsure ? ' the search tried' : ''} the answer sends players the other way, so this branch never runs`,
+        `"${checker!.name}" checks ${describeGate(asked, nameOf, this.characterName)}, and on every way of playing${unsure ? ' the search tried' : ''} the answer sends players the other way, so this branch never runs`,
         conditionsIn(asked),
       );
     }
@@ -1058,9 +1069,9 @@ export class ReachabilityAnalyzer {
     if (measured && measured.length > 0) {
       const describe = (g: GateOnTheWay) => g.earlierLine
         ? (g.conditions.length > 0
-          ? `no earlier line taking its place (one does when ${g.conditions.map((c) => describeGate(c, nameOf)).join(' and ')})`
+          ? `no earlier line taking its place (one does when ${g.conditions.map((c) => describeGate(c, nameOf, this.characterName)).join(' and ')})`
           : 'no earlier line taking its place (one always does)')
-        : g.conditions.map((c) => describeGate(c, nameOf)).join(' and ');
+        : g.conditions.map((c) => describeGate(c, nameOf, this.characterName)).join(' and ');
       const closed = measured.filter((g) => g.met === 0);
       const shown = closed.length > 0 ? closed : measured;
       const needs = [...new Set(shown.map(describe))].join(' and ');
@@ -1071,7 +1082,7 @@ export class ReachabilityAnalyzer {
     }
 
     const conditions = reachedParents.flatMap((i) => conditionsIn(i.connection.condition));
-    const gates = [...new Set(conditions.map((c) => describeGate(c, nameOf)))];
+    const gates = [...new Set(conditions.map((c) => describeGate(c, nameOf, this.characterName)))];
     return gates.length > 0
       ? withHints(`${names} links here, but it needs ${gates.join(' and ')}, and ${noWay} has that there`, conditions)
       : `${names} links here, but ${noWay} takes that link: the choice or line leading here is never on offer`;
@@ -1094,7 +1105,7 @@ export class ReachabilityAnalyzer {
       const why = oneRun.closed(parent.sourceBeatId, beatId);
       if (!why) continue;
       const from = this.story.getBeat(parent.sourceBeatId);
-      const gates = why.conditions.map((c) => describeGate(c, nameOf)).join(' and ');
+      const gates = why.conditions.map((c) => describeGate(c, nameOf, this.characterName)).join(' and ');
       const values = why.values.length > 0 ? `, and in one playthrough ${why.values.join(' and ')}` : '';
       check = from?.type === 'conditionBeat'
         ? ` "${from.name}" checks ${gates}${values}.`
@@ -1120,7 +1131,7 @@ export class ReachabilityAnalyzer {
   /** A link the counter ranges shut, in words: the check, and the values that settle it. */
   private rangeClosedDetails(fromId: string, why: RangeClosure, nameOf: (id: string) => string): string {
     const from = this.story.getBeat(fromId);
-    const each = (list: any[]) => list.map((c) => describeGate(c, nameOf)).join(' and ');
+    const each = (list: any[]) => list.map((c) => describeGate(c, nameOf, this.characterName)).join(' and ');
     const ways = why.ways && why.ways.length > 1 ? why.ways : [why.conditions];
     const gates = ways.length === 1 ? each(ways[0]) : `either ${ways.map(each).join('; or ')}`;
     const values = why.values.length > 0 ? `, and ${why.values.join(' and ')}` : '';

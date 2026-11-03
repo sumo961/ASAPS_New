@@ -1159,3 +1159,12 @@ describe('a Restart that keeps what players did (2026-11-03)', () => {
     expect(search.complete).toBe(false);
   });
 });
+
+describe('a role check in words (2026-11-03)', () => {
+  it('names the character and the role', async () => {
+    const { describeGate } = await import('../../src/analysis/ReachabilityAnalyzer');
+    const names = (id: string) => (id === 'char_tomas' ? 'Tomas' : id);
+    expect(describeGate({ type: 'roleHolder', role: 'confidant', character: 'char_tomas', operator: '==' }, (id) => id, names)).toBe('Tomas as the confidant');
+    expect(describeGate({ type: 'roleHolder', role: '@confidant', character: 'char_tomas', operator: '!=' }, (id) => id, names)).toBe('someone other than Tomas as the confidant');
+  });
+});

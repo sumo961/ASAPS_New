@@ -580,6 +580,11 @@ export class StateSimulationAnalyzer {
   /** The search for unreached beats ran out of budget: "unreachable" then means "not found". */
   public searchLimited = false;
   /**
+   * Why the last situation search stopped short: its budget ran out, or only
+   * that it stopped following Replays that keep values (MAX_SITUATION_REPLAYS).
+   */
+  public searchLimitReason: 'budget' | 'replays' | null = null;
+  /**
    * The counter ranges the last situation search ran with (counterRanges),
    * when every state it played lay in them. Null otherwise.
    */
@@ -784,6 +789,8 @@ export class StateSimulationAnalyzer {
       else file({ beatId, state, parent, via, start, runs });
     };
     let aimed: { file: (item: Item) => void } | null = null;
+    let replaysCut = false;
+    let outOfBudget = false;
     for (const state of this.initialStates()) {
       const first = cloneState(state);
       push(startBeatId, first, -1, null, arrivalKey(first));
@@ -820,7 +827,7 @@ export class StateSimulationAnalyzer {
             // A Restart that keeps what players did starts from somewhere new
             // each time (feelings, totals): followed a few times, not forever.
             // Cut off, the search counts as stopped short.
-            if (again && item.runs >= MAX_SITUATION_REPLAYS) result.complete = false;
+            if (again && item.runs >= MAX_SITUATION_REPLAYS) { result.complete = false; replaysCut = true; }
             else if (again) on(null, again, after, true);
           }
         } else if (this.loopsOnItself(beat)) result.traps.add(beat.id);
@@ -858,7 +865,7 @@ export class StateSimulationAnalyzer {
     while (fresh.length > 0 || waiting > 0) {
       const finds = result.perBeat.size + result.endings.size + result.stops.size + result.traps.size + this.shownReplies.size;
       if (finds !== found) { found = finds; lastFind = result.situations; }
-      if (result.situations >= maxSituations || result.situations - lastFind >= maxStalled) { result.complete = false; break; }
+      if (result.situations >= maxSituations || result.situations - lastFind >= maxStalled) { result.complete = false; outOfBudget = true; break; }
       if (result.situations % 250 === 0) yield { expansions: result.situations, beatsReached: result.perBeat.size, pathsFound: 0, phase: 'situations' };
       refreshDistance();
       const item = fresh.pop() ?? take();
@@ -922,6 +929,7 @@ export class StateSimulationAnalyzer {
       result.arrivals.set(beatId, list);
     }
     this.searchLimited = !result.complete;
+    this.searchLimitReason = result.complete ? null : outOfBudget || !replaysCut ? 'budget' : 'replays';
     if (ranges && !rangesHold) console.warn('[StateSimulationAnalyzer] A played state fell outside the counter ranges; not using them');
     const checksBegan = performance.now();
     this.rangeFacts = rangesHold && ranges ? yield* this.linkChecks(ranges, result) : null;

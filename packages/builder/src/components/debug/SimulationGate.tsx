@@ -47,12 +47,14 @@ export const SimulationProgressNote: React.FC<{ progress: SimulationProgress | n
  * everything. Given how many unreachable beats it may have missed, it says
  * the rest are certain: no open link leads to them.
  */
-export const SearchLimitNote: React.FC<{ unsure?: number; afterReplays?: number }> = ({ unsure, afterReplays = 0 }) => {
+export const SearchLimitNote: React.FC<{ unsure?: number; afterReplays?: number; reason?: 'budget' | 'replays' | null }> = ({ unsure, afterReplays = 0, reason }) => {
   const marked = afterReplays === 0 ? '“may be reachable”'
     : afterReplays === unsure ? '“only after replays”' : '“may be reachable” or “only after replays”';
   return (
   <div className="p-2 mb-2 rounded border border-amber-200 bg-amber-50 text-xs text-amber-800" data-testid="search-limit-note">
-    This story is too large to try every way through, and the search stopped at its limit.{' '}
+    {reason === 'replays'
+      ? 'This story has an end screen whose Restart keeps what players did, so each replay can start somewhere new; the search followed a few replays, not every one.'
+      : 'This story is too large to try every way through, and the search stopped at its limit.'}{' '}
     {unsure === undefined
       ? 'An unreachable beat here is one it did not find, so it may still be possible to reach it.'
       : unsure === 0

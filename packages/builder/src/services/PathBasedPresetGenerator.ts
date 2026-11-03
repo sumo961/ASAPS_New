@@ -499,6 +499,10 @@ function groupByOwnConditions(story: Story, beat: any, presets: GeneratedPreset[
   if (own.length === 0) return presets;
   const negative = (c: any) => c.operator === 'not' || c.operator === '!=' || c.checkType === 'notHas';
   const nameOf = (id: string) => story.getBeat(id)?.name?.trim() ?? id;
+  const characterName = (id: string) => {
+    const c: any = ((story as any).getCharacters?.() ?? []).find((x: any) => x?.id === id || x?.name === id);
+    return c?.displayName || c?.name || id;
+  };
   return presets.map((p) => {
     const { variables, counters, inventory, inventoryQuantities, affect, visitedBeats } = p.preset.state;
     context.loadSimulationState((affect ?? {}) as any, variables, counters,
@@ -510,7 +514,7 @@ function groupByOwnConditions(story: Story, beat: any, presets: GeneratedPreset[
     return {
       ...p,
       outcomeGroup: met.length > 0
-        ? `With ${met.map((c) => describeGate(c, nameOf)).join(' and ')}`
+        ? `With ${met.map((c) => describeGate(c, nameOf, characterName)).join(' and ')}`
         : "With none of this beat's conditions met",
     };
   });
