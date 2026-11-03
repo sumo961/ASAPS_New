@@ -866,3 +866,110 @@ describe('stopped short, the situation search aims at the links never taken', ()
     expect(aimed.complete).toBe(false);
   });
 });
+
+describe('counter ranges, worked out before the search (2026-11-03)', () => {
+  const counterCheck = (id: string, name: string, operator: string, value: number, yes: string, no: string) => ({
+    id, type: 'conditionBeat',
+    parameters: { conditionType: 'counter', condition: { type: 'counter', variableName: name, operator, value }, trueTarget: yes, falseTarget: no },
+  });
+  const info = (id: string, to: string, effects?: any[]) => ({ id, type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: to, ...(effects ? { effects } : {}) }] });
+  const stop = (id: string) => ({ id, type: 'endScreen', parameters: { message: id, showRestart: false } });
+  const add = (name: string, value: number) => [{ type: 'incrementCounter', target: name, value }];
+  const unreached = (s: Story, maxSituations?: number) => {
+    const analyzer = new StateSimulationAnalyzer(s);
+    const search = analyzer.exploreSituations(maxSituations ? { maxSituations, maxAimed: 0 } : {});
+    return {
+      analyzer,
+      beats: new ReachabilityAnalyzer(s, {
+        playedBeats: new Set(search.perBeat.keys()),
+        searchLimited: analyzer.searchLimited,
+        ranges: analyzer.rangeFacts,
+        gatesOnTheWay: (from, to) => analyzer.gatesOnTheWay(from, to, (search.arrivals.get(from) ?? []).map((a) => a.state)),
+      }).analyze().unreachableBeats,
+    };
+  };
+
+  // Group 3's shape: everything that pays comes after the check that you're broke.
+  const broke = () => story([
+    { id: 'start', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'a', text: 'A', target: 'broke', effects: add('anger', 1) },
+      { id: 'b', text: 'B', target: 'broke', effects: add('anger', 2) },
+      { id: 'c', text: 'C', target: 'broke', effects: add('anger', 3) },
+    ] } },
+    counterCheck('broke', 'Money', '<=', 0, 'dead', 'job'),
+    info('job', 'deeper', add('Money', 4000)),
+    info('deeper', 'end'),
+    stop('dead'), stop('end'),
+  ]);
+
+  it('rules out a branch a check always answers the same way, as certain even when the search stops short', () => {
+    const { analyzer, beats } = unreached(broke(), 2);
+    expect(analyzer.searchLimited).toBe(true);
+    expect(analyzer.rangeFacts?.reached.has('job')).toBe(false);
+    const job = beats.find((u) => u.beatId === 'job')!;
+    expect(job.unsure).toBeUndefined();
+    expect(job.details).toContain('"broke" checks Money <= 0, and Money is always 0 there, so the answer always sends players the other way');
+    expect(job.details).toContain('Money changes in "job" (not reached)');
+    expect(beats.find((u) => u.beatId === 'deeper')!.unsure).toBeUndefined();
+  });
+
+  it('rules out a choice whose counter can never be enough there', () => {
+    const s = story([
+      info('first', 'menu', add('Trust', 1)),
+      { id: 'menu', type: 'multiChoice', parameters: { question: 'q', choices: [
+        { id: 'ask', text: 'Ask', target: 'secret', conditions: [{ type: 'counter', variableName: 'Trust', operator: '>=', value: 5 }] },
+        { id: 'go', text: 'Go', target: 'end' },
+      ] } },
+      info('secret', 'end'), stop('end'),
+    ]);
+    const secret = unreached(s).beats.find((u) => u.beatId === 'secret')!;
+    expect(secret.details).toContain('it needs Trust >= 5, and Trust is always 1 there, so no way of playing has that there');
+  });
+
+  it('keeps open what a loop can add up to, and the search finds it', () => {
+    const s = story([
+      { id: 'hub', type: 'multiChoice', parameters: { question: 'q', choices: [
+        { id: 'work', text: 'Work', target: 'shift' },
+        { id: 'buy', text: 'Buy', target: 'shop', conditions: [{ type: 'counter', variableName: 'coins', operator: '>=', value: 3 }] },
+      ] } },
+      info('shift', 'hub', add('coins', 1)),
+      info('shop', 'end'), stop('end'),
+    ]);
+    const analyzer = new StateSimulationAnalyzer(s);
+    const search = analyzer.exploreSituations();
+    expect(analyzer.rangeFacts?.reached.has('shop')).toBe(true);
+    expect(search.perBeat.has('shop')).toBe(true);
+  });
+
+  it('keeps open what replays add up to when the end screen keeps the counters', () => {
+    const s = story([
+      info('start', 'check', add('runs', 1)),
+      counterCheck('check', 'runs', '>=', 3, 'last', 'again'),
+      { id: 'again', type: 'endScreen', parameters: { message: 'again', showRestart: true, reset: false }, connections: [{ targetId: 'start' }] },
+      stop('last'),
+    ]);
+    expect(new StateSimulationAnalyzer(s).counterRanges()!.reached.has('last')).toBe(true);
+  });
+
+  it('holds every state the search plays', () => {
+    const s = broke();
+    const analyzer = new StateSimulationAnalyzer(s);
+    const search = analyzer.exploreSituations();
+    const ranges = analyzer.counterRanges()!;
+    for (const [beatId, arrivals] of search.arrivals) {
+      for (const a of arrivals) {
+        for (const [k, v] of a.state.counters) {
+          const r = ranges.at(beatId)!.get(k)!;
+          expect(v >= r[0] && v <= r[1]).toBe(true);
+        }
+      }
+    }
+    expect(analyzer.rangeFacts).not.toBeNull();
+  });
+
+  it('can be turned off', () => {
+    const analyzer = new StateSimulationAnalyzer(broke());
+    analyzer.exploreSituations({ counterRanges: false });
+    expect(analyzer.rangeFacts).toBeNull();
+  });
+});

@@ -5,7 +5,7 @@ import type { Connection, Condition } from '../types';
 import { analysisLinks, EXTRA_LINK } from './analysisLinks';
 import { isTextForCounter } from '../engine/variableValues';
 import { StoryContext, PLAYTHROUGH_VARIABLE } from '../engine/StoryContext';
-import type { GateOnTheWay } from './StateSimulationAnalyzer';
+import type { GateOnTheWay, CounterRangeFacts, RangeClosure } from './StateSimulationAnalyzer';
 
 /**
  * Analysis of a specific condition's satisfiability
@@ -117,6 +117,11 @@ export interface ReachabilityConfig {
    * says which of them keeps a never-taken link closed.
    */
   gatesOnTheWay?: (fromBeatId: string, toBeatId: string) => GateOnTheWay[][];
+  /**
+   * The counter ranges the search ran with (StateSimulationAnalyzer.rangeFacts):
+   * beats outside them and links they shut are out on every way of playing.
+   */
+  ranges?: CounterRangeFacts | null;
 }
 
 /**
@@ -145,8 +150,8 @@ export function describeGate(c: any, beatName: (id: string) => string): string {
 
 export class ReachabilityAnalyzer {
   private story: Story;
-  private config: Required<Omit<ReachabilityConfig, 'playedBeats' | 'searchLimited' | 'gatesOnTheWay'>>
-    & Pick<ReachabilityConfig, 'playedBeats' | 'searchLimited' | 'gatesOnTheWay'>;
+  private config: Required<Omit<ReachabilityConfig, 'playedBeats' | 'searchLimited' | 'gatesOnTheWay' | 'ranges'>>
+    & Pick<ReachabilityConfig, 'playedBeats' | 'searchLimited' | 'gatesOnTheWay' | 'ranges'>;
   private counterModifications: Map<string, { min: number; max: number }>;
   private variableValues: Map<string, Set<any>>;
   /** Variables with a Project Settings default: they never start unset. */
@@ -168,6 +173,7 @@ export class ReachabilityAnalyzer {
       playedBeats: config.playedBeats,
       searchLimited: config.searchLimited,
       gatesOnTheWay: config.gatesOnTheWay,
+      ranges: config.ranges,
     };
     this.counterModifications = new Map();
     this.variableValues = new Map();
@@ -931,6 +937,7 @@ export class ReachabilityAnalyzer {
       if (!beat) continue;
       for (const conn of analysisLinks(beat)) {
         if (open.has(conn.targetId) || !this.story.getBeat(conn.targetId) || this.linkNeverOpens(beat, conn)) continue;
+        if (this.config.ranges && !this.config.ranges.reached.has(conn.targetId)) continue;
         open.add(conn.targetId);
         todo.push(conn.targetId);
       }
@@ -940,6 +947,7 @@ export class ReachabilityAnalyzer {
 
   /** A link with a condition on the way that can never hold (neverHolds). */
   private linkNeverOpens(beat: Beat, conn: Connection): boolean {
+    if (this.config.ranges?.closed(beat.id, conn.targetId)) return true;
     if (conditionsIn(conn.condition).some((c) => this.neverHolds(c))) return true;
     if (beat.type === 'conditionBeat') {
       const params: any = beat.getParameters();
@@ -1009,6 +1017,12 @@ export class ReachabilityAnalyzer {
       return hints.length > 0 ? `${text}. ${hints.join('. ')}.` : text;
     };
 
+    // Ruled out by the counter ranges: certain, and they say why.
+    for (const parent of reachedParents) {
+      const why = this.config.ranges?.closed(parent.sourceBeatId, beatId);
+      if (why) return withHints(this.rangeClosedDetails(parent.sourceBeatId, why, nameOf), why.conditions);
+    }
+
     const checker = reachedParents.map((i) => this.story.getBeat(i.sourceBeatId)).find((b) => b?.type === 'conditionBeat');
     const asked = checker ? (checker.getParameters() as any).condition : null;
     if (asked) {
@@ -1048,6 +1062,20 @@ export class ReachabilityAnalyzer {
     return gates.length > 0
       ? withHints(`${names} links here, but it needs ${gates.join(' and ')}, and ${noWay} has that there`, conditions)
       : `${names} links here, but ${noWay} takes that link: the choice or line leading here is never on offer`;
+  }
+
+  /** A link the counter ranges shut, in words: the check, and the values that settle it. */
+  private rangeClosedDetails(fromId: string, why: RangeClosure, nameOf: (id: string) => string): string {
+    const from = this.story.getBeat(fromId);
+    const gates = why.conditions.map((c) => describeGate(c, nameOf)).join(' and ');
+    const values = why.values.length > 0 ? `, and ${why.values.join(' and ')}` : '';
+    if (from?.type === 'conditionBeat') {
+      return `"${from.name}" checks ${gates}${values}, so the answer always sends players the other way: this branch never runs`;
+    }
+    if (why.earlierLine) {
+      return `"${from?.name ?? fromId}" links here, but an earlier line plays instead whenever ${gates}${values}, so the line or reply leading here is never shown`;
+    }
+    return `"${from?.name ?? fromId}" links here, but it needs ${gates}${values}, so no way of playing has that there`;
   }
 
   /**

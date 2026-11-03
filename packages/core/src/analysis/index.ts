@@ -24,7 +24,10 @@ export type {
   SituationStep,
   SituationConfig,
   GateOnTheWay,
+  RangeClosure,
+  CounterRangeFacts,
 } from './StateSimulationAnalyzer';
+export type { Range } from './counterRanges';
 export type {
   ConstraintAnalysisConfig,
 } from './ConstraintPathAnalyzer';

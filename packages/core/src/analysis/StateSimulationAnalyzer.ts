@@ -32,6 +32,7 @@ import {
 } from './ConstraintSet';
 import type { BackwardAnalysisResult, PathRequirement, DecisionPoint } from './BackwardAnalyzer';
 import { isMultiChoiceLike } from '../beats/MultiChoiceBeat';
+import { ANY, allOf, anyOf, applyChange, beatsOnLoops, changeFrom, compareRanges, describeRange, hull, not, type Change, type Range, type Verdict } from './counterRanges';
 
 // ============================================================================
 // Types
@@ -267,6 +268,11 @@ export interface SituationConfig {
    * to it first. 0 turns it off.
    */
   maxAimed?: number;
+  /**
+   * Work out counter ranges first (counterRanges) and leave out of the search
+   * what they rule out. Default true.
+   */
+  counterRanges?: boolean;
 }
 
 /** What exploreSituations found. */
@@ -297,6 +303,27 @@ export interface GateOnTheWay {
   neverShown?: boolean;
   met: number;
   of: number;
+}
+
+/** Why the counter ranges rule a link out (counterRanges). */
+export interface RangeClosure {
+  /** Conditions that can never all hold there; for a Condition beat, its check, which always answers the other way. */
+  conditions: Condition[];
+  /** What the ranges say about the counters those read: "Money is always 0 there". */
+  values: string[];
+  /** Shut by an earlier line that always plays instead (its conditions always hold). */
+  earlierLine?: boolean;
+}
+
+/**
+ * The values each counter can have when players arrive at each beat, one
+ * range per counter (counterRanges). Sound: a beat outside `reached` no way of
+ * playing gets to, and a link `closed` names is never taken.
+ */
+export interface CounterRangeFacts {
+  reached: ReadonlySet<string>;
+  at(beatId: string): ReadonlyMap<string, Range> | undefined;
+  closed(fromId: string, toId: string): RangeClosure | null;
 }
 
 /** States kept per beat for Story Logic: enough to tell what differs, not every combination. */
@@ -509,6 +536,11 @@ export class StateSimulationAnalyzer {
   public truncated = false;
   /** The search for unreached beats ran out of budget: "unreachable" then means "not found". */
   public searchLimited = false;
+  /**
+   * The counter ranges the last situation search ran with (counterRanges),
+   * when every state it played lay in them. Null otherwise.
+   */
+  public rangeFacts: CounterRangeFacts | null = null;
   /** Dialog Tree replies some playthrough had on screen, as `beatId|choiceId`. */
   public shownReplies = new Set<string>();
 
@@ -624,9 +656,14 @@ export class StateSimulationAnalyzer {
       hiddenChoices: new Set(), arrivals: new Map(),
     };
     this.searchLimited = false;
+    this.rangeFacts = null;
     if (!startBeatId) return result;
     this.shownReplies = new Set();
-    const keyOf = this.stateThatDecidesGates(new Map(this.story.getAllBeats().map((b) => [b.id, 0])));
+    // Ranges first: what they rule out the search need not tell states apart for.
+    const ranges = config.counterRanges === false ? null : this.counterRanges();
+    let rangesHold = !!ranges;
+    const open = ranges?.reached;
+    const keyOf = this.stateThatDecidesGates(new Map(this.story.getAllBeats().filter((b) => !open || open.has(b.id)).map((b) => [b.id, 0])));
     interface Item { beatId: string; state: SimulationState; parent: number; via: SituationStep | null; start: string }
     interface Arrived { state: SimulationState; parent: number; count: number; start: string }
     const arrived = new Map<string, Map<string, Arrived>>();
@@ -653,7 +690,7 @@ export class StateSimulationAnalyzer {
       const size = result.perBeat.size + stopsFound.size + this.shownReplies.size;
       if (size === distanceFor) return;
       distanceFor = size;
-      distance = this.distanceToUncovered(new Set(result.perBeat.keys()), stopsFound);
+      distance = this.distanceToUncovered(new Set(result.perBeat.keys()), stopsFound, open);
     };
     const file = (item: Item) => {
       const d = distance.get(item.beatId);
@@ -676,6 +713,16 @@ export class StateSimulationAnalyzer {
         result.stops.add(from.beatId);
         stopsFound.add(`${from.beatId}|${from.label || beatId}`);
         return;
+      }
+      // Every state played must lie in the ranges, or they are not to be trusted.
+      if (rangesHold) {
+        const r = ranges!.at(beatId);
+        if (!r) rangesHold = false;
+        else for (const [k, v] of state.counters) {
+          const n = typeof v === 'number' ? v : Number(v) || 0;
+          const range = r.get(k) ?? [0, 0];
+          if (!(n >= range[0] && n <= range[1])) { rangesHold = false; break; }
+        }
       }
       // Noted before situations merge: what no gate reads still shows in the text.
       let states = arrived.get(beatId);
@@ -780,8 +827,9 @@ export class StateSimulationAnalyzer {
     // Stopped short: aim what's left at the links still never taken.
     const maxAimed = config.maxAimed ?? 100000;
     const maxAimedStalled = Math.min(maxAimed, 20000);
-    if (!result.complete && maxAimed > 0) {
-      const goals = this.closedLinkGoals(new Set(result.perBeat.keys()));
+    const leftToFind = !rangesHold || [...open!].some((id) => !result.perBeat.has(id));
+    if (!result.complete && maxAimed > 0 && leftToFind) {
+      const goals = this.closedLinkGoals(new Set(result.perBeat.keys()), rangesHold ? open : undefined);
       if (goals.length > 0) {
         const near: Item[][] = [];
         let queued = 0;
@@ -833,6 +881,8 @@ export class StateSimulationAnalyzer {
       result.arrivals.set(beatId, list);
     }
     this.searchLimited = !result.complete;
+    if (ranges && !rangesHold) console.warn('[StateSimulationAnalyzer] A played state fell outside the counter ranges; not using them');
+    this.rangeFacts = rangesHold ? ranges : null;
     return result;
   }
 
@@ -949,7 +999,7 @@ export class StateSimulationAnalyzer {
    * hold to take it (a Condition beat's answer, or every gate on some way
    * through) and how far each beat is from the link's beat.
    */
-  private closedLinkGoals(played: Set<string>): Array<{ holds: (s: SimulationState) => boolean; distance: Map<string, number> }> {
+  private closedLinkGoals(played: Set<string>, open?: ReadonlySet<string>): Array<{ holds: (s: SimulationState) => boolean; distance: Map<string, number> }> {
     const into = new Map<string, string[]>();
     for (const beat of this.story.getAllBeats()) {
       for (const c of analysisLinks(beat)) {
@@ -972,7 +1022,7 @@ export class StateSimulationAnalyzer {
       const beat = this.getBeat(beatId);
       if (!beat) continue;
       for (const target of new Set(analysisLinks(beat).map((c) => c.targetId))) {
-        if (played.has(target) || !this.getBeat(target)) continue;
+        if (played.has(target) || !this.getBeat(target) || (open && !open.has(target))) continue;
         let holds: ((s: SimulationState) => boolean) | null = null;
         if (beat.type === 'conditionBeat') {
           const params: any = beat.getParameters();
@@ -1035,6 +1085,294 @@ export class StateSimulationAnalyzer {
       ways.push([{ conditions: [], earlierLine: false, neverShown: true, met: 0, of: states.length }]);
     }
     return ways;
+  }
+
+  /**
+   * The values each counter can have when players arrive at each beat: one
+   * range per counter, not every combination, so it finishes fast however
+   * many ways there are to play. It takes the steps the situation search
+   * does (requirement redirects, Condition beats, choices on offer, Replays)
+   * and reads how each step changes a counter from the simulator's own
+   * effects. Where a range can't be pinned down it holds every value, so a
+   * branch it rules out is out on every way of playing. Null without a start.
+   */
+  public counterRanges(): CounterRangeFacts | null {
+    const start = this.story.getFirstBeatId();
+    if (!start) return null;
+    const starts = this.initialStates();
+    const keys = new Set<string>();
+    for (const s of starts) for (const k of s.counters.keys()) keys.add(k);
+    // A step can name a counter nothing started with: take it in and go again.
+    for (let round = 0; round < 6; round++) {
+      const facts = this.rangesFor([...keys], start, starts, keys);
+      if (facts) return facts;
+    }
+    return null;
+  }
+
+  private rangesFor(order: string[], start: string, starts: SimulationState[], keys: Set<string>): CounterRangeFacts | null {
+    const fresh = new Set<string>();
+    const changes = new Map<string, Map<string, Change>>();
+    const base = starts[0] ?? createInitialState();
+    const asNumber = (v: unknown): number | null => (typeof v === 'number' ? v : v === undefined ? 0 : null);
+    // How one step changes each counter: run it from 0, 1 and 7.
+    const probe = (id: string, step: (s: SimulationState) => SimulationState): Map<string, Change> => {
+      const known = changes.get(id);
+      if (known) return known;
+      const outs = [0, 1, 7].map((p) => {
+        const s = cloneState(base);
+        s.counters = new Map(order.map((k) => [k, p]));
+        return step(s);
+      });
+      const out = new Map<string, Change>();
+      for (const o of outs) for (const k of o.counters.keys()) if (!keys.has(k)) fresh.add(k);
+      for (const k of order) {
+        const ys = outs.map((o) => asNumber(o.counters.get(k)));
+        const change = ys.every((y): y is number => y !== null) ? changeFrom(ys[0], ys[1], ys[2]) : null;
+        if (change && change.a === 1 && change.b === 0) continue;
+        out.set(k, change);
+      }
+      changes.set(id, out);
+      return out;
+    };
+    const first = new Map<string, Range>();
+    for (const k of order) {
+      const values = starts.map((s) => asNumber(s.counters.get(k)));
+      first.set(k, values.every((v): v is number => v !== null && Number.isFinite(v))
+        ? [Math.min(...values), Math.max(...values)] : ANY);
+    }
+    // Only a beat on a loop can keep growing; there a bound is let go after a
+    // few rounds. Elsewhere ranges settle by themselves, and stay precise.
+    const anything = new Map(order.map((k) => [k, ANY]));
+    const onLoop = beatsOnLoops(this.story.getAllBeats().map((b) => b.id),
+      (id) => { const b = this.getBeat(id); return b ? this.rangeSteps(b, anything, start, probe).map((s) => s.to) : []; });
+    const at = new Map<string, Map<string, Range>>([[start, first]]);
+    const changed = new Map<string, number>();
+    const queue = [start];
+    const queued = new Set(queue);
+    while (queue.length > 0 && fresh.size === 0) {
+      const id = queue.shift()!;
+      queued.delete(id);
+      const beat = this.getBeat(id);
+      if (!beat) continue;
+      for (const { to, ranges } of this.rangeSteps(beat, at.get(id)!, start, probe)) {
+        if (!this.getBeat(to)) continue;
+        const was = at.get(to);
+        let grew = !was;
+        if (was) {
+          // A loop that adds can add forever: past three rounds a growing bound is let go.
+          const widen = onLoop.has(to) && (changed.get(to) ?? 0) >= 3;
+          const merged = new Map(was);
+          for (const [k, r] of ranges) {
+            const old = was.get(k) ?? [0, 0];
+            let h = hull(old, r);
+            if (h[0] === old[0] && h[1] === old[1]) continue;
+            if (widen) h = [h[0] < old[0] ? -Infinity : h[0], h[1] > old[1] ? Infinity : h[1]];
+            merged.set(k, h);
+            grew = true;
+          }
+          if (grew) { at.set(to, merged); changed.set(to, (changed.get(to) ?? 0) + 1); }
+        } else at.set(to, ranges);
+        if (grew && !queued.has(to)) { queued.add(to); queue.push(to); }
+      }
+    }
+    if (fresh.size > 0) { fresh.forEach((k) => keys.add(k)); return null; }
+    // With the ranges settled: which links some way takes, and why the others stay shut.
+    const taken = new Set<string>();
+    const shut = new Map<string, RangeClosure>();
+    for (const [id, ranges] of at) {
+      const beat = this.getBeat(id);
+      if (!beat) continue;
+      this.rangeSteps(beat, ranges, start, probe, {
+        taken: (to) => taken.add(`${id}\u0000${to}`),
+        shut: (to, why) => { if (!shut.has(`${id}\u0000${to}`)) shut.set(`${id}\u0000${to}`, why); },
+      });
+    }
+    return {
+      reached: new Set(at.keys()),
+      at: (beatId) => at.get(beatId),
+      closed: (fromId, toId) => (at.has(fromId) && !taken.has(`${fromId}\u0000${toId}`) ? shut.get(`${fromId}\u0000${toId}`) ?? null : null),
+    };
+  }
+
+  /**
+   * Where players at this beat go next, and the ranges they arrive with — the
+   * situation search's step (expand), over ranges: a branch is left out only
+   * when its gate certainly fails for every value in them.
+   */
+  private rangeSteps(
+    beat: Beat,
+    ranges: Map<string, Range>,
+    start: string,
+    probe: (id: string, step: (s: SimulationState) => SimulationState) => Map<string, Change>,
+    note?: { taken: (to: string) => void; shut: (to: string, why: RangeClosure) => void },
+  ): Array<{ to: string; ranges: Map<string, Range> }> {
+    const out: Array<{ to: string; ranges: Map<string, Range> }> = [];
+    const go = (to: string | null | undefined, next: Map<string, Range>) => {
+      if (!to) return;
+      out.push({ to, ranges: next });
+      note?.taken(to);
+    };
+    const via = (change: Map<string, Change>): Map<string, Range> => {
+      const next = new Map(ranges);
+      for (const [k, f] of change) next.set(k, applyChange(next.get(k) ?? [0, 0], f));
+      return next;
+    };
+    const rangeIn = (r: Map<string, Range>) => (key: string): Range => r.get(key) ?? [0, 0];
+
+    // Requirements unmet send players elsewhere before the beat shows.
+    const requires = (beat as any).requires as any[] | undefined;
+    if (Array.isArray(requires) && requires.length > 0) {
+      const checks = requires.map((req) => ({ req, ok: !req?.condition ? true as Verdict : this.rangeVerdict(req.condition, rangeIn(ranges)) }));
+      let shows = true;
+      if ((beat as any).requiresMode === 'any') {
+        const some = anyOf(checks.map((c) => c.ok));
+        const fallback = checks.find((c) => c.req?.fallbackTarget)?.req.fallbackTarget;
+        if (some !== true && fallback) { go(fallback, ranges); if (some === false) shows = false; }
+      } else {
+        for (const c of checks) {
+          if (c.ok === true) continue;
+          const fallback = c.req?.fallbackTarget;
+          if (fallback) go(fallback, ranges);
+          if (c.ok === false) { if (fallback) shows = false; break; }
+        }
+      }
+      if (!shows) return out;
+    }
+
+    const after = via(probe(`${beat.id}\u0000beat`, (s) => this.applyBeatEffects(beat, s)));
+    const rangeAfter = rangeIn(after);
+    const valuesOf = (conditions: any[], r: (key: string) => Range): string[] => {
+      const out: string[] = [];
+      for (const c of conditions) {
+        if (!c || typeof c !== 'object') continue;
+        const names = c.type === 'counter' ? [c.variableName || c.variable || c.left]
+          : c.type === 'counterCompare' ? [c.counter1, c.counter2] : [];
+        for (const name of names) {
+          if (!name) continue;
+          const words = describeRange(name, r(this.counterKey(c.character, name)));
+          if (words && !out.includes(words)) out.push(words);
+        }
+      }
+      return out;
+    };
+    // Every choice hidden: the beat's own link (linkWhenAllHidden), over ranges.
+    const hiddenLinks = (r: (key: string) => Range): { targets: string[]; maybeNone: boolean } => {
+      if (beat.type === 'dialogTree') return { targets: [], maybeNone: true };
+      const links: Connection[] = (beat as any).connections ?? [];
+      const targets: string[] = [];
+      for (const c of links) {
+        if (!c.condition) continue;
+        const v = Array.isArray(c.condition) ? undefined : this.rangeVerdict(c.condition, r);
+        if (v === false) continue;
+        targets.push(c.targetId);
+        if (v === true) return { targets, maybeNone: false };
+      }
+      const fallback = links.find((c) => !c.condition)?.targetId ?? beat.defaultTarget ?? null;
+      if (fallback) targets.push(fallback);
+      return { targets, maybeNone: !fallback };
+    };
+
+    if (this.isTerminalBeat(beat)) {
+      if (beat.type === 'endScreen' && beat.getParameters().showRestart !== false) {
+        const replay = via(probe(`${beat.id}\u0000replay`, (s) => this.stateAfterReplay(beat, this.applyBeatEffects(beat, s))));
+        const { targets, maybeNone } = hiddenLinks(rangeIn(replay));
+        for (const t of targets) go(t, replay);
+        if (maybeNone && beat.getParameters().reset === true) go(start, replay);
+      }
+      return out;
+    }
+    const connections = this.getConnections(beat);
+    if (connections.length === 0) return out;
+    const along = (i: number, conn: Connection, choice: boolean) => via(probe(`${beat.id}\u0000${i}`, (s) => {
+      const entered = this.applyBeatEffects(beat, s);
+      const next = choice ? this.applyChoiceEffects(beat, cloneState(entered), i, conn) : cloneState(entered);
+      this.applyEffectsList(conn.effects, next);
+      return next;
+    }));
+
+    if (beat.type === 'conditionBeat') {
+      const params: any = beat.getParameters();
+      const asked = this.getCondition(beat);
+      const more: any[] = Array.isArray(params.moreConditions) ? params.moreConditions : [];
+      const firstAnswer = asked ? this.rangeVerdict(asked, rangeAfter) : true;
+      const answers = [firstAnswer, ...more.map((c) => this.rangeVerdict(c, rangeAfter))];
+      const yes = more.length === 0 ? firstAnswer : params.conditionsMatch === 'any' ? anyOf(answers) : allOf(answers);
+      const label = (c: Connection) => c.label?.toLowerCase();
+      const yesLink = connections.find((c) => label(c) === 'true' || label(c) === 'yes') ?? connections[0];
+      const noLink = connections.find((c) => label(c) === 'false' || label(c) === 'no') ?? connections[0];
+      const asks = [asked, ...more].filter(Boolean);
+      for (const [link, possible] of [[yesLink, yes !== false], [noLink, yes !== true]] as const) {
+        if (possible) go(link.targetId, along(connections.indexOf(link), link, false));
+        else note?.shut(link.targetId, { conditions: asks, values: valuesOf(asks, rangeAfter) });
+      }
+    } else if (this.isChoiceBeat(beat) || this.hasTimedExit(beat)) {
+      const offers = connections.map((conn) => this.rangeOffered(beat, conn, rangeAfter));
+      if (offers.every((o) => o.offered !== true)) {
+        for (const t of hiddenLinks(rangeAfter).targets) go(t, after);
+      }
+      connections.forEach((conn, i) => {
+        const { offered, closure } = offers[i];
+        if (offered === false) {
+          if (closure) note?.shut(conn.targetId, { ...closure, values: valuesOf(closure.conditions, rangeAfter) });
+          return;
+        }
+        if (this.isNeverDrawn(beat, conn)) return;
+        go(conn.targetId, along(i, conn, true));
+      });
+    } else {
+      go(connections[0].targetId, along(0, connections[0], false));
+    }
+    return out;
+  }
+
+  /** choiceOffered over ranges: certainly on screen, certainly not (and why), or it depends. */
+  private rangeOffered(beat: Beat, connection: Connection, range: (key: string) => Range): { offered: Verdict; closure?: Omit<RangeClosure, 'values'> } {
+    const conds: any[] = [];
+    const own: any = connection.condition;
+    if (Array.isArray(own)) conds.push(...own); else if (own) conds.push(own);
+    const unless: any[][] = [];
+    if (beat.type === 'dialogTree') {
+      const tree = beat.getParameters().dialogTree;
+      const target = connection.targetId === beat.id ? '__self__' : connection.targetId;
+      for (const step of (connection as any).route ?? this.dialogPathTo(tree, target, connection.label)) {
+        if (Array.isArray(step.choice?.conditions)) conds.push(...step.choice.conditions);
+        unless.push(...(step.unless ?? []));
+      }
+    }
+    const own_ = conds.map((c) => ({ c, v: this.rangeVerdict(c, range) }));
+    const earlier = unless.map((list) => ({ list, v: allOf(list.map((c) => this.rangeVerdict(c, range))) }));
+    const offered = allOf([...own_.map((x) => x.v), ...earlier.map((x) => not(x.v))]);
+    if (offered !== false) return { offered };
+    const failing = own_.filter((x) => x.v === false).map((x) => x.c);
+    if (failing.length > 0) return { offered, closure: { conditions: failing } };
+    const always = earlier.find((x) => x.v === true);
+    return { offered, closure: always ? { conditions: always.list, earlierLine: true } : undefined };
+  }
+
+  /** evaluateCondition over ranges, for what ranges can decide: counters. Anything else depends (undefined). */
+  private rangeVerdict(c: any, range: (key: string) => Range): Verdict {
+    if (!c) return true;
+    if (typeof c !== 'object' || Array.isArray(c)) return undefined;
+    const operator = c.operator;
+    if (c.type === 'counter') {
+      const name = c.variableName || c.variable || c.left;
+      if (!name) return false;
+      const r = range(this.counterKey(c.character, name));
+      const raw = c.value ?? c.right;
+      if (isTextForCounter(raw)) return operator === '!=';
+      const v = counterComparisonValue(raw);
+      if (operator === '==' || operator === '!=') {
+        return typeof v === 'number' && Number.isFinite(v) ? compareRanges(r, operator, [v, v]) : undefined;
+      }
+      const n = typeof v === 'number' ? v : Number(v) || 0;
+      return compareRanges(r, operator, [n, n]);
+    }
+    if (c.type === 'counterCompare') {
+      const owner = c.character;
+      return compareRanges(range(this.counterKey(owner, c.counter1 || '')), operator, range(this.counterKey(owner, c.counter2 || '')));
+    }
+    return undefined;
   }
 
   /**
@@ -1618,7 +1956,7 @@ export class StateSimulationAnalyzer {
    * Get a beat by ID (cached)
    */
   /** Links to the nearest beat on no finished path yet, for every beat that can get to one. */
-  private distanceToUncovered(covered: Set<string>, stopsFound: Set<string>): Map<string, number> {
+  private distanceToUncovered(covered: Set<string>, stopsFound: Set<string>, open?: ReadonlySet<string>): Map<string, number> {
     const incoming = new Map<string, string[]>();
     const beats = this.story.getAllBeats();
     for (const beat of beats) {
@@ -1656,7 +1994,8 @@ export class StateSimulationAnalyzer {
       walk(b.getParameters().dialogTree);
       return waiting;
     };
-    let level = beats.filter((b) => !covered.has(b.id) || stopToFind(b) || replyToFind(b)).map((b) => b.id);
+    // Not what the counter ranges rule out: no way of playing gets there.
+    let level = beats.filter((b) => (!covered.has(b.id) && (!open || open.has(b.id))) || stopToFind(b) || replyToFind(b)).map((b) => b.id);
     level.forEach((id) => distance.set(id, 0));
     for (let d = 1; level.length > 0; d++) {
       const next: string[] = [];
