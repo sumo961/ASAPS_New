@@ -180,6 +180,13 @@ function addItem(state: SimulationState, bag: string, item: string, quantity: nu
   if (total > 1) (state.itemCounts ??= new Map()).set(`${bag}\u0001${item}`, total);
 }
 
+/** Put exactly this many of an item in the player's bag. */
+function setPlayerQuantity(state: SimulationState, item: string, quantity: number): void {
+  state.inventory.get('player')?.delete(item);
+  state.itemCounts?.delete(`player\u0001${item}`);
+  if (quantity > 0) addItem(state, 'player', item, quantity);
+}
+
 /** Take some away; at none the item leaves the bag (as StoryContext.removeFromInventory). */
 function removeItem(state: SimulationState, bag: string, item: string, quantity: number): void {
   const left = itemQuantity(state, bag, item) - Math.max(1, quantity);
@@ -313,6 +320,10 @@ export interface RangeClosure {
   values: string[];
   /** Shut by an earlier line that always plays instead (its conditions always hold). */
   earlierLine?: boolean;
+  /** With several ways there (a Dialog Tree's routes): each way's own conditions. */
+  ways?: Condition[][];
+  /** Of the conditions, the ones that failed where this was worked out (internal). */
+  failing?: Condition[];
 }
 
 /**
@@ -324,6 +335,36 @@ export interface CounterRangeFacts {
   reached: ReadonlySet<string>;
   at(beatId: string): ReadonlyMap<string, Range> | undefined;
   closed(fromId: string, toId: string): RangeClosure | null;
+  /** A played state at this beat lies in what was worked out (the check that it can be trusted). */
+  holds(beatId: string, state: SimulationState): boolean;
+}
+
+/** A fact counterRanges follows but can't pin down: any value. */
+const ANY_VALUE = Symbol('any value');
+/** What a variable nobody knows holds while a step is played (with 5 the second time). */
+const STAND_IN = '\u0000anything';
+
+/** What counterRanges knows on arrival: ranges for counters, values for the facts it tracks. */
+interface AbsState {
+  facts: ReadonlyMap<string, unknown>;
+  ranges: Map<string, Range>;
+}
+
+/** The facts a condition reads, as counterRanges tracks them; '*' for what it can't. */
+function factsRead(c: any): string[] {
+  if (!c || typeof c !== 'object') return [];
+  const name = c.variableName || c.variable || c.left;
+  switch (c.type) {
+    case 'variable': return name ? [`v\u0001${name}`] : [];
+    case 'visitedBeat': { const id = c.beatId || c.value; return id ? [`b\u0001${id}`] : []; }
+    case 'inventory': {
+      // A threshold read from a variable or counter: not followed.
+      if (c.compareVariable || typeof c.quantityValue === 'string') return ['*'];
+      const item = String(c.item || c.value || c.right || '');
+      return item ? [`i\u0001${item}`] : [];
+    }
+    default: return [];
+  }
 }
 
 /** States kept per beat for Story Logic: enough to tell what differs, not every combination. */
@@ -715,15 +756,7 @@ export class StateSimulationAnalyzer {
         return;
       }
       // Every state played must lie in the ranges, or they are not to be trusted.
-      if (rangesHold) {
-        const r = ranges!.at(beatId);
-        if (!r) rangesHold = false;
-        else for (const [k, v] of state.counters) {
-          const n = typeof v === 'number' ? v : Number(v) || 0;
-          const range = r.get(k) ?? [0, 0];
-          if (!(n >= range[0] && n <= range[1])) { rangesHold = false; break; }
-        }
-      }
+      if (rangesHold && !ranges!.holds(beatId, state)) rangesHold = false;
       // Noted before situations merge: what no gate reads still shows in the text.
       let states = arrived.get(beatId);
       if (!states) arrived.set(beatId, (states = new Map()));
@@ -882,8 +915,104 @@ export class StateSimulationAnalyzer {
     }
     this.searchLimited = !result.complete;
     if (ranges && !rangesHold) console.warn('[StateSimulationAnalyzer] A played state fell outside the counter ranges; not using them');
-    this.rangeFacts = rangesHold ? ranges : null;
+    const checksBegan = performance.now();
+    this.rangeFacts = rangesHold && ranges ? yield* this.linkChecks(ranges, result) : null;
+    this.linkCheckMs = performance.now() - checksBegan;
     return result;
+  }
+
+  /**
+   * Stopped short with beats still open: for each link from a played beat to
+   * an unplayed one, follow exactly what its conditions read, together
+   * (counterRanges with those facts tracked). One that finds no way to meet
+   * them all at once rules the link out. Each is trusted only when every beat
+   * and state the search played lies in it.
+   */
+  /** Every counter a step names (counterRanges), found once. */
+  private rangeKeys = new Set<string>();
+  /** The beats on loops, from the first counterRanges run: later runs leave out more, never add. */
+  private rangeLoops: Set<string> | null = null;
+  /** How each step changes counters (counterRanges), for the counters in rangeCounterOrder. */
+  private rangeCounterSteps = new Map<string, Map<string, Change>>();
+  private rangeCounterOrder = '';
+  /** isTerminalBeat per beat, for counterRanges (it builds the beat's links each time). */
+  private rangeTerminal = new Map<string, boolean>();
+  /** getConnections per beat, for counterRanges: it asks once per combination of facts. */
+  private rangeLinks = new Map<string, Connection[]>();
+
+  /** How long the last search's link checks took (linkChecks), in ms. */
+  public linkCheckMs = 0;
+
+  private *linkChecks(base: CounterRangeFacts, result: SituationSearch): Generator<SimulationProgress, CounterRangeFacts, void> {
+    const played = new Set(result.perBeat.keys());
+    if (result.complete) return base;
+    const merge = (into: CounterRangeFacts, checks: CounterRangeFacts[]): CounterRangeFacts => {
+      const all = [into, ...checks];
+      return {
+        reached: new Set([...into.reached].filter((id) => checks.every((c) => c.reached.has(id)))),
+        at: into.at,
+        holds: into.holds,
+        closed: (fromId, toId) => {
+          for (const f of all) { const why = f.closed(fromId, toId); if (why) return why; }
+          return null;
+        },
+      };
+    };
+    // What one check rules out, the next starts from: "ruined" is set only on
+    // a beat a visit check already shut. Until a round finds nothing new.
+    let facts = base;
+    let budget = 40;
+    for (let round = 0; round < 4 && budget > 0; round++) {
+      if ([...facts.reached].every((id) => played.has(id))) break;
+      const groups = new Map<string, string[]>();
+      for (const beatId of played) {
+        const beat = this.getBeat(beatId);
+        if (!beat) continue;
+        const links = analysisLinks(beat);
+        for (const target of new Set(links.map((c) => c.targetId))) {
+          if (played.has(target) || !this.getBeat(target) || !facts.reached.has(target) || facts.closed(beatId, target)) continue;
+          const conditions: any[] = beat.type === 'conditionBeat'
+            ? [this.getCondition(beat), ...((beat.getParameters() as any).moreConditions ?? [])]
+            : this.gatesOnTheWay(beatId, target, []).flat().flatMap((g) => g.conditions);
+          if (links.some((c) => c.targetId === target && c.label === EXTRA_LINK.requiresFallback)) {
+            conditions.push(...(((beat as any).requires ?? []) as any[]).map((r) => r?.condition));
+          }
+          const track = [...new Set(conditions.flatMap((c) => factsRead(c)))].sort();
+          if (track.length === 0 || track.includes('*') || track.length > 4) continue;
+          groups.set(track.join('\u0002'), track);
+        }
+      }
+      const checks: CounterRangeFacts[] = [];
+      for (const track of groups.values()) {
+        if (budget-- <= 0) break;
+        yield { expansions: result.situations, beatsReached: result.perBeat.size, pathsFound: 0, phase: 'situations' };
+        const check = this.counterRanges(track, 40000, facts);
+        if (!check) continue;
+        const fits = [...played].every((id) => check.reached.has(id))
+          && [...result.arrivals].every(([id, list]) => list.every((a) => check.holds(id, a.state)));
+        if (fits) checks.push(check);
+        else console.warn('[StateSimulationAnalyzer] A played state fell outside a link check; not using it');
+      }
+      const before = facts.reached.size;
+      const closedBefore = this.countClosed(facts, played);
+      if (checks.length === 0) break;
+      facts = merge(facts, checks);
+      if (facts.reached.size === before && this.countClosed(facts, played) === closedBefore) break;
+    }
+    return facts;
+  }
+
+  /** How many links from played beats to unplayed ones the facts rule out. */
+  private countClosed(facts: CounterRangeFacts, played: Set<string>): number {
+    let n = 0;
+    for (const beatId of played) {
+      const beat = this.getBeat(beatId);
+      if (!beat) continue;
+      for (const target of new Set(analysisLinks(beat).map((c) => c.targetId))) {
+        if (!played.has(target) && facts.closed(beatId, target)) n++;
+      }
+    }
+    return n;
   }
 
   /** analyzeRaw without freezing the UI: same slices and progress as analyzeAsync. */
@@ -1094,176 +1223,352 @@ export class StateSimulationAnalyzer {
    * does (requirement redirects, Condition beats, choices on offer, Replays)
    * and reads how each step changes a counter from the simulator's own
    * effects. Where a range can't be pinned down it holds every value, so a
-   * branch it rules out is out on every way of playing. Null without a start.
+   * branch it rules out is out on every way of playing.
+   *
+   * `track` adds facts followed exactly, together: variables (`v\u0001name`),
+   * visits (`b\u0001beatId`) and items in the player's bag (`i\u0001item`).
+   * Each beat is then visited once per combination of their values, so
+   * conditions on several of them at once can be ruled out ("sentSouth and
+   * ruined" when no way has both). Null without a start, or when the
+   * combinations run past `nodeCap`.
    */
-  public counterRanges(): CounterRangeFacts | null {
+  public counterRanges(track: string[] = [], nodeCap = 60000, known?: CounterRangeFacts): CounterRangeFacts | null {
     const start = this.story.getFirstBeatId();
     if (!start) return null;
     const starts = this.initialStates();
-    const keys = new Set<string>();
+    // The counters steps name, kept from earlier runs (the link checks run many).
+    const keys = this.rangeKeys;
     for (const s of starts) for (const k of s.counters.keys()) keys.add(k);
     // A step can name a counter nothing started with: take it in and go again.
     for (let round = 0; round < 6; round++) {
-      const facts = this.rangesFor([...keys], start, starts, keys);
-      if (facts) return facts;
+      const facts = this.rangesFor([...keys], track, start, starts, keys, nodeCap, known);
+      if (facts !== undefined) return facts;
     }
     return null;
   }
 
-  private rangesFor(order: string[], start: string, starts: SimulationState[], keys: Set<string>): CounterRangeFacts | null {
+  /** One run of counterRanges: undefined when a step named a new counter (go again). */
+  private rangesFor(
+    order: string[], track: string[], start: string, starts: SimulationState[], keys: Set<string>, nodeCap: number,
+    known?: CounterRangeFacts,
+  ): CounterRangeFacts | null | undefined {
     const fresh = new Set<string>();
-    const changes = new Map<string, Map<string, Change>>();
-    const base = starts[0] ?? createInitialState();
+    // Feelings never change a counter, variable, item or visit: the probes
+    // leave the runtime out (its per-beat tick is most of a step's cost).
+    const base: SimulationState = { ...cloneState(starts[0] ?? createInitialState()), runtime: undefined, pendingRuntime: undefined };
     const asNumber = (v: unknown): number | null => (typeof v === 'number' ? v : v === undefined ? 0 : null);
-    // How one step changes each counter: run it from 0, 1 and 7.
-    const probe = (id: string, step: (s: SimulationState) => SimulationState): Map<string, Change> => {
-      const known = changes.get(id);
-      if (known) return known;
-      const outs = [0, 1, 7].map((p) => {
-        const s = cloneState(base);
-        s.counters = new Map(order.map((k) => [k, p]));
-        return step(s);
-      });
-      const out = new Map<string, Change>();
-      for (const o of outs) for (const k of o.counters.keys()) if (!keys.has(k)) fresh.add(k);
-      for (const k of order) {
-        const ys = outs.map((o) => asNumber(o.counters.get(k)));
-        const change = ys.every((y): y is number => y !== null) ? changeFrom(ys[0], ys[1], ys[2]) : null;
-        if (change && change.a === 1 && change.b === 0) continue;
-        out.set(k, change);
+    const factsKey = (facts: ReadonlyMap<string, unknown>) => track.map((k) => {
+      const v = facts.get(k);
+      return v === ANY_VALUE ? '?' : `${typeof v}:${String(v)}`;
+    }).join('\u0002');
+    const readFact = (s: SimulationState, k: string): unknown => {
+      const name = k.slice(2);
+      if (k[0] === 'v') return s.variables.has(name) ? s.variables.get(name) : undefined;
+      if (k[0] === 'b') return s.visitedBeats.has(name);
+      return itemQuantity(s, 'player', name);
+    };
+    // A fact nobody knows is played twice, with two stand-ins: what comes out
+    // the same both times doesn't depend on it.
+    const loadFacts = (s: SimulationState, facts: ReadonlyMap<string, unknown>, alt: boolean) => {
+      for (const k of track) {
+        const v = facts.get(k);
+        const unknown = v === ANY_VALUE;
+        const name = k.slice(2);
+        if (k[0] === 'v') {
+          const x = unknown ? (alt ? 5 : STAND_IN) : v;
+          if (x === undefined) s.variables.delete(name); else s.variables.set(name, x as any);
+        } else if (k[0] === 'b') {
+          if (unknown ? alt : v) s.visitedBeats.add(name); else s.visitedBeats.delete(name);
+        } else {
+          setPlayerQuantity(s, name, unknown ? (alt ? 5 : 2) : Number(v) || 0);
+        }
       }
-      changes.set(id, out);
+    };
+    // How one step changes things. Counters: run it from 0, 1 and 7, once per
+    // step (no counter change reads anything else). Tracked facts: run it from
+    // their values, twice (counters at 0 and 7, so a fact computed from one
+    // shows), and a third time with other stand-ins when one is unknown.
+    if (this.rangeCounterOrder !== order.join('\u0002')) {
+      this.rangeCounterOrder = order.join('\u0002');
+      this.rangeCounterSteps.clear();
+    }
+    const counterSteps = this.rangeCounterSteps;
+    const typedBeat = (beat: Beat) => beat.type === 'inputText' || beat.type === 'keypad';
+    const run = (p: number, facts: ReadonlyMap<string, unknown> | null, alt: boolean, step: (s: SimulationState) => SimulationState) => {
+      const s = cloneState(base);
+      s.counters = new Map(order.map((k) => [k, p]));
+      if (facts) loadFacts(s, facts, alt);
+      const out = step(s);
+      for (const k of out.counters.keys()) if (!keys.has(k)) fresh.add(k);
       return out;
     };
-    const first = new Map<string, Range>();
-    for (const k of order) {
-      const values = starts.map((s) => asNumber(s.counters.get(k)));
-      first.set(k, values.every((v): v is number => v !== null && Number.isFinite(v))
-        ? [Math.min(...values), Math.max(...values)] : ANY);
-    }
+    const factSteps = new Map<string, Map<string, unknown>>();
+    const probe = (id: string, beat: Beat, from: AbsState, step: (s: SimulationState) => SimulationState): AbsState => {
+      let change = counterSteps.get(id);
+      if (!change) {
+        const runs = [0, 1, 7].map((p) => run(p, null, false, step));
+        change = new Map<string, Change>();
+        for (const k of order) {
+          const ys = runs.map((o) => asNumber(o.counters.get(k)));
+          // What players type is anything, whatever the simulator puts there.
+          let f = ys.every((y): y is number => y !== null) ? changeFrom(ys[0], ys[1], ys[2]) : null;
+          if (f && typedBeat(beat) && !(f.a === 1 && f.b === 0)) f = null;
+          if (f && f.a === 1 && f.b === 0) continue;
+          change.set(k, f);
+        }
+        counterSteps.set(id, change);
+      }
+      let facts: ReadonlyMap<string, unknown> = from.facts;
+      if (track.length > 0) {
+        const cacheKey = `${id}\u0000${factsKey(from.facts)}`;
+        let known = factSteps.get(cacheKey);
+        if (!known) {
+          const unknownFact = track.some((k) => from.facts.get(k) === ANY_VALUE);
+          const runs = [run(0, from.facts, false, step), run(7, from.facts, false, step), ...(unknownFact ? [run(0, from.facts, true, step)] : [])];
+          known = new Map<string, unknown>();
+          for (const k of track) {
+            const outs = runs.map((o) => readFact(o, k));
+            const before = from.facts.get(k);
+            const same = outs.every((o) => Object.is(o, outs[0]));
+            known.set(k, !same || outs[0] === STAND_IN ? ANY_VALUE
+              : typedBeat(beat) && k[0] === 'v' && !Object.is(outs[0], before) ? ANY_VALUE
+                : outs[0]);
+          }
+          factSteps.set(cacheKey, known);
+        }
+        facts = known;
+      }
+      if (change.size === 0) return { facts, ranges: from.ranges };
+      const ranges = new Map(from.ranges);
+      for (const [k, f] of change) ranges.set(k, applyChange(ranges.get(k) ?? [0, 0], f));
+      return { facts, ranges };
+    };
+
+    interface Node { beat: string; state: AbsState; grown: number }
+    const nodes = new Map<string, Node>();
+    const byBeat = new Map<string, Node[]>();
+    // A fact taking many values at a beat (a run count, a loop's tally) is let go there.
+    const valuesSeen = new Map<string, Set<string>>();
+    const queue: string[] = [];
+    const queued = new Set<string>();
+    let tooMany = false;
+    const anything = new Map(order.map((k) => [k, ANY]));
+    const anyFacts = new Map(track.map((k) => [k, ANY_VALUE as unknown]));
     // Only a beat on a loop can keep growing; there a bound is let go after a
     // few rounds. Elsewhere ranges settle by themselves, and stay precise.
-    const anything = new Map(order.map((k) => [k, ANY]));
-    const onLoop = beatsOnLoops(this.story.getAllBeats().map((b) => b.id),
-      (id) => { const b = this.getBeat(id); return b ? this.rangeSteps(b, anything, start, probe).map((s) => s.to) : []; });
-    const at = new Map<string, Map<string, Range>>([[start, first]]);
-    const changed = new Map<string, number>();
-    const queue = [start];
-    const queued = new Set(queue);
-    while (queue.length > 0 && fresh.size === 0) {
-      const id = queue.shift()!;
-      queued.delete(id);
+    const onLoop = this.rangeLoops ?? beatsOnLoops(this.story.getAllBeats().map((b) => b.id), (id) => {
+      const b = this.getBeat(id);
+      return b ? this.rangeSteps(b, { facts: anyFacts, ranges: anything }, start, probe, undefined, known).map((s) => s.to) : [];
+    });
+    const arrive = (to: string, state: AbsState) => {
+      if (!this.getBeat(to)) return;
+      let facts: ReadonlyMap<string, unknown> = state.facts;
+      for (const k of track) {
+        const v = facts.get(k);
+        if (v === ANY_VALUE) continue;
+        const seenKey = `${to}\u0000${k}`;
+        let seen = valuesSeen.get(seenKey);
+        if (!seen) valuesSeen.set(seenKey, (seen = new Set()));
+        seen.add(`${typeof v}:${String(v)}`);
+        if (seen.size > 8) { const copy = new Map(facts); copy.set(k, ANY_VALUE); facts = copy; }
+      }
+      const key = `${to}\u0003${factsKey(facts)}`;
+      const was = nodes.get(key);
+      let grew = !was;
+      if (!was) {
+        if (nodes.size >= nodeCap) { tooMany = true; return; }
+        const node: Node = { beat: to, state: { facts, ranges: state.ranges }, grown: 0 };
+        nodes.set(key, node);
+        const list = byBeat.get(to);
+        if (list) list.push(node); else byBeat.set(to, [node]);
+      } else {
+        // A loop that adds can add forever: past three rounds a growing bound is let go.
+        const widen = onLoop.has(to) && was.grown >= 3;
+        const merged = new Map(was.state.ranges);
+        for (const [k, r] of state.ranges) {
+          const old = merged.get(k) ?? [0, 0];
+          let h = hull(old, r);
+          if (h[0] === old[0] && h[1] === old[1]) continue;
+          if (widen) h = [h[0] < old[0] ? -Infinity : h[0], h[1] > old[1] ? Infinity : h[1]];
+          merged.set(k, h);
+          grew = true;
+        }
+        if (grew) { was.state = { facts: was.state.facts, ranges: merged }; was.grown++; }
+      }
+      if (grew && !queued.has(key)) { queued.add(key); queue.push(key); }
+    };
+    for (const s of starts) {
+      const ranges = new Map<string, Range>();
+      for (const k of order) {
+        const v = asNumber(s.counters.get(k));
+        ranges.set(k, v !== null && Number.isFinite(v) ? [v, v] : ANY);
+      }
+      arrive(start, { facts: new Map(track.map((k) => [k, readFact(s, k)])), ranges });
+    }
+    while (queue.length > 0 && fresh.size === 0 && !tooMany) {
+      const key = queue.shift()!;
+      queued.delete(key);
+      const node = nodes.get(key)!;
+      const beat = this.getBeat(node.beat);
+      if (!beat) continue;
+      for (const { to, state } of this.rangeSteps(beat, node.state, start, probe, undefined, known)) arrive(to, state);
+    }
+    if (fresh.size > 0) { fresh.forEach((k) => keys.add(k)); return undefined; }
+    if (track.length === 0 && !known) this.rangeLoops = onLoop;
+    if (tooMany) return null;
+
+    // With everything settled: which links some way takes, and why the others stay shut.
+    const taken = new Set<string>();
+    interface Shut {
+      conditions: Map<string, Condition>; ways: Map<string, Condition[]>; earlierLine: boolean; values: Set<string>;
+      /** Conditions that failed at every arrival: alone they are the reason. */
+      alwaysFailing: Map<string, Condition> | null;
+      arrivals: Map<string, ReadonlyMap<string, unknown>>;
+    }
+    const shut = new Map<string, Shut>();
+    const nameOf = (id: string) => this.getBeat(id)?.name ?? id;
+    const describeFacts = (facts: ReadonlyMap<string, unknown>, about: Condition[]): string | null => {
+      const read = new Set(about.flatMap((c) => factsRead(c)));
+      const parts = track.filter((k) => read.has(k)).map((k) => {
+        const v = facts.get(k);
+        const name = k.slice(2);
+        if (k[0] === 'v') return v === ANY_VALUE ? `${name} anything` : v === undefined ? `${name} unset` : `${name} ${String(v)}`;
+        if (k[0] === 'b') return v === ANY_VALUE ? `"${nameOf(name)}" visited or not` : v ? `"${nameOf(name)}" visited` : `"${nameOf(name)}" not visited`;
+        return v === ANY_VALUE ? `any number of ${name}` : v === 0 ? `no ${name}` : `${String(v)} ${name}`;
+      });
+      return parts.length > 0 ? parts.join(' and ') : null;
+    };
+    for (const [id, list] of byBeat) {
       const beat = this.getBeat(id);
       if (!beat) continue;
-      for (const { to, ranges } of this.rangeSteps(beat, at.get(id)!, start, probe)) {
-        if (!this.getBeat(to)) continue;
-        const was = at.get(to);
-        let grew = !was;
-        if (was) {
-          // A loop that adds can add forever: past three rounds a growing bound is let go.
-          const widen = onLoop.has(to) && (changed.get(to) ?? 0) >= 3;
-          const merged = new Map(was);
-          for (const [k, r] of ranges) {
-            const old = was.get(k) ?? [0, 0];
-            let h = hull(old, r);
-            if (h[0] === old[0] && h[1] === old[1]) continue;
-            if (widen) h = [h[0] < old[0] ? -Infinity : h[0], h[1] > old[1] ? Infinity : h[1]];
-            merged.set(k, h);
-            grew = true;
-          }
-          if (grew) { at.set(to, merged); changed.set(to, (changed.get(to) ?? 0) + 1); }
-        } else at.set(to, ranges);
-        if (grew && !queued.has(to)) { queued.add(to); queue.push(to); }
+      for (const node of list) {
+        this.rangeSteps(beat, node.state, start, probe, {
+          taken: (to) => taken.add(`${id}\u0000${to}`),
+          shut: (to, why) => {
+            const k = `${id}\u0000${to}`;
+            let entry = shut.get(k);
+            if (!entry) shut.set(k, (entry = { conditions: new Map(), ways: new Map(), earlierLine: false, values: new Set(), alwaysFailing: null, arrivals: new Map() }));
+            for (const c of why.conditions) entry.conditions.set(JSON.stringify(c), c);
+            entry.ways.set(JSON.stringify(why.conditions), why.conditions);
+            entry.earlierLine ||= !!why.earlierLine;
+            why.values.forEach((v) => entry!.values.add(v));
+            const failing = new Map((why.failing ?? why.conditions).map((c) => [JSON.stringify(c), c] as const));
+            entry.alwaysFailing = entry.alwaysFailing === null ? failing
+              : new Map([...entry.alwaysFailing].filter(([key]) => failing.has(key)));
+            entry.arrivals.set(factsKey(node.state.facts), node.state.facts);
+          },
+        }, known);
       }
     }
-    if (fresh.size > 0) { fresh.forEach((k) => keys.add(k)); return null; }
-    // With the ranges settled: which links some way takes, and why the others stay shut.
-    const taken = new Set<string>();
-    const shut = new Map<string, RangeClosure>();
-    for (const [id, ranges] of at) {
-      const beat = this.getBeat(id);
-      if (!beat) continue;
-      this.rangeSteps(beat, ranges, start, probe, {
-        taken: (to) => taken.add(`${id}\u0000${to}`),
-        shut: (to, why) => { if (!shut.has(`${id}\u0000${to}`)) shut.set(`${id}\u0000${to}`, why); },
-      });
-    }
+    const hullAt = (beatId: string): Map<string, Range> | undefined => {
+      const list = byBeat.get(beatId);
+      if (!list) return undefined;
+      const out = new Map<string, Range>();
+      for (const n of list) for (const [k, r] of n.state.ranges) out.set(k, out.has(k) ? hull(out.get(k)!, r) : r);
+      return out;
+    };
+    const inRanges = (ranges: ReadonlyMap<string, Range>, state: SimulationState): boolean => {
+      for (const [k, v] of state.counters) {
+        const n = typeof v === 'number' ? v : Number(v) || 0;
+        const r = ranges.get(k) ?? [0, 0];
+        if (!(n >= r[0] && n <= r[1])) return false;
+      }
+      return true;
+    };
     return {
-      reached: new Set(at.keys()),
-      at: (beatId) => at.get(beatId),
-      closed: (fromId, toId) => (at.has(fromId) && !taken.has(`${fromId}\u0000${toId}`) ? shut.get(`${fromId}\u0000${toId}`) ?? null : null),
+      reached: new Set(byBeat.keys()),
+      at: hullAt,
+      holds: (beatId, state) => (byBeat.get(beatId) ?? []).some((n) => track.every((k) => {
+        const v = n.state.facts.get(k);
+        return v === ANY_VALUE || Object.is(v, readFact(state, k));
+      }) && inRanges(n.state.ranges, state)),
+      closed: (fromId, toId) => {
+        const k = `${fromId}\u0000${toId}`;
+        const entry = byBeat.has(fromId) && !taken.has(k) ? shut.get(k) : undefined;
+        if (!entry) return null;
+        // One condition no arrival meets says it best; else all of a way's together.
+        const alone = entry.alwaysFailing && entry.alwaysFailing.size > 0 && !entry.earlierLine ? [...entry.alwaysFailing.values()] : null;
+        const about = alone ?? [...entry.conditions.values()];
+        const values = [...entry.values];
+        const combos = [...new Set([...entry.arrivals.values()].map((f) => describeFacts(f, about)).filter((c): c is string => !!c))];
+        if (combos.length > 0) {
+          const shown = combos.slice(0, 3);
+          values.push(`players arrive there with ${shown.join(', or with ')}${combos.length > shown.length ? `, or ${combos.length - shown.length} more ways` : ''}`);
+        }
+        return {
+          conditions: about, values,
+          ...(!alone && entry.ways.size > 1 ? { ways: [...entry.ways.values()] } : {}),
+          ...(entry.earlierLine ? { earlierLine: true } : {}),
+        };
+      },
     };
   }
 
   /**
-   * Where players at this beat go next, and the ranges they arrive with — the
-   * situation search's step (expand), over ranges: a branch is left out only
-   * when its gate certainly fails for every value in them.
+   * Where players at this beat go next, and what they arrive with — the
+   * situation search's step (expand), over ranges and tracked facts: a branch
+   * is left out only when its gate certainly fails there.
    */
   private rangeSteps(
     beat: Beat,
-    ranges: Map<string, Range>,
+    from: AbsState,
     start: string,
-    probe: (id: string, step: (s: SimulationState) => SimulationState) => Map<string, Change>,
+    probe: (id: string, beat: Beat, from: AbsState, step: (s: SimulationState) => SimulationState) => AbsState,
     note?: { taken: (to: string) => void; shut: (to: string, why: RangeClosure) => void },
-  ): Array<{ to: string; ranges: Map<string, Range> }> {
-    const out: Array<{ to: string; ranges: Map<string, Range> }> = [];
-    const go = (to: string | null | undefined, next: Map<string, Range>) => {
+    known?: CounterRangeFacts,
+  ): Array<{ to: string; state: AbsState }> {
+    const out: Array<{ to: string; state: AbsState }> = [];
+    const go = (to: string | null | undefined, next: AbsState) => {
       if (!to) return;
-      out.push({ to, ranges: next });
+      // Already ruled out by an earlier check: no way of playing goes there.
+      if (known && (!known.reached.has(to) || known.closed(beat.id, to))) return;
+      out.push({ to, state: next });
       note?.taken(to);
     };
-    const via = (change: Map<string, Change>): Map<string, Range> => {
-      const next = new Map(ranges);
-      for (const [k, f] of change) next.set(k, applyChange(next.get(k) ?? [0, 0], f));
-      return next;
-    };
-    const rangeIn = (r: Map<string, Range>) => (key: string): Range => r.get(key) ?? [0, 0];
 
     // Requirements unmet send players elsewhere before the beat shows.
     const requires = (beat as any).requires as any[] | undefined;
     if (Array.isArray(requires) && requires.length > 0) {
-      const checks = requires.map((req) => ({ req, ok: !req?.condition ? true as Verdict : this.rangeVerdict(req.condition, rangeIn(ranges)) }));
+      const checks = requires.map((req) => ({ req, ok: !req?.condition ? true as Verdict : this.rangeVerdict(req.condition, from) }));
       let shows = true;
       if ((beat as any).requiresMode === 'any') {
         const some = anyOf(checks.map((c) => c.ok));
         const fallback = checks.find((c) => c.req?.fallbackTarget)?.req.fallbackTarget;
-        if (some !== true && fallback) { go(fallback, ranges); if (some === false) shows = false; }
+        if (some !== true && fallback) { go(fallback, from); if (some === false) shows = false; }
       } else {
         for (const c of checks) {
           if (c.ok === true) continue;
           const fallback = c.req?.fallbackTarget;
-          if (fallback) go(fallback, ranges);
+          if (fallback) go(fallback, from);
           if (c.ok === false) { if (fallback) shows = false; break; }
         }
       }
       if (!shows) return out;
     }
 
-    const after = via(probe(`${beat.id}\u0000beat`, (s) => this.applyBeatEffects(beat, s)));
-    const rangeAfter = rangeIn(after);
-    const valuesOf = (conditions: any[], r: (key: string) => Range): string[] => {
-      const out: string[] = [];
+    const after = probe(`${beat.id}\u0000beat`, beat, from, (s) => this.applyBeatEffects(beat, s));
+    const valuesOf = (conditions: any[], at: AbsState): string[] => {
+      const words: string[] = [];
       for (const c of conditions) {
         if (!c || typeof c !== 'object') continue;
         const names = c.type === 'counter' ? [c.variableName || c.variable || c.left]
           : c.type === 'counterCompare' ? [c.counter1, c.counter2] : [];
         for (const name of names) {
           if (!name) continue;
-          const words = describeRange(name, r(this.counterKey(c.character, name)));
-          if (words && !out.includes(words)) out.push(words);
+          const w = describeRange(name, at.ranges.get(this.counterKey(c.character, name)) ?? [0, 0]);
+          if (w && !words.includes(w)) words.push(w);
         }
       }
-      return out;
+      return words;
     };
     // Every choice hidden: the beat's own link (linkWhenAllHidden), over ranges.
-    const hiddenLinks = (r: (key: string) => Range): { targets: string[]; maybeNone: boolean } => {
+    const hiddenLinks = (at: AbsState): { targets: string[]; maybeNone: boolean } => {
       if (beat.type === 'dialogTree') return { targets: [], maybeNone: true };
       const links: Connection[] = (beat as any).connections ?? [];
       const targets: string[] = [];
       for (const c of links) {
         if (!c.condition) continue;
-        const v = Array.isArray(c.condition) ? undefined : this.rangeVerdict(c.condition, r);
+        const v = Array.isArray(c.condition) ? undefined : this.rangeVerdict(c.condition, at);
         if (v === false) continue;
         targets.push(c.targetId);
         if (v === true) return { targets, maybeNone: false };
@@ -1273,30 +1578,33 @@ export class StateSimulationAnalyzer {
       return { targets, maybeNone: !fallback };
     };
 
-    if (this.isTerminalBeat(beat)) {
+    let terminal = this.rangeTerminal.get(beat.id);
+    if (terminal === undefined) this.rangeTerminal.set(beat.id, (terminal = this.isTerminalBeat(beat)));
+    if (terminal) {
       if (beat.type === 'endScreen' && beat.getParameters().showRestart !== false) {
-        const replay = via(probe(`${beat.id}\u0000replay`, (s) => this.stateAfterReplay(beat, this.applyBeatEffects(beat, s))));
-        const { targets, maybeNone } = hiddenLinks(rangeIn(replay));
+        const replay = probe(`${beat.id}\u0000replay`, beat, from, (s) => this.stateAfterReplay(beat, this.applyBeatEffects(beat, s)));
+        const { targets, maybeNone } = hiddenLinks(replay);
         for (const t of targets) go(t, replay);
         if (maybeNone && beat.getParameters().reset === true) go(start, replay);
       }
       return out;
     }
-    const connections = this.getConnections(beat);
+    let connections = this.rangeLinks.get(beat.id);
+    if (!connections) this.rangeLinks.set(beat.id, (connections = this.getConnections(beat)));
     if (connections.length === 0) return out;
-    const along = (i: number, conn: Connection, choice: boolean) => via(probe(`${beat.id}\u0000${i}`, (s) => {
+    const along = (i: number, conn: Connection, choice: boolean) => probe(`${beat.id}\u0000${i}`, beat, from, (s) => {
       const entered = this.applyBeatEffects(beat, s);
       const next = choice ? this.applyChoiceEffects(beat, cloneState(entered), i, conn) : cloneState(entered);
       this.applyEffectsList(conn.effects, next);
       return next;
-    }));
+    });
 
     if (beat.type === 'conditionBeat') {
       const params: any = beat.getParameters();
       const asked = this.getCondition(beat);
       const more: any[] = Array.isArray(params.moreConditions) ? params.moreConditions : [];
-      const firstAnswer = asked ? this.rangeVerdict(asked, rangeAfter) : true;
-      const answers = [firstAnswer, ...more.map((c) => this.rangeVerdict(c, rangeAfter))];
+      const firstAnswer = asked ? this.rangeVerdict(asked, after) : true;
+      const answers = [firstAnswer, ...more.map((c) => this.rangeVerdict(c, after))];
       const yes = more.length === 0 ? firstAnswer : params.conditionsMatch === 'any' ? anyOf(answers) : allOf(answers);
       const label = (c: Connection) => c.label?.toLowerCase();
       const yesLink = connections.find((c) => label(c) === 'true' || label(c) === 'yes') ?? connections[0];
@@ -1304,17 +1612,17 @@ export class StateSimulationAnalyzer {
       const asks = [asked, ...more].filter(Boolean);
       for (const [link, possible] of [[yesLink, yes !== false], [noLink, yes !== true]] as const) {
         if (possible) go(link.targetId, along(connections.indexOf(link), link, false));
-        else note?.shut(link.targetId, { conditions: asks, values: valuesOf(asks, rangeAfter) });
+        else note?.shut(link.targetId, { conditions: asks, values: valuesOf(asks, after) });
       }
     } else if (this.isChoiceBeat(beat) || this.hasTimedExit(beat)) {
-      const offers = connections.map((conn) => this.rangeOffered(beat, conn, rangeAfter));
+      const offers = connections.map((conn) => this.rangeOffered(beat, conn, after));
       if (offers.every((o) => o.offered !== true)) {
-        for (const t of hiddenLinks(rangeAfter).targets) go(t, after);
+        for (const t of hiddenLinks(after).targets) go(t, after);
       }
       connections.forEach((conn, i) => {
         const { offered, closure } = offers[i];
         if (offered === false) {
-          if (closure) note?.shut(conn.targetId, { ...closure, values: valuesOf(closure.conditions, rangeAfter) });
+          if (closure) note?.shut(conn.targetId, { ...closure, values: valuesOf(closure.conditions, after) });
           return;
         }
         if (this.isNeverDrawn(beat, conn)) return;
@@ -1326,35 +1634,40 @@ export class StateSimulationAnalyzer {
     return out;
   }
 
-  /** choiceOffered over ranges: certainly on screen, certainly not (and why), or it depends. */
-  private rangeOffered(beat: Beat, connection: Connection, range: (key: string) => Range): { offered: Verdict; closure?: Omit<RangeClosure, 'values'> } {
+  /** choiceOffered over ranges and tracked facts: certainly on screen, certainly not (and why), or it depends. */
+  private rangeOffered(beat: Beat, connection: Connection, at: AbsState): { offered: Verdict; closure?: Omit<RangeClosure, 'values'> } {
     const conds: any[] = [];
     const own: any = connection.condition;
     if (Array.isArray(own)) conds.push(...own); else if (own) conds.push(own);
     const unless: any[][] = [];
     if (beat.type === 'dialogTree') {
-      const tree = beat.getParameters().dialogTree;
       const target = connection.targetId === beat.id ? '__self__' : connection.targetId;
-      for (const step of (connection as any).route ?? this.dialogPathTo(tree, target, connection.label)) {
+      for (const step of (connection as any).route ?? this.dialogPathTo(beat.getParameters().dialogTree, target, connection.label)) {
         if (Array.isArray(step.choice?.conditions)) conds.push(...step.choice.conditions);
         unless.push(...(step.unless ?? []));
       }
     }
-    const own_ = conds.map((c) => ({ c, v: this.rangeVerdict(c, range) }));
-    const earlier = unless.map((list) => ({ list, v: allOf(list.map((c) => this.rangeVerdict(c, range))) }));
-    const offered = allOf([...own_.map((x) => x.v), ...earlier.map((x) => not(x.v))]);
+    const ownVerdicts = conds.map((c) => ({ c, v: this.rangeVerdict(c, at) }));
+    const earlier = unless.map((list) => ({ list, v: allOf(list.map((c) => this.rangeVerdict(c, at))) }));
+    const offered = allOf([...ownVerdicts.map((x) => x.v), ...earlier.map((x) => not(x.v))]);
     if (offered !== false) return { offered };
-    const failing = own_.filter((x) => x.v === false).map((x) => x.c);
-    if (failing.length > 0) return { offered, closure: { conditions: failing } };
+    const failing = ownVerdicts.filter((x) => x.v === false).map((x) => x.c);
+    // Named with the other conditions of the way: together they are what can't all hold.
+    if (failing.length > 0) return { offered, closure: { conditions: conds.filter(Boolean), failing } };
     const always = earlier.find((x) => x.v === true);
     return { offered, closure: always ? { conditions: always.list, earlierLine: true } : undefined };
   }
 
-  /** evaluateCondition over ranges, for what ranges can decide: counters. Anything else depends (undefined). */
-  private rangeVerdict(c: any, range: (key: string) => Range): Verdict {
+  /**
+   * evaluateCondition over ranges and tracked facts, for what they can decide:
+   * counters by their ranges, tracked variables, visits and items by their
+   * value. Anything else depends (undefined).
+   */
+  private rangeVerdict(c: any, at: AbsState): Verdict {
     if (!c) return true;
     if (typeof c !== 'object' || Array.isArray(c)) return undefined;
     const operator = c.operator;
+    const range = (key: string): Range => at.ranges.get(key) ?? [0, 0];
     if (c.type === 'counter') {
       const name = c.variableName || c.variable || c.left;
       if (!name) return false;
@@ -1372,7 +1685,18 @@ export class StateSimulationAnalyzer {
       const owner = c.character;
       return compareRanges(range(this.counterKey(owner, c.counter1 || '')), operator, range(this.counterKey(owner, c.counter2 || '')));
     }
-    return undefined;
+    // Facts it follows exactly: ask the simulator itself, on a state holding just them.
+    const read = factsRead(c);
+    if (read.length === 0 || read.some((k) => !at.facts.has(k) || at.facts.get(k) === ANY_VALUE)) return undefined;
+    const s = createInitialState();
+    for (const k of read) {
+      const v = at.facts.get(k);
+      const name = k.slice(2);
+      if (k[0] === 'v') { if (v !== undefined) s.variables.set(name, v as any); }
+      else if (k[0] === 'b') { if (v) s.visitedBeats.add(name); }
+      else setPlayerQuantity(s, name, Number(v) || 0);
+    }
+    return this.evaluateCondition(c, s);
   }
 
   /**

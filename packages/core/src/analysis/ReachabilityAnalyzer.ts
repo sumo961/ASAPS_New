@@ -1067,7 +1067,9 @@ export class ReachabilityAnalyzer {
   /** A link the counter ranges shut, in words: the check, and the values that settle it. */
   private rangeClosedDetails(fromId: string, why: RangeClosure, nameOf: (id: string) => string): string {
     const from = this.story.getBeat(fromId);
-    const gates = why.conditions.map((c) => describeGate(c, nameOf)).join(' and ');
+    const each = (list: any[]) => list.map((c) => describeGate(c, nameOf)).join(' and ');
+    const ways = why.ways && why.ways.length > 1 ? why.ways : [why.conditions];
+    const gates = ways.length === 1 ? each(ways[0]) : `either ${ways.map(each).join('; or ')}`;
     const values = why.values.length > 0 ? `, and ${why.values.join(' and ')}` : '';
     if (from?.type === 'conditionBeat') {
       return `"${from.name}" checks ${gates}${values}, so the answer always sends players the other way: this branch never runs`;

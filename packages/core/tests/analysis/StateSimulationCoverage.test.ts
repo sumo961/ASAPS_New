@@ -973,3 +973,98 @@ describe('counter ranges, worked out before the search (2026-11-03)', () => {
     expect(analyzer.rangeFacts).toBeNull();
   });
 });
+
+describe('links that need several things at once (2026-11-03)', () => {
+  const stop = (id: string) => ({ id, type: 'endScreen', parameters: { message: id, showRestart: false } });
+  const is = (name: string, value: string) => ({ type: 'variable', variableName: name, operator: '==', value });
+  const setTo = (name: string, value: string) => [{ type: 'setVariable', target: name, value }];
+  const check = (s: Story, maxSituations: number) => {
+    const analyzer = new StateSimulationAnalyzer(s);
+    const search = analyzer.exploreSituations({ maxSituations, maxAimed: 0 });
+    const beats = new ReachabilityAnalyzer(s, {
+      playedBeats: new Set(search.perBeat.keys()),
+      searchLimited: analyzer.searchLimited,
+      ranges: analyzer.rangeFacts,
+      gatesOnTheWay: (from, to) => analyzer.gatesOnTheWay(from, to, (search.arrivals.get(from) ?? []).map((a) => a.state)),
+    }).analyze().unreachableBeats;
+    return { analyzer, search, beat: (id: string) => beats.find((u) => u.beatId === id) };
+  };
+  // North sets one, south the other: no way has both.
+  const forks = (oneWayBoth = false) => story([
+    { id: 'start', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'n', text: 'North', target: oneWayBoth ? 'also' : 'mid', effects: setTo('a', 'x') },
+      { id: 's', text: 'South', target: 'mid', effects: setTo('b', 'y') },
+    ] } },
+    { id: 'also', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'mid', effects: setTo('b', 'y') }] },
+    { id: 'mid', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'both', text: 'Both', target: 'treasure', conditions: [is('a', 'x'), is('b', 'y')] },
+      { id: 'leave', text: 'Leave', target: 'end' },
+    ] } },
+    { id: 'treasure', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] },
+    stop('end'),
+  ]);
+
+  it('rules out a choice that needs two values no way of playing has together', () => {
+    const { analyzer, beat } = check(forks(), 3);
+    expect(analyzer.searchLimited).toBe(true);
+    const treasure = beat('treasure')!;
+    expect(treasure.unsure).toBeUndefined();
+    expect(treasure.details).toContain('it needs a == x and b == y');
+    expect(treasure.details).toContain('a x and b unset');
+    expect(treasure.details).toContain('a unset and b y');
+  });
+
+  it('keeps it open when one way sets both, and the search plays it', () => {
+    expect(new StateSimulationAnalyzer(forks(true)).counterRanges(['v\u0001a', 'v\u0001b'])!.reached.has('treasure')).toBe(true);
+    expect(new StateSimulationAnalyzer(forks(true)).exploreSituations().perBeat.has('treasure')).toBe(true);
+  });
+
+  it('rules out an item asked for before anything gives it', () => {
+    const s = story([
+      { id: 'door', type: 'multiChoice', parameters: { question: 'q', choices: [
+        { id: 'p', text: 'Pay', target: 'vault', conditions: [{ type: 'inventory', operator: 'contains', item: 'Gold' }] },
+        { id: 'w', text: 'Walk', target: 'shop' },
+        { id: 'x', text: 'Wait', target: 'shop' },
+      ] } },
+      { id: 'shop', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end', effects: [{ type: 'addInventory', target: 'Gold' }] }] },
+      { id: 'vault', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] },
+      stop('end'),
+    ]);
+    const vault = check(s, 2).beat('vault')!;
+    expect(vault.unsure).toBeUndefined();
+    expect(vault.details).toContain('players arrive there with no Gold');
+  });
+
+  it('starts each check from what the others ruled out', () => {
+    // b is set to y only behind a choice that needs a visit nobody makes first.
+    const s = story([
+      { id: 'start', type: 'multiChoice', parameters: { question: 'q', choices: [
+        { id: 'k', text: 'Knock', target: 'setter', conditions: [{ type: 'visitedBeat', operator: '==', beatId: 'later' }] },
+        { id: 'g', text: 'Go', target: 'later' },
+      ] } },
+      { id: 'setter', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'later', effects: setTo('b', 'y') }] },
+      { id: 'later', type: 'multiChoice', parameters: { question: 'q', choices: [
+        { id: 'y', text: 'Yes', target: 'prize', conditions: [is('b', 'y')] },
+        { id: 'n', text: 'No', target: 'end' },
+      ] } },
+      { id: 'prize', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] },
+      stop('end'),
+    ]);
+    const { beat } = check(s, 3);
+    expect(beat('setter')!.unsure).toBeUndefined();
+    expect(beat('prize')!.unsure).toBeUndefined();
+  });
+
+  it('leaves what players type open', () => {
+    const s = story([
+      { id: 'ask', type: 'inputText', parameters: { prompt: 'Name?', saveToType: 'variable', variable: 'name' }, connections: [{ targetId: 'gate' }] },
+      { id: 'gate', type: 'multiChoice', parameters: { question: 'q', choices: [
+        { id: 'b', text: 'Bob', target: 'secret', conditions: [is('name', 'Bob')] },
+        { id: 'l', text: 'Leave', target: 'end' },
+      ] } },
+      { id: 'secret', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] },
+      stop('end'),
+    ]);
+    expect(new StateSimulationAnalyzer(s).counterRanges(['v\u0001name'])!.reached.has('secret')).toBe(true);
+  });
+});

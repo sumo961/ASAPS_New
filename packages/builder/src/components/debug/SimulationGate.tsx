@@ -54,7 +54,9 @@ export const SearchLimitNote: React.FC<{ unsure?: number }> = ({ unsure }) => (
       ? 'An unreachable beat here is one it did not find, so it may still be possible to reach it.'
       : unsure === 0
         ? 'Even so, every unreachable beat here is unreachable whatever players do: no link that can open leads to it.'
-        : `${unsure === 1 ? 'One unreachable beat, marked “may be reachable”, is' : `${unsure} unreachable beats, marked “may be reachable”, are`} ones it did not find: a way of playing it did not try may still get there. Every other unreachable beat is unreachable whatever players do.`}
+        : `${unsure === 1
+          ? 'One unreachable beat, marked “may be reachable”, is one it did not find'
+          : `${unsure} unreachable beats, marked “may be reachable”, are ones it did not find`}: a way of playing it did not try may still get there. Every other unreachable beat is unreachable whatever players do.`}
   </div>
 );
 
