@@ -1,5 +1,17 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.155, 2026-11-03)
+
+### Overview
+A fix found while taking the User Guide screenshots for v0.9.155.
+
+### Fix: the Debug window never finished on a story whose Restart keeps feelings
+- The situation search followed an end screen's Restart every time it led somewhere new. With **Reset** off, a story with feelings (or any total a check reads) starts each replay from a new state, so the search replayed again and again, each step slower as the carried-over state grew: on a copy of The Last Ferry with one ending's Reset turned off, Problems never appeared, and in the web build the main window froze with it (the Debug window shares its thread there). It now follows at most three Replays on one way of playing; cutting one off counts as stopping short, so beats only later replays could reach stay "may be reachable" / "only after replays" rather than certain, and the counter ranges, which follow every Replay, still decide what is certain. That copy now takes 17 ms. Student stories: same beats played and the same findings; group 3's search fell from 170,000 situations to 1,177 (3 s → 0.1 s). None of the templates turn Reset off, which is why the release checks didn't meet it.
+
+**Files modified:** packages/core/src/analysis/StateSimulationAnalyzer.ts; tests/analysis/StateSimulationCoverage.test.ts
+
+---
+
 ## 2026-11-03: The Problems release (v0.9.155)
 
 ### Overview

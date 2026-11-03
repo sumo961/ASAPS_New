@@ -1141,3 +1141,21 @@ describe('counters that move together (2026-11-03)', () => {
     expect(new StateSimulationAnalyzer(s).exploreSituations().perBeat.has('hit')).toBe(true);
   });
 });
+
+describe('a Restart that keeps what players did (2026-11-03)', () => {
+  it('is followed a few times, not forever, and the search says it stopped short', () => {
+    // Every run adds to the tally and nothing resets it: each replay is new.
+    const s = story([
+      { id: 'start', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'check', effects: [{ type: 'incrementCounter', target: 'tally', value: 1 }] }] },
+      // A check far ahead reads the tally, so no two runs are the same.
+      { id: 'check', type: 'conditionBeat', parameters: { conditionType: 'counter', condition: { type: 'counter', variableName: 'tally', operator: '>=', value: 100 }, trueTarget: 'won', falseTarget: 'again' } },
+      { id: 'again', type: 'endScreen', parameters: { message: 'again', showRestart: true, reset: false }, connections: [{ targetId: 'start' }] },
+      { id: 'won', type: 'endScreen', parameters: { message: 'won', showRestart: false } },
+    ]);
+    const t = performance.now();
+    const search = new StateSimulationAnalyzer(s).exploreSituations();
+    expect(performance.now() - t).toBeLessThan(2000);
+    expect(search.situations).toBeLessThan(20);
+    expect(search.complete).toBe(false);
+  });
+});

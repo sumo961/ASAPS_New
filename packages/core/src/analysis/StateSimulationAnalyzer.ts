@@ -199,6 +199,8 @@ function removeItem(state: SimulationState, bag: string, item: string, quantity:
 
 /** How a path going on past an end screen records that decision. */
 const REPLAY_DECISION = 'Replay';
+/** Replays the situation search follows on one way of playing. */
+const MAX_SITUATION_REPLAYS = 3;
 
 /** Target of a route that ends the story: no beat has this id. */
 const STORY_STOPS = '__story_stops__';
@@ -706,7 +708,8 @@ export class StateSimulationAnalyzer {
     let rangesHold = !!ranges;
     const open = ranges?.reached;
     const keyOf = this.stateThatDecidesGates(new Map(this.story.getAllBeats().filter((b) => !open || open.has(b.id)).map((b) => [b.id, 0])));
-    interface Item { beatId: string; state: SimulationState; parent: number; via: SituationStep | null; start: string }
+    /** `runs`: Replays taken on the way here. */
+    interface Item { beatId: string; state: SimulationState; parent: number; via: SituationStep | null; start: string; runs: number }
     interface Arrived { state: SimulationState; parent: number; count: number; start: string }
     const arrived = new Map<string, Map<string, Arrived>>();
     const trapAt = new Map<string, boolean>();
@@ -749,7 +752,7 @@ export class StateSimulationAnalyzer {
       if (item) waiting--;
       return item;
     };
-    const push = (beatId: string, state: SimulationState, parent: number, via: SituationStep | null, start: string) => {
+    const push = (beatId: string, state: SimulationState, parent: number, via: SituationStep | null, start: string, runs = 0) => {
       if (!this.getBeat(beatId) && parent >= 0) {
         const from = parents[parent].step;
         result.stops.add(from.beatId);
@@ -776,9 +779,9 @@ export class StateSimulationAnalyzer {
       }
       seen.add(key);
       // Beats nobody has played yet go first: reach before thoroughness.
-      if (!result.perBeat.has(beatId)) fresh.push({ beatId, state, parent, via, start });
-      else if (aimed) aimed.file({ beatId, state, parent, via, start });
-      else file({ beatId, state, parent, via, start });
+      if (!result.perBeat.has(beatId)) fresh.push({ beatId, state, parent, via, start, runs });
+      else if (aimed) aimed.file({ beatId, state, parent, via, start, runs });
+      else file({ beatId, state, parent, via, start, runs });
     };
     let aimed: { file: (item: Item) => void } | null = null;
     for (const state of this.initialStates()) {
@@ -793,19 +796,19 @@ export class StateSimulationAnalyzer {
       result.situations++;
       result.perBeat.set(beat.id, (result.perBeat.get(beat.id) ?? 0) + 1);
       const redirect = this.requirementRedirect(beat, item.state);
-      if (redirect) { push(redirect, item.state, item.parent, item.via, item.start); return; }
+      if (redirect) { push(redirect, item.state, item.parent, item.via, item.start, item.runs); return; }
       const me = parents.length;
       parents.push({ parent: item.parent, step: { beatId: beat.id, label: '', replies: [] } });
       if (!result.routes.has(beat.id)) result.routes.set(beat.id, me);
       const state = this.applyBeatEffects(beat, item.state);
-      const on = (conn: Connection | null, target: string, next: SimulationState) => {
+      const on = (conn: Connection | null, target: string, next: SimulationState, replay = false) => {
         const step: SituationStep = {
           beatId: beat.id, next: target, label: conn?.label ?? '',
           replies: ((conn as any)?.route ?? []).filter((st: any) => st.choice).map((st: any) => String(st.choice.text ?? '')),
         };
         const at = parents.length;
         parents.push({ parent: me, step });
-        push(target, next, at, step, item.start);
+        push(target, next, at, step, item.start, item.runs + (replay ? 1 : 0));
       };
       if (this.isTerminalBeat(beat)) {
         if (['endScreen', 'aiSummary'].includes(beat.type)) {
@@ -813,8 +816,12 @@ export class StateSimulationAnalyzer {
           if (beat.type === 'endScreen' && beat.getParameters().showRestart !== false) {
             const after = this.stateAfterReplay(beat, state);
             const link = this.linkWhenAllHidden(beat, after);
-            if (link) on(null, link, after);
-            else if (beat.getParameters().reset === true && hashState(after) !== hashState(this.seededInitialState())) on(null, startBeatId, after);
+            const again = link ?? (beat.getParameters().reset === true && hashState(after) !== hashState(this.seededInitialState()) ? startBeatId : null);
+            // A Restart that keeps what players did starts from somewhere new
+            // each time (feelings, totals): followed a few times, not forever.
+            // Cut off, the search counts as stopped short.
+            if (again && item.runs >= MAX_SITUATION_REPLAYS) result.complete = false;
+            else if (again) on(null, again, after, true);
           }
         } else if (this.loopsOnItself(beat)) result.traps.add(beat.id);
         else result.stops.add(beat.id);
