@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.155*
+*Last revised against v0.9.156*
 
 ---
 
@@ -3488,9 +3488,9 @@ Each entry names the problem and the beat (*Dead end: The cellar*) and says in a
 **Problems on beats nobody reaches wait their turn.** A fault on a beat no way of playing reaches yet is shown as a note, with *(No way of playing reaches this beat yet.)*: no player meets it until the beat is linked in. The entry that says why the beat is unreached keeps its place.
 
 ![Debug Tools — Problems tab](images/109-debug-problems.png)
-*The Problems tab on a copy of The Last Ferry with three mistakes put in: a misspelled name (an error), a choice that needs more coins than one playthrough gives (a warning, marked "only after replays" because one ending's Restart keeps the coins), and that ending's Restart keeps values (a note).*
+*The Problems tab on a copy of The Last Ferry with three mistakes put in: a misspelled name (an error), a beat that needs more coins than one playthrough gives (Never on offer: The steward's cabin, 1 more beat behind it, marked "only after replays" because one ending's Restart keeps the coins), and that ending's Restart keeps values (a note). A second warning says some players reach Halfway with every choice hidden.*
 
-When nothing turns up, the tab says **No problems found.** Problems is about structure and state. To check whether what a beat *says* holds for everyone who gets there, use [Check with AI](#check-with-ai) in Story Logic.
+When nothing turns up, the tab says **No problems found.** If the search stopped short, it adds why: *No problems found, but this story is too large to try every way through*, or *No problems found, but the search followed only a few replays of a Restart that keeps values* ([see below](#search-limit)). Problems is about structure and state. To check whether what a beat *says* holds for everyone who gets there, use [Check with AI](#check-with-ai) in Story Logic.
 
 <a id="story-warnings"></a>
 #### What the warnings mean
@@ -3537,7 +3537,7 @@ Every other unreachable beat in the list is certain.
 ### Reachability
 
 ![Debug Tools — Reachability tab](images/31-debug-reachability.png)
-*The Reachability tab shows total beats, how many players can reach, how many nothing links to, and each unreachable beat with why. Here the search note says it followed only a few replays of a Restart that keeps values, and the one beat only replays could reach is marked "only after replays". Click a beat to highlight it on the main flowchart.*
+*The Reachability tab shows total beats, how many players can reach, how many nothing links to, and each unreachable beat with why. Here the search note says it followed only a few replays of a Restart that keeps values, and the two beats only replays could reach are marked "only after replays". Click a beat to highlight it on the main flowchart.*
 
 Reachability is the long version of the unreachable entries in Problems: every beat, sorted. The summary cards count **Total Beats**, **Reachable**, **Unreachable** and **Nothing links here**. Below them, expand *Reachable Beats*, *Broken Connections*, *Unreachable Beats*, *Nothing links here*, *Warnings* and *Unreachable Condition Branches* to drill into the specifics; the search box filters the beat lists by name.
 
@@ -3599,7 +3599,7 @@ With an AI provider set up, the **AI findings** section at the bottom of Story L
    - **Not a problem**: dismisses the finding.
 
 ![Check with AI — a finding with a proposed fix](images/110-check-with-ai-finding.png)
-*Check with AI on The Last Ferry: the captain calls the player "the only passenger still awake", but Boarding has just shown a family that isn't asleep. Propose a fix offers a one-line edit, tried on a copy first, with Apply and Decline. Above it, what the check cost.*
+*Check with AI on The Last Ferry: the captain calls the player "the only passenger still awake", but Boarding has just shown a family that isn't asleep. Propose a fix offers a one-line edit, tried on a copy first, with Apply and Decline. Above it, what the check cost. (The template has since taken this fix: the captain now says "one of the few passengers still awake".)*
 
 Every finding has to quote words really in the beat and point at a state players really arrive in; anything that doesn't is left out, and the section says how many (*2 findings were left out: not grounded in the beat's words or states*). After a check it shows what the check really used (*Last check: …*), and a running total for all checks and fixes on this story.
 

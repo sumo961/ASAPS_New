@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.155** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.155 is the Problems release**:
+Current release: **v0.9.156** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.156 is a fix release**: the Debug
+window no longer keeps working forever on a story whose end screen's Restart
+keeps what players did while the story tracks feelings, and it says why it
+stopped early. "Start as if…" names role checks in plain words ("With Tomas as
+the confidant"), and The Last Ferry template's captain no longer calls the
+player the only passenger awake. The User Guide's Debug pictures are new.
+
+**v0.9.155 was the Problems release**:
 the Debug window opens on a Problems tab that lists everything its tools
 found in one place, worst first, and clicking a problem shows the beat.
 Checking a large story is much faster, and when it is too large to try every
