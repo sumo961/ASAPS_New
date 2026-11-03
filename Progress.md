@@ -92,7 +92,9 @@ Playing Birka V18 on the engine showed where Path Analysis disagreed, now fixed:
 - "Never on offer" now names the condition the players who get there don't meet, measured on the states they arrive in, and where the story sets it: for example "markFakeRole is set in "E3 - Mark DM Victor Mon" (to made or supplied or refused)", with "not reached" on setters no way of playing reaches.
 - This found three certain mistakes in the student stories: group 5's Greater Sword is only in the Merchant's and the Storage's bags and nothing gives it to the player; V18's "Stay in Birka" checks `folkertPath` as a counter against the text "stay"; a V18 Dialog Tree line sits behind a next line with no condition.
 
-**Files modified:** packages/core/src/analysis/ReachabilityAnalyzer.ts, StateSimulationAnalyzer.ts (gatesOnTheWay), index.ts; packages/builder/src/services/storySimulation.ts (reachabilityOf), components/debug/problems.ts, ProblemsPanel.tsx, ReachabilityReport.tsx, SimulationGate.tsx; tests/analysis/StateSimulationCoverage.test.ts
+- **Aimed at what's left:** when the search stops short, it now spends what remains on the links still never taken: only situations that meet such a link's conditions, nearest to it first, until 20,000 more find nothing. On group 1 this found "E3 - CHECK Mark Denied" after 355 situations (the one beat only the path search had found); it found nothing new on group 3 or V18, at about 1 s extra. On the Birka QA copy, beats marked "may be reachable" went from 14 to 10, Problems still opens in about 5 s.
+
+**Files modified:** packages/core/src/analysis/ReachabilityAnalyzer.ts, StateSimulationAnalyzer.ts (gatesOnTheWay, aimed phase), index.ts; packages/builder/src/services/storySimulation.ts (reachabilityOf), components/debug/problems.ts, ProblemsPanel.tsx, ReachabilityReport.tsx, SimulationGate.tsx; tests/analysis/StateSimulationCoverage.test.ts
 
 ---
 

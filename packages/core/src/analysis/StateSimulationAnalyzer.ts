@@ -261,6 +261,12 @@ export interface SituationConfig {
   maxSituations?: number;
   /** Stop after this many situations with nothing new found. */
   maxStalled?: number;
+  /**
+   * Stopped short, try this many more situations aimed at the links still
+   * never taken: only states that meet a closed link's conditions, nearest
+   * to it first. 0 turns it off.
+   */
+  maxAimed?: number;
 }
 
 /** What exploreSituations found. */
@@ -690,28 +696,23 @@ export class StateSimulationAnalyzer {
       seen.add(key);
       // Beats nobody has played yet go first: reach before thoroughness.
       if (!result.perBeat.has(beatId)) fresh.push({ beatId, state, parent, via, start });
+      else if (aimed) aimed.file({ beatId, state, parent, via, start });
       else file({ beatId, state, parent, via, start });
     };
+    let aimed: { file: (item: Item) => void } | null = null;
     for (const state of this.initialStates()) {
       const first = cloneState(state);
       push(startBeatId, first, -1, null, arrivalKey(first));
     }
     let found = 0;
     let lastFind = 0;
-    while (fresh.length > 0 || waiting > 0) {
-      const finds = result.perBeat.size + result.endings.size + result.stops.size + result.traps.size + this.shownReplies.size;
-      if (finds !== found) { found = finds; lastFind = result.situations; }
-      if (result.situations >= maxSituations || result.situations - lastFind >= maxStalled) { result.complete = false; break; }
-      if (result.situations % 250 === 0) yield { expansions: result.situations, beatsReached: result.perBeat.size, pathsFound: 0, phase: 'situations' };
-      refreshDistance();
-      const item = fresh.pop() ?? take();
-      if (!item) break;
+    const expand = (item: Item): void => {
       const beat = this.getBeat(item.beatId);
-      if (!beat) continue;
+      if (!beat) return;
       result.situations++;
       result.perBeat.set(beat.id, (result.perBeat.get(beat.id) ?? 0) + 1);
       const redirect = this.requirementRedirect(beat, item.state);
-      if (redirect) { push(redirect, item.state, item.parent, item.via, item.start); continue; }
+      if (redirect) { push(redirect, item.state, item.parent, item.via, item.start); return; }
       const me = parents.length;
       parents.push({ parent: item.parent, step: { beatId: beat.id, label: '', replies: [] } });
       if (!result.routes.has(beat.id)) result.routes.set(beat.id, me);
@@ -736,10 +737,10 @@ export class StateSimulationAnalyzer {
           }
         } else if (this.loopsOnItself(beat)) result.traps.add(beat.id);
         else result.stops.add(beat.id);
-        continue;
+        return;
       }
       const connections = this.getConnections(beat);
-      if (connections.length === 0) { result.stops.add(beat.id); continue; }
+      if (connections.length === 0) { result.stops.add(beat.id); return; }
       if (beat.type === 'conditionBeat') {
         const yes = this.conditionBeatResult(beat, state);
         const taken = (yes
@@ -751,7 +752,7 @@ export class StateSimulationAnalyzer {
         if (offered.length === 0) {
           const link = this.linkWhenAllHidden(beat, state);
           if (link) { result.hiddenChoices.add(beat.id); on(null, link, state); } else result.stops.add(beat.id);
-          continue;
+          return;
         }
         connections.forEach((conn, i) => {
           if (!offered.includes(conn) || this.isNeverDrawn(beat, conn)) return;
@@ -764,6 +765,54 @@ export class StateSimulationAnalyzer {
         const next = cloneState(state);
         this.applyEffectsList(only.effects, next);
         on(only, only.targetId, next);
+      }
+    };
+    while (fresh.length > 0 || waiting > 0) {
+      const finds = result.perBeat.size + result.endings.size + result.stops.size + result.traps.size + this.shownReplies.size;
+      if (finds !== found) { found = finds; lastFind = result.situations; }
+      if (result.situations >= maxSituations || result.situations - lastFind >= maxStalled) { result.complete = false; break; }
+      if (result.situations % 250 === 0) yield { expansions: result.situations, beatsReached: result.perBeat.size, pathsFound: 0, phase: 'situations' };
+      refreshDistance();
+      const item = fresh.pop() ?? take();
+      if (!item) break;
+      expand(item);
+    }
+    // Stopped short: aim what's left at the links still never taken.
+    const maxAimed = config.maxAimed ?? 100000;
+    const maxAimedStalled = Math.min(maxAimed, 20000);
+    if (!result.complete && maxAimed > 0) {
+      const goals = this.closedLinkGoals(new Set(result.perBeat.keys()));
+      if (goals.length > 0) {
+        const near: Item[][] = [];
+        let queued = 0;
+        aimed = {
+          file: (item) => {
+            let best = Infinity;
+            for (const g of goals) {
+              const d = g.distance.get(item.beatId);
+              if (d !== undefined && d < best && g.holds(item.state)) best = d;
+            }
+            if (best < Infinity) { (near[best] ??= []).push(item); queued++; }
+          },
+        };
+        for (const item of [...fresh.splice(0), ...buckets.flat(), ...far.splice(0)]) aimed.file(item);
+        buckets.length = 0;
+        waiting = 0;
+        // Aimed well, a way through turns up soon (group 1's after 355): stop
+        // after a while with nothing new.
+        let lastAimFind = 0;
+        for (let spent = 0; spent < maxAimed; spent++) {
+          if (spent % 250 === 0) yield { expansions: result.situations, beatsReached: result.perBeat.size, pathsFound: 0, phase: 'situations' };
+          let item = fresh.pop();
+          if (!item && queued > 0) {
+            for (const list of near) { if (list?.length) { item = list.pop(); queued--; break; } }
+          }
+          if (!item) break;
+          const before = result.perBeat.size;
+          expand(item);
+          if (result.perBeat.size > before) lastAimFind = spent;
+          else if (spent - lastAimFind >= maxAimedStalled) break;
+        }
       }
     }
     const wayFrom = (parent: number): SituationStep[] => {
@@ -893,6 +942,56 @@ export class StateSimulationAnalyzer {
       necessaryBeats,
       analysisTime: performance.now() - startTime,
     };
+  }
+
+  /**
+   * The links from played beats to unplayed ones, each with what a state must
+   * hold to take it (a Condition beat's answer, or every gate on some way
+   * through) and how far each beat is from the link's beat.
+   */
+  private closedLinkGoals(played: Set<string>): Array<{ holds: (s: SimulationState) => boolean; distance: Map<string, number> }> {
+    const into = new Map<string, string[]>();
+    for (const beat of this.story.getAllBeats()) {
+      for (const c of analysisLinks(beat)) {
+        let list = into.get(c.targetId);
+        if (!list) into.set(c.targetId, (list = []));
+        list.push(beat.id);
+      }
+    }
+    const distanceTo = (goal: string): Map<string, number> => {
+      const d = new Map([[goal, 0]]);
+      const todo = [goal];
+      for (let i = 0; i < todo.length; i++) {
+        for (const from of into.get(todo[i]) ?? []) if (!d.has(from)) { d.set(from, d.get(todo[i])! + 1); todo.push(from); }
+      }
+      return d;
+    };
+    const goals: Array<{ holds: (s: SimulationState) => boolean; distance: Map<string, number> }> = [];
+    const distances = new Map<string, Map<string, number>>();
+    for (const beatId of played) {
+      const beat = this.getBeat(beatId);
+      if (!beat) continue;
+      for (const target of new Set(analysisLinks(beat).map((c) => c.targetId))) {
+        if (played.has(target) || !this.getBeat(target)) continue;
+        let holds: ((s: SimulationState) => boolean) | null = null;
+        if (beat.type === 'conditionBeat') {
+          const params: any = beat.getParameters();
+          const wantYes = target === params.trueTarget;
+          if (!wantYes && target !== params.falseTarget) continue;
+          holds = (s) => this.conditionBeatResult(beat, s) === wantYes;
+        } else {
+          const ways = this.gatesOnTheWay(beatId, target, []).filter((w) => !w.some((g) => g.neverShown) && w.length > 0);
+          if (ways.length === 0) continue;
+          holds = (s) => ways.some((w) => w.every((g) => {
+            const all = g.conditions.every((c) => !c || this.evaluateCondition(c, s));
+            return g.earlierLine ? !all : all;
+          }));
+        }
+        if (!distances.has(beatId)) distances.set(beatId, distanceTo(beatId));
+        goals.push({ holds, distance: distances.get(beatId)! });
+      }
+    }
+    return goals;
   }
 
   /**

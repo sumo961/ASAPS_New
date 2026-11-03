@@ -845,3 +845,24 @@ describe('what an unreachable beat says when the search stops short (2026-11-03)
     expect(hidden.unsure).toBeUndefined();
   });
 });
+
+describe('stopped short, the situation search aims at the links never taken', () => {
+  // The key comes the long way round, so the check is first met without it.
+  const build = () => story([
+    { id: 'start', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'b', text: 'Shop', target: 'shop', effects: [{ type: 'setVariable', target: 'key', value: 'yes' }] },
+      { id: 'a', text: 'Walk', target: 'hall' },
+    ] } },
+    { id: 'shop', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'hall' }] },
+    { id: 'hall', type: 'conditionBeat', parameters: { conditionType: 'variable', condition: { type: 'variable', variableName: 'key', operator: '==', value: 'yes' }, trueTarget: 'vault', falseTarget: 'end' } },
+    { id: 'vault', type: 'endScreen', parameters: { message: 'v', showRestart: false } },
+    { id: 'end', type: 'endScreen', parameters: { message: 'e', showRestart: false } },
+  ]);
+
+  it('tries the states that open a closed link before giving up', () => {
+    expect(new StateSimulationAnalyzer(build()).exploreSituations({ maxSituations: 4, maxAimed: 0 }).perBeat.has('vault')).toBe(false);
+    const aimed = new StateSimulationAnalyzer(build()).exploreSituations({ maxSituations: 4 });
+    expect(aimed.perBeat.has('vault')).toBe(true);
+    expect(aimed.complete).toBe(false);
+  });
+});
