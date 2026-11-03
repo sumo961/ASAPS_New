@@ -11,13 +11,14 @@ A fix found while taking the User Guide screenshots for v0.9.155.
 - **The limit note says why it stopped:** a search cut off only by the replay limit now says *This story has an end screen whose Restart keeps what players did, so each replay can start somewhere new; the search followed a few replays, not every one* instead of calling a 12-beat story "too large" (`StateSimulationAnalyzer.searchLimitReason`); the same in "No problems found, but…".
 
 ### Smaller fixes found while taking the screenshots
+- **The Last Ferry template:** Check with AI (run for the guide screenshot) caught the captain calling the player "the only passenger still awake" right after Boarding shows a family with too much luggage. The line now says "one of the few passengers still awake" (the AI's proposed fix).
 - **Start as if…** named a role check "a roleHolder condition"; it now reads "With Tomas as the confidant" (`describeGate` names roles and characters, also in Reachability's "Never on offer").
 - **Problems:** the "only after replays" mark sat between a beat's name and ", 1 more beat behind it"; it now follows them.
 
 ### User Guide
 - Header now "Last revised against v0.9.155". Screenshots retaken in the QA browser at 2×: 10 (Start as if… on "On the stairs", grouped by the beat's conditions), 31 (Reachability), 32 (Path Analysis Forward), 33 (Story Logic), and a new 109 (Problems, on a copy of The Last Ferry with three mistakes put in). Captions updated; the search-limit section explains the replay note. These show the wording of the fixes above, so they belong with the next release. New 110: a Check with AI finding with its proposed fix, taken in the desktop app's Debug window with its configured provider on a copy of The Last Ferry (one check, $0.06, plus one fix proposal; nothing applied) — the first Check with AI run in the desktop Debug window with a real provider. It found a true slip in the template: the captain calls the player "the only passenger still awake" right after Boarding shows a family with too much luggage.
 
-**Files modified:** packages/core/src/analysis/StateSimulationAnalyzer.ts, ReachabilityAnalyzer.ts; packages/builder/src/components/debug/SimulationGate.tsx, ProblemsPanel.tsx, ReachabilityReport.tsx, services/PathBasedPresetGenerator.ts; tests/analysis/StateSimulationCoverage.test.ts; docs/USER_GUIDE.md, docs/images/10, 31, 32, 33, 109, 110
+**Files modified:** packages/core/src/analysis/StateSimulationAnalyzer.ts, ReachabilityAnalyzer.ts; packages/builder/src/components/debug/SimulationGate.tsx, ProblemsPanel.tsx, ReachabilityReport.tsx, services/PathBasedPresetGenerator.ts, public/templates/last-ferry.asapst + src/last-ferry.project.json; tests/analysis/StateSimulationCoverage.test.ts; docs/USER_GUIDE.md, docs/images/10, 31, 32, 33, 109, 110
 
 ---
 

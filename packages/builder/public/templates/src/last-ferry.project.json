@@ -128,7 +128,7 @@
                "dialogNode": {
                 "id": "n_ask",
                 "speaker": "@captain",
-                "text": "${@player.name}. You're the only passenger still awake, and you heard them both. If this were your ship — what would you do?",
+                "text": "${@player.name}. You're one of the few passengers still awake, and you heard them both. If this were your ship — what would you do?",
                 "choices": [
                  {
                   "id": "side_ingrid",
