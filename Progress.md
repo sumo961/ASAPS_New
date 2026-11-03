@@ -8,7 +8,16 @@ A fix found while taking the User Guide screenshots for v0.9.155.
 ### Fix: the Debug window never finished on a story whose Restart keeps feelings
 - The situation search followed an end screen's Restart every time it led somewhere new. With **Reset** off, a story with feelings (or any total a check reads) starts each replay from a new state, so the search replayed again and again, each step slower as the carried-over state grew: on a copy of The Last Ferry with one ending's Reset turned off, Problems never appeared, and in the web build the main window froze with it (the Debug window shares its thread there). It now follows at most three Replays on one way of playing; cutting one off counts as stopping short, so beats only later replays could reach stay "may be reachable" / "only after replays" rather than certain, and the counter ranges, which follow every Replay, still decide what is certain. That copy now takes 17 ms. Student stories: same beats played and the same findings; group 3's search fell from 170,000 situations to 1,177 (3 s → 0.1 s). None of the templates turn Reset off, which is why the release checks didn't meet it.
 
-**Files modified:** packages/core/src/analysis/StateSimulationAnalyzer.ts; tests/analysis/StateSimulationCoverage.test.ts
+- **The limit note says why it stopped:** a search cut off only by the replay limit now says *This story has an end screen whose Restart keeps what players did, so each replay can start somewhere new; the search followed a few replays, not every one* instead of calling a 12-beat story "too large" (`StateSimulationAnalyzer.searchLimitReason`); the same in "No problems found, but…".
+
+### Smaller fixes found while taking the screenshots
+- **Start as if…** named a role check "a roleHolder condition"; it now reads "With Tomas as the confidant" (`describeGate` names roles and characters, also in Reachability's "Never on offer").
+- **Problems:** the "only after replays" mark sat between a beat's name and ", 1 more beat behind it"; it now follows them.
+
+### User Guide
+- Header now "Last revised against v0.9.155". Screenshots retaken in the QA browser at 2×: 10 (Start as if… on "On the stairs", grouped by the beat's conditions), 31 (Reachability), 32 (Path Analysis Forward), 33 (Story Logic), and a new 109 (Problems, on a copy of The Last Ferry with three mistakes put in). Captions updated; the search-limit section explains the replay note. These show the wording of the fixes above, so they belong with the next release. Not taken: a Check with AI finding card (needs a configured AI provider and a paid check).
+
+**Files modified:** packages/core/src/analysis/StateSimulationAnalyzer.ts, ReachabilityAnalyzer.ts; packages/builder/src/components/debug/SimulationGate.tsx, ProblemsPanel.tsx, ReachabilityReport.tsx, services/PathBasedPresetGenerator.ts; tests/analysis/StateSimulationCoverage.test.ts; docs/USER_GUIDE.md, docs/images/10, 31, 32, 33, 109
 
 ---
 

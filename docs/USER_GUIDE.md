@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.148*
+*Last revised against v0.9.155*
 
 ---
 
@@ -3362,7 +3362,7 @@ Since v0.9.85 the panel also appears for **indoor-only projects** — a venue wi
 When previewing from a beat other than the start, ASAPS Modern intelligently analyzes all paths to that beat and generates **state presets** representing different ways the interactor could have arrived there.
 
 ![Path Presets Menu](images/10-path-presets.png)
-*The path presets menu showing different routes to the current beat*
+*Start as if… for "On the stairs" in The Last Ferry: the states that change what happens there, grouped by which of the beat's own conditions they meet ("With Tomas as the confidant" opens the notebook reply), three per group with Show more.*
 
 **Using Path Presets:**
 
@@ -3487,6 +3487,9 @@ Each entry names the problem and the beat (*Dead end: The cellar*) and says in a
 
 **Problems on beats nobody reaches wait their turn.** A fault on a beat no way of playing reaches yet is shown as a note, with *(No way of playing reaches this beat yet.)*: no player meets it until the beat is linked in. The entry that says why the beat is unreached keeps its place.
 
+![Debug Tools — Problems tab](images/109-debug-problems.png)
+*The Problems tab on a copy of The Last Ferry with three mistakes put in: a misspelled name (an error), a choice that needs more coins than one playthrough gives (a warning, marked "only after replays" because one ending's Restart keeps the coins), and that ending's Restart keeps values (a note).*
+
 When nothing turns up, the tab says **No problems found.** Problems is about structure and state. To check whether what a beat *says* holds for everyone who gets there, use [Check with AI](#check-with-ai) in Story Logic.
 
 <a id="story-warnings"></a>
@@ -3521,6 +3524,8 @@ These are advice only: nothing changes at runtime. The checks explore the same r
 
 Problems, Reachability and Story Logic play your story with a fast search that looks at *situations* (a beat, plus the state that matters from there on) rather than at every whole path. Even so, a very large story can have more ways through than the search can try. When that happens, an amber note at the top says so: *This story is too large to try every way through, and the search stopped at its limit.*
 
+A story of any size gets a note too if an end screen's Restart keeps what players did (its **Reset** is off): each replay can then start from somewhere new, so the search follows a few replays rather than every one, and says so (*the search followed a few replays, not every one*).
+
 That doesn't make the answers guesses. Most unreachable beats are unreachable **for certain**, whatever players do: every link that leads to them has a condition that can never hold (a check of text against a counter, a value nothing sets, an item nothing gives, a range a counter can never reach there). The note says which are which:
 
 - If the search is sure of all of them, the note says *every unreachable beat here is unreachable whatever players do*.
@@ -3532,7 +3537,7 @@ Every other unreachable beat in the list is certain.
 ### Reachability
 
 ![Debug Tools — Reachability tab](images/31-debug-reachability.png)
-*The Reachability tab shows total beats, how many are reachable from start, how many nothing links to, and any warnings detected. Click a beat to highlight it on the main flowchart.*
+*The Reachability tab shows total beats, how many players can reach, how many nothing links to, and each unreachable beat with why. Here the search note says it followed only a few replays of a Restart that keeps values, and the one beat only replays could reach is marked "only after replays". Click a beat to highlight it on the main flowchart.*
 
 Reachability is the long version of the unreachable entries in Problems: every beat, sorted. The summary cards count **Total Beats**, **Reachable**, **Unreachable** and **Nothing links here**. Below them, expand *Reachable Beats*, *Broken Connections*, *Unreachable Beats*, *Nothing links here*, *Warnings* and *Unreachable Condition Branches* to drill into the specifics; the search box filters the beat lists by name.
 
@@ -3571,7 +3576,7 @@ In **Tree** mode the same labels mark where a branch stops. Each choice in the t
 ### Story Logic
 
 ![Debug Tools — Story Logic tab](images/33-debug-story-logic.png)
-*The Story Logic tab: hub beats with how many states players arrive in and what differs, e.g. someone's trust and who plays a role.*
+*The Story Logic tab: the beats players reach in different states, with how many states each. Open one to see what differs, e.g. someone's trust and who plays a role.*
 
 Story Logic looks for places where your text might not hold for every player. It works from the same play-through as the other tabs, so it knows the states players actually arrive in. The summary at the top counts **Different states** (and, with AI on, **AI findings**); click a figure to jump to its section.
 
