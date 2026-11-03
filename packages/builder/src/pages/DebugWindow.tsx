@@ -236,7 +236,7 @@ export const DebugWindow: React.FC = () => {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        <SimulationGate story={story}>
+        <SimulationGate story={story} needs={activeTab === 'paths' ? 'paths' : 'situations'}>
         {activeTab === 'problems' && (
           <ProblemsPanel story={story} onHighlightBeat={handleHighlightBeat} />
         )}

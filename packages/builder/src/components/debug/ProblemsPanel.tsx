@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle, Info, Search } from 'lucide-react';
 import type { Story } from '@asaps/core';
-import { simulateStory } from '../../services/storySimulation';
+import { searchSituations } from '../../services/storySimulation';
 import { collectProblems, type Problem, type ProblemSeverity } from './problems';
 import { SearchLimitNote } from './SimulationGate';
 
@@ -14,7 +14,7 @@ const SECTION: Record<ProblemSeverity, { title: string; icon: React.ReactNode; b
 /** Everything the debug tools found wrong, in one list. */
 export const ProblemsPanel: React.FC<{ story: Story; onHighlightBeat?: (beatId: string) => void }> = ({ story, onHighlightBeat }) => {
   const [search, setSearch] = useState('');
-  const simulation = useMemo(() => simulateStory(story), [story]);
+  const simulation = useMemo(() => searchSituations(story), [story]);
   const problems = useMemo(() => collectProblems(story, simulation), [story, simulation]);
   const term = search.trim().toLowerCase();
   const shown = term

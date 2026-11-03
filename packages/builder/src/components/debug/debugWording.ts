@@ -32,11 +32,13 @@ const PHASE: Record<SimulationProgress['phase'], string> = {
   exploring: 'Trying every way through',
   unreached: 'Looking for beats not reached yet',
   replay: 'Following Replay buttons',
+  situations: 'Trying what players can do',
 };
 
 /** "Looking for beats not reached yet: 12,430 paths, 287 of 419 beats reached". */
 export function simulationProgressText(progress: SimulationProgress | null, totalBeats: number): string {
   if (!progress) return `Starting, ${totalBeats.toLocaleString()} beats to check`;
+  if (progress.phase === 'situations') return `${PHASE.situations}: ${progress.beatsReached.toLocaleString()} of ${totalBeats.toLocaleString()} beats reached`;
   return `${PHASE[progress.phase]}: ${progress.pathsFound.toLocaleString()} paths, ${progress.beatsReached.toLocaleString()} of ${totalBeats.toLocaleString()} beats reached`;
 }
 

@@ -14,6 +14,7 @@
  * - No exponential explosion from constraint set enumeration
  */
 
+import { arrivalKey, type BeatArrival } from './arrivalStates';
 import type { Story } from '../engine/Story';
 import { alignForComparison, counterComparisonValue, isTextForCounter } from '../engine/variableValues';
 import type { Beat } from '../beats/Beat';
@@ -255,6 +256,13 @@ export interface SituationStep {
   replies: string[];
 }
 
+export interface SituationConfig {
+  /** Stop after this many situations. */
+  maxSituations?: number;
+  /** Stop after this many situations with nothing new found. */
+  maxStalled?: number;
+}
+
 /** What exploreSituations found. */
 export interface SituationSearch {
   /** Every situation was played: nothing else can be reached under these rules. */
@@ -267,7 +275,14 @@ export interface SituationSearch {
   routes: Map<string, number>;
   /** One way to a beat. */
   routeTo?: (beatId: string) => SituationStep[];
+  /** Beats some player reaches with every choice hidden. */
+  hiddenChoices: Set<string>;
+  /** The distinct states each beat is arrived in, most common first (up to ARRIVALS_KEPT each). */
+  arrivals: Map<string, BeatArrival[]>;
 }
+
+/** States kept per beat for Story Logic: enough to tell what differs, not every combination. */
+const ARRIVALS_KEPT = 100;
 
 /** How far a running path analysis has got (analyzeAsync progress). */
 export interface SimulationProgress {
@@ -277,8 +292,8 @@ export interface SimulationProgress {
   beatsReached: number;
   /** Paths finished so far. */
   pathsFound: number;
-  /** What it is doing: trying every way, looking for what's still unreached, following Replay. */
-  phase: 'exploring' | 'unreached' | 'replay';
+  /** What it is doing: trying every way, looking for what's still unreached, following Replay; or the situation search. */
+  phase: 'exploring' | 'unreached' | 'replay' | 'situations';
 }
 
 /** Let the event loop run (paint, input) before the next slice of work. */
@@ -552,16 +567,57 @@ export class StateSimulationAnalyzer {
    * with how many situations exist, not with how many orders reach them, so
    * the search can finish where exploring paths runs out of budget.
    */
-  public exploreSituations(config: { maxSituations?: number } = {}): SituationSearch {
+  public exploreSituations(config: SituationConfig = {}): SituationSearch {
+    const run = this.situationRun(config);
+    let step = run.next();
+    while (!step.done) step = run.next();
+    return step.value;
+  }
+
+  /** exploreSituations without freezing the UI: the same slices as analyzeRawAsync. */
+  public async exploreSituationsAsync(
+    onProgress?: (progress: SimulationProgress) => void,
+    signal?: { aborted: boolean },
+    config: SituationConfig = {},
+    sliceMs = 12
+  ): Promise<SituationSearch> {
+    const run = this.situationRun(config);
+    let sliceStart = performance.now();
+    let step = run.next();
+    while (!step.done) {
+      if (performance.now() - sliceStart >= sliceMs) {
+        onProgress?.(step.value);
+        await yieldToEventLoop();
+        if (signal?.aborted) throw new DOMException('Situation search cancelled', 'AbortError');
+        sliceStart = performance.now();
+      }
+      step = run.next();
+    }
+    return step.value;
+  }
+
+  private *situationRun(config: SituationConfig): Generator<SimulationProgress, SituationSearch, void> {
     const startBeatId = this.story.getFirstBeatId();
     const maxSituations = config.maxSituations ?? 500000;
+    // Long after the last find, more of the same finds nothing: stop and say so.
+    const maxStalled = config.maxStalled ?? 150000;
     const result: SituationSearch = {
       complete: true, situations: 0, perBeat: new Map(), endings: new Set(), stops: new Set(), traps: new Set(), routes: new Map(),
+      hiddenChoices: new Set(), arrivals: new Map(),
     };
+    this.searchLimited = false;
     if (!startBeatId) return result;
     this.shownReplies = new Set();
     const keyOf = this.stateThatDecidesGates(new Map(this.story.getAllBeats().map((b) => [b.id, 0])));
-    interface Item { beatId: string; state: SimulationState; parent: number; via: SituationStep | null }
+    interface Item { beatId: string; state: SimulationState; parent: number; via: SituationStep | null; start: string }
+    interface Arrived { state: SimulationState; parent: number; count: number; start: string }
+    const arrived = new Map<string, Map<string, Arrived>>();
+    const trapAt = new Map<string, boolean>();
+    const isTrapAt = (beat: Beat): boolean => {
+      let known = trapAt.get(beat.id);
+      if (known === undefined) trapAt.set(beat.id, (known = this.isTrap(beat)));
+      return known;
+    };
     const parents: Array<{ parent: number; step: SituationStep }> = [];
     const seen = new Set<string>();
     // The rest wait by how near they are to something still to find, and each
@@ -596,23 +652,45 @@ export class StateSimulationAnalyzer {
       if (item) waiting--;
       return item;
     };
-    const push = (beatId: string, state: SimulationState, parent: number, via: SituationStep | null) => {
+    const push = (beatId: string, state: SimulationState, parent: number, via: SituationStep | null, start: string) => {
       if (!this.getBeat(beatId) && parent >= 0) {
         const from = parents[parent].step;
         result.stops.add(from.beatId);
         stopsFound.add(`${from.beatId}|${from.label || beatId}`);
         return;
       }
+      // Noted before situations merge: what no gate reads still shows in the text.
+      let states = arrived.get(beatId);
+      if (!states) arrived.set(beatId, (states = new Map()));
+      if (states.size < ARRIVALS_KEPT) {
+        const arrivedKey = `${start}\u0002${arrivalKey(state)}`;
+        const known = states.get(arrivedKey);
+        if (known) known.count++;
+        else states.set(arrivedKey, { state, parent, count: 1, start });
+      }
       const key = `${beatId}|${keyOf(beatId, state)}`;
-      if (seen.has(key)) return;
+      if (seen.has(key)) {
+        // Back in the same situation, and no way out of here reaches an end.
+        const again = this.getBeat(beatId);
+        if (again && !this.isTerminalBeat(again) && isTrapAt(again)) result.traps.add(beatId);
+        return;
+      }
       seen.add(key);
       // Beats nobody has played yet go first: reach before thoroughness.
-      if (!result.perBeat.has(beatId)) fresh.push({ beatId, state, parent, via });
-      else file({ beatId, state, parent, via });
+      if (!result.perBeat.has(beatId)) fresh.push({ beatId, state, parent, via, start });
+      else file({ beatId, state, parent, via, start });
     };
-    for (const state of this.initialStates()) push(startBeatId, cloneState(state), -1, null);
+    for (const state of this.initialStates()) {
+      const first = cloneState(state);
+      push(startBeatId, first, -1, null, arrivalKey(first));
+    }
+    let found = 0;
+    let lastFind = 0;
     while (fresh.length > 0 || waiting > 0) {
-      if (result.situations >= maxSituations) { result.complete = false; break; }
+      const finds = result.perBeat.size + result.endings.size + result.stops.size + result.traps.size + this.shownReplies.size;
+      if (finds !== found) { found = finds; lastFind = result.situations; }
+      if (result.situations >= maxSituations || result.situations - lastFind >= maxStalled) { result.complete = false; break; }
+      if (result.situations % 250 === 0) yield { expansions: result.situations, beatsReached: result.perBeat.size, pathsFound: 0, phase: 'situations' };
       refreshDistance();
       const item = fresh.pop() ?? take();
       if (!item) break;
@@ -621,7 +699,7 @@ export class StateSimulationAnalyzer {
       result.situations++;
       result.perBeat.set(beat.id, (result.perBeat.get(beat.id) ?? 0) + 1);
       const redirect = this.requirementRedirect(beat, item.state);
-      if (redirect) { push(redirect, item.state, item.parent, item.via); continue; }
+      if (redirect) { push(redirect, item.state, item.parent, item.via, item.start); continue; }
       const me = parents.length;
       parents.push({ parent: item.parent, step: { beatId: beat.id, label: '', replies: [] } });
       if (!result.routes.has(beat.id)) result.routes.set(beat.id, me);
@@ -633,7 +711,7 @@ export class StateSimulationAnalyzer {
         };
         const at = parents.length;
         parents.push({ parent: me, step });
-        push(target, next, at, step);
+        push(target, next, at, step, item.start);
       };
       if (this.isTerminalBeat(beat)) {
         if (['endScreen', 'aiSummary'].includes(beat.type)) {
@@ -660,7 +738,7 @@ export class StateSimulationAnalyzer {
         const offered = connections.filter((c) => this.choiceOffered(beat, c, state));
         if (offered.length === 0) {
           const link = this.linkWhenAllHidden(beat, state);
-          if (link) on(null, link, state); else result.stops.add(beat.id);
+          if (link) { result.hiddenChoices.add(beat.id); on(null, link, state); } else result.stops.add(beat.id);
           continue;
         }
         connections.forEach((conn, i) => {
@@ -676,11 +754,24 @@ export class StateSimulationAnalyzer {
         on(only, only.targetId, next);
       }
     }
-    result.routeTo = (beatId: string) => {
+    const wayFrom = (parent: number): SituationStep[] => {
       const steps: SituationStep[] = [];
-      for (let at = result.routes.get(beatId) ?? -1; at >= 0; at = parents[at].parent) if (parents[at].step.next) steps.unshift(parents[at].step);
+      for (let at = parent; at >= 0; at = parents[at].parent) if (parents[at].step.next) steps.unshift(parents[at].step);
       return steps;
     };
+    result.routeTo = (beatId: string) => wayFrom(result.routes.get(beatId) ?? -1);
+    const named = (id: string) => ({ beatId: id, beatName: this.getBeat(id)?.name ?? id });
+    for (const [beatId, states] of arrived) {
+      const list = [...states.values()].sort((a, b) => b.count - a.count).map((a): BeatArrival => {
+        const way = wayFrom(a.parent);
+        return {
+          state: a.state, stepIndex: way.length, pathCount: a.count, startKey: a.start,
+          path: { steps: [...way.map((s) => named(s.beatId)), named(beatId)] },
+        };
+      });
+      result.arrivals.set(beatId, list);
+    }
+    this.searchLimited = !result.complete;
     return result;
   }
 

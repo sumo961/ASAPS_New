@@ -1,29 +1,36 @@
 import React, { useEffect, useState } from 'react';
 import type { SimulationProgress, Story } from '@asaps/core';
-import { cachedSimulation, cancelSimulation, simulateStoryAsync } from '../../services/storySimulation';
+import {
+  cachedSimulation, cachedSituations, cancelSimulation, cancelSituations, searchSituationsAsync, simulateStoryAsync,
+} from '../../services/storySimulation';
 import { simulationProgressText } from './debugWording';
 
 /**
- * Runs the story's one simulation before the tools that read it, so they find
- * it ready. A large story takes a while: the window stays usable and says how
- * far it has got. If the simulation fails, the tools handle that themselves.
+ * Runs the search the open tool reads before the tool, so it finds it ready.
+ * A large story takes a while: the window stays usable and says how far it has
+ * got. If the search fails, the tools handle that themselves.
  */
-export const SimulationGate: React.FC<{ story: Story; children: React.ReactNode }> = ({ story, children }) => {
-  const [readyFor, setReadyFor] = useState<Story | null>(() => (cachedSimulation(story) ? story : null));
+export const SimulationGate: React.FC<{ story: Story; needs: 'situations' | 'paths'; children: React.ReactNode }> = ({ story, needs, children }) => {
+  const isCached = () => (needs === 'paths' ? cachedSimulation(story) : cachedSituations(story)) !== undefined;
+  const [readyFor, setReadyFor] = useState<string | null>(() => (isCached() ? needs : null));
+  const [readyStory, setReadyStory] = useState<Story>(story);
   const [progress, setProgress] = useState<SimulationProgress | null>(null);
 
   useEffect(() => {
-    if (cachedSimulation(story)) { setReadyFor(story); return; }
+    const done = () => { setReadyStory(story); setReadyFor(needs); };
+    if (isCached()) { done(); return; }
     let current = true;
     setReadyFor(null);
     setProgress(null);
-    simulateStoryAsync(story, (p) => { if (current) setProgress(p); })
-      .catch((err) => { if (err?.name !== 'AbortError') console.error('[SimulationGate] Simulation failed:', err); })
-      .finally(() => { if (current) setReadyFor(story); });
-    return () => { current = false; cancelSimulation(story); };
-  }, [story]);
+    const onProgress = (p: SimulationProgress) => { if (current) setProgress(p); };
+    const run: Promise<unknown> = needs === 'paths' ? simulateStoryAsync(story, onProgress) : searchSituationsAsync(story, onProgress);
+    run
+      .catch((err) => { if (err?.name !== 'AbortError') console.error('[SimulationGate] Search failed:', err); })
+      .finally(() => { if (current) done(); });
+    return () => { current = false; if (needs === 'paths') cancelSimulation(story); else cancelSituations(story); };
+  }, [story, needs]);
 
-  if (readyFor === story) return <>{children}</>;
+  if (readyFor === needs && readyStory === story) return <>{children}</>;
   return <SimulationProgressNote progress={progress} totalBeats={story.getAllBeats().length} />;
 };
 

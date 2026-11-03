@@ -710,3 +710,61 @@ describe('searching situations (experiment)', () => {
     expect(new StateSimulationAnalyzer(build()).exploreSituations({ maxSituations: 1 }).complete).toBe(false);
   });
 });
+
+describe('what the situation search hands the debug tools', () => {
+  const end = { id: 'end', type: 'endScreen', parameters: { message: 'e', showRestart: false } };
+
+  it('keeps the states a beat is arrived in, with a way there, even where no gate tells them apart', () => {
+    const r = new StateSimulationAnalyzer(story([
+      { id: 'menu', type: 'multiChoice', parameters: { question: 'q', choices: [
+        { id: 'a', text: 'A', target: 'hall', effects: [{ type: 'setVariable', target: 'mood', value: 'glad' }] },
+        { id: 'b', text: 'B', target: 'hall', effects: [{ type: 'setVariable', target: 'mood', value: 'sad' }] },
+      ] } },
+      { id: 'hall', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] },
+      end,
+    ])).exploreSituations();
+    const hall = r.arrivals.get('hall')!;
+    expect(hall.map((a) => a.state.variables.get('mood')).sort()).toEqual(['glad', 'sad']);
+    expect(hall[0].path.steps.map((s) => s.beatId)).toEqual(['menu', 'hall']);
+    expect(hall[0].stepIndex).toBe(1);
+  });
+
+  it('notes a beat reached with every choice hidden', () => {
+    const r = new StateSimulationAnalyzer(story([
+      { id: 'menu', type: 'multiChoice', connections: [{ targetId: 'end', label: 'A' }], parameters: { question: 'q', choices: [
+        { id: 'a', text: 'A', target: 'end', conditions: [{ type: 'variable', variableName: 'never', operator: '==', value: 'yes' }] },
+      ] } },
+      end,
+    ])).exploreSituations();
+    expect([...r.hiddenChoices]).toEqual(['menu']);
+  });
+
+  it('calls a loop with no way out a trap, and an ending met twice not', () => {
+    const r = new StateSimulationAnalyzer(story([
+      { id: 'menu', type: 'multiChoice', parameters: { question: 'q', choices: [
+        { id: 'a', text: 'A', target: 'end' }, { id: 'b', text: 'B', target: 'end' }, { id: 'c', text: 'C', target: 'x' },
+      ] } },
+      { id: 'x', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'y' }] },
+      { id: 'y', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'x' }] },
+      end,
+    ])).exploreSituations();
+    expect(r.traps.has('x')).toBe(true);
+    expect(r.traps.has('end')).toBe(false);
+  });
+
+  it('stops once nothing new has turned up for a long time, and says so', () => {
+    const analyzer = new StateSimulationAnalyzer(story([
+      { id: 'menu', type: 'multiChoice', parameters: { question: 'q', choices: [
+        { id: 'a', text: 'More', target: 'menu', effects: [{ type: 'incrementCounter', target: 'n', value: 1 }] },
+        { id: 'c', text: 'Less', target: 'menu', effects: [{ type: 'incrementCounter', target: 'n', value: -1 }] },
+        { id: 'b', text: 'Leave', target: 'end', conditions: [{ type: 'counter', variableName: 'n', operator: '<', value: 1000000 }] },
+      ] } },
+      end,
+    ]));
+    const r = analyzer.exploreSituations({ maxStalled: 50 });
+    expect(r.complete).toBe(false);
+    expect(r.situations).toBeLessThan(200);
+    expect(analyzer.searchLimited).toBe(true);
+  });
+});
+

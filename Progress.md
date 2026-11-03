@@ -81,6 +81,12 @@ Playing Birka V18 on the engine showed where Path Analysis disagreed, now fixed:
 
 **Files modified:** packages/builder/src/services/storyLogicReview.ts (new), services/prompts/storyLogicReview.ts (new), types/storyLogic.ts (new), components/debug/StoryLogicAISection.tsx (new), components/debug/LogicValidationReport.tsx, pages/DebugWindow.tsx, services/DebugWindowManager.ts, services/AIService.ts, services/findingFixService.ts, App.tsx, utils/aiEditsLedger.ts, utils/projectZipManager.ts, storage/types.ts, storage/adapters/DirectoryAdapter.ts, contexts/PersistenceContext.tsx, types/aiEdits.ts, types/generationReview.ts, components/ai/AIEditsLogDialog.tsx; packages/core/src/persistence/DirectoryFormat.ts; tests
 
+
+**Problems, Reachability and Story Logic run on a faster search**
+- They now use a search of situations (a beat in a state that matters from there on) instead of whole paths. On the six student stories it takes 0.1–13 s where the path search took up to 54 s. Path Analysis and Start as if… keep the path search, which runs only when they are opened.
+- It heads for what it hasn't found yet, and stops when nothing new has turned up for 150,000 situations. Problem lists matched the path search on all six apart from two additions; Story Logic's list of beats reached in different states differs, since states no gate reads are told apart less fully.
+- A beat either search finds counts as reached.
+
 ---
 
 ## 2026-11-01: The large-project release (v0.9.154)

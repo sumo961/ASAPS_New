@@ -6,7 +6,7 @@ import {
   detectStoryWarnings,
   type Story,
 } from '@asaps/core';
-import type { StorySimulation } from '../../services/storySimulation';
+import type { StorySituations } from '../../services/storySimulation';
 import { validateStoryLogic, type LogicValidationResult } from '../../utils/storyLogicValidator';
 import { storyWarningLabel } from './storyWarningLabels';
 
@@ -27,8 +27,8 @@ export interface Problem {
   behindIt: number;
 }
 
-/** Story Logic's checks over the story's one simulation. */
-export function storyLogicValidation(story: Story, simulation: StorySimulation | null): LogicValidationResult {
+/** Story Logic's checks over the story's one search. */
+export function storyLogicValidation(story: Story, simulation: StorySituations | null): LogicValidationResult {
   const arrivals = simulation?.arrivals() ?? null;
   const storyData = {
     beats: story.getAllBeats().map((beat) => ({
@@ -86,7 +86,7 @@ const RANK: Record<ProblemSeverity, number> = { error: 0, warning: 1, note: 2 };
  * and what can't be reached. Unreachable beats are told by their cause: the
  * first one on the way, with how many more are behind it.
  */
-export function collectProblems(story: Story, simulation: StorySimulation): Problem[] {
+export function collectProblems(story: Story, simulation: StorySituations): Problem[] {
   const out = new Map<string, Problem>();
   const beatName = (id: string) => story.getBeat(id)?.name?.trim() || id;
   const add = (severity: ProblemSeverity, label: string, beatId: string, message: string, behindIt = 0) => {
@@ -96,8 +96,8 @@ export function collectProblems(story: Story, simulation: StorySimulation): Prob
     out.set(id, { id, severity, label, beatId, beatName: beatName(beatId), message, more: [], behindIt });
   };
 
-  const { analyzer, paths, playedBeats } = simulation;
-  for (const w of detectStoryWarnings({ paths, story, shownReplies: analyzer.shownReplies, searchLimited: analyzer.searchLimited })) {
+  const { analyzer, playedBeats } = simulation;
+  for (const w of detectStoryWarnings({ evidence: simulation.evidence, story, shownReplies: analyzer.shownReplies, searchLimited: analyzer.searchLimited })) {
     // A cast that doesn't take leaves the player playing on: worth checking, not a stop.
     add(w.severity === 'error' && w.code !== 'role' ? 'error' : 'warning', storyWarningLabel(w.code), w.beatId, w.message);
   }
@@ -119,15 +119,15 @@ export function collectProblems(story: Story, simulation: StorySimulation): Prob
   const explainsStop = (label: string) =>
     label === storyWarningLabel('reply-nowhere') || label === LOGIC_LABEL.dialog_line_without_exit || label === 'Broken link';
   const explained = new Set([...out.values()].filter((p) => explainsStop(p.label)).map((p) => p.beatId));
-  for (const outcome of simulation.result().outcomes) {
-    const count = outcome.pathVariations?.length ?? 0;
-    if (outcome.endType === 'stuck') {
-      add('error', 'Stuck in a loop', outcome.endingBeatId, 'Players who get here keep coming back and no way on gets out.');
-    } else if (outcome.endType === 'deadEnd' && explained.has(outcome.endingBeatId)) {
+  for (const beatId of simulation.search.traps) {
+    add('error', 'Stuck in a loop', beatId, 'Players who get here keep coming back and no way on gets out.');
+  }
+  for (const beatId of simulation.search.stops) {
+    if (explained.has(beatId)) {
       // Players really do stop here: whatever explains it is an error.
-      for (const p of out.values()) if (p.beatId === outcome.endingBeatId && explainsStop(p.label)) p.severity = 'error';
-    } else if (outcome.endType === 'deadEnd') {
-      add('error', 'Dead end', outcome.endingBeatId, `The story stops here without an end screen (${count.toLocaleString()} ${count === 1 ? 'path' : 'paths'}).`);
+      for (const p of out.values()) if (p.beatId === beatId && explainsStop(p.label)) p.severity = 'error';
+    } else {
+      add('error', 'Dead end', beatId, 'The story stops here without an end screen.');
     }
   }
 
@@ -149,7 +149,9 @@ export function collectProblems(story: Story, simulation: StorySimulation): Prob
     if (u.reason === 'unreachableParent') continue;
     const behind = countBehind(u.beatId);
     const severity: ProblemSeverity = u.reason === 'orphaned' && behind === 0 && story.getBeat(u.beatId)?.type !== 'endScreen' ? 'note' : 'warning';
-    add(severity, u.reason === 'orphaned' ? 'Nothing links here' : 'Never on offer', u.beatId, u.details, behind);
+    // Stopped at its limit, the search can't speak for every way of playing.
+    const details = analyzer.searchLimited ? u.details.replace('on every way of playing', 'on every way the search tried') : u.details;
+    add(severity, u.reason === 'orphaned' ? 'Nothing links here' : 'Never on offer', u.beatId, details, behind);
   }
 
   // Told once: an unlinked setup beat is both, and what's behind it belongs to the setup.

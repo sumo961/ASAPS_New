@@ -1,7 +1,9 @@
 /**
- * One path simulation per story for the Debug window: Path Analysis
- * (outcomes, tree, warnings), Reachability, Story Logic (arrival states) and the
- * Preview's Start as if… read the same paths instead of each simulating the story again.
+ * One search of each kind per story for the Debug window, so tools read the
+ * same answer instead of each simulating the story again:
+ * - the situation search (what can happen) for Problems, Reachability and Story Logic;
+ * - the path search (which ways through there are) for Path Analysis and the
+ *   Preview's Start as if…, which show or start from whole playthroughs.
  *
  * Keyed by the Story object: the Debug window builds a new one whenever the
  * story changes, so a cached simulation never outlives its story.
@@ -14,6 +16,8 @@ import {
   type ConstraintPathResult,
   type BeatArrival,
   type SimulationProgress,
+  type SituationSearch,
+  type StoryEvidence,
 } from '@asaps/core';
 
 export interface StorySimulation {
@@ -25,6 +29,88 @@ export interface StorySimulation {
   arrivals: () => Map<string, BeatArrival[]>;
   /** Every beat on a path: what reachable means in every tool. */
   playedBeats: ReadonlySet<string>;
+}
+
+/** What the situation search found, for the tools that ask what can happen. */
+export interface StorySituations {
+  analyzer: StateSimulationAnalyzer;
+  search: SituationSearch;
+  /** Every beat some way of playing reaches, by either search if both have run:
+   *  the path search can find a beat the situation search stopped short of. */
+  playedBeats: ReadonlySet<string>;
+  arrivals: () => Map<string, BeatArrival[]>;
+  evidence: StoryEvidence;
+}
+
+const situationsCache = new WeakMap<Story, StorySituations>();
+const situationsRunning = new WeakMap<Story, { promise: Promise<StorySituations>; signal: { aborted: boolean } }>();
+const situationListeners = new WeakMap<Story, Set<(progress: SimulationProgress) => void>>();
+
+function finishSituations(story: Story, analyzer: StateSimulationAnalyzer, search: SituationSearch): StorySituations {
+  const played = () => {
+    const paths = cache.get(story)?.playedBeats;
+    return new Set<string>([...search.perBeat.keys(), ...(paths ?? [])]);
+  };
+  const situations: StorySituations = {
+    analyzer,
+    search,
+    get playedBeats() { return played(); },
+    arrivals: () => search.arrivals,
+    evidence: {
+      get played() { return played(); },
+      hiddenChoices: search.hiddenChoices,
+      arrivalsAt: (beatId) => (search.arrivals.get(beatId) ?? []).map((a) => a.state),
+    },
+  };
+  situationsCache.set(story, situations);
+  return situations;
+}
+
+export function cachedSituations(story: Story): StorySituations | undefined {
+  return situationsCache.get(story);
+}
+
+export function searchSituations(story: Story): StorySituations {
+  const cached = situationsCache.get(story);
+  if (cached) return cached;
+  const analyzer = newAnalyzer(story);
+  return finishSituations(story, analyzer, analyzer.exploreSituations());
+}
+
+/** searchSituations without freezing the window; callers share one run. */
+export function searchSituationsAsync(
+  story: Story,
+  onProgress?: (progress: SimulationProgress) => void,
+): Promise<StorySituations> {
+  const cached = situationsCache.get(story);
+  if (cached) return Promise.resolve(cached);
+  let listeners = situationListeners.get(story);
+  if (!listeners) situationListeners.set(story, (listeners = new Set()));
+  if (onProgress) listeners.add(onProgress);
+  const under = situationsRunning.get(story);
+  if (under) return under.promise;
+  const signal = { aborted: false };
+  const analyzer = newAnalyzer(story);
+  const run = analyzer
+    .exploreSituationsAsync((p) => situationListeners.get(story)?.forEach((l) => l(p)), signal)
+    .then((search) => finishSituations(story, analyzer, search))
+    .finally(() => {
+      if (situationsRunning.get(story)?.signal === signal) {
+        situationsRunning.delete(story);
+        situationListeners.delete(story);
+      }
+    });
+  situationsRunning.set(story, { promise: run, signal });
+  return run;
+}
+
+/** Stop a situation search nobody needs any more. */
+export function cancelSituations(story: Story): void {
+  const under = situationsRunning.get(story);
+  if (!under) return;
+  under.signal.aborted = true;
+  situationsRunning.delete(story);
+  situationListeners.delete(story);
 }
 
 const cache = new WeakMap<Story, StorySimulation>();

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Story, BeatTypeRegistry } from '@asaps/core';
 import { collectProblems } from '../problems';
-import { simulateStory } from '../../../services/storySimulation';
+import { searchSituations } from '../../../services/storySimulation';
 
 beforeEach(() => vi.stubGlobal('setInterval', vi.fn()));
 afterEach(() => vi.unstubAllGlobals());
@@ -16,7 +16,7 @@ const end = { id: 'end', name: 'End', type: 'endScreen', parameters: { message: 
 describe('collectProblems', () => {
   it('a clean story has none', () => {
     const story = build([{ id: 's', name: 'S', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] }, end]);
-    expect(collectProblems(story, simulateStory(story))).toEqual([]);
+    expect(collectProblems(story, searchSituations(story))).toEqual([]);
   });
 
   it('lists a dead end first and says what stops there', () => {
@@ -24,7 +24,7 @@ describe('collectProblems', () => {
       { id: 'm', name: 'Menu', type: 'multiChoice', parameters: { question: 'q', choices: [{ id: 'a', text: 'A', target: 'end' }, { id: 'b', text: 'B', target: 'stop' }] } },
       { id: 'stop', name: 'Stop', type: 'infoText', parameters: { text: 't' } }, end,
     ]);
-    const [first] = collectProblems(story, simulateStory(story));
+    const [first] = collectProblems(story, searchSituations(story));
     expect(first).toMatchObject({ severity: 'error', label: 'Dead end', beatId: 'stop' });
   });
 
@@ -34,7 +34,7 @@ describe('collectProblems', () => {
       { id: 'lost', name: 'Lost', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'lost2' }] },
       { id: 'lost2', name: 'Lost 2', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] },
     ]);
-    const unreachable = collectProblems(story, simulateStory(story)).filter((p) => p.label === 'Nothing links here');
+    const unreachable = collectProblems(story, searchSituations(story)).filter((p) => p.label === 'Nothing links here');
     expect(unreachable.map((p) => [p.beatId, p.behindIt, p.severity])).toEqual([['lost', 1, 'warning']]);
   });
 
@@ -46,7 +46,7 @@ describe('collectProblems', () => {
       { id: 'c', text: 'Two' },
       { id: 'e', text: 'Three' },
     ] } } }, end]);
-    const replies = collectProblems(story, simulateStory(story)).filter((p) => p.label === 'Reply goes nowhere');
+    const replies = collectProblems(story, searchSituations(story)).filter((p) => p.label === 'Reply goes nowhere');
     expect(replies).toHaveLength(1);
     expect(replies[0].more).toHaveLength(1);
   });

@@ -44,8 +44,10 @@ export interface StoryWarning {
 }
 
 export interface DetectConfig {
-  /** Paths from StateSimulationAnalyzer.analyzeRaw(). Used for violation checks. */
-  paths: SimulatedPath[];
+  /** What was played, from the path search (analyzeRaw) ... */
+  paths?: SimulatedPath[];
+  /** ... or from any other search. */
+  evidence?: StoryEvidence;
   story: Story;
   /** Replies some playthrough had on screen (StateSimulationAnalyzer.shownReplies). */
   shownReplies?: ReadonlySet<string>;
@@ -53,17 +55,48 @@ export interface DetectConfig {
   searchLimited?: boolean;
 }
 
+/** What a search of the story saw players do. */
+export interface StoryEvidence {
+  played: ReadonlySet<string>;
+  /** Beats some player reaches with every choice hidden. */
+  hiddenChoices: ReadonlySet<string>;
+  /** The states a beat is arrived in. */
+  arrivalsAt: (beatId: string) => SimulationState[];
+}
+
+function evidenceFromPaths(paths: SimulatedPath[]): StoryEvidence {
+  const played = new Set<string>();
+  const hiddenChoices = new Set<string>();
+  for (const p of paths) for (const s of p.steps) {
+    played.add(s.beatId);
+    if (s.allChoicesHidden) hiddenChoices.add(s.beatId);
+  }
+  return {
+    played,
+    hiddenChoices,
+    arrivalsAt: (beatId) => {
+      const out: SimulationState[] = [];
+      for (const p of paths) {
+        const i = p.steps.findIndex((s) => s.beatId === beatId);
+        if (i >= 0) out.push(i > 0 ? p.steps[i - 1].stateAfter : p.steps[i].stateAfter);
+      }
+      return out;
+    },
+  };
+}
+
 /**
  * Run all authoring-side checks and return the collected warnings.
  */
 export function detectStoryWarnings(cfg: DetectConfig): StoryWarning[] {
   const warnings: StoryWarning[] = [];
-  const { paths, story } = cfg;
+  const { story } = cfg;
+  const evidence = cfg.evidence ?? evidenceFromPaths(cfg.paths ?? []);
 
   // 1. Keypad-specific checks
   for (const beat of story.getAllBeats()) {
     if (beat.type !== 'keypad') continue;
-    warnings.push(...detectKeypadWarnings(beat, story, paths));
+    warnings.push(...detectKeypadWarnings(beat, story));
   }
 
   // 2. Requires-declared checks (any beat)
@@ -71,7 +104,7 @@ export function detectStoryWarnings(cfg: DetectConfig): StoryWarning[] {
     const params = beat.getParameters() as any;
     const requires: StateRequirement[] | undefined = beat.requires || params.requires;
     if (!requires || requires.length === 0) continue;
-    warnings.push(...detectRequiresWarnings(beat, requires, story, paths));
+    warnings.push(...detectRequiresWarnings(beat, requires, story, evidence));
   }
 
   // 3. Cast roles (the same checks the generation review runs), so stories
@@ -89,13 +122,9 @@ export function detectStoryWarnings(cfg: DetectConfig): StoryWarning[] {
 
   // Paths that arrived at a choice with nothing to choose.
   const skipped = new Map<string, Beat>();
-  for (const path of paths) {
-    for (const step of path.steps) {
-      if (step.allChoicesHidden && !skipped.has(step.beatId)) {
-        const beat = story.getBeat(step.beatId);
-        if (beat) skipped.set(step.beatId, beat);
-      }
-    }
+  for (const id of evidence.hiddenChoices) {
+    const beat = story.getBeat(id);
+    if (beat) skipped.set(id, beat);
   }
   for (const beat of skipped.values()) {
     const first = beat.connections?.find((c) => !c.condition)?.targetId ?? beat.defaultTarget;
@@ -107,10 +136,10 @@ export function detectStoryWarnings(cfg: DetectConfig): StoryWarning[] {
     });
   }
 
-  warnings.push(...detectStateWiring(story, paths));
+  warnings.push(...detectStateWiring(story, evidence.played));
 
   // 4. Mistakes only a read of the beat shows: the simulator plays them as written.
-  const played = new Set(paths.flatMap((p) => p.steps.map((step) => step.beatId)));
+  const played = evidence.played;
   for (const beat of story.getAllBeats()) {
     warnings.push(...detectCounterText(beat));
     if (beat.type === 'dialogTree') warnings.push(...detectDialogShape(beat, cfg.shownReplies, played, cfg.searchLimited));
@@ -149,7 +178,7 @@ export function looksLikeSameName(a: string, b: string): boolean {
   return Math.min(x.length, y.length) >= 6 && nameDistance(x, y, 2) <= 2;
 }
 
-function detectStateWiring(story: Story, paths: SimulatedPath[]): StoryWarning[] {
+function detectStateWiring(story: Story, played: ReadonlySet<string>): StoryWarning[] {
   type Kind = 'value' | 'item';
   const reads = new Map<string, { kind: Kind; name: string; beats: Set<string> }>();
   const sets = new Map<string, Set<string>>();
@@ -223,8 +252,7 @@ function detectStateWiring(story: Story, paths: SimulatedPath[]): StoryWarning[]
   }
 
   // Needs the playthroughs: without them nothing is known about who is reached.
-  if (paths.length > 0) {
-    const played = new Set(paths.flatMap((p) => p.steps.map((s) => s.beatId)));
+  if (played.size > 0) {
     for (const [k, read] of reads) {
       const setters = sets.get(k);
       if (!setters || starts.has(k)) continue;
@@ -370,7 +398,6 @@ function canLeaveWithout(start: string, avoid: string, story: Story): boolean {
 function detectKeypadWarnings(
   keypad: Beat,
   story: Story,
-  paths: SimulatedPath[],
 ): StoryWarning[] {
   const out: StoryWarning[] = [];
   const params = keypad.getParameters() as any;
@@ -641,7 +668,7 @@ function detectRequiresWarnings(
   beat: Beat,
   requires: StateRequirement[],
   story: Story,
-  paths: SimulatedPath[],
+  evidence: StoryEvidence,
 ): StoryWarning[] {
   const out: StoryWarning[] = [];
   const ancestors = collectAncestorBeatIds(beat.id, story);
@@ -710,11 +737,8 @@ function detectRequiresWarnings(
   // and when the requirement is fulfillable at all (otherwise Rule 4a handles it).
   let totalPathsToBeat = 0;
   let violatingPaths = 0;
-  for (const p of paths) {
-    const stepIdx = p.steps.findIndex((s: SimulatedStep) => s.beatId === beat.id);
-    if (stepIdx < 0) continue;
+  for (const stateBefore of evidence.arrivalsAt(beat.id)) {
     totalPathsToBeat++;
-    const stateBefore = stepIdx > 0 ? p.steps[stepIdx - 1].stateAfter : p.steps[stepIdx].stateAfter;
     for (const req of requires) {
       const cond = req.condition as any;
       const refs = collectConditionReferencedNames(cond || {}).filter(Boolean);
@@ -732,7 +756,7 @@ function detectRequiresWarnings(
       beatId: beat.id,
       beatName: beat.name,
       message:
-        `${violatingPaths} of ${totalPathsToBeat} simulated paths reach this beat ` +
+        `${violatingPaths} of ${totalPathsToBeat} ways of playing reach this beat ` +
         `without satisfying its declared requirement. Players may encounter this ` +
         `beat unprepared — the runtime gate will redirect to the fallback, but ` +
         `consider whether that flow is what you want.`,

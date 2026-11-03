@@ -8,13 +8,13 @@
  * items, casting and feelings — so a beat reached by hundreds of paths shows
  * the handful of states that actually differ, each with a sample path.
  */
-import { hashState, itemQuantity, type SimulatedPath, type SimulationState } from './StateSimulationAnalyzer';
+import { hashState, itemQuantity, type SimulatedPath, type SimulatedStep, type SimulationState } from './StateSimulationAnalyzer';
 
 export interface BeatArrival {
   /** The state on arrival (the beat's own effects not yet applied). */
   state: SimulationState;
-  /** A path that arrives in this state, and where in it the beat is. */
-  path: SimulatedPath;
+  /** A way that arrives in this state, and where in it the beat is. */
+  path: { steps: Array<Pick<SimulatedStep, 'beatId' | 'beatName'>> };
   stepIndex: number;
   /** How many arrivals (path visits) share this state. */
   pathCount: number;

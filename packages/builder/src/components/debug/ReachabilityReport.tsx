@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { AlertCircle, CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronRight, Search, Unlink, GitBranch } from 'lucide-react';
 import { Story, ReachabilityAnalyzer } from '@asaps/core';
-import { simulateStory } from '../../services/storySimulation';
+import { searchSituations } from '../../services/storySimulation';
 import { SearchLimitNote } from './SimulationGate';
 import type { ReachabilityResult, UnreachableBeat } from '@asaps/core';
 
@@ -34,7 +34,7 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
   const analysis = useMemo<ReachabilityResult>(() => {
     // The same answer as Path Analysis: reachable means some way of playing
     // gets there, not just that a link exists.
-    const analyzer = new ReachabilityAnalyzer(story, { playedBeats: simulateStory(story).playedBeats });
+    const analyzer = new ReachabilityAnalyzer(story, { playedBeats: searchSituations(story).playedBeats });
     return analyzer.analyze();
   }, [story]);
 
@@ -169,7 +169,7 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
               </div>
             </div>
 
-            {simulateStory(story).analyzer.searchLimited && <SearchLimitNote />}
+            {searchSituations(story).analyzer.searchLimited && <SearchLimitNote />}
 
             {/* Broken connections alert */}
             {analysis.brokenConnections && analysis.brokenConnections.length > 0 && (

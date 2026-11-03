@@ -20,6 +20,9 @@ export type {
   SimulatedPath,
   SimulationAnalysisConfig,
   SimulationProgress,
+  SituationSearch,
+  SituationStep,
+  SituationConfig,
 } from './StateSimulationAnalyzer';
 export type {
   ConstraintAnalysisConfig,
@@ -55,6 +58,7 @@ export { detectStoryWarnings, looksLikeSameName } from './StoryWarnings';
 export { analyzeRoleFindings, beatCastRoles, type RoleFinding } from './roleFindings';
 export type {
   StoryWarning,
+  StoryEvidence,
   StoryWarningCode,
 } from './StoryWarnings';
 

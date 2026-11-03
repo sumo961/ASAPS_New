@@ -3,7 +3,7 @@ import { useAIFeatures } from '../../utils/aiFeatures';
 import { Sparkles, AlertTriangle, CheckCircle, GitMerge, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react';
 import type { Story } from '@asaps/core';
 import { arrivalKey, describeArrivalDifferences, type BeatArrival, type SimulationState } from '@asaps/core';
-import { simulateStory } from '../../services/storySimulation';
+import { searchSituations } from '../../services/storySimulation';
 import { storyLogicValidation } from './problems';
 import { StoryLogicAISection } from './StoryLogicAISection';
 import type { StoryLogicStore } from '../../types/storyLogic';
@@ -74,7 +74,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
   // checks fall back to the links.
   const simulation = useMemo(() => {
     try {
-      return simulateStory(story);
+      return searchSituations(story);
     } catch (error) {
       console.error('[LogicValidationReport] Path simulation failed:', error);
       return null;
