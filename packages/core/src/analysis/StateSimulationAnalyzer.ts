@@ -281,6 +281,18 @@ export interface SituationSearch {
   arrivals: Map<string, BeatArrival[]>;
 }
 
+/** A condition on the way between two beats, and how many arrival states meet it (gatesOnTheWay). */
+export interface GateOnTheWay {
+  /** All of these must hold (one condition, or an earlier line's list). */
+  conditions: Condition[];
+  /** An earlier line shown instead when these hold: met where they don't. */
+  earlierLine: boolean;
+  /** The line or reply leading there is never shown, whatever the state. */
+  neverShown?: boolean;
+  met: number;
+  of: number;
+}
+
 /** States kept per beat for Story Logic: enough to tell what differs, not every combination. */
 const ARRIVALS_KEPT = 100;
 
@@ -881,6 +893,49 @@ export class StateSimulationAnalyzer {
       necessaryBeats,
       analysisTime: performance.now() - startTime,
     };
+  }
+
+  /**
+   * What stands between two beats for players who arrive at the first in
+   * these states, one list per way from one to the other (a Dialog Tree can
+   * have several): each condition on that way (the link's own, and in a
+   * Dialog Tree every reply's on the way to the exit), with how many of the
+   * states meet it. An earlier line that is shown instead is a gate too, met
+   * where it isn't shown. A Condition beat's own check is not included.
+   */
+  public gatesOnTheWay(fromId: string, toId: string, states: SimulationState[]): GateOnTheWay[][] {
+    const beat = this.story.getBeat(fromId);
+    if (!beat || beat.type === 'conditionBeat') return [];
+    const ways: GateOnTheWay[][] = [];
+    for (const conn of this.getConnections(beat)) {
+      if (conn.targetId !== toId) continue;
+      const gates = new Map<string, GateOnTheWay>();
+      const add = (conditions: any[], earlierLine: boolean) => {
+        const key = `${earlierLine}|${JSON.stringify(conditions)}`;
+        if (gates.has(key)) return;
+        const all = (s: SimulationState) => conditions.every((c) => !c || this.evaluateCondition(c, s));
+        const met = states.filter((s) => (earlierLine ? !all(s) : all(s))).length;
+        gates.set(key, { conditions, earlierLine, met, of: states.length });
+      };
+      for (const c of Array.isArray(conn.condition) ? conn.condition : [conn.condition]) if (c) add([c], false);
+      if (beat.type === 'dialogTree') {
+        const tree = beat.getParameters().dialogTree;
+        const target = conn.targetId === beat.id ? '__self__' : conn.targetId;
+        for (const step of (conn as any).route ?? this.dialogPathTo(tree, target, conn.label)) {
+          for (const c of Array.isArray(step.choice?.conditions) ? step.choice.conditions : []) if (c) add([c], false);
+          for (const list of step.unless ?? []) add(list, true);
+        }
+      }
+      ways.push([...gates.values()]);
+    }
+    // Linked from the tree, but no way through it gets there: the line or
+    // reply leading there is never shown (a next line before it always plays,
+    // or it is hidden). Unless the routes were cut off at their limit.
+    if (ways.length === 0 && beat.type === 'dialogTree'
+      && analysisLinks(beat).some((c) => c.targetId === toId) && this.dialogRoutes(beat).length < 200) {
+      ways.push([{ conditions: [], earlierLine: false, neverShown: true, met: 0, of: states.length }]);
+    }
+    return ways;
   }
 
   /**

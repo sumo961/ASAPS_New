@@ -42,9 +42,25 @@ export const SimulationProgressNote: React.FC<{ progress: SimulationProgress | n
   </div>
 );
 
-/** Said wherever "unreachable" is, when the search stopped before trying everything. */
-export const SearchLimitNote: React.FC = () => (
-  <div className="p-2 mb-2 rounded border border-amber-200 bg-amber-50 text-xs text-amber-800">
-    This story is too large to try every way through, and the search stopped at its limit. An unreachable beat here is one it did not find, so it may still be possible to reach it.
+/**
+ * Said wherever "unreachable" is, when the search stopped before trying
+ * everything. Given how many unreachable beats it may have missed, it says
+ * the rest are certain: no open link leads to them.
+ */
+export const SearchLimitNote: React.FC<{ unsure?: number }> = ({ unsure }) => (
+  <div className="p-2 mb-2 rounded border border-amber-200 bg-amber-50 text-xs text-amber-800" data-testid="search-limit-note">
+    This story is too large to try every way through, and the search stopped at its limit.{' '}
+    {unsure === undefined
+      ? 'An unreachable beat here is one it did not find, so it may still be possible to reach it.'
+      : unsure === 0
+        ? 'Even so, every unreachable beat here is unreachable whatever players do: no link that can open leads to it.'
+        : `${unsure === 1 ? 'One unreachable beat, marked “may be reachable”, is' : `${unsure} unreachable beats, marked “may be reachable”, are`} ones it did not find: a way of playing it did not try may still get there. Every other unreachable beat is unreachable whatever players do.`}
   </div>
+);
+
+/** The mark on an unreachable beat the search may have missed. */
+export const MayBeReachable: React.FC = () => (
+  <span className="ml-1 px-1 rounded bg-amber-100 text-amber-800 text-[10px] font-medium align-middle" title="The search stopped at its limit before it could rule this beat out">
+    may be reachable
+  </span>
 );

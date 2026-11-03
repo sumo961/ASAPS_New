@@ -768,3 +768,80 @@ describe('what the situation search hands the debug tools', () => {
   });
 });
 
+
+describe('what an unreachable beat says when the search stops short (2026-11-03)', () => {
+  const end = { id: 'end', type: 'endScreen', parameters: { message: 'e', showRestart: false } };
+  const reachability = (s: Story, config: { played?: string[]; limited: boolean }) => {
+    const analyzer = new StateSimulationAnalyzer(s);
+    const search = analyzer.exploreSituations();
+    const played = new Set(config.played ?? search.perBeat.keys());
+    return new ReachabilityAnalyzer(s, {
+      playedBeats: played,
+      searchLimited: config.limited,
+      gatesOnTheWay: (from, to) => analyzer.gatesOnTheWay(from, to, (search.arrivals.get(from) ?? []).map((a) => a.state)),
+    }).analyze().unreachableBeats;
+  };
+
+  it('marks only what an open link leads to as maybe reachable', () => {
+    const s = story([
+      { id: 'menu', type: 'multiChoice', parameters: { question: 'q', choices: [
+        // Only the merchant carries it, and nothing hands it over.
+        { id: 'g', text: 'Pay', target: 'vault', conditions: [{ type: 'inventory', operator: 'contains', item: 'Gold' }] },
+        // Set to the number 1 by a choice: "1" can match it.
+        { id: 'd', text: 'Door', target: 'door', conditions: [{ type: 'variable', variableName: 'key', operator: '==', value: '1' }] },
+        // Text against a counter never matches.
+        { id: 'c', text: 'Count', target: 'odd', conditions: [{ type: 'counter', variableName: 'n', operator: '==', value: 'many' }] },
+        { id: 'k', text: 'Take the key', target: 'end', effects: [{ type: 'setVariable', target: 'key', value: 1 }] },
+      ] } },
+      { id: 'vault', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] },
+      { id: 'door', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'behind' }] },
+      { id: 'behind', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] },
+      { id: 'odd', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] },
+      { id: 'lost', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] },
+      end,
+    ], [{ id: 'm', name: 'Merchant', role: 'npc', inventory: [{ name: 'Gold', quantity: 5 }] }]);
+    // As if the search had stopped after the first beat.
+    const unreached = reachability(s, { played: ['menu', 'end'], limited: true });
+    const unsure = (id: string) => unreached.find((u) => u.beatId === id)?.unsure ?? false;
+    expect(unsure('door')).toBe(true);
+    expect(unsure('behind')).toBe(true);
+    expect(unsure('vault')).toBe(false);
+    expect(unsure('odd')).toBe(false);
+    expect(unsure('lost')).toBe(false);
+    expect(unreached.find((u) => u.beatId === 'vault')!.details).toContain('Nothing in the story gives Gold to the player: only Merchant carries it');
+    expect(unreached.find((u) => u.beatId === 'odd')!.details).toContain('a counter holds a number');
+    expect(unreached.find((u) => u.beatId === 'door')!.details).toContain('no way of playing the search tried');
+  });
+
+  it('names the condition players miss on the way and where the story sets it', () => {
+    const s = story([
+      { id: 'talk', type: 'dialogTree', parameters: { dialogTree: { id: 'root', speaker: 'Guard', text: 'Halt.', choices: [
+        { id: 'r1', text: 'Charge', conditions: [{ type: 'variable', variableName: 'mood', operator: '==', value: 'brave' }],
+          dialogNode: { id: 'n1', speaker: 'Guard', text: 'Fine.', target: 'cave', choices: [] } },
+        { id: 'r2', text: 'Leave', target: 'end' },
+      ] } } },
+      { id: 'cave', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] },
+      { id: 'pep', type: 'setVariable', parameters: { type: 'variable', name: 'mood', value: 'brave' }, connections: [{ targetId: 'end' }] },
+      end,
+    ]);
+    const cave = reachability(s, { limited: false }).find((u) => u.beatId === 'cave')!;
+    expect(cave.reason).toBe('neverOffered');
+    expect(cave.unsure).toBeUndefined();
+    expect(cave.details).toContain('it needs mood == brave, and no way of playing has that there');
+    expect(cave.details).toContain('mood is set in "pep" (to brave, not reached)');
+  });
+
+  it('says when a next line before it always plays instead, and counts that as certain', () => {
+    const s = story([
+      { id: 'talk', type: 'dialogTree', connections: [{ targetId: 'end' }, { targetId: 'hidden' }], parameters: { dialogTree: { id: 'root', speaker: 'Guard', text: 'Halt.', choices: [
+        { id: 'c1', continue: true, text: '', dialogNode: { id: 'n1', speaker: 'Guard', text: 'Go.', target: 'end', choices: [] } },
+        { id: 'c2', continue: true, text: '', dialogNode: { id: 'n2', speaker: 'Guard', text: 'Never said.', target: 'hidden', choices: [] } },
+      ] } } },
+      { id: 'hidden', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'end' }] },
+      end,
+    ]);
+    const hidden = reachability(s, { limited: true }).find((u) => u.beatId === 'hidden')!;
+    expect(hidden.details).toContain('never shown: a next line before it always plays instead');
+    expect(hidden.unsure).toBeUndefined();
+  });
+});

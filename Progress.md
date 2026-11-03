@@ -87,6 +87,13 @@ Playing Birka V18 on the engine showed where Path Analysis disagreed, now fixed:
 - It heads for what it hasn't found yet, and stops when nothing new has turned up for 150,000 situations. Problem lists matched the path search on all six apart from two additions; Story Logic's list of beats reached in different states differs, since states no gate reads are told apart less fully.
 - A beat either search finds counts as reached.
 
+**Unreachable beats: which are certain, and why**
+- When the search stops at its limit, only beats an open link route leads to are marked "may be reachable". A link counts as closed only when a condition on it can never hold: text checked against a counter, a variable nothing sets to that value (compared as the runtime does, so 1 matches "1"), an item nothing gives the player, or a Dialog Tree line a next line before it always replaces. On the six student stories the uncertain beats are group 1: 2 of 11, group 3: 81 of 96, group 5: 0 of 4, V18: 10 of 77. No beat the search played is ever counted as closed off.
+- "Never on offer" now names the condition the players who get there don't meet, measured on the states they arrive in, and where the story sets it: for example "markFakeRole is set in "E3 - Mark DM Victor Mon" (to made or supplied or refused)", with "not reached" on setters no way of playing reaches.
+- This found three certain mistakes in the student stories: group 5's Greater Sword is only in the Merchant's and the Storage's bags and nothing gives it to the player; V18's "Stay in Birka" checks `folkertPath` as a counter against the text "stay"; a V18 Dialog Tree line sits behind a next line with no condition.
+
+**Files modified:** packages/core/src/analysis/ReachabilityAnalyzer.ts, StateSimulationAnalyzer.ts (gatesOnTheWay), index.ts; packages/builder/src/services/storySimulation.ts (reachabilityOf), components/debug/problems.ts, ProblemsPanel.tsx, ReachabilityReport.tsx, SimulationGate.tsx; tests/analysis/StateSimulationCoverage.test.ts
+
 ---
 
 ## 2026-11-01: The large-project release (v0.9.154)

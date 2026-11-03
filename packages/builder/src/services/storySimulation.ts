@@ -9,6 +9,7 @@
  * story changes, so a cached simulation never outlives its story.
  */
 import {
+  ReachabilityAnalyzer,
   StateSimulationAnalyzer,
   arrivalStates,
   type Story,
@@ -18,6 +19,7 @@ import {
   type SimulationProgress,
   type SituationSearch,
   type StoryEvidence,
+  type ReachabilityResult,
 } from '@asaps/core';
 
 export interface StorySimulation {
@@ -64,6 +66,20 @@ function finishSituations(story: Story, analyzer: StateSimulationAnalyzer, searc
   };
   situationsCache.set(story, situations);
   return situations;
+}
+
+/**
+ * What is reachable, by what the search played. Stopped at its limit, the
+ * search marks what it may have missed (unsure); every never-taken link says
+ * which condition on the way the players who get there don't meet.
+ */
+export function reachabilityOf(story: Story, simulation: StorySituations): ReachabilityResult {
+  const { analyzer, search } = simulation;
+  return new ReachabilityAnalyzer(story, {
+    playedBeats: simulation.playedBeats,
+    searchLimited: analyzer.searchLimited,
+    gatesOnTheWay: (from, to) => analyzer.gatesOnTheWay(from, to, (search.arrivals.get(from) ?? []).map((a) => a.state)),
+  }).analyze();
 }
 
 export function cachedSituations(story: Story): StorySituations | undefined {

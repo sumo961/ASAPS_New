@@ -23,6 +23,7 @@ export type {
   SituationSearch,
   SituationStep,
   SituationConfig,
+  GateOnTheWay,
 } from './StateSimulationAnalyzer';
 export type {
   ConstraintAnalysisConfig,

@@ -3,7 +3,7 @@ import { AlertCircle, AlertTriangle, CheckCircle, Info, Search } from 'lucide-re
 import type { Story } from '@asaps/core';
 import { searchSituations } from '../../services/storySimulation';
 import { collectProblems, type Problem, type ProblemSeverity } from './problems';
-import { SearchLimitNote } from './SimulationGate';
+import { MayBeReachable, SearchLimitNote } from './SimulationGate';
 
 const SECTION: Record<ProblemSeverity, { title: string; icon: React.ReactNode; box: string }> = {
   error: { title: 'Errors: players get stuck or miss something', icon: <AlertCircle className="w-4 h-4 text-red-600" />, box: 'border-red-200 bg-red-50' },
@@ -32,7 +32,7 @@ export const ProblemsPanel: React.FC<{ story: Story; onHighlightBeat?: (beatId: 
 
   return (
     <div className="space-y-4" data-testid="problems-panel">
-      {simulation.analyzer.searchLimited && <SearchLimitNote />}
+      {simulation.analyzer.searchLimited && <SearchLimitNote unsure={problems.filter((p) => p.unsure).length} />}
       <div className="relative">
         <Search className="w-4 h-4 absolute left-2.5 top-2 text-gray-400" />
         <input
@@ -70,6 +70,7 @@ const ProblemRow: React.FC<{ problem: Problem; box: string; onHighlightBeat?: (b
       <button type="button" onClick={() => onHighlightBeat?.(p.beatId)} className="font-medium text-gray-900 hover:underline text-left">
         {p.label}: {p.beatName}
       </button>
+      {p.unsure && <MayBeReachable />}
       {p.more.length > 0 && <span className="ml-1 text-gray-500">×{p.more.length + 1}</span>}
       {p.behindIt > 0 && <span className="ml-1 font-medium text-gray-700">, {p.behindIt} more {p.behindIt === 1 ? 'beat' : 'beats'} behind it</span>}
       <div className="text-gray-700 mt-0.5">{p.message}</div>

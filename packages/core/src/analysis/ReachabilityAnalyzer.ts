@@ -5,6 +5,7 @@ import type { Connection, Condition } from '../types';
 import { analysisLinks, EXTRA_LINK } from './analysisLinks';
 import { isTextForCounter } from '../engine/variableValues';
 import { StoryContext, PLAYTHROUGH_VARIABLE } from '../engine/StoryContext';
+import type { GateOnTheWay } from './StateSimulationAnalyzer';
 
 /**
  * Analysis of a specific condition's satisfiability
@@ -36,6 +37,11 @@ export interface UnreachableBeat {
     connection: Connection;
   }>;
   suggestedFixes?: string[];
+  /**
+   * The search stopped at its limit before it could rule this beat out: a
+   * link route leads here, so some way of playing it did not try may.
+   */
+  unsure?: boolean;
 }
 
 /**
@@ -103,6 +109,14 @@ export interface ReachabilityConfig {
    * Without it, reachable means linked from the start.
    */
   playedBeats?: ReadonlySet<string>;
+  /** The search behind playedBeats stopped at its limit before trying everything. */
+  searchLimited?: boolean;
+  /**
+   * The conditions on a link between two played beats, with how many of the
+   * states players arrive in meet each (StateSimulationAnalyzer.gatesOnTheWay):
+   * says which of them keeps a never-taken link closed.
+   */
+  gatesOnTheWay?: (fromBeatId: string, toBeatId: string) => GateOnTheWay[][];
 }
 
 /**
@@ -131,12 +145,17 @@ export function describeGate(c: any, beatName: (id: string) => string): string {
 
 export class ReachabilityAnalyzer {
   private story: Story;
-  private config: Required<Omit<ReachabilityConfig, 'playedBeats'>> & Pick<ReachabilityConfig, 'playedBeats'>;
+  private config: Required<Omit<ReachabilityConfig, 'playedBeats' | 'searchLimited' | 'gatesOnTheWay'>>
+    & Pick<ReachabilityConfig, 'playedBeats' | 'searchLimited' | 'gatesOnTheWay'>;
   private counterModifications: Map<string, { min: number; max: number }>;
   private variableValues: Map<string, Set<any>>;
   /** Variables with a Project Settings default: they never start unset. */
   private variablesWithStartValue = new Set<string>();
   private stateAnalyzed: boolean = false;
+  /** Where each variable (v), counter (c) and item (i) is changed: beat id → the values it sets. */
+  private setters = new Map<string, Map<string, Set<string>>>();
+  /** The beat whose effects are being read. */
+  private settingBeat: string | null = null;
   private brokenConnections: BrokenConnection[] = [];
   private conditionBeatWarnings: ConditionBeatWarning[] = [];
 
@@ -147,6 +166,8 @@ export class ReachabilityAnalyzer {
       detectOrphans: config.detectOrphans ?? true,
       suggestFixes: config.suggestFixes ?? true,
       playedBeats: config.playedBeats,
+      searchLimited: config.searchLimited,
+      gatesOnTheWay: config.gatesOnTheWay,
     };
     this.counterModifications = new Map();
     this.variableValues = new Map();
@@ -183,7 +204,10 @@ export class ReachabilityAnalyzer {
       : linkedBeats;
 
     // Step 3: Analyze unreachable beats
-    const unreachableBeats = this.analyzeUnreachableBeats(allBeats, reachableBeats);
+    // Stopped at its limit, the search can't rule out what an open link route
+    // leads to; what none does is unreachable whatever it tried.
+    const openLinked = this.config.searchLimited ? this.beatsOnOpenLinks() : new Set<string>();
+    const unreachableBeats = this.analyzeUnreachableBeats(allBeats, reachableBeats, openLinked);
 
     // Step 4: Detect orphaned beats (no incoming connections)
     const orphanedBeats = this.config.detectOrphans
@@ -295,6 +319,7 @@ export class ReachabilityAnalyzer {
     this.counterModifications.clear();
     this.variableValues.clear();
     this.variablesWithStartValue.clear();
+    this.setters.clear();
 
     // Values a variable has without any beat setting it: its Project
     // Settings default (the runtime starts it there), and the built-in
@@ -313,6 +338,20 @@ export class ReachabilityAnalyzer {
 
     for (const beat of allBeats) {
       const params = beat.getParameters();
+      this.settingBeat = beat.id;
+
+      // Items a beat hands over: Add/Remove Inventory (add, or a transfer), a picked prop.
+      if (beat.type === 'addRemoveInventory') {
+        const item = params.item || params.prop;
+        const action = params.action || params.operation || 'add';
+        if (item && (action === 'add' || action === 'transfer')) this.noteSetter('i', item);
+      }
+      if (beat.type === 'pickProp') {
+        for (const prop of Array.isArray(params.props) ? params.props : []) {
+          const item = prop?.inventoryName || prop?.locationName || prop?.name || prop?.id;
+          if (item) this.noteSetter('i', item);
+        }
+      }
 
       // Analyze SetVariable beats (including 'variable' alias)
       if (beat.type === 'setVariable' || beat.type === 'variable') {
@@ -323,6 +362,7 @@ export class ReachabilityAnalyzer {
 
         if (!varName) continue;
 
+        this.noteSetter(varType === 'counter' ? 'c' : 'v', varName, varValue);
         if (varType === 'variable') {
           // Track variable values
           if (!this.variableValues.has(varName)) {
@@ -396,6 +436,7 @@ export class ReachabilityAnalyzer {
         if (saveToType === 'variable') {
           const varName = params.variable;
           if (varName) {
+            this.noteSetter('v', varName, 'what the player enters');
             if (!this.variableValues.has(varName)) {
               this.variableValues.set(varName, new Set());
             }
@@ -405,6 +446,7 @@ export class ReachabilityAnalyzer {
         } else if (saveToType === 'counter') {
           const counterName = params.counter;
           if (counterName) {
+            this.noteSetter('c', counterName);
             if (!this.counterModifications.has(counterName)) {
               this.counterModifications.set(counterName, { min: 0, max: 0 });
             }
@@ -416,6 +458,64 @@ export class ReachabilityAnalyzer {
         }
       }
     }
+    this.settingBeat = null;
+  }
+
+  /** Note that the beat being read changes a variable (v), counter (c) or item (i). */
+  private noteSetter(kind: 'v' | 'c' | 'i', name: unknown, value?: unknown): void {
+    if (!this.settingBeat || typeof name !== 'string' || !name) return;
+    const key = `${kind}\u0001${name}`;
+    let byBeat = this.setters.get(key);
+    if (!byBeat) this.setters.set(key, (byBeat = new Map()));
+    let values = byBeat.get(this.settingBeat);
+    if (!values) byBeat.set(this.settingBeat, (values = new Set()));
+    if (value !== undefined && value !== null && value !== '') values.add(String(value));
+  }
+
+  /**
+   * Where the story changes what a condition reads, in words: "markFakeRole
+   * is set in \"Call Mark\" (to made)". Beats no way of playing reaches say so.
+   */
+  private whereSet(c: any): string | null {
+    if (!c || typeof c !== 'object') return null;
+    this.ensureStateAnalyzed();
+    if (c.type === 'visitedBeat') {
+      const visited = this.story.getBeat(c.beatId || c.value);
+      const negative = c.operator === '!=' || c.operator === 'not';
+      if (!visited || negative || !this.config.playedBeats) return null;
+      return this.config.playedBeats.has(visited.id)
+        ? `"${visited.name.trim()}" is reached on some ways of playing`
+        : `"${visited.name.trim()}" is not reached`;
+    }
+    const name = c.variableName || c.variable || c.left;
+    const item = c.item || c.value || c.right;
+    const [key, what] =
+      c.type === 'variable' && name ? [`v\u0001${name}`, name]
+      : c.type === 'counter' && name ? [`c\u0001${name}`, name]
+      : c.type === 'inventory' && item ? [`i\u0001${item}`, item]
+      : [null, null];
+    if (!key) return null;
+    const byBeat = this.setters.get(key);
+    if (!byBeat || byBeat.size === 0) {
+      if (c.type === 'variable') return this.variablesWithStartValue.has(name) ? `Nothing in the story sets ${name}: it keeps its starting value` : `Nothing in the story sets ${name}`;
+      if (c.type === 'counter') return `Nothing in the story changes ${name}`;
+      return null;
+    }
+    const played = this.config.playedBeats;
+    const entries = [...byBeat].map(([beatId, values]) => ({ beatId, values, reached: !played || played.has(beatId) }));
+    entries.sort((a, b) => Number(b.reached) - Number(a.reached));
+    const shown = entries.slice(0, 3).map((e) => {
+      const beatName = `"${this.story.getBeat(e.beatId)?.name?.trim() || e.beatId}"`;
+      const notes = [
+        ...(c.type === 'variable' && e.values.size > 0 ? [`to ${[...e.values].join(' or ')}`] : []),
+        ...(e.reached ? [] : ['not reached']),
+      ];
+      return notes.length > 0 ? `${beatName} (${notes.join(', ')})` : beatName;
+    });
+    const more = entries.length - shown.length;
+    const list = more > 0 ? `${shown.join(', ')} and ${more} more` : shown.length > 1 ? `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}` : shown[0];
+    const verb = c.type === 'variable' ? 'is set in' : c.type === 'counter' ? 'changes in' : 'is given in';
+    return `${what} ${verb} ${list}`;
   }
 
   /** Walk a beat's parameters and links and record every state-changing effect. */
@@ -441,14 +541,19 @@ export class ReachabilityAnalyzer {
 
   /** Record one effect object (setVariable / incrementCounter / setCounter). */
   private recordEffect(effect: any): void {
+    if (effect.type === 'addInventory') this.noteSetter('i', effect.target || effect.item);
+    else if (effect.type === 'counter') this.noteSetter('c', effect.counter);
+    else if (effect.type === 'variable') this.noteSetter('v', effect.variable, effect.value ?? true);
     if (effect.type === 'setVariable') {
       const name = effect.target || effect.variable || effect.variableName;
       if (typeof name !== 'string' || !name) return;
+      this.noteSetter('v', name, effect.value ?? true);
       if (!this.variableValues.has(name)) this.variableValues.set(name, new Set());
       this.variableValues.get(name)!.add(effect.value);
     } else if (effect.type === 'incrementCounter' || effect.type === 'setCounter') {
       const name = effect.target;
       if (typeof name !== 'string' || !name) return;
+      this.noteSetter('c', name);
       if (!this.counterModifications.has(name)) this.counterModifications.set(name, { min: 0, max: 0 });
       const range = this.counterModifications.get(name)!;
       if (effect.type === 'setCounter') {
@@ -478,6 +583,7 @@ export class ReachabilityAnalyzer {
         (e.type === 'incrementCounter' || e.type === 'setCounter') && e.target === counterName
       );
       if (!alreadyProcessed) {
+        this.noteSetter('c', counterName);
         const value = Number(counterValue) || 0;
         if (!this.counterModifications.has(counterName)) {
           this.counterModifications.set(counterName, { min: 0, max: 0 });
@@ -739,7 +845,8 @@ export class ReachabilityAnalyzer {
    */
   private analyzeUnreachableBeats(
     allBeats: Beat[],
-    reachableBeats: Set<string>
+    reachableBeats: Set<string>,
+    openLinked: Set<string>
   ): UnreachableBeat[] {
     const unreachable: UnreachableBeat[] = [];
 
@@ -784,16 +891,8 @@ export class ReachabilityAnalyzer {
 
         const reachedParents = incomingConnections.filter((i) => reachableBeats.has(i.sourceBeatId));
         if (this.config.playedBeats && reachedParents.length > 0) {
-          const names = [...new Set(reachedParents.map((i) => `"${i.sourceBeatName}"`))].join(', ');
           reason = 'neverOffered';
-          const checker = reachedParents.map((i) => this.story.getBeat(i.sourceBeatId)).find((b) => b?.type === 'conditionBeat');
-          const asked = checker ? (checker.getParameters() as any).condition : null;
-          const gates = [...new Set(reachedParents.flatMap((i) => conditionsIn(i.connection.condition).map((c) => describeGate(c, (id) => this.story.getBeat(id)?.name ?? id))))];
-          details = asked
-            ? `"${checker!.name}" checks ${describeGate(asked, (id) => this.story.getBeat(id)?.name ?? id)}, and on every way of playing the answer sends players the other way, so this branch never runs`
-            : gates.length > 0
-            ? `${names} links here, but it needs ${gates.join(' and ')}, and no way of playing has that there`
-            : `${names} links here, but no way of playing takes that link: the choice or line leading here is never on offer`;
+          details = this.neverOfferedDetails(beat.id, reachedParents, openLinked.has(beat.id));
         } else if (hasImpossibleCondition) {
           reason = 'impossibleCondition';
           details = 'All paths to this beat have impossible conditions';
@@ -809,6 +908,7 @@ export class ReachabilityAnalyzer {
         beatType: beat.type,
         reason,
         details,
+        ...(openLinked.has(beat.id) ? { unsure: true } : {}),
         blockingConditions: blockingConditions.length > 0 ? blockingConditions : undefined,
         incomingConnections,
         suggestedFixes: suggestedFixes.length > 0 ? suggestedFixes : undefined
@@ -816,6 +916,138 @@ export class ReachabilityAnalyzer {
     }
 
     return unreachable;
+  }
+
+  /**
+   * Beats a link route from the start leads to, leaving out links that are
+   * closed whatever players do: a condition on the way that can never hold.
+   */
+  private beatsOnOpenLinks(): Set<string> {
+    const first = this.story.getFirstBeatId();
+    const open = new Set<string>(first ? [first] : []);
+    const todo = [...open];
+    while (todo.length > 0) {
+      const beat = this.story.getBeat(todo.pop()!);
+      if (!beat) continue;
+      for (const conn of analysisLinks(beat)) {
+        if (open.has(conn.targetId) || !this.story.getBeat(conn.targetId) || this.linkNeverOpens(beat, conn)) continue;
+        open.add(conn.targetId);
+        todo.push(conn.targetId);
+      }
+    }
+    return open;
+  }
+
+  /** A link with a condition on the way that can never hold (neverHolds). */
+  private linkNeverOpens(beat: Beat, conn: Connection): boolean {
+    if (conditionsIn(conn.condition).some((c) => this.neverHolds(c))) return true;
+    if (beat.type === 'conditionBeat') {
+      const params: any = beat.getParameters();
+      const more = Array.isArray(params.moreConditions) ? params.moreConditions : [];
+      if (conn.targetId === params.trueTarget && conn.targetId !== params.falseTarget && more.length === 0
+        && params.condition && this.neverHolds(params.condition)) return true;
+    }
+    // Closed only if every way through has one (a Dialog Tree can have several).
+    const ways = this.config.gatesOnTheWay?.(beat.id, conn.targetId) ?? [];
+    return ways.length > 0 && ways.every((gates) => gates.some((g) =>
+      g.neverShown || (g.earlierLine && g.conditions.length === 0) || (!g.earlierLine && g.conditions.some((c) => this.neverHolds(c)))));
+  }
+
+  /**
+   * Why a condition can never hold, whatever the players do, or null. Only
+   * what is certain: text checked as a counter, a variable nothing sets to
+   * that value, an item nothing gives the player.
+   */
+  private neverHolds(c: any): string | null {
+    if (!c || typeof c !== 'object') return null;
+    this.ensureStateAnalyzed();
+    const name = c.variableName || c.variable || c.left;
+    const value = c.value ?? c.right;
+    const op = c.operator || '==';
+    if (c.type === 'counter' && name && isTextForCounter(value) && op !== '!=') {
+      return `${name} is checked as a counter, and a counter holds a number, so it can never be "${value}"`;
+    }
+    if (c.type === 'variable' && name && (op === '==' || op === '===')) {
+      if (value === undefined || value === null || value === '' || value === 0 || value === '0' || value === false || value === 'false') return null;
+      const values = this.variableValues.get(name) ?? new Set();
+      if (values.has('__user_input__')) return null;
+      // Loosely, as the runtime compares: 1 matches "1", true matches "true".
+      const same = (v: unknown) => String(v) === String(value)
+        || (String(v).trim() !== '' && String(value).trim() !== '' && Number(v) === Number(value));
+      if ([...values].some(same)) return null;
+      return values.size === 0 ? `Nothing in the story sets ${name}` : `Nothing in the story sets ${name} to ${value}`;
+    }
+    if (c.type === 'inventory') {
+      const item = String(c.item || c.value || c.right || '');
+      if (!item || c.quantityCheck || c.checkType === 'quantity' || c.checkType === 'notHas' || op === 'not' || op === '!=') return null;
+      if ((this.setters.get(`i\u0001${item}`)?.size ?? 0) > 0) return null;
+      const characters: any[] = (this.story as any).getCharacters?.() ?? [];
+      const carriers = characters.filter((ch) => (Array.isArray(ch?.inventory) ? ch.inventory : []).some((it: any) => String(it?.name ?? '').trim() === item));
+      if (carriers.some((ch) => ch?.role === 'player')) return null;
+      return carriers.length > 0
+        ? `Nothing in the story gives ${item} to the player: only ${carriers.map((ch) => ch.name).join(' and ')} ${carriers.length === 1 ? 'carries' : 'carry'} it`
+        : `Nothing in the story gives ${item}`;
+    }
+    return null;
+  }
+
+  /**
+   * Why a link from a played beat is never taken: the Condition beat's check
+   * that always goes the other way, or the conditions on the way that the
+   * players who get there don't meet, and where the story sets what they read.
+   */
+  private neverOfferedDetails(
+    beatId: string,
+    reachedParents: Array<{ sourceBeatId: string; sourceBeatName: string; connection: Connection }>,
+    unsure: boolean,
+  ): string {
+    const nameOf = (id: string) => this.story.getBeat(id)?.name ?? id;
+    const names = [...new Set(reachedParents.map((i) => `"${i.sourceBeatName}"`))].join(', ');
+    const noWay = unsure ? 'no way of playing the search tried' : 'no way of playing';
+    const withHints = (text: string, conditions: any[]): string => {
+      const hints = [...new Set(conditions.map((c) => this.neverHolds(c) ?? this.whereSet(c)).filter((h): h is string => !!h))];
+      return hints.length > 0 ? `${text}. ${hints.join('. ')}.` : text;
+    };
+
+    const checker = reachedParents.map((i) => this.story.getBeat(i.sourceBeatId)).find((b) => b?.type === 'conditionBeat');
+    const asked = checker ? (checker.getParameters() as any).condition : null;
+    if (asked) {
+      return withHints(
+        `"${checker!.name}" checks ${describeGate(asked, nameOf)}, and on every way of playing${unsure ? ' the search tried' : ''} the answer sends players the other way, so this branch never runs`,
+        conditionsIn(asked),
+      );
+    }
+
+    const measured = this.config.gatesOnTheWay
+      // Only parents with states to measure: one the other search reached has none.
+      ? [...new Map(reachedParents
+        .flatMap((i) => this.config.gatesOnTheWay!(i.sourceBeatId, beatId).flat())
+        .filter((g) => g.of > 0)
+        .map((g) => [`${g.earlierLine}|${JSON.stringify(g.conditions)}`, g] as const)).values()]
+      : null;
+    if (measured?.some((g) => g.neverShown)) {
+      return `${names} links here, but the line or reply leading here is never shown: a next line before it always plays instead, or it is set to hidden`;
+    }
+    if (measured && measured.length > 0) {
+      const describe = (g: GateOnTheWay) => g.earlierLine
+        ? (g.conditions.length > 0
+          ? `no earlier line taking its place (one does when ${g.conditions.map((c) => describeGate(c, nameOf)).join(' and ')})`
+          : 'no earlier line taking its place (one always does)')
+        : g.conditions.map((c) => describeGate(c, nameOf)).join(' and ');
+      const closed = measured.filter((g) => g.met === 0);
+      const shown = closed.length > 0 ? closed : measured;
+      const needs = [...new Set(shown.map(describe))].join(' and ');
+      const text = closed.length > 0
+        ? `${names} links here, but it needs ${needs}, and ${noWay} has that there`
+        : `${names} links here, but it needs ${needs} at once, and ${noWay} has all of that there`;
+      return withHints(text, shown.flatMap((g) => g.conditions));
+    }
+
+    const conditions = reachedParents.flatMap((i) => conditionsIn(i.connection.condition));
+    const gates = [...new Set(conditions.map((c) => describeGate(c, nameOf)))];
+    return gates.length > 0
+      ? withHints(`${names} links here, but it needs ${gates.join(' and ')}, and ${noWay} has that there`, conditions)
+      : `${names} links here, but ${noWay} takes that link: the choice or line leading here is never on offer`;
   }
 
   /**

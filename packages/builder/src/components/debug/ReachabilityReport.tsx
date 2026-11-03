@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { AlertCircle, CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronRight, Search, Unlink, GitBranch } from 'lucide-react';
-import { Story, ReachabilityAnalyzer } from '@asaps/core';
-import { searchSituations } from '../../services/storySimulation';
-import { SearchLimitNote } from './SimulationGate';
+import { Story } from '@asaps/core';
+import { reachabilityOf, searchSituations } from '../../services/storySimulation';
+import { MayBeReachable, SearchLimitNote } from './SimulationGate';
 import type { ReachabilityResult, UnreachableBeat } from '@asaps/core';
 
 interface ReachabilityReportProps {
@@ -32,10 +32,8 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
 
   // Run analysis
   const analysis = useMemo<ReachabilityResult>(() => {
-    // The same answer as Path Analysis: reachable means some way of playing
-    // gets there, not just that a link exists.
-    const analyzer = new ReachabilityAnalyzer(story, { playedBeats: searchSituations(story).playedBeats });
-    return analyzer.analyze();
+    // Reachable means some way of playing gets there, not just that a link exists.
+    return reachabilityOf(story, searchSituations(story));
   }, [story]);
 
   const toggleSection = (section: string) => {
@@ -169,7 +167,7 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
               </div>
             </div>
 
-            {searchSituations(story).analyzer.searchLimited && <SearchLimitNote />}
+            {searchSituations(story).analyzer.searchLimited && <SearchLimitNote unsure={analysis.unreachableBeats.filter((b) => b.unsure).length} />}
 
             {/* Broken connections alert */}
             {analysis.brokenConnections && analysis.brokenConnections.length > 0 && (
@@ -347,6 +345,7 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
                           <div className="flex-1">
                             <div className="text-sm font-medium text-gray-900">
                               {getBeatName(unreachable.beatId)}
+                              {unreachable.unsure && <MayBeReachable />}
                             </div>
                             <div className="text-xs text-gray-500 mt-1">
                               {unreachable.beatId}

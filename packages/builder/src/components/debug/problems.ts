@@ -1,12 +1,11 @@
 import {
-  ReachabilityAnalyzer,
   analysisLinks,
   arrivalKey,
   arrivesDifferently,
   detectStoryWarnings,
   type Story,
 } from '@asaps/core';
-import type { StorySituations } from '../../services/storySimulation';
+import { reachabilityOf, type StorySituations } from '../../services/storySimulation';
 import { validateStoryLogic, type LogicValidationResult } from '../../utils/storyLogicValidator';
 import { storyWarningLabel } from './storyWarningLabels';
 
@@ -25,6 +24,8 @@ export interface Problem {
   more: string[];
   /** Beats that can't be reached because of this one. */
   behindIt: number;
+  /** Unreached, but the search stopped before it could rule the beat out. */
+  unsure?: boolean;
 }
 
 /** Story Logic's checks over the story's one search. */
@@ -110,7 +111,7 @@ export function collectProblems(story: Story, simulation: StorySituations): Prob
       LOGIC_LABEL[issue.category] ?? 'Story logic', issue.beatId, issue.message);
   }
 
-  const reach = new ReachabilityAnalyzer(story, { playedBeats }).analyze();
+  const reach = reachabilityOf(story, simulation);
   for (const link of reach.brokenConnections) {
     add('error', 'Broken link', link.sourceBeatId, `Links to a beat that no longer exists (${link.targetId}). Players who take it get an error and the story stops.`);
   }
@@ -149,9 +150,8 @@ export function collectProblems(story: Story, simulation: StorySituations): Prob
     if (u.reason === 'unreachableParent') continue;
     const behind = countBehind(u.beatId);
     const severity: ProblemSeverity = u.reason === 'orphaned' && behind === 0 && story.getBeat(u.beatId)?.type !== 'endScreen' ? 'note' : 'warning';
-    // Stopped at its limit, the search can't speak for every way of playing.
-    const details = analyzer.searchLimited ? u.details.replace('on every way of playing', 'on every way the search tried') : u.details;
-    add(severity, u.reason === 'orphaned' ? 'Nothing links here' : 'Never on offer', u.beatId, details, behind);
+    add(severity, u.reason === 'orphaned' ? 'Nothing links here' : 'Never on offer', u.beatId, u.details, behind);
+    if (u.unsure) out.get(`Never on offer|${u.beatId}`)!.unsure = true;
   }
 
   // Told once: an unlinked setup beat is both, and what's behind it belongs to the setup.
