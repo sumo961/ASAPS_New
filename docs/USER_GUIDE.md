@@ -3598,6 +3598,9 @@ With an AI provider set up, the **AI findings** section at the bottom of Story L
    - **Go to beat**: highlights the beat.
    - **Not a problem**: dismisses the finding.
 
+![Check with AI — a finding with a proposed fix](images/110-check-with-ai-finding.png)
+*Check with AI on The Last Ferry: the captain calls the player "the only passenger still awake", but Boarding has just shown a family that isn't asleep. Propose a fix offers a one-line edit, tried on a copy first, with Apply and Decline. Above it, what the check cost.*
+
 Every finding has to quote words really in the beat and point at a state players really arrive in; anything that doesn't is left out, and the section says how many (*2 findings were left out: not grounded in the beat's words or states*). After a check it shows what the check really used (*Last check: …*), and a running total for all checks and fixes on this story.
 
 **Results are kept with the project.** Run it again after editing and only beats whose words or states changed are read again (*Check these 4 with AI*); the rest keep their results. A finding an earlier check made that the latest one didn't is still shown, marked **From an earlier check**, until you dismiss it or the words it quotes leave the beat. Fixes you apply or decline are recorded in [AI ▸ AI changes](#after-generation-the-review-banner) with the source *Story Logic*.

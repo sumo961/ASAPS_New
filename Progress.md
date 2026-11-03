@@ -15,9 +15,9 @@ A fix found while taking the User Guide screenshots for v0.9.155.
 - **Problems:** the "only after replays" mark sat between a beat's name and ", 1 more beat behind it"; it now follows them.
 
 ### User Guide
-- Header now "Last revised against v0.9.155". Screenshots retaken in the QA browser at 2×: 10 (Start as if… on "On the stairs", grouped by the beat's conditions), 31 (Reachability), 32 (Path Analysis Forward), 33 (Story Logic), and a new 109 (Problems, on a copy of The Last Ferry with three mistakes put in). Captions updated; the search-limit section explains the replay note. These show the wording of the fixes above, so they belong with the next release. Not taken: a Check with AI finding card (needs a configured AI provider and a paid check).
+- Header now "Last revised against v0.9.155". Screenshots retaken in the QA browser at 2×: 10 (Start as if… on "On the stairs", grouped by the beat's conditions), 31 (Reachability), 32 (Path Analysis Forward), 33 (Story Logic), and a new 109 (Problems, on a copy of The Last Ferry with three mistakes put in). Captions updated; the search-limit section explains the replay note. These show the wording of the fixes above, so they belong with the next release. New 110: a Check with AI finding with its proposed fix, taken in the desktop app's Debug window with its configured provider on a copy of The Last Ferry (one check, $0.06, plus one fix proposal; nothing applied) — the first Check with AI run in the desktop Debug window with a real provider. It found a true slip in the template: the captain calls the player "the only passenger still awake" right after Boarding shows a family with too much luggage.
 
-**Files modified:** packages/core/src/analysis/StateSimulationAnalyzer.ts, ReachabilityAnalyzer.ts; packages/builder/src/components/debug/SimulationGate.tsx, ProblemsPanel.tsx, ReachabilityReport.tsx, services/PathBasedPresetGenerator.ts; tests/analysis/StateSimulationCoverage.test.ts; docs/USER_GUIDE.md, docs/images/10, 31, 32, 33, 109
+**Files modified:** packages/core/src/analysis/StateSimulationAnalyzer.ts, ReachabilityAnalyzer.ts; packages/builder/src/components/debug/SimulationGate.tsx, ProblemsPanel.tsx, ReachabilityReport.tsx, services/PathBasedPresetGenerator.ts; tests/analysis/StateSimulationCoverage.test.ts; docs/USER_GUIDE.md, docs/images/10, 31, 32, 33, 109, 110
 
 ---
 
