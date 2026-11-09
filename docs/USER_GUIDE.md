@@ -4221,6 +4221,7 @@ Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual 
     - *Inside left / Inside right* — Small portrait inside the text box
     - *Above left / Above right* — Larger portrait above the text box
   - **Portrait size** — Size in pixels (default: 48px inside, 80px above)
+  - <a id="dim-silent-characters"></a>**Dim characters who aren't speaking** — for scenes where you placed several characters on the stage with **Add Character** in the Visual Editor: while one of them speaks, the others are drawn darker and greyer, so the player sees at a glance who is talking. When the next line belongs to someone else, the light moves to them. During narration, or when the speaker isn't standing on the stage, nobody is dimmed. **How strongly** sets how dark they get (default 50%). The Visual Editor shows it for the beat's speaker, so you can see the effect while you place characters. Off by default.
 
   Individual beats can override these global settings. This lets you hide the speaker name for narration beats while showing it for dialog, for example.
 

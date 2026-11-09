@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import type { Location, BeatLook } from '@asaps/core';
+import { findSpeakerCharacterId } from '@asaps/core';
 import type { Character } from '../../types/character';
 import type { GlobalSettings } from '../../storage/types';
 import type { ThemeAssetUrls } from '../../hooks/useThemes';
@@ -470,6 +471,13 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     }
     return url;
   }, [effectiveShowSpeaker, effectiveShowGraphics, beatContent?.speaker, characters, assets]);
+
+  // Speaker Display → "Dim characters who aren't speaking": the beat's speaker,
+  // as the character id the characters on the stage record.
+  const speakingCharacter = React.useMemo(() => {
+    if (!globalSettings?.speakerDisplay?.dimSilentCharacters || !beatContent?.speaker) return undefined;
+    return findSpeakerCharacterId(beatContent.speaker, characters) ?? beatContent.speaker;
+  }, [globalSettings?.speakerDisplay?.dimSilentCharacters, beatContent?.speaker, characters]);
 
   // Resolve translated speaker name when a translation language is active
   const translationState = useTranslationState();
@@ -1643,6 +1651,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         editorMode={true}
                         speakerName={effectiveShowSpeaker && beatContent?.speaker ? resolvedSpeakerName : undefined}
                         speakerPortraitUrl={speakerPortraitUrl}
+                  speakingCharacter={speakingCharacter}
                         theme={globalSettings ? (() => {
                           const baseTheme = applyTextBoxBorder(applyBeatLook(convertGlobalSettingsToTheme(globalSettings), look), textBoxBorder);
                           return {
@@ -1674,6 +1683,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   onLayoutComputed={handleLayoutComputed}
                   speakerName={effectiveShowSpeaker && beatContent?.speaker ? resolvedSpeakerName : undefined}
                   speakerPortraitUrl={speakerPortraitUrl}
+                  speakingCharacter={speakingCharacter}
                   theme={globalSettings ? (() => {
                     const baseTheme = applyTextBoxBorder(applyBeatLook(convertGlobalSettingsToTheme(globalSettings), look), textBoxBorder);
                     return {

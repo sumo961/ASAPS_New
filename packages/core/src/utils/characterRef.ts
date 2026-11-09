@@ -100,3 +100,17 @@ export function findSpeakerCharacter<C extends CharacterLike>(
   }
   return null;
 }
+
+/**
+ * The id of the character a displayed speaker name belongs to (as in
+ * findSpeakerCharacter): the base character's id, which is what a character
+ * placed on the stage records.
+ */
+export function findSpeakerCharacterId<C extends CharacterLike>(
+  speakerName: string | null | undefined,
+  characters: ReadonlyArray<C> | null | undefined,
+  merged?: (id: string) => C | undefined,
+): string | undefined {
+  if (!speakerName || !characters?.length) return undefined;
+  return characters.find((base) => findSpeakerCharacter(speakerName, [base], merged))?.id;
+}

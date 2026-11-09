@@ -26,6 +26,7 @@
  *    is the next iteration.
  */
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { DIM_TRANSITION, silentCharacterFilters } from '../utils/speakerDimming';
 import type { AnimationPath, Location } from '@asaps/core';
 import { getAnimationManager } from '../animation/AnimationEngine';
 import type { SpriteSheetData } from './PositionedBeatView';
@@ -76,6 +77,13 @@ export interface ResponsiveCharacterLayerProps {
    *  it is oversize with negative offsets. Absent ⇒ image-anchored
    *  paths behave as stage-anchored. */
   imageRectFn?: () => { x: number; y: number; width: number; height: number } | null;
+  /**
+   * Who is speaking now (a character id, or the name a character was placed
+   * with): with Speaker Display's "Dim characters who aren't speaking"
+   * (`dimSettings`), the other characters in this layer are dimmed.
+   */
+  speakingCharacter?: string;
+  dimSettings?: { dimSilentCharacters?: boolean; dimStrength?: number };
 }
 
 interface AnimatedPosition {
@@ -108,7 +116,14 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
   selectedElementName,
   onElementSelect,
   imageRectFn,
+  speakingCharacter,
+  dimSettings,
 }, ref) => {
+  // Speaker Display → "Dim characters who aren't speaking".
+  const silentFilters = useMemo(
+    () => silentCharacterFilters(locations, speakingCharacter, dimSettings),
+    [locations, speakingCharacter, dimSettings],
+  );
   // Animated-position map, keyed by location.name (which legacy
   // AnimationPath.elementId matches against).
   const [animatedPositions, setAnimatedPositions] = useState<Record<string, AnimatedPosition>>({});
@@ -517,6 +532,7 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
           cursor: editorMode ? 'pointer' : undefined,
           outline: isSelected ? '2px solid rgba(59, 130, 246, 0.95)' : undefined,
           outlineOffset: isSelected ? 2 : undefined,
+          ...(loc.kind === 'character' ? { filter: silentFilters.get(idx), transition: DIM_TRANSITION } : {}),
         };
         const handleEditorClick = editorMode && onElementSelect
           ? (e: React.MouseEvent) => {

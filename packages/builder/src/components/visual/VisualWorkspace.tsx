@@ -5,7 +5,7 @@
 
 import { beatSnapshot } from '../../utils/beatSnapshot';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeDialogTreeLayout, type DialogTreeLayoutTheme, DEFAULT_DIALOG_TREE_THEME, calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions, DIALOG_CHAT_RESPONSE_DELAY } from '@asaps/core';
+import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeDialogTreeLayout, type DialogTreeLayoutTheme, DEFAULT_DIALOG_TREE_THEME, calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions, DIALOG_CHAT_RESPONSE_DELAY, findSpeakerCharacterId } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
 import { syncFreeLayoutParams, wordsFor, withWords, isClickable, withClickable } from '../../utils/freeLayoutElements';
 import { choiceStateOptionsAsync, visibleChoiceIds, choiceConditionSummary, type ChoiceStateOption } from '../../utils/dialogChoiceVisibility';
@@ -2006,6 +2006,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const show = override === true ? true : override === false ? false : globalOn;
     if (!show) return '';
     return previewRoles(((beat as any).speaker as string) || '', previewHolder);
+  })();
+  // Speaker Display → "Dim characters who aren't speaking": who speaks in the
+  // previewed line (a Dialog Tree's current line), as a character id.
+  const slotPreviewSpeakingCharacter: string | undefined = (() => {
+    if (!(globalSettings as any)?.speakerDisplay?.dimSilentCharacters || !beat) return undefined;
+    const raw: string | undefined = beat.type === 'dialogTree' || beat.type === 'aiDialogTree'
+      ? (dialogNodeAt((slotPreviewParams as any)?.dialogTree, dialogTreeNodePath) ?? (slotPreviewParams as any)?.dialogTree)?.speaker
+      : (beat as any).speaker;
+    if (!raw) return undefined;
+    const name = previewRoles(raw, previewHolder);
+    return findSpeakerCharacterId(name, characters) ?? name;
   })();
   const slotPreviewContent: Record<string, any> | null =
     !isSlotPreview || !beat || !slotPreviewParams
@@ -6741,6 +6752,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       // array — iterate values.
                       characterLocations={freePositionedLocations(beat)}
                       characterResolver={stageCharacterResolver}
+                      speakingCharacter={slotPreviewSpeakingCharacter}
                       // Props (and characters without a resolvable state
                       // image) resolve their asset id to a fresh URL — the
                       // stored location.imageUrl is a stale blob: URL after
@@ -7006,6 +7018,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     // here stayed empty.
                     characterLocations={freePositionedLocations(beat)}
                     characterResolver={stageCharacterResolver}
+                    speakingCharacter={slotPreviewSpeakingCharacter}
                     assetResolver={previewAssetResolver}
                     spriteDataResolver={previewSpriteDataResolver}
                     selectedElementName={(() => {

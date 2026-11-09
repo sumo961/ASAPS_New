@@ -1094,6 +1094,8 @@ export class ReactRenderer extends BaseRenderer {
   private characterPortraitResolver: ((speakerName: string) => string | undefined) | null = null;  // Speaker portrait resolver
   /** A speaker's character Theme Color (speakerDisplay.useCharacterColors). */
   private speakerColorResolver: ((speakerName: string) => string | undefined) | null = null;
+  /** A speaker to their character's id, for dimming the characters on the stage who aren't speaking. */
+  private speakerCharacterResolver: ((speakerName: string) => string | undefined) | null = null;
   private speakerThemeCache: { base: RenderThemeSettings | undefined; color: string; border: string; look: BeatLook | undefined; theme: RenderThemeSettings } | null = null;
   protected timerState: { totalTime: number; remainingTime: number; visible: boolean; label?: string } | undefined;  // NEW: Timer state for progress bar
   private timerStateListeners: Set<(state: typeof this.timerState) => void> = new Set();  // Listeners for timer state changes
@@ -1635,6 +1637,26 @@ export class ReactRenderer extends BaseRenderer {
   /** Resolve a speaker to their character's Theme Color (for speaker names). */
   setSpeakerColorResolver(resolver: ((speakerName: string) => string | undefined) | null): void {
     this.speakerColorResolver = resolver;
+  }
+
+  /**
+   * Resolve a speaker to their character's id (Speaker Display → "Dim
+   * characters who aren't speaking"). Without one, a stage character is
+   * matched by the name it was placed with.
+   */
+  setSpeakerCharacterResolver(resolver: ((speakerName: string) => string | undefined) | null): void {
+    this.speakerCharacterResolver = resolver;
+  }
+
+  /**
+   * Who is speaking now, as a character id (or the name, without a resolver):
+   * the characters on the stage who aren't them are dimmed when Speaker
+   * Display asks for it. An inner voice is still the speaker's own line.
+   */
+  protected speakingCharacterNow(): string | undefined {
+    if (!this.theme?.speakerDisplay?.dimSilentCharacters) return undefined;
+    const raw = (this.getState('beatSpeaker') as string | undefined) || undefined;
+    return raw ? (this.speakerCharacterResolver?.(raw) ?? raw) : undefined;
   }
 
   /**
@@ -2854,6 +2876,7 @@ export class ReactRenderer extends BaseRenderer {
             characterLocations={charPropLocations.length > 0 ? charPropLocations : undefined}
             animations={animations || (this.getState('animations') as AnimationPath[] | undefined)}
             characterResolver={this.characterResolver ?? undefined}
+            speakingCharacter={this.speakingCharacterNow()}
             assetResolver={this.assetResolver ?? undefined}
             spriteDataResolver={this.spriteDataResolver ?? undefined}
             timerState={this.timerState}
@@ -2923,6 +2946,7 @@ export class ReactRenderer extends BaseRenderer {
             characterLocations={charPropLocations.length > 0 ? charPropLocations : undefined}
             animations={animations || (this.getState('animations') as AnimationPath[] | undefined)}
             characterResolver={this.characterResolver ?? undefined}
+            speakingCharacter={this.speakingCharacterNow()}
             assetResolver={this.assetResolver ?? undefined}
             spriteDataResolver={this.spriteDataResolver ?? undefined}
             timerState={this.timerState}
@@ -3035,6 +3059,7 @@ export class ReactRenderer extends BaseRenderer {
                 const exchange = this.getState('dialogExchange') as DialogExchange | undefined;
                 return exchange?.inner ? { color: exchange.color } : undefined;
               })()}
+              speakingCharacter={this.speakingCharacterNow()}
               speakerPortraitUrl={(() => {
                 const beatOverride = this.getState('showSpeaker') as boolean | undefined;
                 const globalShowNames = this.theme?.speakerDisplay?.showNames ?? false;
@@ -3526,6 +3551,7 @@ export class ReactRenderer extends BaseRenderer {
               characterLocations={this.pickFreePositioned(locations)}
               animations={this.getState('animations') as AnimationPath[] | undefined}
               characterResolver={this.characterResolver ?? undefined}
+              speakingCharacter={this.speakingCharacterNow()}
               assetResolver={this.assetResolver ?? undefined}
               spriteDataResolver={this.spriteDataResolver ?? undefined}
               timerState={this.timerState}
@@ -3653,6 +3679,7 @@ export class ReactRenderer extends BaseRenderer {
             characterLocations={this.pickFreePositioned(locations)}
             animations={this.getState('animations') as AnimationPath[] | undefined}
             characterResolver={this.characterResolver ?? undefined}
+            speakingCharacter={this.speakingCharacterNow()}
             assetResolver={this.assetResolver ?? undefined}
             spriteDataResolver={this.spriteDataResolver ?? undefined}
             timerState={this.timerState}
@@ -3901,6 +3928,7 @@ export class ReactRenderer extends BaseRenderer {
               characterLocations={this.pickFreePositioned(locations)}
               animations={this.getState('animations') as AnimationPath[] | undefined}
               characterResolver={this.characterResolver ?? undefined}
+              speakingCharacter={this.speakingCharacterNow()}
               assetResolver={this.assetResolver ?? undefined}
               spriteDataResolver={this.spriteDataResolver ?? undefined}
               timerState={this.timerState}
@@ -3951,6 +3979,7 @@ export class ReactRenderer extends BaseRenderer {
             characterLocations={this.pickFreePositioned(locations)}
             animations={this.getState('animations') as AnimationPath[] | undefined}
             characterResolver={this.characterResolver ?? undefined}
+            speakingCharacter={this.speakingCharacterNow()}
             assetResolver={this.assetResolver ?? undefined}
             spriteDataResolver={this.spriteDataResolver ?? undefined}
             timerState={this.timerState}
@@ -4048,6 +4077,7 @@ export class ReactRenderer extends BaseRenderer {
               characterLocations={this.pickFreePositioned(locations)}
               animations={this.getState('animations') as AnimationPath[] | undefined}
               characterResolver={this.characterResolver ?? undefined}
+              speakingCharacter={this.speakingCharacterNow()}
               assetResolver={this.assetResolver ?? undefined}
               spriteDataResolver={this.spriteDataResolver ?? undefined}
               timerState={this.timerState}
@@ -4097,6 +4127,7 @@ export class ReactRenderer extends BaseRenderer {
             characterLocations={this.pickFreePositioned(locations)}
             animations={this.getState('animations') as AnimationPath[] | undefined}
             characterResolver={this.characterResolver ?? undefined}
+            speakingCharacter={this.speakingCharacterNow()}
             assetResolver={this.assetResolver ?? undefined}
             spriteDataResolver={this.spriteDataResolver ?? undefined}
             timerState={this.timerState}

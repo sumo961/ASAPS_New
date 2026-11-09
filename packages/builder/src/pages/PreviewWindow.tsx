@@ -10,7 +10,7 @@ import { simulationProgressShort } from '../components/debug/debugWording';
 import type { SimulationProgress } from '@asaps/core';
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech, Download, Mic, MicOff, MessagesSquare } from 'lucide-react';
-import { Story, StoryEngine, Beat, BeatTypeRegistry, findSpeakerCharacter } from '@asaps/core';
+import { Story, StoryEngine, Beat, BeatTypeRegistry, findSpeakerCharacter, findSpeakerCharacterId } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, buildLoadingTranslationMap, type UIStringKey } from '@asaps/core';
 import { harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, ConversationHistoryPanel } from '@asaps/renderer';
@@ -1242,6 +1242,14 @@ export const PreviewWindow: React.FC = () => {
         const ctx = engineRef.current?.getContext() as any;
         const ch: any = findSpeakerCharacter(speakerName, pd.characters as any[], ctx?.getMergedCharacter ? (id: string) => ctx.getMergedCharacter(id) : undefined);
         return typeof ch?.color === 'string' && ch.color ? ch.color : undefined;
+      });
+
+      // Who is speaking, as the character id a character on the stage records
+      // (Speaker Display → "Dim characters who aren't speaking").
+      reactRenderer.setSpeakerCharacterResolver((speakerName: string) => {
+        const pd = previewDataRef.current;
+        const ctx = engineRef.current?.getContext() as any;
+        return findSpeakerCharacterId(speakerName, (pd?.characters ?? []) as any[], ctx?.getMergedCharacter ? (id: string) => ctx.getMergedCharacter(id) : undefined);
       });
 
       // Set up sound blob resolver for beat sounds

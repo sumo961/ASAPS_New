@@ -176,6 +176,10 @@ export interface GlobalSettings {
     useCharacterColors?: boolean;             // Each speaker's name in their character's Theme Color (falls back to nameColor)
     graphicPosition: 'off' | 'inside-left' | 'inside-right' | 'above-left' | 'above-right';  // Portrait placement
     graphicSize?: number;                     // Portrait size in px (default 48 inside, 80 above)
+    /** While a character placed on the stage speaks, the other characters on the stage are dimmed (off by default). */
+    dimSilentCharacters?: boolean;
+    /** How strongly they are dimmed, 0–100 (default 50). */
+    dimStrength?: number;
   };
   translation?: {
     sourceLanguage: string;  // BCP 47 code, default 'en'

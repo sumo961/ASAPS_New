@@ -101,6 +101,8 @@ interface SpatialFlowViewProps {
   characterLocations?: Location[];
   animations?: AnimationPath[];
   characterResolver?: (characterId: string, stateId?: string) => string | undefined;
+  /** Who is speaking now (character id or placed name): Speaker Display can dim the other characters on the stage. */
+  speakingCharacter?: string;
   assetResolver?: (assetId: string) => string | undefined;
   spriteDataResolver?: (characterId: string) => SpriteSheetData | null;
   /** Editor-only: makes free-positioned sprites + slot content clickable for selection. */
@@ -296,6 +298,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   characterLocations,
   animations,
   characterResolver,
+  speakingCharacter,
   assetResolver,
   spriteDataResolver,
   editorMode,
@@ -975,6 +978,8 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
             animations={animations}
             characterResolver={characterResolver}
             assetResolver={assetResolver}
+            speakingCharacter={speakingCharacter}
+            dimSettings={theme?.speakerDisplay}
             spriteDataResolver={spriteDataResolver}
             editorMode={editorMode}
             selectedElementName={selectedElementName}

@@ -24,6 +24,7 @@ import { renderMarkdownLite, markdownLiteToPlain } from '../utils/markdownLite';
 import { ChoicePicture, isPictureChoiceStyle, pictureChoiceLabel, type ChoicePictureStyle } from './ChoicePicture';
 import { revealBoundary } from '../utils/typewriterGranularity';
 import { thoughtBoxStyle } from '../utils/innerVoice';
+import { DIM_TRANSITION, dimFilter, showsSpeaker, silentCharacterFilters } from '../utils/speakerDimming';
 
 /** A frame picture's edge height on a fixed stage: the picture's share of the stage width, never taller than in the picture. */
 const stageFrameBand = (stageWidth: number) => (f: number, naturalPx: number) =>
@@ -582,6 +583,10 @@ export interface RenderThemeSettings {
     useCharacterColors?: boolean;             // Hosts resolve each speaker's Theme Color into nameColor
     graphicPosition: 'off' | 'inside-left' | 'inside-right' | 'above-left' | 'above-right';  // Portrait placement
     graphicSize?: number;                     // Portrait size in px (default 48 inside, 80 above)
+    /** While a character on the stage speaks, dim the other characters on the stage. */
+    dimSilentCharacters?: boolean;
+    /** How strongly they are dimmed, 0–100 (default 50). */
+    dimStrength?: number;
   };
 }
 
@@ -708,6 +713,12 @@ export interface PositionedBeatViewProps {
   speakerPortraitUrl?: string;
   /** The current line is an inner voice (core dialogExchange): its box is drawn as a thought. */
   thought?: { color?: string };
+  /**
+   * Who is speaking now, as a character id (or the name they are placed
+   * with): with Speaker Display's "Dim characters who aren't speaking", the
+   * other characters on the stage are dimmed. Passed whether or not names show.
+   */
+  speakingCharacter?: string;
 }
 
 /**
@@ -1411,7 +1422,18 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   speakerName,
   speakerPortraitUrl,
   thought,
+  speakingCharacter,
 }) => {
+  // Speaker Display → "Dim characters who aren't speaking": a filter per
+  // character element that isn't the speaker, when the speaker is on the stage.
+  // (Decided per location, not per index: the elements below are copies.)
+  const silentFilter = React.useMemo(
+    () => silentCharacterFilters(elements.map((e) => e.location), speakingCharacter, theme.speakerDisplay).size > 0
+      ? dimFilter(theme.speakerDisplay?.dimStrength) : undefined,
+    [elements, speakingCharacter, theme.speakerDisplay],
+  );
+  const dimFor = (element: PositionedElementData): string | undefined =>
+    silentFilter && element.location.kind === 'character' && !showsSpeaker(element.location, speakingCharacter) ? silentFilter : undefined;
   // Settings → Text Box → Box Visibility rides the theme, as it does for
   // ReactRenderer.setTheme. Reading it here too means every caller follows it:
   // the Visual Editor's fixed-layout stage never passed the props, so it drew
@@ -1912,6 +1934,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           <PositionedElement
             key={`other-${index}-${element.location.name}`}
             element={element}
+            dimFilter={dimFor(element)}
             index={index}
             onAction={handleAction}
             interactive={interactive}
@@ -2396,6 +2419,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           <PositionedElement
             key={`element-${index}-${element.location.name}`}
             element={element}
+            dimFilter={dimFor(element)}
             index={index}
             onAction={handleAction}
             interactive={interactive}
@@ -2517,10 +2541,13 @@ interface PositionedElementProps {
   speakerPortraitUrl?: string;
   /** The line is an inner voice: draw its box as a thought (first text element only). */
   thought?: { color?: string };
+  /** A character who isn't speaking while another stage character does: drawn with this filter. */
+  dimFilter?: string;
 }
 
 const PositionedElement: React.FC<PositionedElementProps> = ({
   element,
+  dimFilter: silentFilter,
   index,
   onAction,
   interactive,
@@ -2624,6 +2651,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
     transform: transforms.length > 0 ? transforms.join(' ') : undefined,
     transformOrigin: 'center center',
     opacity: effectiveOpacity,
+    // Characters on the stage dim and brighten as the speaker changes.
+    ...(location.kind === 'character' ? { filter: silentFilter, transition: DIM_TRANSITION } : {}),
   };
 
   // Special handling for input fields (detected by name containing 'input')
@@ -5052,18 +5081,18 @@ const AssetElement: React.FC<{
             backgroundRepeat: 'no-repeat',
             imageRendering: 'pixelated',
             cursor: isClickable ? 'pointer' : 'default',
-            transition: isClickable ? 'transform 0.1s ease, filter 0.1s ease' : undefined,
+            transition: isClickable ? 'transform 0.1s ease, filter 0.1s ease' : finalStyle.transition,
           }}
           onClick={handleClick}
           onMouseEnter={(e) => {
             if (isClickable) {
-              e.currentTarget.style.filter = 'brightness(1.1)';
+              e.currentTarget.style.filter = `${finalStyle.filter ?? ''} brightness(1.1)`.trim();
               e.currentTarget.style.transform = (finalStyle.transform || '') + ' scale(1.05)';
             }
           }}
           onMouseLeave={(e) => {
             if (isClickable) {
-              e.currentTarget.style.filter = '';
+              e.currentTarget.style.filter = finalStyle.filter ?? '';
               e.currentTarget.style.transform = finalStyle.transform || '';
             }
           }}
@@ -5144,21 +5173,21 @@ const AssetElement: React.FC<{
             maxHeight: 'none',
             // Make clickable props visually interactive
             cursor: isClickable ? 'pointer' : 'default',
-            transition: isClickable ? 'transform 0.1s ease, filter 0.1s ease' : undefined,
+            transition: isClickable ? 'transform 0.1s ease, filter 0.1s ease' : finalStyle.transition,
           }}
           draggable={false}
           onClick={handleClick}
           onMouseEnter={(e) => {
             setIsHovered(true);
             if (isClickable) {
-              e.currentTarget.style.filter = 'brightness(1.1)';
+              e.currentTarget.style.filter = `${finalStyle.filter ?? ''} brightness(1.1)`.trim();
               e.currentTarget.style.transform = (finalStyle.transform || '') + ' scale(1.05)';
             }
           }}
           onMouseLeave={(e) => {
             setIsHovered(false);
             if (isClickable) {
-              e.currentTarget.style.filter = '';
+              e.currentTarget.style.filter = finalStyle.filter ?? '';
               e.currentTarget.style.transform = finalStyle.transform || '';
             }
           }}

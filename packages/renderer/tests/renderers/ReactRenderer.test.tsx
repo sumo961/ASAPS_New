@@ -371,3 +371,43 @@ describe('ReactRenderer speaker name colors', () => {
     expect((renderer as any).speakerTheme()).toBe(off);
   });
 });
+
+// Speaker Display → "Dim characters who aren't speaking": the characters on the
+// stage who aren't the speaker are drawn with a dimming filter.
+describe("ReactRenderer dims the characters who aren't speaking", () => {
+  const pic = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+  const stage = [
+    { id: 'e1', name: 'Stan', kind: 'character', characterId: 'char_stan', characterName: 'Stan', imageUrl: pic, x: 0, y: 0, width: 300, height: 600 },
+    { id: 'e2', name: 'Billie', kind: 'character', characterId: 'char_billie', characterName: 'Billie', imageUrl: pic, x: 600, y: 0, width: 300, height: 600 },
+    { id: 'e3', name: 'dialog', kind: 'dialog', x: 100, y: 600, width: 800, height: 150 },
+  ] as any[];
+  // The renderer's own default look, with these Speaker Display settings.
+  const withSpeakerDisplay = async (extra: Record<string, unknown>) => {
+    const { DEFAULT_THEME } = await import('../../src/components/PositionedBeatView');
+    renderer.setTheme({ ...DEFAULT_THEME, speakerDisplay: { nameStyle: 'off', namePosition: 'left', graphicPosition: 'off', ...extra } } as any);
+  };
+  const filterOf = (name: string): string => {
+    let el: HTMLElement | null = container.querySelector(`img[alt="${name}"]`);
+    while (el && el !== container) { if (el.style.filter) return el.style.filter; el = el.parentElement; }
+    return '';
+  };
+
+  it('dims Billie while Stan speaks, and Stan when Billie answers', async () => {
+    await withSpeakerDisplay({ dimSilentCharacters: true });
+    renderer.setSpeakerCharacterResolver((s) => ({ Stan: 'char_stan', Billie: 'char_billie' } as Record<string, string>)[s]);
+    void renderer.renderDialog('Stan', 'You okay?', undefined, stage);
+    await waitFor(() => expect(container.querySelector('img[alt="Billie"]')).toBeTruthy());
+    await waitFor(() => expect(filterOf('Billie')).toContain('brightness(0.7)'));
+    expect(filterOf('Stan')).toBe('');
+    void renderer.renderDialog('Billie', 'Leave me alone.', undefined, stage);
+    await waitFor(() => expect(filterOf('Stan')).toContain('brightness(0.7)'));
+    expect(filterOf('Billie')).toBe('');
+  });
+
+  it('leaves everyone as they are with the option off', async () => {
+    await withSpeakerDisplay({});
+    void renderer.renderDialog('Stan', 'You okay?', undefined, stage);
+    await waitFor(() => expect(container.querySelector('img[alt="Billie"]')).toBeTruthy());
+    expect(filterOf('Billie')).toBe('');
+  });
+});

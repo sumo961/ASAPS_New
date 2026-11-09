@@ -2273,6 +2273,39 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     )}
                   </div>
 
+                  {/* Dim the characters on the stage who aren't speaking */}
+                  <div className="mt-3" data-testid="dim-silent-characters">
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.speakerDisplay?.dimSilentCharacters ?? false}
+                        onChange={(e) => handleChange('speakerDisplay', 'dimSilentCharacters', e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      <span>Dim characters who aren't speaking</span>
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      While a character placed on the stage speaks, the other characters on the stage are drawn darker. During narration, or when the speaker isn't on the stage, nobody is dimmed.
+                    </p>
+                    {settings.speakerDisplay?.dimSilentCharacters && (
+                      <div className="mt-2">
+                        <label className="block text-sm font-medium text-gray-600 mb-1">
+                          How strongly: {settings.speakerDisplay?.dimStrength ?? 50}%
+                        </label>
+                        <input
+                          type="range"
+                          min={10}
+                          max={100}
+                          step={5}
+                          value={settings.speakerDisplay?.dimStrength ?? 50}
+                          onChange={(e) => handleChange('speakerDisplay', 'dimStrength', parseInt(e.target.value, 10))}
+                          className="w-full"
+                          aria-label="How strongly characters who aren't speaking are dimmed"
+                        />
+                      </div>
+                    )}
+                  </div>
+
                   {/* Character Portraits overview */}
                   {characters.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-gray-200">

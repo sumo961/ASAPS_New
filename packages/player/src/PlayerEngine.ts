@@ -1,4 +1,4 @@
-import { StoryEngine, Story, SerializedStoryState, ASMLParser, BeatTypeRegistry, findSpeakerCharacter } from '@asaps/core';
+import { StoryEngine, Story, SerializedStoryState, ASMLParser, BeatTypeRegistry, findSpeakerCharacter, findSpeakerCharacterId } from '@asaps/core';
 import type { IRenderer, StoryMetadata, BeatConfig, ConversationLine, ConversationRecord } from '@asaps/core';
 import type { RenderThemeSettings } from '@asaps/renderer';
 import { toMeterCounterData, harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, getAudioManager } from '@asaps/renderer';
@@ -89,6 +89,8 @@ interface GlobalSettings {
     useCharacterColors?: boolean;
     graphicPosition?: string;
     graphicSize?: number;
+    dimSilentCharacters?: boolean;
+    dimStrength?: number;
   };
 }
 
@@ -239,7 +241,7 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       const showNames = sd.showNames ?? (nameStyle !== 'off');
       const graphicPosition = sd.graphicPosition || 'off';
       const showGraphics = sd.showGraphics ?? (graphicPosition !== 'off');
-      return { showNames, showGraphics, nameStyle, namePosition: sd.namePosition || 'left', nameColor: sd.nameColor, useCharacterColors: sd.useCharacterColors, graphicPosition, graphicSize: sd.graphicSize };
+      return { showNames, showGraphics, nameStyle, namePosition: sd.namePosition || 'left', nameColor: sd.nameColor, useCharacterColors: sd.useCharacterColors, graphicPosition, graphicSize: sd.graphicSize, dimSilentCharacters: sd.dimSilentCharacters, dimStrength: sd.dimStrength };
     })() : undefined,
   };
 }
@@ -831,6 +833,15 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         const ctx = this.engine?.getContext() as any;
         const char: any = findSpeakerCharacter(speakerName, characters as any[], ctx?.getMergedCharacter ? (id: string) => ctx.getMergedCharacter(id) : undefined);
         return typeof char?.color === 'string' && char.color ? char.color : undefined;
+      });
+    }
+
+    // Who is speaking, as the character id a character on the stage records
+    // (Speaker Display → "Dim characters who aren't speaking").
+    if ('setSpeakerCharacterResolver' in renderer && characters.length > 0) {
+      (renderer as any).setSpeakerCharacterResolver((speakerName: string): string | undefined => {
+        const ctx = this.engine?.getContext() as any;
+        return findSpeakerCharacterId(speakerName, characters as any[], ctx?.getMergedCharacter ? (id: string) => ctx.getMergedCharacter(id) : undefined);
       });
     }
 
