@@ -81,7 +81,7 @@ export type {
 } from './PathTree';
 
 // Reachability analysis
-export { ReachabilityAnalyzer, describeGate } from './ReachabilityAnalyzer';
+export { ReachabilityAnalyzer, describeGate, characterNamer } from './ReachabilityAnalyzer';
 export type {
   ReachabilityResult,
   UnreachableBeat,

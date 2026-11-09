@@ -1,5 +1,19 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.156, 2026-11-09)
+
+### Overview
+Review fixes to the v0.9.156 replay limit and role-check wording.
+
+### Fixes
+- **The replay limit no longer reports stopping short when nothing was missed:** the search counted itself incomplete whenever a way of playing reached its third Replay, even when that Replay led back into a situation it had already played. A story whose replays meet again (Reset off, values that only switch on) lost its "certain" verdicts to "may be reachable" / "only after replays" and showed the replay note. Only a Replay into a new situation now counts as cut off.
+- **Role checks that keep the character in their value** now read "Tomas as the confidant", as the engine reads them, instead of " as the confidant"; a role check naming nobody says "nobody as the confidant".
+- **One way to name characters:** Reachability and "Start as if…" share `characterNamer` (core) instead of two copies.
+
+**Files modified:** `packages/core/src/analysis/StateSimulationAnalyzer.ts`, `packages/core/src/analysis/ReachabilityAnalyzer.ts`, `packages/core/src/analysis/index.ts`, `packages/builder/src/services/PathBasedPresetGenerator.ts`, `packages/builder/src/components/debug/ReachabilityReport.tsx`, `packages/core/tests/analysis/StateSimulationCoverage.test.ts`
+
+---
+
 ## 2026-11-04: The replay-fix release (v0.9.156)
 
 ### Overview

@@ -35,6 +35,7 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
     // Reachable means some way of playing gets there, not just that a link exists.
     return reachabilityOf(story, searchSituations(story));
   }, [story]);
+  const search = searchSituations(story).analyzer;
 
   const toggleSection = (section: string) => {
     const newExpanded = new Set(expandedSections);
@@ -167,7 +168,7 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
               </div>
             </div>
 
-            {searchSituations(story).analyzer.searchLimited && <SearchLimitNote reason={searchSituations(story).analyzer.searchLimitReason} unsure={analysis.unreachableBeats.filter((b) => b.unsure).length} afterReplays={analysis.unreachableBeats.filter((b) => b.afterReplays).length} />}
+            {search.searchLimited && <SearchLimitNote reason={search.searchLimitReason} unsure={analysis.unreachableBeats.filter((b) => b.unsure).length} afterReplays={analysis.unreachableBeats.filter((b) => b.afterReplays).length} />}
 
             {/* Broken connections alert */}
             {analysis.brokenConnections && analysis.brokenConnections.length > 0 && (

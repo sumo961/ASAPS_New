@@ -8,7 +8,7 @@
 
 import { rolesReferencedIn } from '../utils/rolePreview';
 import { simulateStory, simulateStoryAsync } from './storySimulation';
-import { describeGate } from '@asaps/core';
+import { describeGate, characterNamer } from '@asaps/core';
 import { StoryContext, type Story, type StatePreset } from '@asaps/core';
 import {
   StateSimulationAnalyzer,
@@ -499,10 +499,7 @@ function groupByOwnConditions(story: Story, beat: any, presets: GeneratedPreset[
   if (own.length === 0) return presets;
   const negative = (c: any) => c.operator === 'not' || c.operator === '!=' || c.checkType === 'notHas';
   const nameOf = (id: string) => story.getBeat(id)?.name?.trim() ?? id;
-  const characterName = (id: string) => {
-    const c: any = ((story as any).getCharacters?.() ?? []).find((x: any) => x?.id === id || x?.name === id);
-    return c?.displayName || c?.name || id;
-  };
+  const characterName = characterNamer(story);
   return presets.map((p) => {
     const { variables, counters, inventory, inventoryQuantities, affect, visitedBeats } = p.preset.state;
     context.loadSimulationState((affect ?? {}) as any, variables, counters,

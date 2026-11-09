@@ -826,9 +826,12 @@ export class StateSimulationAnalyzer {
             const again = link ?? (beat.getParameters().reset === true && hashState(after) !== hashState(this.seededInitialState()) ? startBeatId : null);
             // A Restart that keeps what players did starts from somewhere new
             // each time (feelings, totals): followed a few times, not forever.
-            // Cut off, the search counts as stopped short.
-            if (again && item.runs >= MAX_SITUATION_REPLAYS) { result.complete = false; replaysCut = true; }
-            else if (again) on(null, again, after, true);
+            // Cut off, the search counts as stopped short, but only when the
+            // replay would lead somewhere new: one into a situation already
+            // played loses nothing.
+            if (again && item.runs >= MAX_SITUATION_REPLAYS && this.getBeat(again)) {
+              if (!seen.has(`${again}|${keyOf(again, after)}`)) { result.complete = false; replaysCut = true; }
+            } else if (again) on(null, again, after, true);
           }
         } else if (this.loopsOnItself(beat)) result.traps.add(beat.id);
         else result.stops.add(beat.id);

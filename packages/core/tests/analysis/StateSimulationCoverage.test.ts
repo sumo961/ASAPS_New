@@ -1168,3 +1168,32 @@ describe('a role check in words (2026-11-03)', () => {
     expect(describeGate({ type: 'roleHolder', role: '@confidant', character: 'char_tomas', operator: '!=' }, (id) => id, names)).toBe('someone other than Tomas as the confidant');
   });
 });
+
+describe('a Restart that keeps values, when the replays meet again (2026-11-09)', () => {
+  it('a replay into a situation already played does not make the search stop short', () => {
+    // Each run sets one more flag until all three are set; the fourth run
+    // replays into the same situation as the third, so nothing is left to find (it ends on its own end screen, which is new).
+    const set = (id: string, flag: string) => ({ id, type: 'infoText', parameters: { text: id }, connections: [{ targetId: 'again', effects: [{ type: 'setVariable', target: flag, value: true }] }] });
+    const is = (id: string, flag: string, yes: string, no: string) => ({ id, type: 'conditionBeat', parameters: { conditionType: 'variable', variableName: flag, operator: '==', value: true, trueTarget: yes, falseTarget: no } });
+    const s = story([
+      { id: 'start', type: 'infoText', parameters: { text: 't' }, connections: [{ targetId: 'ca' }] },
+      is('ca', 'a', 'cb', 'setA'), is('cb', 'b', 'cc', 'setB'), is('cc', 'c', 'again2', 'setC'),
+      set('setA', 'a'), set('setB', 'b'), set('setC', 'c'),
+      { id: 'again', type: 'endScreen', parameters: { message: 'again', showRestart: true, reset: false }, connections: [{ targetId: 'start' }] },
+      { id: 'again2', type: 'endScreen', parameters: { message: 'again2', showRestart: true, reset: false }, connections: [{ targetId: 'start' }] },
+    ]);
+    const analyzer = new StateSimulationAnalyzer(s);
+    const search = analyzer.exploreSituations();
+    expect(search.complete).toBe(true);
+    expect(analyzer.searchLimitReason).toBeNull();
+  });
+});
+
+describe('a role check that names its character in the value (2026-11-09)', () => {
+  it('reads the value as the engine does', async () => {
+    const { describeGate } = await import('../../src/analysis/ReachabilityAnalyzer');
+    const names = (id: string) => (id === 'char_tomas' ? 'Tomas' : id);
+    expect(describeGate({ type: 'roleHolder', role: 'confidant', value: '@char_tomas', operator: '==' }, (id) => id, names)).toBe('Tomas as the confidant');
+    expect(describeGate({ type: 'roleHolder', role: 'confidant', operator: '==' }, (id) => id, names)).toBe('nobody as the confidant');
+  });
+});

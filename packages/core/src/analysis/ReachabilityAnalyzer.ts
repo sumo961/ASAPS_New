@@ -156,10 +156,21 @@ export function describeGate(c: any, beatName: (id: string) => string, character
     case 'counter': return `${name} ${c.operator || '=='} ${c.value ?? c.right}`;
     case 'roleHolder': {
       const role = String(c.role || 'player').replace(/^@/, '');
-      return `${negative ? 'someone other than ' : ''}${characterName(String(c.character || '').replace(/^@/, ''))} as the ${role}`;
+      // As the engine reads it: the character, else the value (StoryContext).
+      const who = String(c.character || c.value || '').replace(/^@/, '');
+      return `${negative ? 'someone other than ' : ''}${who ? characterName(who) : 'nobody'} as the ${role}`;
     }
     default: return `a ${c.type} condition`;
   }
+}
+
+/** Names a story's characters by id or name, as the story shows them; unknown ids stay as they are. */
+export function characterNamer(story: Story): (id: string) => string {
+  return (id) => {
+    const characters: any[] = (story as any).getCharacters?.() ?? [];
+    const c = characters.find((x) => x?.id === id || x?.name === id);
+    return c?.displayName || c?.name || id;
+  };
 }
 
 export class ReachabilityAnalyzer {
@@ -179,11 +190,7 @@ export class ReachabilityAnalyzer {
   private conditionBeatWarnings: ConditionBeatWarning[] = [];
 
   /** A character by its id, as the story names them. */
-  private characterName = (id: string): string => {
-    const characters: any[] = (this.story as any).getCharacters?.() ?? [];
-    const c = characters.find((x) => x?.id === id || x?.name === id);
-    return c?.displayName || c?.name || id;
-  };
+  private characterName = (id: string): string => characterNamer(this.story)(id);
 
   constructor(story: Story, config: ReachabilityConfig = {}) {
     this.story = story;
