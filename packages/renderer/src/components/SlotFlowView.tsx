@@ -45,6 +45,9 @@ import { WebViewElement } from './WebViewElement';
 import { ARSceneElement } from './ARSceneElement';
 import { runSlotPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer } from './ResponsiveCharacterLayer';
+import { SpeechBubbleLayer } from './SpeechBubbleLayer';
+import { speakerLocation } from '../utils/speechBubble';
+import type { SpeechLineMode } from './PositionedBeatView';
 
 /**
  * Stacking contract of the slot stage (positioned-tier z, root context):
@@ -226,6 +229,13 @@ interface SlotFlowViewProps {
   characterResolver?: (characterId: string, stateId?: string) => string | undefined;
   /** Who is speaking now (character id or placed name): Speaker Display can dim the other characters on the stage. */
   speakingCharacter?: string;
+  /**
+   * The line is shown as a speech bubble by a host that draws it
+   * (SpatialFlowView, whose characters sit outside this view): how the body
+   * card shows meanwhile. Without it, this view draws the bubble itself when
+   * it has the characters (Speaker Display ▸ speech bubbles).
+   */
+  speechLine?: SpeechLineMode;
   assetResolver?: (assetId: string) => string | undefined;
   spriteDataResolver?: (characterId: string) => SpriteSheetData | null;
   /**
@@ -373,6 +383,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   animations,
   characterResolver,
   speakingCharacter,
+  speechLine: speechLineProp,
   assetResolver,
   spriteDataResolver,
   selectedElementName,
@@ -502,6 +513,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const typewriterGranularity = theme.textEffects?.typewriterGranularity ?? 'letter';
   const titleReveal = useTextReveal(titleText, effectiveTextAnim, typewriterSpeed, fadeInMs, typewriterGranularity);
   const bodyReveal = useTextReveal(bodyText, effectiveTextAnim, typewriterSpeed, fadeInMs, typewriterGranularity);
+
+  // Speaker Display → "Show lines as: speech bubbles": the body line drawn as
+  // a bubble next to the character saying it, when they are on this stage.
+  // (A hyperText body keeps its box: its links live in the text.)
+  const bubbleSpeaker = theme.speakerDisplay?.lineStyle === 'bubble' && speechLineProp === undefined && beatType !== 'hyperText'
+    ? speakerLocation(characterLocations, speakingCharacter)
+    : undefined;
+  const [bubblePlaced, setBubblePlaced] = React.useState(false);
+  const bubbleOn = !!bubbleSpeaker && !!bodyText.trim();
+  const bodySpeechLine: SpeechLineMode | undefined = speechLineProp
+    ?? (bubbleOn ? (bubblePlaced ? (editorMode ? 'ghost' : 'hidden') : 'shown') : undefined);
+  const lineInBubble = bodySpeechLine === 'hidden' || bodySpeechLine === 'ghost';
 
   // ── preferredLines honoring for the title (soft) ──────────────────────
   // The author can ask a title to be N lines. We bias toward it with a
@@ -1663,7 +1686,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               })}
             </div>
           )}
-          {speakerSlot && speakerText && (() => {
+          {speakerSlot && speakerText && !lineInBubble && (() => {
             // Bug 19a — small label above the body. No card behind it
             // (it's an attribution, not a content card). Centered, slight
             // opacity to recede next to the body. dialogTree spatial
@@ -1781,6 +1804,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 className={a.className}
                 data-slotflow-slot={bodySlot?.name}
                 {...(exchange?.earlier.length ? { 'data-slotflow-current': '' } : {})}
+                {...(bodySpeechLine ? { 'data-speech-line': bodySpeechLine } : {})}
                 onClick={editorClick}
                 style={{
                   ...CONTENT_ABOVE_SPRITES,
@@ -1812,6 +1836,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   ...(ovFontSizePx ? { fontSize: `${ovFontSizePx}px` } : null),
                   ...(ovRotation ? { transform: `rotate(${ovRotation}deg)`, transformOrigin: 'center center' } : null),
                   ...(ovWidthPx ? { maxWidth: ovWidthPx } : null),
+                  // Shown as a speech bubble: the card keeps its place (the
+                  // buttons stay put) but isn't seen; faint in the editor.
+                  ...(bodySpeechLine === 'hidden' ? { visibility: 'hidden' as const } : null),
+                  ...(bodySpeechLine === 'ghost' ? { opacity: 0.3 } : null),
                 }}
               >
                 {beatType === 'hyperText' && Array.isArray((content as any).links) && (content as any).links.length > 0
@@ -2625,6 +2653,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           editorMode={editorMode}
           selectedElementName={selectedElementName}
           onElementSelect={onElementSelect}
+        />
+      )}
+      {bubbleOn && bubbleSpeaker && (
+        <SpeechBubbleLayer
+          text={bodyText}
+          speakerElementName={bubbleSpeaker.name}
+          speakFrom={bubbleSpeaker.speakFrom}
+          flipX={bubbleSpeaker.flipX}
+          theme={theme}
+          avoidRects={reservedHudRects}
+          onPlaced={setBubblePlaced}
+          zIndex={5}
         />
       )}
     </div>

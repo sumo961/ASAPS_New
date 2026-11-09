@@ -33,6 +33,13 @@ export function applyBeatLook<T extends RenderThemeSettings | undefined>(theme: 
     ...(look.stageColor ? { backgroundColor: look.stageColor } : {}),
     // A plain box on this beat, where the theme draws one with a frame picture.
     ...(tb.framePicture === 'off' ? { textboxFrameUrl: undefined } : {}),
+    // Speech bubbles on or off for this beat, over Speaker Display.
+    ...(look.speechBubbles ? {
+      speakerDisplay: {
+        ...(t.speakerDisplay ?? { nameStyle: 'off' as const, namePosition: 'left' as const, graphicPosition: 'off' as const }),
+        lineStyle: look.speechBubbles === 'on' ? 'bubble' as const : 'box' as const,
+      },
+    } : {}),
     textBox: set(t.textBox, {
       backgroundColor: tb.backgroundColor,
       opacity: tb.opacity,

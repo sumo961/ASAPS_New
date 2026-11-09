@@ -47,6 +47,8 @@ export interface BeatLook {
     borderColor?: string;
     borderRadius?: number;
   };
+  /** 'on'/'off': this beat's spoken lines as speech bubbles or in the text box, over Speaker Display's choice. */
+  speechBubbles?: 'on' | 'off';
   /** Font names as an element's font (the renderer resolves the family); sizes in px. */
   fonts?: {
     titleFont?: string;
@@ -104,6 +106,12 @@ export interface Location {
   characterName?: string;   // Character name for ASML export and legacy import
   stateId?: string;         // Which character state to display
   size?: number;            // Scale percentage (e.g., 90 = 90% scale, like ASML size attribute)
+  /**
+   * Where this placed character speaks from, as fractions of its box (0–1):
+   * a speech bubble's tail points here (Speaker Display ▸ speech bubbles).
+   * Unset: the middle of the picture near its top. Mirrored with flipX.
+   */
+  speakFrom?: { x: number; y: number };
   // Font properties for text/button/dialog elements
   font?: string;
   fontSize?: number;

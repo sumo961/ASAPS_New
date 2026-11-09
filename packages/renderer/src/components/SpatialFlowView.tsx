@@ -16,6 +16,9 @@ import { SlotFlowView, applyAlphaToHex, buttonPictureStyle } from './SlotFlowVie
 import { runSpatialPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer, type ResponsiveCharacterLayerHandle } from './ResponsiveCharacterLayer';
 import { TimerProgressBar } from './TimerProgressBar';
+import { SpeechBubbleLayer } from './SpeechBubbleLayer';
+import { speakerLocation } from '../utils/speechBubble';
+import type { SpeechLineMode } from './PositionedBeatView';
 import type { Location, AnimationPath } from '@asaps/core';
 import type { SpriteSheetData } from './PositionedBeatView';
 
@@ -380,6 +383,20 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   // animate in parallel because they share the same flip moment.
   const [imagePhase, setImagePhase] = useState<'enter' | 'exit'>('enter');
   const handleExitStart = useCallback(() => setImagePhase('exit'), []);
+
+  // Speaker Display → "Show lines as: speech bubbles". The characters sit in
+  // this view and the line in the SlotFlowView inside it, so the bubble is
+  // drawn here and SlotFlowView is told how to show the line's card.
+  const bubbleBody = spatial.slots.find(s => s.role === 'body');
+  const bubbleText: string = bubbleBody?.source ? String((content as Record<string, unknown>)[bubbleBody.source] ?? '') : '';
+  const bubbleSpeaker = theme?.speakerDisplay?.lineStyle === 'bubble' && beatType !== 'hyperText'
+    ? speakerLocation(characterLocations, speakingCharacter)
+    : undefined;
+  const [bubblePlaced, setBubblePlaced] = useState(false);
+  const bubbleOn = !!bubbleSpeaker && !!bubbleText.trim();
+  const bodySpeechLine: SpeechLineMode | undefined = bubbleOn
+    ? (bubblePlaced ? (editorMode ? 'ghost' : 'hidden') : 'shown')
+    : undefined;
 
   // Default-target countdown — mirror of SlotFlowView's subscription
   // wiring so a spatial beat (titleScreen, dialogTree spatial node,
@@ -894,6 +911,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           extraExitMs={spatialExitMs}
           reservedHudRects={reservedHudRects}
           onSubscribeReservedHudRects={onSubscribeReservedHudRects}
+          speechLine={bodySpeechLine}
           onExitStart={handleExitStart}
           forceMultiActionGate={hasDynamicActions}
           onGateChange={handleGateChange}
@@ -986,6 +1004,18 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
             onElementSelect={onElementSelect}
           />
         </div>
+      )}
+      {bubbleOn && bubbleSpeaker && theme && (
+        <SpeechBubbleLayer
+          text={bubbleText}
+          speakerElementName={bubbleSpeaker.name}
+          speakFrom={bubbleSpeaker.speakFrom}
+          flipX={bubbleSpeaker.flipX}
+          theme={theme}
+          avoidRects={reservedHudRects}
+          onPlaced={setBubblePlaced}
+          zIndex={5}
+        />
       )}
     </div>
   );

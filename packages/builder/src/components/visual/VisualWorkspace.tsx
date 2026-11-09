@@ -2457,6 +2457,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       // Add transform properties (rotation and scale)
       if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
       if (el.flipX) location.flipX = true;
+      if (el.speakFrom) location.speakFrom = el.speakFrom;
       if (el.flipY) location.flipY = true;
       if (el.imageFit) location.imageFit = el.imageFit;
       if (el.imageFrame) location.imageFrame = el.imageFrame;
@@ -2829,6 +2830,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         // Add transform properties (rotation and scale)
         if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
         if (el.flipX) location.flipX = true;
+        if (el.speakFrom) location.speakFrom = el.speakFrom;
         if (el.flipY) location.flipY = true;
         if (el.imageFit) location.imageFit = el.imageFit;
         if (el.imageFrame) location.imageFrame = el.imageFrame;
@@ -3234,6 +3236,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             height: loc.height,
             rotation: loc.rotation ?? 0,
             ...(loc.flipX ? { flipX: true } : {}),
+            ...(loc.speakFrom ? { speakFrom: loc.speakFrom } : {}),
             ...(loc.flipY ? { flipY: true } : {}),
             ...(loc.imageFit ? { imageFit: loc.imageFit } : {}),
             ...(loc.imageFrame ? { imageFrame: loc.imageFrame } : {}),
@@ -3413,6 +3416,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             height: loc.height,
             rotation: (loc as any).rotation ?? 0,
             ...((loc as any).flipX ? { flipX: true } : {}),
+            ...((loc as any).speakFrom ? { speakFrom: (loc as any).speakFrom } : {}),
             ...((loc as any).flipY ? { flipY: true } : {}),
             ...((loc as any).imageFit ? { imageFit: (loc as any).imageFit } : {}),
             ...((loc as any).imageFrame ? { imageFrame: (loc as any).imageFrame } : {}),
@@ -3563,6 +3567,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               height: loc.height,
               rotation: loc.rotation ?? 0,
               ...(loc.flipX ? { flipX: true } : {}),
+              ...(loc.speakFrom ? { speakFrom: loc.speakFrom } : {}),
               ...(loc.flipY ? { flipY: true } : {}),
               ...(loc.imageFit ? { imageFit: loc.imageFit } : {}),
               ...(loc.imageFrame ? { imageFrame: loc.imageFrame } : {}),
@@ -3709,6 +3714,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           height: loc.height,
           rotation: loc.rotation ?? 0,
           ...(loc.flipX ? { flipX: true } : {}),
+          ...(loc.speakFrom ? { speakFrom: loc.speakFrom } : {}),
           ...(loc.flipY ? { flipY: true } : {}),
           ...(loc.imageFit ? { imageFit: loc.imageFit } : {}),
           ...(loc.imageFrame ? { imageFrame: loc.imageFrame } : {}),
@@ -3931,6 +3937,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           height: loc.height,
           rotation: loc.rotation || 0,
           ...(loc.flipX ? { flipX: true } : {}),
+          ...(loc.speakFrom ? { speakFrom: loc.speakFrom } : {}),
           ...(loc.flipY ? { flipY: true } : {}),
           ...(loc.imageFit ? { imageFit: loc.imageFit } : {}),
           ...(loc.imageFrame ? { imageFrame: loc.imageFrame } : {}),
@@ -5057,6 +5064,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       // Add transform properties (rotation and scale)
       if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
       if (el.flipX) location.flipX = true;
+      if (el.speakFrom) location.speakFrom = el.speakFrom;
       if (el.flipY) location.flipY = true;
       if (el.imageFit) location.imageFit = el.imageFit;
       if (el.imageFrame) location.imageFrame = el.imageFrame;

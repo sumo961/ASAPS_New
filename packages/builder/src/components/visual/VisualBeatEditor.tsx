@@ -64,7 +64,7 @@ import { pictureStart, resizePicture } from '../../utils/pictureResize';
  * Helper to resolve fresh image URL from assets using assetId.
  * Character state images stored with blob URLs become stale after page reload.
  */
-function resolveCharacterImageUrl(
+export function resolveCharacterImageUrl(
   state: { visual?: { assetId?: string; image?: string } } | undefined,
   defaultImage: string | undefined,
   assets: Asset[],
@@ -135,6 +135,8 @@ export interface VisualElement {
   /** Mirrored left↔right / upside down (pictures, characters, props). */
   flipX?: boolean;
   flipY?: boolean;
+  /** Characters: where a speech bubble's tail points, as fractions of the box (see Location.speakFrom). */
+  speakFrom?: { x: number; y: number };
   /** Pictures: 'scale' fills the box, 'crop' shows the picture at imageFrame (see utils/pictureResize). */
   imageFit?: 'scale' | 'crop';
   imageFrame?: { x: number; y: number; w: number; h: number };
@@ -655,6 +657,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       scale: el.scale,
       ...(el.flipX ? { flipX: true } : {}),
       ...(el.flipY ? { flipY: true } : {}),
+      ...(el.speakFrom ? { speakFrom: el.speakFrom } : {}),
       ...(el.imageFit ? { imageFit: el.imageFit } : {}),
       ...(el.imageFrame ? { imageFrame: el.imageFrame } : {}),
       // Character-specific fields

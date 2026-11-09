@@ -32,7 +32,8 @@ import {
 import { getAllPresetSounds, isPresetSound, getPresetSound, type PresetSound } from '@asaps/core';
 import { getSlotSpec, getSpatialSpec } from '@asaps/renderer';
 import type { Asset } from '../assets/AssetManager';
-import { clampOnStage, type VisualElement } from './VisualBeatEditor';
+import { clampOnStage, resolveCharacterImageUrl, type VisualElement } from './VisualBeatEditor';
+import { SpeakFromPicker } from './SpeakFromPicker';
 import { DraftNumberInput } from '../common/DraftNumberInput';
 import type { Character, CharacterState } from '../../types/character';
 import type { GlobalSettings } from '../../storage/types';
@@ -3061,6 +3062,22 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                         })()}
                       </select>
                     </div>
+
+                    {/* Where a speech bubble's tail points on this character */}
+                    {(() => {
+                      const character = characters.find(c => c.id === selected.characterId);
+                      const state = character?.states?.find(s => s.id === (selected.stateId || character?.defaultState));
+                      const sprite = character?.visual?.type === 'sprite' ? character.visual.spriteSheet : undefined;
+                      const imageUrl = sprite ? undefined : resolveCharacterImageUrl(state as any, character?.visual?.defaultImage, assets) || selected.imageUrl;
+                      return (
+                        <SpeakFromPicker
+                          imageUrl={imageUrl}
+                          frameAspect={sprite?.frameWidth && sprite?.frameHeight ? sprite.frameWidth / sprite.frameHeight : undefined}
+                          value={selected.speakFrom}
+                          onChange={(speakFrom) => onElementUpdate(selected.id, { speakFrom })}
+                        />
+                      );
+                    })()}
 
                     {/* Size/Scale Slider */}
                     <div>

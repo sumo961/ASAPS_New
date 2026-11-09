@@ -25,6 +25,8 @@ import { ChoicePicture, isPictureChoiceStyle, pictureChoiceLabel, type ChoicePic
 import { revealBoundary } from '../utils/typewriterGranularity';
 import { thoughtBoxStyle } from '../utils/innerVoice';
 import { DIM_TRANSITION, dimFilter, showsSpeaker, silentCharacterFilters } from '../utils/speakerDimming';
+import { speakerLocation } from '../utils/speechBubble';
+import { SpeechBubbleLayer } from './SpeechBubbleLayer';
 
 /** A frame picture's edge height on a fixed stage: the picture's share of the stage width, never taller than in the picture. */
 const stageFrameBand = (stageWidth: number) => (f: number, naturalPx: number) =>
@@ -587,6 +589,12 @@ export interface RenderThemeSettings {
     dimSilentCharacters?: boolean;
     /** How strongly they are dimmed, 0–100 (default 50). */
     dimStrength?: number;
+    /**
+     * 'bubble': a line spoken by a character on the stage is drawn as a
+     * speech bubble pointing at them, instead of in the text box (which
+     * stays for narration and wherever no bubble fits). Default 'box'.
+     */
+    lineStyle?: 'box' | 'bubble';
   };
 }
 
@@ -1434,6 +1442,14 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   );
   const dimFor = (element: PositionedElementData): string | undefined =>
     silentFilter && element.location.kind === 'character' && !showsSpeaker(element.location, speakingCharacter) ? silentFilter : undefined;
+  // Speaker Display → "Show lines as: speech bubbles": the placed character
+  // saying this line, when there is one. Narration keeps the text box.
+  const bubbleSpeaker = theme.speakerDisplay?.lineStyle === 'bubble' && !previewMode
+    ? speakerLocation(elements.map((e) => e.location), speakingCharacter)
+    : undefined;
+  // Whether the bubble is showing (SpeechBubbleLayer says so; until then, and
+  // whenever none fits, the line stays in its text box).
+  const [bubblePlaced, setBubblePlaced] = React.useState(false);
   // Settings → Text Box → Box Visibility rides the theme, as it does for
   // ReactRenderer.setTheme. Reading it here too means every caller follows it:
   // the Visual Editor's fixed-layout stage never passed the props, so it drew
@@ -2287,6 +2303,19 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // Determine if buttons should be visible
   const shouldShowButtons = effectiveAnimationsComplete || animation === 'none' || sortedTextElements.length === 0;
 
+  // The spoken line shown as a speech bubble: the first text box (the one the
+  // speaker's name and portrait go with). Its box is hidden while the bubble
+  // shows, and its name label and portrait above it go with it.
+  const bubbleLineIdx = bubbleSpeaker
+    ? adjustedElements.findIndex((el) => el.location.kind === 'text' || el.location.kind === 'dialog')
+    : -1;
+  const bubbleLine = bubbleLineIdx >= 0 ? adjustedElements[bubbleLineIdx] : undefined;
+  const bubbleOn = !!bubbleSpeaker && !!bubbleLine?.content?.trim();
+  const lineInBubble = bubbleOn && bubblePlaced;
+  const speechLineMode: SpeechLineMode | undefined = bubbleOn
+    ? (lineInBubble ? (editorMode ? 'ghost' : 'hidden') : 'shown')
+    : undefined;
+
   return (
     <div
       style={containerStyle}
@@ -2331,7 +2360,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
         />
       )}
       {/* Speaker name label overlay (VN-style) */}
-      {speakerName && theme.speakerDisplay?.nameStyle === 'label' && (() => {
+      {speakerName && !lineInBubble && theme.speakerDisplay?.nameStyle === 'label' && (() => {
         const namePos = theme.speakerDisplay?.namePosition ?? 'left';
         const isLeft = textDirection === 'rtl' ? namePos === 'right' : namePos === 'left';
         // Position label just above and aligned with first text element
@@ -2373,7 +2402,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
       })()}
 
       {/* Speaker portrait above text box — flush on top, aligned with text box edges */}
-      {speakerName && speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'above-left' || theme.speakerDisplay?.graphicPosition === 'above-right') && (() => {
+      {speakerName && speakerPortraitUrl && !lineInBubble && (theme.speakerDisplay?.graphicPosition === 'above-left' || theme.speakerDisplay?.graphicPosition === 'above-right') && (() => {
         const isLeft = theme.speakerDisplay?.graphicPosition === 'above-left';
         const size = theme.speakerDisplay?.graphicSize ?? 80;
         const firstTextEl = adjustedElements.find(el => el.location.kind === 'text' || el.location.kind === 'dialog');
@@ -2456,10 +2485,23 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             speakerName={isFirstText ? speakerName : undefined}
             speakerPortraitUrl={isFirstText ? speakerPortraitUrl : undefined}
             thought={isFirstText ? thought : undefined}
+            speechLine={index === bubbleLineIdx ? speechLineMode : undefined}
           />
           );
         });
       })()}
+      {bubbleOn && bubbleSpeaker && bubbleLine && (
+        <SpeechBubbleLayer
+          text={bubbleLine.content}
+          speakerElementName={bubbleSpeaker.name}
+          speakFrom={bubbleSpeaker.speakFrom}
+          flipX={bubbleSpeaker.flipX}
+          theme={theme}
+          avoidRects={reservedHudRects}
+          skipAnimation={effectiveSkipAnimation}
+          onPlaced={setBubblePlaced}
+        />
+      )}
     </div>
   );
 };
@@ -2543,6 +2585,24 @@ interface PositionedElementProps {
   thought?: { color?: string };
   /** A character who isn't speaking while another stage character does: drawn with this filter. */
   dimFilter?: string;
+  /** This text box holds the spoken line shown as a speech bubble: see speechLineProps. */
+  speechLine?: SpeechLineMode;
+}
+
+/**
+ * The text box of a line shown as a speech bubble: 'shown' while the bubble
+ * is being placed (or doesn't fit), 'hidden' while it shows — kept in place
+ * so the buttons stay put and its lettering can be copied — and 'ghost' in
+ * the Visual Editor, where the box stays findable.
+ */
+export type SpeechLineMode = 'shown' | 'hidden' | 'ghost';
+
+function speechLineProps(mode: SpeechLineMode | undefined): { attrs: Record<string, string>; style: React.CSSProperties } {
+  if (!mode) return { attrs: {}, style: {} };
+  return {
+    attrs: { 'data-speech-line': mode },
+    style: mode === 'hidden' ? { visibility: 'hidden' } : mode === 'ghost' ? { opacity: 0.3 } : {},
+  };
 }
 
 const PositionedElement: React.FC<PositionedElementProps> = ({
@@ -2584,6 +2644,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   speakerName,
   speakerPortraitUrl,
   thought,
+  speechLine,
 }) => {
   const { location, content, assetUrl, hyperlinks, description } = element;
 
@@ -2727,6 +2788,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           speakerName={speakerName}
           speakerPortraitUrl={speakerPortraitUrl}
           thought={thought}
+          speechLine={speechLine}
         />
       );
     }
@@ -2969,6 +3031,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           speakerName={speakerName}
           speakerPortraitUrl={speakerPortraitUrl}
           thought={thought}
+          speechLine={speechLine}
         />
       );
     }
@@ -3263,7 +3326,9 @@ const TextElement: React.FC<{
   speakerName?: string;  // Speaker name for inline display
   speakerPortraitUrl?: string;  // Speaker portrait URL for inside-text display
   thought?: { color?: string };  // Inner voice: dashed, see-through, italic box
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0, speakerName, speakerPortraitUrl, thought }) => {
+  speechLine?: SpeechLineMode;  // The line is shown as a speech bubble
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0, speakerName, speakerPortraitUrl, thought, speechLine }) => {
+  const line = speechLineProps(speechLine);
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
   const [animationStarted, setAnimationStarted] = React.useState(false);
@@ -3591,6 +3656,7 @@ const TextElement: React.FC<{
       </style>
       <div
         ref={containerRef}
+        {...line.attrs}
         style={{
           ...style,
           ...animationStyle,
@@ -3622,6 +3688,7 @@ const TextElement: React.FC<{
           justifyContent: needsScroll || hasOverflow ? undefined : 'center',
           whiteSpace: 'pre-wrap', // Preserve line breaks in imported content
           ...(thought ? thoughtBoxStyle(thought.color, { padding: shouldHideTextBox ? 0 : padding }) : null),
+          ...line.style,
         }}
       >
         {/* Inner wrapper for scroll indicator positioning */}
@@ -4277,7 +4344,9 @@ const DialogElement: React.FC<{
   speakerName?: string;
   speakerPortraitUrl?: string;
   thought?: { color?: string };  // Inner voice: dashed, see-through, italic box
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0, speakerName, speakerPortraitUrl, thought }) => {
+  speechLine?: SpeechLineMode;  // The line is shown as a speech bubble
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0, speakerName, speakerPortraitUrl, thought, speechLine }) => {
+  const line = speechLineProps(speechLine);
   const frameSize = usePictureSize(theme.textboxFrameUrl);
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
@@ -4536,6 +4605,7 @@ const DialogElement: React.FC<{
   return (
     <div
       ref={containerRef}
+      {...line.attrs}
       style={{
         ...style,
         ...dimensionStyle,
@@ -4560,6 +4630,7 @@ const DialogElement: React.FC<{
         display: 'block',
         lineHeight: '1.5',
         ...(thought ? thoughtBoxStyle(thought.color, { padding: hideTextBox ? 0 : paddingVertical }) : null),
+        ...line.style,
       }}
     >
       {/* Inner wrapper for scroll indicator positioning */}
@@ -4665,12 +4736,14 @@ interface AnimatedSpriteProps {
   finalStyle: React.CSSProperties;
   isClickable: boolean;
   onClick: () => void;
+  /** data-character-name for a character (speech bubbles find the speaker by it). */
+  tag?: Record<string, string>;
 }
 
 // Track mount count globally for debugging
 let animatedSpriteMountCount = 0;
 
-const AnimatedSpriteInner: React.FC<AnimatedSpriteProps> = ({ assetUrl, spriteSheet, finalStyle, isClickable, onClick }) => {
+const AnimatedSpriteInner: React.FC<AnimatedSpriteProps> = ({ assetUrl, spriteSheet, finalStyle, isClickable, onClick, tag }) => {
   const [currentFrameIndex, setCurrentFrameIndex] = React.useState(0);
   const startTimeRef = React.useRef<number>(Date.now());
   const animationFrameIdRef = React.useRef<number | null>(null);
@@ -4884,6 +4957,7 @@ const AnimatedSpriteInner: React.FC<AnimatedSpriteProps> = ({ assetUrl, spriteSh
 
   return (
     <div
+      {...tag}
       style={{
         ...finalStyle,
         width: spriteSheet.frameWidth,
@@ -4985,6 +5059,10 @@ const AssetElement: React.FC<{
   };
 
   const isClickable = interactive && actionId && onAction;
+  // A character's picture carries its element's name: speech bubbles find
+  // the speaker on the stage by it (SpeechBubbleLayer), as in the
+  // responsive layouts' ResponsiveCharacterLayer.
+  const tag: Record<string, string> = kind === 'character' ? { 'data-character-name': name } : {};
 
   // Tooltip portal for prop descriptions
   const tooltipPortal = showTooltip ? ReactDOM.createPortal(
@@ -5050,6 +5128,7 @@ const AssetElement: React.FC<{
       if (shouldAnimate) {
         return (
           <AnimatedSprite
+            tag={tag}
             assetUrl={assetUrl}
             spriteSheet={spriteSheet}
             finalStyle={finalStyle}
@@ -5071,6 +5150,7 @@ const AssetElement: React.FC<{
 
       return (
         <div
+          {...tag}
           style={{
             ...finalStyle,
             width: spriteSheet.frameWidth,
@@ -5106,6 +5186,7 @@ const AssetElement: React.FC<{
       return (
         <>
           <video
+            {...tag}
             src={assetUrl}
             style={{
               ...finalStyle,
@@ -5131,6 +5212,7 @@ const AssetElement: React.FC<{
       return (
         <>
           <div
+            {...tag}
             style={{ ...finalStyle, overflow: 'hidden', cursor: isClickable ? 'pointer' : 'default' }}
             onClick={handleClick}
             onMouseEnter={() => setIsHovered(true)}
@@ -5162,6 +5244,7 @@ const AssetElement: React.FC<{
     return (
       <>
         <img
+          {...tag}
           src={assetUrl}
           alt={name}
           style={{
@@ -5218,7 +5301,7 @@ const AssetElement: React.FC<{
   };
 
   return (
-    <div style={placeholderStyle}>
+    <div {...tag} style={placeholderStyle}>
       <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{name}</div>
       <div style={{ fontSize: '10px', opacity: 0.7 }}>({kind})</div>
       {assetId && (

@@ -180,6 +180,8 @@ export interface GlobalSettings {
     dimSilentCharacters?: boolean;
     /** How strongly they are dimmed, 0–100 (default 50). */
     dimStrength?: number;
+    /** 'bubble': a line said by a character on the stage shows as a speech bubble pointing at them (default 'box': the text box). */
+    lineStyle?: 'box' | 'bubble';
   };
   translation?: {
     sourceLanguage: string;  // BCP 47 code, default 'en'

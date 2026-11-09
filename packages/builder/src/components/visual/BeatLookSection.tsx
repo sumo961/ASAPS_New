@@ -99,7 +99,7 @@ export const BeatLookSection: React.FC<Props> = ({ value, globalSettings, fonts,
     (n, v) => n + (v && typeof v === 'object' ? Object.keys(v).length : 1), 0,
   ) + (value.textBoxBorder ? 1 : 0);
 
-  const setTop = (key: 'stageColor' | 'textColor', v: string | undefined) =>
+  const setTop = (key: 'stageColor' | 'textColor' | 'speechBubbles', v: string | undefined) =>
     onChange({ ...value, look: tidyLook({ ...look, [key]: v }) });
   const setIn = (group: Group, key: string, v: string | number | undefined) =>
     onChange({ ...value, look: tidyLook({ ...look, [group]: { ...(look as any)[group], [key]: v } }) });
@@ -162,6 +162,22 @@ export const BeatLookSection: React.FC<Props> = ({ value, globalSettings, fonts,
             </Row>
             <Row label="Text colour" changed={!!look.textColor} onReset={() => setTop('textColor', undefined)}>
               {color(look.textColor, project?.colors.textColor, (c) => setTop('textColor', c))}
+            </Row>
+          </div>
+
+          <div className="space-y-1.5">
+            <Row label="Spoken lines" changed={!!look.speechBubbles} onReset={() => setTop('speechBubbles', undefined)}>
+              <select
+                data-testid="beat-speech-bubbles"
+                value={look.speechBubbles ?? ''}
+                onChange={(e) => setTop('speechBubbles', e.target.value || undefined)}
+                className="w-full px-1 py-0.5 text-xs border border-gray-300 rounded"
+                title="Speech bubbles: a line said by a character on the stage appears in a bubble pointing at them (Project Settings ▸ Speaker Display)."
+              >
+                <option value="">Project ({globalSettings?.speakerDisplay?.lineStyle === 'bubble' ? 'speech bubbles' : 'text box'})</option>
+                <option value="on">Speech bubbles on this beat</option>
+                <option value="off">Text box on this beat</option>
+              </select>
             </Row>
           </div>
 

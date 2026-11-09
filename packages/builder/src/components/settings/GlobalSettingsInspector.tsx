@@ -2273,6 +2273,23 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     )}
                   </div>
 
+                  {/* Lines as speech bubbles */}
+                  <div className="mt-3" data-testid="speech-bubbles">
+                    <label className="block text-sm font-medium text-gray-600 mb-1" htmlFor="speaker-line-style">Show lines as</label>
+                    <select
+                      id="speaker-line-style"
+                      value={settings.speakerDisplay?.lineStyle ?? 'box'}
+                      onChange={(e) => handleChange('speakerDisplay', 'lineStyle', e.target.value)}
+                      className="w-full px-3 py-2 border rounded"
+                    >
+                      <option value="box">A text box</option>
+                      <option value="bubble">Speech bubbles</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Speech bubbles: when a character placed on the stage speaks, the line appears in a bubble next to them, pointing at them. Narration, and characters who aren't on the stage, keep the text box, as does any line whose bubble doesn't fit, as on a small phone. Choose where the bubble points by selecting the character in the Visual Editor.
+                    </p>
+                  </div>
+
                   {/* Dim the characters on the stage who aren't speaking */}
                   <div className="mt-3" data-testid="dim-silent-characters">
                     <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">

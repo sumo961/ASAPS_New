@@ -128,6 +128,7 @@ export function normalizeSpeakerDisplay(sd: any): {
   graphicSize?: number;
   dimSilentCharacters?: boolean;
   dimStrength?: number;
+  lineStyle?: 'box' | 'bubble';
 } {
   // Already new format
   if (sd.nameStyle) {
@@ -145,6 +146,7 @@ export function normalizeSpeakerDisplay(sd: any): {
       graphicSize: sd.graphicSize,
       dimSilentCharacters: sd.dimSilentCharacters,
       dimStrength: sd.dimStrength,
+      lineStyle: sd.lineStyle,
     };
   }
   // Migrate old format: namePosition 'off'|'left'|'right' → nameStyle + namePosition
@@ -172,7 +174,7 @@ export function normalizeSpeakerDisplay(sd: any): {
   // Derive showNames/showGraphics from migrated values
   const showNames = sd.showNames ?? (nameStyle !== 'off');
   const showGraphics = sd.showGraphics ?? (graphicPosition !== 'off');
-  return { showNames, showGraphics, nameStyle, namePosition, nameColor: sd.nameColor, useCharacterColors: sd.useCharacterColors, graphicPosition, graphicSize: sd.graphicSize, dimSilentCharacters: sd.dimSilentCharacters, dimStrength: sd.dimStrength };
+  return { showNames, showGraphics, nameStyle, namePosition, nameColor: sd.nameColor, useCharacterColors: sd.useCharacterColors, graphicPosition, graphicSize: sd.graphicSize, dimSilentCharacters: sd.dimSilentCharacters, dimStrength: sd.dimStrength, lineStyle: sd.lineStyle };
 }
 
 /**

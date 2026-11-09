@@ -91,6 +91,7 @@ interface GlobalSettings {
     graphicSize?: number;
     dimSilentCharacters?: boolean;
     dimStrength?: number;
+    lineStyle?: 'box' | 'bubble';
   };
 }
 
@@ -241,7 +242,7 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       const showNames = sd.showNames ?? (nameStyle !== 'off');
       const graphicPosition = sd.graphicPosition || 'off';
       const showGraphics = sd.showGraphics ?? (graphicPosition !== 'off');
-      return { showNames, showGraphics, nameStyle, namePosition: sd.namePosition || 'left', nameColor: sd.nameColor, useCharacterColors: sd.useCharacterColors, graphicPosition, graphicSize: sd.graphicSize, dimSilentCharacters: sd.dimSilentCharacters, dimStrength: sd.dimStrength };
+      return { showNames, showGraphics, nameStyle, namePosition: sd.namePosition || 'left', nameColor: sd.nameColor, useCharacterColors: sd.useCharacterColors, graphicPosition, graphicSize: sd.graphicSize, dimSilentCharacters: sd.dimSilentCharacters, dimStrength: sd.dimStrength, lineStyle: sd.lineStyle === 'bubble' ? 'bubble' : undefined };
     })() : undefined,
   };
 }
