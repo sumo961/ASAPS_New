@@ -845,6 +845,12 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         return findSpeakerCharacterId(speakerName, characters as any[], ctx?.getMergedCharacter ? (id: string) => ctx.getMergedCharacter(id) : undefined);
       });
     }
+    // The player's character: speech bubbles show the player's Dialog Tree
+    // replies, and inner voices' thoughts, at them.
+    if ('setPlayerCharacterResolver' in renderer) {
+      const playerId = (characters as any[]).find((c) => c?.role === 'player')?.id as string | undefined;
+      (renderer as any).setPlayerCharacterResolver(() => playerId);
+    }
 
     // Asset resolver - resolves asset IDs to blob URLs
     if ('setAssetResolver' in renderer) {

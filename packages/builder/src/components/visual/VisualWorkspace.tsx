@@ -2010,7 +2010,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Speaker Display → "Dim characters who aren't speaking": who speaks in the
   // previewed line (a Dialog Tree's current line), as a character id.
   const slotPreviewSpeakingCharacter: string | undefined = (() => {
-    if (!(globalSettings as any)?.speakerDisplay?.dimSilentCharacters || !beat) return undefined;
+    // Always passed: the stage dims or draws bubbles as the theme says.
+    if (!beat) return undefined;
     const raw: string | undefined = beat.type === 'dialogTree' || beat.type === 'aiDialogTree'
       ? (dialogNodeAt((slotPreviewParams as any)?.dialogTree, dialogTreeNodePath) ?? (slotPreviewParams as any)?.dialogTree)?.speaker
       : (beat as any).speaker;

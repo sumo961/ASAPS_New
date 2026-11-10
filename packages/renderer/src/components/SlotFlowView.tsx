@@ -45,8 +45,8 @@ import { WebViewElement } from './WebViewElement';
 import { ARSceneElement } from './ARSceneElement';
 import { runSlotPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer } from './ResponsiveCharacterLayer';
-import { SpeechBubbleLayer } from './SpeechBubbleLayer';
-import { speakerLocation } from '../utils/speechBubble';
+import { StageBubbles, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
+import { bubbleSpeakerFor, type BubbleHistory } from '../utils/speechBubble';
 import type { SpeechLineMode } from './PositionedBeatView';
 
 /**
@@ -230,6 +230,11 @@ interface SlotFlowViewProps {
   /** Who is speaking now (character id or placed name): Speaker Display can dim the other characters on the stage. */
   speakingCharacter?: string;
   /**
+   * Speech bubbles: the line before the current one, kept up beside it,
+   * and the player's character (ReactRenderer.bubbleHistory).
+   */
+  bubbleHistory?: BubbleHistory;
+  /**
    * The line is shown as a speech bubble by a host that draws it
    * (SpatialFlowView, whose characters sit outside this view): how the body
    * card shows meanwhile. Without it, this view draws the bubble itself when
@@ -383,6 +388,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   animations,
   characterResolver,
   speakingCharacter,
+  bubbleHistory,
   speechLine: speechLineProp,
   assetResolver,
   spriteDataResolver,
@@ -518,7 +524,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // a bubble next to the character saying it, when they are on this stage.
   // (A hyperText body keeps its box: its links live in the text.)
   const bubbleSpeaker = theme.speakerDisplay?.lineStyle === 'bubble' && speechLineProp === undefined && beatType !== 'hyperText'
-    ? speakerLocation(characterLocations, speakingCharacter)
+    ? bubbleSpeakerFor(characterLocations, speakingCharacter, !!exchange?.inner, bubbleHistory)
     : undefined;
   const [bubblePlaced, setBubblePlaced] = React.useState(false);
   const bubbleOn = !!bubbleSpeaker && !!bodyText.trim();
@@ -1642,7 +1648,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             justifyContent: 'flex-start',
           }}
         >
-          {exchange && exchange.earlier.length > 0 && (
+          {/* In speech bubbles the line before stands on the stage instead. */}
+          {exchange && exchange.earlier.length > 0 && !lineInBubble && (
             <div data-slotflow-exchange="" style={{ ...CONTENT_ABOVE_SPRITES, display: 'flex', flexDirection: 'column', gap: `clamp(8px, ${vhU(1.5)}, 16px)`, marginBottom: `clamp(10px, ${vhU(2)}, 20px)`, alignSelf: isConversation ? 'flex-start' : 'center', width: '100%' }}>
               {exchange.earlier.map((line, i) => {
                 const card = textBoxCardStyle(theme, { isTitle: false, ...frameOpts });
@@ -2656,14 +2663,16 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         />
       )}
       {bubbleOn && bubbleSpeaker && (
-        <SpeechBubbleLayer
+        <StageBubbles
           text={bodyText}
-          speakerElementName={bubbleSpeaker.name}
-          speakFrom={bubbleSpeaker.speakFrom}
-          flipX={bubbleSpeaker.flipX}
+          speaker={bubbleSpeaker as BubbleSpeakerLocation}
+          locations={characterLocations as BubbleSpeakerLocation[] | undefined}
+          thought={exchange?.inner ? { color: exchange.color } : undefined}
+          history={bubbleHistory}
+          placed={bubblePlaced}
+          onPlaced={setBubblePlaced}
           theme={theme}
           avoidRects={reservedHudRects}
-          onPlaced={setBubblePlaced}
           zIndex={5}
         />
       )}

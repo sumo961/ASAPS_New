@@ -411,3 +411,45 @@ describe("ReactRenderer dims the characters who aren't speaking", () => {
     expect(filterOf('Billie')).toBe('');
   });
 });
+
+// Speech bubbles: the stage is told who speaks whether or not dimming is on,
+// and the line before stays up beside the next one.
+describe('ReactRenderer speech bubble history', () => {
+  const r = () => renderer as any;
+  const line = (speaker: string, text: string) => ({ speaker, text });
+
+  it('tells the stage who speaks without "dim characters" on', () => {
+    renderer.setTheme({ speakerDisplay: { lineStyle: 'bubble' } } as any);
+    renderer.setSpeakerCharacterResolver((s) => (s === 'Stan' ? 'char_stan' : undefined));
+    renderer.setState('beatSpeaker', 'Stan');
+    expect(r().speakingCharacterNow()).toBe('char_stan');
+  });
+
+  it('keeps the line just shown up after Continue, until the story moves past the next line', () => {
+    r().bubbleHistory().onShown(line('char_stan', 'You okay?'));
+    r().noteBubbleTurn(undefined); // Continue
+    expect(r().bubbleHistory().earlier).toEqual(line('char_stan', 'You okay?'));
+    r().bubbleHistory().onShown(line('char_billie', 'Leave me alone.'));
+    const h = r().bubbleHistory();
+    expect(h.earlierAnchor).toBe(`char_billie\u0000Leave me alone.`);
+  });
+
+  it("shows the player's Dialog Tree reply at the player's character", () => {
+    renderer.setPlayerCharacterResolver(() => 'char_you');
+    renderer.setState('currentBeatType', 'dialogTree');
+    r().bubbleHistory().onShown(line('char_stan', 'You okay?'));
+    r().noteBubbleTurn('Not really.');
+    expect(r().bubbleHistory().earlier).toEqual(line('char_you', 'Not really.'));
+    expect(r().bubbleHistory().player).toBe('char_you');
+  });
+
+  it('keeps nothing up after a choice that is not a line, or a screen without a bubble', () => {
+    renderer.setPlayerCharacterResolver(() => 'char_you');
+    renderer.setState('currentBeatType', 'multiChoice');
+    r().bubbleHistory().onShown(line('char_stan', 'Where to?'));
+    r().noteBubbleTurn('Go to the kitchen');
+    expect(r().bubbleHistory().earlier).toBeUndefined();
+    r().noteBubbleTurn(undefined); // narration screen: nothing was shown in a bubble
+    expect(r().bubbleHistory().earlier).toBeUndefined();
+  });
+});

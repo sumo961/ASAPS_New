@@ -16,8 +16,8 @@ import { SlotFlowView, applyAlphaToHex, buttonPictureStyle } from './SlotFlowVie
 import { runSpatialPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer, type ResponsiveCharacterLayerHandle } from './ResponsiveCharacterLayer';
 import { TimerProgressBar } from './TimerProgressBar';
-import { SpeechBubbleLayer } from './SpeechBubbleLayer';
-import { speakerLocation } from '../utils/speechBubble';
+import { StageBubbles, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
+import { bubbleSpeakerFor, type BubbleHistory } from '../utils/speechBubble';
 import type { SpeechLineMode } from './PositionedBeatView';
 import type { Location, AnimationPath } from '@asaps/core';
 import type { SpriteSheetData } from './PositionedBeatView';
@@ -106,6 +106,8 @@ interface SpatialFlowViewProps {
   characterResolver?: (characterId: string, stateId?: string) => string | undefined;
   /** Who is speaking now (character id or placed name): Speaker Display can dim the other characters on the stage. */
   speakingCharacter?: string;
+  /** Speech bubbles: the line before the current one, and the player's character (ReactRenderer.bubbleHistory). */
+  bubbleHistory?: BubbleHistory;
   assetResolver?: (assetId: string) => string | undefined;
   spriteDataResolver?: (characterId: string) => SpriteSheetData | null;
   /** Editor-only: makes free-positioned sprites + slot content clickable for selection. */
@@ -302,6 +304,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   animations,
   characterResolver,
   speakingCharacter,
+  bubbleHistory,
   assetResolver,
   spriteDataResolver,
   editorMode,
@@ -390,7 +393,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   const bubbleBody = spatial.slots.find(s => s.role === 'body');
   const bubbleText: string = bubbleBody?.source ? String((content as Record<string, unknown>)[bubbleBody.source] ?? '') : '';
   const bubbleSpeaker = theme?.speakerDisplay?.lineStyle === 'bubble' && beatType !== 'hyperText'
-    ? speakerLocation(characterLocations, speakingCharacter)
+    ? bubbleSpeakerFor(characterLocations, speakingCharacter, false, bubbleHistory)
     : undefined;
   const [bubblePlaced, setBubblePlaced] = useState(false);
   const bubbleOn = !!bubbleSpeaker && !!bubbleText.trim();
@@ -1006,14 +1009,15 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
         </div>
       )}
       {bubbleOn && bubbleSpeaker && theme && (
-        <SpeechBubbleLayer
+        <StageBubbles
           text={bubbleText}
-          speakerElementName={bubbleSpeaker.name}
-          speakFrom={bubbleSpeaker.speakFrom}
-          flipX={bubbleSpeaker.flipX}
+          speaker={bubbleSpeaker as BubbleSpeakerLocation}
+          locations={characterLocations as BubbleSpeakerLocation[] | undefined}
+          history={bubbleHistory}
+          placed={bubblePlaced}
+          onPlaced={setBubblePlaced}
           theme={theme}
           avoidRects={reservedHudRects}
-          onPlaced={setBubblePlaced}
           zIndex={5}
         />
       )}

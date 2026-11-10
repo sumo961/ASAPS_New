@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
+  bubbleLineKey,
+  bubbleSpeakerFor,
+  earlierLineFor,
+  thoughtPath,
+  thoughtTrail,
   bubblePath,
   bubbleSize,
   bubbleTextMaxWidth,
@@ -93,6 +98,20 @@ describe('placeSpeechBubble', () => {
     expect(ox > 0 && oy > 0 ? ox * oy : 0).toBeLessThan(face.width * face.height * 0.1);
   });
 
+  it('keeps clear of the face below the default point at the top of the head', () => {
+    // Measured in the Preview: a picture as tall as the stage, its head at
+    // the top, cut off at the right edge (Group 2's Vic).
+    const big = { width: 1920, height: 1080 };
+    const speaker = { x: 1085, y: 0, width: 1000, height: 1080 };
+    const mouth = speakPoint(speaker); // top middle: the hair
+    const p = placeSpeechBubble({ stage: big, size: { width: 398, height: 104 }, mouth, speaker })!;
+    expect(p).not.toBeNull();
+    const face = { x: mouth.x - 120, y: 230, width: 240, height: 170 }; // eyes to mouth
+    const ox = Math.min(p.rect.x + p.rect.width, face.x + face.width) - Math.max(p.rect.x, face.x);
+    const oy = Math.min(p.rect.y + p.rect.height, face.y + face.height) - Math.max(p.rect.y, face.y);
+    expect(ox > 0 && oy > 0 ? ox * oy : 0).toBeLessThan(face.width * face.height * 0.1);
+  });
+
   it('gives up (the text box shows) when the bubble does not fit', () => {
     expect(placeSpeechBubble({ stage: { width: 320, height: 568 }, size: { width: 310, height: 80 }, mouth: { x: 160, y: 300 } })).toBeNull();
     expect(placeSpeechBubble({ stage, size: { width: 300, height: 500 }, mouth: { x: 300, y: 400 } })).toBeNull();
@@ -144,5 +163,42 @@ describe("a beat's own look", () => {
     const off = applyBeatLook({ ...DEFAULT_THEME, speakerDisplay: { ...DEFAULT_THEME.speakerDisplay!, lineStyle: 'bubble' } }, { speechBubbles: 'off' });
     expect(off.speakerDisplay?.lineStyle).toBe('box');
     expect(applyBeatLook(DEFAULT_THEME, {}).speakerDisplay).toBe(DEFAULT_THEME.speakerDisplay);
+  });
+});
+
+describe('thought bubbles', () => {
+  it('draws a closed cloud of bumps', () => {
+    const d = thoughtPath(240, 120);
+    expect(d.startsWith('M ')).toBe(true);
+    expect(d.endsWith('Z')).toBe(true);
+    expect((d.match(/ A /g) ?? []).length).toBeGreaterThanOrEqual(7);
+  });
+  it('trails shrinking circles from the cloud toward the point', () => {
+    const trail = thoughtTrail(240, 120, { x: 120, y: 200 });
+    expect(trail).toHaveLength(3);
+    expect(trail[0].r).toBeGreaterThan(trail[1].r);
+    expect(trail[1].r).toBeGreaterThan(trail[2].r);
+    expect(trail.every((c) => c.cy > 120 && c.cy < 200)).toBe(true);
+    expect(thoughtTrail(240, 120, { x: 120, y: 60 })).toEqual([]);
+  });
+});
+
+describe('the line before', () => {
+  const stan = { speaker: 'c-stan', text: 'You okay?' };
+  const billie = { speaker: 'c-billie', text: 'Leave me alone.' };
+  it('shows with the line that came next, and not after', () => {
+    expect(earlierLineFor({ earlier: stan }, billie)).toBe(stan);
+    expect(earlierLineFor({ earlier: stan, earlierAnchor: bubbleLineKey(billie) }, billie)).toBe(stan);
+    expect(earlierLineFor({ earlier: stan, earlierAnchor: bubbleLineKey(billie) }, { speaker: 'c-billie', text: 'Go away.' })).toBeUndefined();
+    expect(earlierLineFor(undefined, billie)).toBeUndefined();
+  });
+  it("points a thought at the player's character when the inner voice isn't on the stage", () => {
+    const locs = [
+      { kind: 'character', name: 'You', characterId: 'c-you' },
+      { kind: 'character', name: 'Stan', characterId: 'c-stan' },
+    ];
+    expect(bubbleSpeakerFor(locs, 'c-doubt', true, { player: 'c-you' })?.name).toBe('You');
+    expect(bubbleSpeakerFor(locs, 'c-doubt', false, { player: 'c-you' })).toBeUndefined();
+    expect(bubbleSpeakerFor(locs, 'c-stan', true, { player: 'c-you' })?.name).toBe('Stan');
   });
 });

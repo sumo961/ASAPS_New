@@ -116,6 +116,15 @@ export function placeSpeechBubble(opts: {
   const tail = Math.min(64, Math.max(24, stage.height * 0.06));
   const towardMiddle = Math.sign(stage.width / 2 - mouth.x) || 1;
 
+  // The speaker's face, around the point the tail aims at: above it when
+  // the author pinned the mouth, below it with the default point at the top
+  // of the head — so both. A bubble over it hides who is talking.
+  const face: BubbleRect | null = speaker ? (() => {
+    const fw = Math.max(40, speaker.width * 0.35);
+    const fh = Math.max(40, speaker.height * 0.18);
+    return { x: mouth.x - fw / 2, y: mouth.y - fh * 0.8, width: fw, height: fh * 2 };
+  })() : null;
+
   type Candidate = { cx: number; cy: number; below?: boolean };
   const candidates: Candidate[] = [];
   for (const lift of [tail, tail * 1.8]) {
@@ -131,14 +140,12 @@ export function placeSpeechBubble(opts: {
   for (const k of [-0.35, 0, 0.35]) {
     candidates.push({ cx: mouth.x + k * w, cy: mouth.y + tail + ry, below: true });
   }
-
-  // The speaker's face: around and above the point the tail aims at. A
-  // bubble over it hides who is talking (a close-up of a large character).
-  const face: BubbleRect | null = speaker ? (() => {
-    const fw = Math.max(40, speaker.width * 0.35);
-    const fh = Math.max(40, speaker.height * 0.18);
-    return { x: mouth.x - fw / 2, y: mouth.y - fh * 0.8, width: fw, height: fh };
-  })() : null;
+  // Clear of the face: above it, or level with it at its sides (a longer
+  // tail, where a close-up leaves no room nearer).
+  if (face) {
+    for (const k of [-0.35, 0, 0.35]) candidates.push({ cx: mouth.x + k * w, cy: face.y - margin - ry });
+    for (const x of [face.x - margin - rx, face.x + face.width + margin + rx]) candidates.push({ cx: x, cy: face.y + ry });
+  }
 
   let best: { score: number; rect: BubbleRect; heavy: number } | null = null;
   for (const c of candidates) {
@@ -210,6 +217,101 @@ export function bubblePath(width: number, height: number, tip?: BubblePoint | nu
   return `M ${f(p1.x)} ${f(p1.y)} L ${f(tip.x)} ${f(tip.y)} L ${f(p2.x)} ${f(p2.y)} A ${f(rx)} ${f(ry)} 0 1 1 ${f(p1.x)} ${f(p1.y)} Z`;
 }
 
+/** How far a thought cloud's bumps reach out from its oval; the cloud's box is this much bigger on each side. */
+export const THOUGHT_BUMP = 12;
+
+/**
+ * A thought: a cloud in its own box (width × height) — bumps around an oval
+ * set in by THOUGHT_BUMP — as one closed path. The tail is a trail of small
+ * circles instead (thoughtTrail).
+ */
+export function thoughtPath(width: number, height: number, stroke = 2): string {
+  const cx = width / 2;
+  const cy = height / 2;
+  const rx = Math.max(4, width / 2 - THOUGHT_BUMP - stroke / 2);
+  const ry = Math.max(4, height / 2 - THOUGHT_BUMP - stroke / 2);
+  // Ramanujan's perimeter, cut into bumps about 44 px apart.
+  const perimeter = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
+  const n = Math.min(20, Math.max(7, Math.round(perimeter / 44)));
+  const pts = Array.from({ length: n }, (_, i) => {
+    const a = (2 * Math.PI * i) / n - Math.PI / 2;
+    return { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) };
+  });
+  let d = `M ${f(pts[0].x)} ${f(pts[0].y)}`;
+  for (let i = 0; i < n; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % n];
+    // An arc bulging outward (to the left of travel, clockwise on screen);
+    // its height stays within THOUGHT_BUMP.
+    const chord = Math.hypot(q.x - p.x, q.y - p.y);
+    const r = Math.max(chord * 0.55, (chord * chord / 4 + THOUGHT_BUMP * THOUGHT_BUMP) / (2 * THOUGHT_BUMP));
+    d += ` A ${f(r)} ${f(r)} 0 0 1 ${f(q.x)} ${f(q.y)}`;
+  }
+  return `${d} Z`;
+}
+
+/**
+ * The trail of a thought: three shrinking circles from the cloud toward
+ * `tip` (in the box's coordinates), the last one next to the tip.
+ */
+export function thoughtTrail(width: number, height: number, tip: BubblePoint): Array<{ cx: number; cy: number; r: number }> {
+  const cx = width / 2;
+  const cy = height / 2;
+  const rx = width / 2;
+  const ry = height / 2;
+  const edge = ovalRadius(rx, ry, tip.x - cx, tip.y - cy);
+  const d = Math.hypot(tip.x - cx, tip.y - cy);
+  if (d <= edge) return [];
+  const ux = (tip.x - cx) / d;
+  const uy = (tip.y - cy) / d;
+  const gap = d - edge;
+  const big = Math.min(9, Math.max(4, gap * 0.16));
+  return [
+    { t: 0.22, r: big },
+    { t: 0.55, r: big * 0.68 },
+    { t: 0.86, r: big * 0.45 },
+  ].map(({ t, r }) => ({ cx: f(cx + ux * (edge + gap * t)), cy: f(cy + uy * (edge + gap * t)), r: f(r) }));
+}
+
+/** A line shown in a bubble: who said it (character id or name) and what. */
+export interface BubbleLine {
+  speaker: string;
+  text: string;
+  /** Thought, not spoken (an inner voice): a cloud. */
+  thought?: { color?: string };
+}
+
+/**
+ * What the stage needs to keep the line before up beside the current one,
+ * as comics do (the renderer keeps it; see ReactRenderer.bubbleHistory):
+ * the line just before — another character's, or the player's own reply in
+ * a Dialog Tree — and the player's character, at whom inner voices point.
+ */
+export interface BubbleHistory {
+  /** The line before the current one. */
+  earlier?: BubbleLine;
+  /**
+   * The first line shown after `earlier` (bubbleLineKey). Unset until the
+   * stage reports one; any other line drops `earlier` (the story moved on
+   * without the player, e.g. on a timer).
+   */
+  earlierAnchor?: string;
+  /** The player's character (role "player"): thoughts point at them. */
+  player?: string;
+  /** The stage showed this line in a bubble. */
+  onShown?: (line: BubbleLine) => void;
+}
+
+export const bubbleLineKey = (line: BubbleLine): string => `${line.speaker}\u0000${line.text}`;
+
+/** The earlier line to show beside `current`, when it still belongs with it. */
+export function earlierLineFor(history: BubbleHistory | undefined, current: BubbleLine | undefined): BubbleLine | undefined {
+  const earlier = history?.earlier;
+  if (!earlier || !current || !earlier.text.trim()) return undefined;
+  if (history.earlierAnchor !== undefined && history.earlierAnchor !== bubbleLineKey(current)) return undefined;
+  return earlier;
+}
+
 /** Which placed character shows the speaker, by character id or by the name it was placed with. */
 export function speakerLocation<T extends StageCharacterLike>(
   locations: ReadonlyArray<T> | undefined,
@@ -218,3 +320,19 @@ export function speakerLocation<T extends StageCharacterLike>(
   if (!locations || !speaker) return undefined;
   return locations.find((l) => showsSpeaker(l, speaker));
 }
+
+/**
+ * Who the current bubble points at: the speaker on the stage — or, for a
+ * thought whose inner voice isn't on the stage (it speaks in the player's
+ * head), the player's character.
+ */
+export function bubbleSpeakerFor<T extends StageCharacterLike>(
+  locations: ReadonlyArray<T> | undefined,
+  speaker: string | undefined,
+  thought: boolean,
+  history: BubbleHistory | undefined,
+): T | undefined {
+  return speakerLocation(locations, speaker)
+    ?? (thought && history?.player ? speakerLocation(locations, history.player) : undefined);
+}
+

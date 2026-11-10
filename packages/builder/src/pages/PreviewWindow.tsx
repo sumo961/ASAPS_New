@@ -1251,6 +1251,10 @@ export const PreviewWindow: React.FC = () => {
         const ctx = engineRef.current?.getContext() as any;
         return findSpeakerCharacterId(speakerName, (pd?.characters ?? []) as any[], ctx?.getMergedCharacter ? (id: string) => ctx.getMergedCharacter(id) : undefined);
       });
+      // The player's character: speech bubbles show the player's Dialog Tree
+      // replies, and inner voices' thoughts, at them.
+      reactRenderer.setPlayerCharacterResolver(() =>
+        ((previewDataRef.current?.characters ?? []) as any[]).find((c) => c?.role === 'player')?.id);
 
       // Set up sound blob resolver for beat sounds
       // This fetches audio from URLs and converts to blobs for the audio manager

@@ -10,6 +10,7 @@ import type { Location, AnimationPath, SlotIntent, DialogExchange, FreeLayoutScr
 import { placeByPercent } from '../utils/freeLayoutPlacement';
 import { applyTextBoxBorder } from '../utils/textBoxBorder';
 import { applyBeatLook } from '../utils/beatLook';
+import { bubbleLineKey, type BubbleHistory, type BubbleLine } from '../utils/speechBubble';
 
 /** One piece of a line read aloud: whose voice reads it. */
 export interface TTSVoiceSegment { text: string; speaker?: string }
@@ -1096,6 +1097,13 @@ export class ReactRenderer extends BaseRenderer {
   private speakerColorResolver: ((speakerName: string) => string | undefined) | null = null;
   /** A speaker to their character's id, for dimming the characters on the stage who aren't speaking. */
   private speakerCharacterResolver: ((speakerName: string) => string | undefined) | null = null;
+  /** The player's character (role "player"), as its id: speech bubbles show their replies and thoughts at them. */
+  private playerCharacterResolver: (() => string | undefined) | null = null;
+  /** Speech bubbles: the line the stage shows in a bubble now (reported by the stage). */
+  private bubbleShown: BubbleLine | null = null;
+  /** Speech bubbles: the line before, kept up beside the next one (see bubbleHistory). */
+  private bubbleEarlier: BubbleLine | null = null;
+  private bubbleEarlierAnchor: string | undefined;
   private speakerThemeCache: { base: RenderThemeSettings | undefined; color: string; border: string; look: BeatLook | undefined; theme: RenderThemeSettings } | null = null;
   protected timerState: { totalTime: number; remainingTime: number; visible: boolean; label?: string } | undefined;  // NEW: Timer state for progress bar
   private timerStateListeners: Set<(state: typeof this.timerState) => void> = new Set();  // Listeners for timer state changes
@@ -1419,6 +1427,7 @@ export class ReactRenderer extends BaseRenderer {
 
     // Speak the clicked choice text if interactor TTS is enabled
     const choiceText = this.choiceTextMap.get(id);
+    this.noteBubbleTurn(choiceText);
     if (choiceText && this.ttsChoiceSpeakCallback) {
       this.ttsChoiceSpeakCallback(choiceText);
     }
@@ -1654,9 +1663,57 @@ export class ReactRenderer extends BaseRenderer {
    * Display asks for it. An inner voice is still the speaker's own line.
    */
   protected speakingCharacterNow(): string | undefined {
-    if (!this.theme?.speakerDisplay?.dimSilentCharacters) return undefined;
+    // Always passed: the views decide from the theme (with the beat's own
+    // look) whether to dim the others or draw the line as a speech bubble.
     const raw = (this.getState('beatSpeaker') as string | undefined) || undefined;
     return raw ? (this.speakerCharacterResolver?.(raw) ?? raw) : undefined;
+  }
+
+  /**
+   * The player's character (role "player"), as its id: in speech bubbles,
+   * a Dialog Tree reply the player picks is shown at them, and an inner
+   * voice that isn't on the stage thinks at them.
+   */
+  setPlayerCharacterResolver(resolver: (() => string | undefined) | null): void {
+    this.playerCharacterResolver = resolver;
+  }
+
+  /**
+   * Speech bubbles: what the stage keeps up beside the current line — the
+   * line before it (another character's, or the reply the player picked in
+   * a Dialog Tree) — and the player's character. Built per render.
+   */
+  protected bubbleHistory(): BubbleHistory {
+    return {
+      ...(this.bubbleEarlier ? { earlier: this.bubbleEarlier, earlierAnchor: this.bubbleEarlierAnchor } : null),
+      player: this.playerCharacterResolver?.(),
+      onShown: this.onBubbleShown,
+    };
+  }
+
+  private onBubbleShown = (line: BubbleLine): void => {
+    this.bubbleShown = line;
+    // The first line after the turn is the one the earlier line goes with.
+    if (this.bubbleEarlier && this.bubbleEarlierAnchor === undefined) this.bubbleEarlierAnchor = bubbleLineKey(line);
+  };
+
+  /**
+   * The player moved on (clicked a button): which line stays up beside the
+   * next one. A Dialog Tree reply is the player's line; Continue keeps the
+   * line just shown; any other choice (going somewhere, doing something) is
+   * not a line, and nothing stays.
+   */
+  private noteBubbleTurn(choiceText: string | undefined): void {
+    const shown = this.bubbleShown;
+    this.bubbleShown = null;
+    this.bubbleEarlierAnchor = undefined;
+    const beatType = this.getState('currentBeatType') as string | undefined;
+    if (choiceText !== undefined) {
+      const player = beatType === 'dialogTree' ? this.playerCharacterResolver?.() : undefined;
+      this.bubbleEarlier = player && choiceText.trim() ? { speaker: player, text: choiceText } : null;
+    } else {
+      this.bubbleEarlier = shown;
+    }
   }
 
   /**
@@ -2877,6 +2934,7 @@ export class ReactRenderer extends BaseRenderer {
             animations={animations || (this.getState('animations') as AnimationPath[] | undefined)}
             characterResolver={this.characterResolver ?? undefined}
             speakingCharacter={this.speakingCharacterNow()}
+            bubbleHistory={this.bubbleHistory()}
             assetResolver={this.assetResolver ?? undefined}
             spriteDataResolver={this.spriteDataResolver ?? undefined}
             timerState={this.timerState}
@@ -2947,6 +3005,7 @@ export class ReactRenderer extends BaseRenderer {
             animations={animations || (this.getState('animations') as AnimationPath[] | undefined)}
             characterResolver={this.characterResolver ?? undefined}
             speakingCharacter={this.speakingCharacterNow()}
+            bubbleHistory={this.bubbleHistory()}
             assetResolver={this.assetResolver ?? undefined}
             spriteDataResolver={this.spriteDataResolver ?? undefined}
             timerState={this.timerState}
@@ -3060,6 +3119,7 @@ export class ReactRenderer extends BaseRenderer {
                 return exchange?.inner ? { color: exchange.color } : undefined;
               })()}
               speakingCharacter={this.speakingCharacterNow()}
+              bubbleHistory={this.bubbleHistory()}
               speakerPortraitUrl={(() => {
                 const beatOverride = this.getState('showSpeaker') as boolean | undefined;
                 const globalShowNames = this.theme?.speakerDisplay?.showNames ?? false;
@@ -3552,6 +3612,7 @@ export class ReactRenderer extends BaseRenderer {
               animations={this.getState('animations') as AnimationPath[] | undefined}
               characterResolver={this.characterResolver ?? undefined}
               speakingCharacter={this.speakingCharacterNow()}
+              bubbleHistory={this.bubbleHistory()}
               assetResolver={this.assetResolver ?? undefined}
               spriteDataResolver={this.spriteDataResolver ?? undefined}
               timerState={this.timerState}
@@ -3680,6 +3741,7 @@ export class ReactRenderer extends BaseRenderer {
             animations={this.getState('animations') as AnimationPath[] | undefined}
             characterResolver={this.characterResolver ?? undefined}
             speakingCharacter={this.speakingCharacterNow()}
+            bubbleHistory={this.bubbleHistory()}
             assetResolver={this.assetResolver ?? undefined}
             spriteDataResolver={this.spriteDataResolver ?? undefined}
             timerState={this.timerState}
@@ -3929,6 +3991,7 @@ export class ReactRenderer extends BaseRenderer {
               animations={this.getState('animations') as AnimationPath[] | undefined}
               characterResolver={this.characterResolver ?? undefined}
               speakingCharacter={this.speakingCharacterNow()}
+              bubbleHistory={this.bubbleHistory()}
               assetResolver={this.assetResolver ?? undefined}
               spriteDataResolver={this.spriteDataResolver ?? undefined}
               timerState={this.timerState}
@@ -3980,6 +4043,7 @@ export class ReactRenderer extends BaseRenderer {
             animations={this.getState('animations') as AnimationPath[] | undefined}
             characterResolver={this.characterResolver ?? undefined}
             speakingCharacter={this.speakingCharacterNow()}
+            bubbleHistory={this.bubbleHistory()}
             assetResolver={this.assetResolver ?? undefined}
             spriteDataResolver={this.spriteDataResolver ?? undefined}
             timerState={this.timerState}
@@ -4078,6 +4142,7 @@ export class ReactRenderer extends BaseRenderer {
               animations={this.getState('animations') as AnimationPath[] | undefined}
               characterResolver={this.characterResolver ?? undefined}
               speakingCharacter={this.speakingCharacterNow()}
+              bubbleHistory={this.bubbleHistory()}
               assetResolver={this.assetResolver ?? undefined}
               spriteDataResolver={this.spriteDataResolver ?? undefined}
               timerState={this.timerState}
@@ -4128,6 +4193,7 @@ export class ReactRenderer extends BaseRenderer {
             animations={this.getState('animations') as AnimationPath[] | undefined}
             characterResolver={this.characterResolver ?? undefined}
             speakingCharacter={this.speakingCharacterNow()}
+            bubbleHistory={this.bubbleHistory()}
             assetResolver={this.assetResolver ?? undefined}
             spriteDataResolver={this.spriteDataResolver ?? undefined}
             timerState={this.timerState}

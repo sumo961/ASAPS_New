@@ -25,8 +25,8 @@ import { ChoicePicture, isPictureChoiceStyle, pictureChoiceLabel, type ChoicePic
 import { revealBoundary } from '../utils/typewriterGranularity';
 import { thoughtBoxStyle } from '../utils/innerVoice';
 import { DIM_TRANSITION, dimFilter, showsSpeaker, silentCharacterFilters } from '../utils/speakerDimming';
-import { speakerLocation } from '../utils/speechBubble';
-import { SpeechBubbleLayer } from './SpeechBubbleLayer';
+import { bubbleSpeakerFor, type BubbleHistory } from '../utils/speechBubble';
+import { StageBubbles, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
 
 /** A frame picture's edge height on a fixed stage: the picture's share of the stage width, never taller than in the picture. */
 const stageFrameBand = (stageWidth: number) => (f: number, naturalPx: number) =>
@@ -727,6 +727,11 @@ export interface PositionedBeatViewProps {
    * other characters on the stage are dimmed. Passed whether or not names show.
    */
   speakingCharacter?: string;
+  /**
+   * Speech bubbles: the line before the current one, kept up beside it,
+   * and the player's character (ReactRenderer.bubbleHistory).
+   */
+  bubbleHistory?: BubbleHistory;
 }
 
 /**
@@ -1431,6 +1436,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   speakerPortraitUrl,
   thought,
   speakingCharacter,
+  bubbleHistory,
 }) => {
   // Speaker Display → "Dim characters who aren't speaking": a filter per
   // character element that isn't the speaker, when the speaker is on the stage.
@@ -1445,7 +1451,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // Speaker Display → "Show lines as: speech bubbles": the placed character
   // saying this line, when there is one. Narration keeps the text box.
   const bubbleSpeaker = theme.speakerDisplay?.lineStyle === 'bubble' && !previewMode
-    ? speakerLocation(elements.map((e) => e.location), speakingCharacter)
+    ? bubbleSpeakerFor(elements.map((e) => e.location), speakingCharacter, !!thought, bubbleHistory)
     : undefined;
   // Whether the bubble is showing (SpeechBubbleLayer says so; until then, and
   // whenever none fits, the line stays in its text box).
@@ -2491,15 +2497,17 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
         });
       })()}
       {bubbleOn && bubbleSpeaker && bubbleLine && (
-        <SpeechBubbleLayer
+        <StageBubbles
           text={bubbleLine.content}
-          speakerElementName={bubbleSpeaker.name}
-          speakFrom={bubbleSpeaker.speakFrom}
-          flipX={bubbleSpeaker.flipX}
+          speaker={bubbleSpeaker as BubbleSpeakerLocation}
+          locations={elements.map((e) => e.location) as BubbleSpeakerLocation[]}
+          thought={thought}
+          history={bubbleHistory}
+          placed={bubblePlaced}
+          onPlaced={setBubblePlaced}
           theme={theme}
           avoidRects={reservedHudRects}
           skipAnimation={effectiveSkipAnimation}
-          onPlaced={setBubblePlaced}
         />
       )}
     </div>

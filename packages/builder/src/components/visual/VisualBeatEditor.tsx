@@ -474,12 +474,13 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     return url;
   }, [effectiveShowSpeaker, effectiveShowGraphics, beatContent?.speaker, characters, assets]);
 
-  // Speaker Display → "Dim characters who aren't speaking": the beat's speaker,
-  // as the character id the characters on the stage record.
+  // The beat's speaker, as the character id the characters on the stage
+  // record: Speaker Display dims the others, or draws the line as a speech
+  // bubble (the stage reads which from the theme, the beat's look included).
   const speakingCharacter = React.useMemo(() => {
-    if (!globalSettings?.speakerDisplay?.dimSilentCharacters || !beatContent?.speaker) return undefined;
+    if (!beatContent?.speaker) return undefined;
     return findSpeakerCharacterId(beatContent.speaker, characters) ?? beatContent.speaker;
-  }, [globalSettings?.speakerDisplay?.dimSilentCharacters, beatContent?.speaker, characters]);
+  }, [beatContent?.speaker, characters]);
 
   // Resolve translated speaker name when a translation language is active
   const translationState = useTranslationState();

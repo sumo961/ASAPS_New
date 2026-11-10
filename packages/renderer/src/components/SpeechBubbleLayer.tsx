@@ -16,6 +16,7 @@ import React from 'react';
 import type { RenderThemeSettings } from './PositionedBeatView';
 import { renderMarkdownLite } from '../utils/markdownLite';
 import { revealBoundary } from '../utils/typewriterGranularity';
+import type { StageCharacterLike } from '../utils/speakerDimming';
 import {
   bubblePath,
   bubbleSize,
@@ -24,6 +25,14 @@ import {
   LIGHT,
   placeSpeechBubble,
   speakPoint,
+  THOUGHT_BUMP,
+  thoughtPath,
+  thoughtTrail,
+  bubbleLineKey,
+  earlierLineFor,
+  speakerLocation,
+  type BubbleHistory,
+  type BubbleLine,
   type BubbleObstacle,
   type BubblePoint,
   type BubbleRect,
@@ -46,6 +55,16 @@ export interface SpeechBubbleLayerProps {
   skipAnimation?: boolean;
   /** Whether the bubble is showing; the host hides the text box while it is. */
   onPlaced?: (placed: boolean) => void;
+  /** The bubble is showing this text (once per line): the renderer remembers it for the next line. */
+  onShown?: () => void;
+  /** A thought (an inner voice): a cloud with a trail of circles, in this colour when set. */
+  thought?: { color?: string };
+  /**
+   * 'earlier': the line before, kept up beside the current one — whole at
+   * once, a little faded, and out of the current bubble's way (it gives up
+   * rather than cover it). It has no text box of its own to hide.
+   */
+  role?: 'current' | 'earlier';
   zIndex?: number;
 }
 
@@ -113,8 +132,12 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
   avoidRects,
   skipAnimation = false,
   onPlaced,
+  onShown,
+  thought,
+  role = 'current',
   zIndex = 150,
 }) => {
+  const earlier = role === 'earlier';
   const layerRef = React.useRef<HTMLDivElement>(null);
   const measureRef = React.useRef<HTMLDivElement>(null);
   const [layout, setLayout] = React.useState<BubbleLayout | null>(null);
@@ -122,6 +145,8 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
   const placedRef = React.useRef<boolean | null>(null);
   const onPlacedRef = React.useRef(onPlaced);
   onPlacedRef.current = onPlaced;
+  const onShownRef = React.useRef(onShown);
+  onShownRef.current = onShown;
 
   const stroke = Math.max(0, theme.textBox?.borderWidth ?? 2);
 
@@ -169,13 +194,15 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
       lineHeight: cs?.lineHeight && cs.lineHeight !== 'normal' ? cs.lineHeight : '1.4',
       letterSpacing: cs?.letterSpacing || 'normal',
     };
-    Object.assign(measure.style, lettering, { maxWidth: `${bubbleTextMaxWidth(stageW)}px` });
+    Object.assign(measure.style, lettering, { maxWidth: `${bubbleTextMaxWidth(stageW)}px`, fontStyle: thought ? 'italic' : '' });
     const m = measure.getBoundingClientRect();
     const textWidth = Math.ceil(m.width / scale) + 1;
     const textHeight = Math.ceil(m.height / scale);
     if (!(textWidth > 1 && textHeight > 0)) return fail();
     const fontPx = parseFloat(lettering.fontSize) || 18;
-    const size = bubbleSize(textWidth, textHeight, fontPx, stroke);
+    const oval = bubbleSize(textWidth, textHeight, fontPx, stroke);
+    // A cloud's bumps sit outside the oval the text fits in.
+    const size = thought ? { width: oval.width + 2 * THOUGHT_BUMP, height: oval.height + 2 * THOUGHT_BUMP } : oval;
 
     const obstacles: BubbleObstacle[] = [];
     for (const r of avoidRects ?? []) obstacles.push({ rect: { x: r.x, y: r.y, width: r.width, height: r.height }, weight: HEAVY });
@@ -189,6 +216,13 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
       const r = el.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: LIGHT });
     });
+    // The line before makes way for the current one.
+    if (earlier) {
+      root.querySelectorAll<HTMLElement>('[data-speech-bubble="current"]').forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: HEAVY });
+      });
+    }
 
     const placement = placeSpeechBubble({
       stage: { width: stageW, height: stageH },
@@ -201,7 +235,7 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
     const next: BubbleLayout = { ...placement, textWidth, textHeight, lettering };
     if (!sameLayout(layoutRef.current, next)) { layoutRef.current = next; setLayout(next); }
     report(true);
-  }, [speakerElementName, speakFrom?.x, speakFrom?.y, flipX, stroke, avoidRects, theme.fonts?.textFont, theme.fonts?.textFontSize, report]);
+  }, [speakerElementName, speakFrom?.x, speakFrom?.y, flipX, stroke, avoidRects, theme.fonts?.textFont, theme.fonts?.textFontSize, report, !!thought, earlier]);
 
   // Place it before the first paint (no flash of the text box), then follow
   // the stage: a resized window, a picture that finished loading, a speaker
@@ -236,20 +270,28 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
     onPlacedRef.current?.(false);
   }, []);
 
-  const revealed = useReveal(text, theme, skipAnimation);
+  // Tell the renderer which line is up, once it shows (and again for the
+  // next line, when the same speaker keeps the same bubble).
+  const shown = !!layout;
+  React.useEffect(() => {
+    if (shown && !earlier) onShownRef.current?.();
+  }, [shown, text, earlier]);
+
+  const revealed = useReveal(text, theme, skipAnimation || earlier);
   const typing = revealed < text.length;
   const cut = typing ? revealBoundary(text, revealed, theme.textEffects?.typewriterGranularity) : text.length;
-  const fade = theme.textEffects?.animation === 'fade'
+  const fade = !earlier && theme.textEffects?.animation === 'fade'
     && !(typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   const { fill, fillOpacity } = fillOf(theme.textBox?.backgroundColor, theme.textBox?.opacity);
   const textColor = theme.colors?.textColor || '#1f2937';
   const textAlpha = (theme.colors?.textAlpha ?? 100) / 100;
+  const outline = stroke > 0 ? (thought?.color || theme.textBox?.borderColor || '#1f2937') : 'none';
 
   return (
     <div
       ref={layerRef}
-      data-speech-bubble-layer=""
+      data-speech-bubble-layer={role}
       style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex }}
     >
       <div
@@ -266,9 +308,11 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
         const localTip = { x: tip.x - rect.x, y: tip.y - rect.y };
         return (
           <div
-            data-speech-bubble=""
+            data-speech-bubble={role}
+            {...(thought ? { 'data-thought': '' } : null)}
             style={{
               position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height,
+              ...(earlier ? { opacity: 0.8 } : null),
               ...(fade ? { animation: `asaps-bubble-in ${theme.textEffects?.fadeInDuration || 500}ms ease-in both` } : null),
             }}
           >
@@ -277,16 +321,19 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
               width={rect.width}
               height={rect.height}
               aria-hidden
-              style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))' }}
+              style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible', ...(earlier ? null : { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))' }) }}
             >
               <path
-                d={bubblePath(rect.width, rect.height, localTip, stroke)}
+                d={thought ? thoughtPath(rect.width, rect.height, stroke) : bubblePath(rect.width, rect.height, localTip, stroke)}
                 fill={fill}
                 fillOpacity={fillOpacity}
-                stroke={stroke > 0 ? theme.textBox?.borderColor || '#1f2937' : 'none'}
+                stroke={outline}
                 strokeWidth={stroke}
                 strokeLinejoin="round"
               />
+              {thought && thoughtTrail(rect.width, rect.height, localTip).map((c, i) => (
+                <circle key={i} cx={c.cx} cy={c.cy} r={c.r} fill={fill} fillOpacity={fillOpacity} stroke={outline} strokeWidth={Math.min(stroke, 2)} />
+              ))}
             </svg>
             <div
               style={{
@@ -300,6 +347,7 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
                 textAlign: 'center',
                 whiteSpace: 'pre-wrap',
                 overflowWrap: 'break-word',
+                ...(thought ? { fontStyle: 'italic' } : null),
               }}
             >
               {typing ? (
@@ -317,3 +365,76 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
     </div>
   );
 };
+
+/** A character placed on the stage, as the bubbles need it. */
+export type BubbleSpeakerLocation = StageCharacterLike & {
+  name: string;
+  speakFrom?: SpeakFrom;
+  flipX?: boolean;
+};
+
+/**
+ * The bubbles on a stage: the current line's, and beside it the line before
+ * (BubbleHistory) while the current one shows — when its speaker is on this
+ * stage too and isn't the one speaking now. Every stage view mounts this.
+ */
+export const StageBubbles: React.FC<{
+  text: string;
+  speaker: BubbleSpeakerLocation;
+  /** Every character placed on the stage (the earlier speaker is looked up here). */
+  locations: ReadonlyArray<BubbleSpeakerLocation> | undefined;
+  thought?: { color?: string };
+  history?: BubbleHistory;
+  /** The current bubble is showing (the host's onPlaced state). */
+  placed: boolean;
+  onPlaced: (placed: boolean) => void;
+  theme: RenderThemeSettings;
+  avoidRects?: SpeechBubbleLayerProps['avoidRects'];
+  skipAnimation?: boolean;
+  zIndex?: number;
+}> = ({ text, speaker, locations, thought, history, placed, onPlaced, theme, avoidRects, skipAnimation, zIndex = 150 }) => {
+  const current: BubbleLine = {
+    speaker: speaker.characterId || speaker.characterName || speaker.name,
+    text,
+    ...(thought ? { thought } : null),
+  };
+  const earlier = placed ? earlierLineFor(history, current) : undefined;
+  const earlierAt = earlier ? speakerLocation(locations, earlier.speaker) : undefined;
+  const onShownRef = React.useRef(history?.onShown);
+  onShownRef.current = history?.onShown;
+  const currentRef = React.useRef(current);
+  currentRef.current = current;
+  const onShown = React.useCallback(() => onShownRef.current?.(currentRef.current), []);
+  return (
+    <>
+      {earlier && earlierAt && earlierAt.name !== speaker.name && (
+        <SpeechBubbleLayer
+          key={`earlier:${bubbleLineKey(earlier)}`}
+          role="earlier"
+          text={earlier.text}
+          speakerElementName={earlierAt.name}
+          speakFrom={earlierAt.speakFrom}
+          flipX={earlierAt.flipX}
+          thought={earlier.thought}
+          theme={theme}
+          avoidRects={avoidRects}
+          zIndex={zIndex - 1}
+        />
+      )}
+      <SpeechBubbleLayer
+        text={text}
+        speakerElementName={speaker.name}
+        speakFrom={speaker.speakFrom}
+        flipX={speaker.flipX}
+        thought={thought}
+        theme={theme}
+        avoidRects={avoidRects}
+        skipAnimation={skipAnimation}
+        onPlaced={onPlaced}
+        onShown={onShown}
+        zIndex={zIndex}
+      />
+    </>
+  );
+};
+
