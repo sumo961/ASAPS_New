@@ -6,6 +6,8 @@ import {
   thoughtPath,
   thoughtTrail,
   bubblePath,
+  drawnPictureRect,
+  headPointFromAlpha,
   bubbleSize,
   bubbleTextMaxWidth,
   HEAVY,
@@ -200,5 +202,40 @@ describe('the line before', () => {
     expect(bubbleSpeakerFor(locs, 'c-doubt', true, { player: 'c-you' })?.name).toBe('You');
     expect(bubbleSpeakerFor(locs, 'c-doubt', false, { player: 'c-you' })).toBeUndefined();
     expect(bubbleSpeakerFor(locs, 'c-stan', true, { player: 'c-you' })?.name).toBe('Stan');
+  });
+});
+
+describe('finding the head on a cut-out picture', () => {
+  // A 100 × 200 picture, see-through around a figure: a head 30 wide at
+  // x 60–89 (drawn right of the middle) from y 20, a body below it 60 wide.
+  const W = 100, H = 200;
+  const figure = () => {
+    const a = new Uint8ClampedArray(W * H);
+    for (let y = 20; y < 50; y++) for (let x = 60; x < 90; x++) a[y * W + x] = 255;
+    for (let y = 50; y < 200; y++) for (let x = 40; x < 100; x++) a[y * W + x] = 255;
+    return a;
+  };
+  it('aims at the head, wherever it is drawn, down to about the eyes', () => {
+    const p = headPointFromAlpha(figure(), W, H)!;
+    expect(p.x).toBeCloseTo(0.75, 2);
+    expect(p.y * H).toBeGreaterThan(25);
+    expect(p.y * H).toBeLessThan(45);
+    expect(p.r).toBeCloseTo(0.15, 2);
+  });
+  it('gives up on a picture without a see-through background, or an empty one', () => {
+    expect(headPointFromAlpha(new Uint8ClampedArray(W * H).fill(255), W, H)).toBeNull();
+    expect(headPointFromAlpha(new Uint8ClampedArray(W * H), W, H)).toBeNull();
+  });
+  it('maps the picture into its box as drawn', () => {
+    const box = { x: 0, y: 0, width: 1000, height: 1080 };
+    expect(drawnPictureRect(box, { width: 500, height: 1080 }, 'contain')).toEqual({ x: 250, y: 0, width: 500, height: 1080 });
+    expect(drawnPictureRect(box, { width: 500, height: 1080 }, 'fill')).toEqual(box);
+  });
+  it('ends the tail at the head, not across the face', () => {
+    const mouth = { x: 300, y: 400 };
+    const p = placeSpeechBubble({ stage, size: { width: 300, height: 100 }, mouth, stopShort: 40 })!;
+    const d = Math.hypot(p.tip.x - mouth.x, p.tip.y - mouth.y);
+    expect(d).toBeGreaterThan(35);
+    expect(d).toBeLessThan(41);
   });
 });

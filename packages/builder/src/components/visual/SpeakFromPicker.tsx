@@ -21,6 +21,7 @@ export const SpeakFromPicker: React.FC<{
   const boxRef = React.useRef<HTMLDivElement>(null);
   const dragging = React.useRef(false);
   const point = value ?? DEFAULT_POINT;
+  const automatic = !value;
 
   const pick = (clientX: number, clientY: number) => {
     const box = boxRef.current?.getBoundingClientRect();
@@ -37,7 +38,7 @@ export const SpeakFromPicker: React.FC<{
           type="button"
           onClick={() => onChange(undefined)}
           disabled={!value}
-          title="Back to the top of the picture"
+          title="Back to automatic: the head found on the picture"
           className="text-gray-400 hover:text-blue-600 disabled:opacity-0"
         >
           <RotateCw className="w-3 h-3" />
@@ -67,12 +68,12 @@ export const SpeakFromPicker: React.FC<{
         {imageUrl && <img src={imageUrl} alt="" draggable={false} className="block w-full h-auto pointer-events-none" />}
         <span
           aria-hidden
-          className="absolute w-3 h-3 -ml-1.5 -mt-1.5 rounded-full border-2 border-white bg-red-500 shadow pointer-events-none"
+          className={`absolute w-3 h-3 -ml-1.5 -mt-1.5 rounded-full border-2 border-white shadow pointer-events-none ${automatic ? 'hidden' : 'bg-red-500'}`}
           style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }}
         />
       </div>
       <p className="text-[11px] text-gray-500 mt-1">
-        Click the mouth or head. Used when Project Settings ▸ Speaker Display shows lines as speech bubbles; a flipped character points at the mirrored spot.
+        {automatic ? 'Automatic: the head found on the picture. ' : ''}Click the mouth or head to choose. Used when Project Settings ▸ Speaker Display shows lines as speech bubbles; a flipped character points at the mirrored spot.
       </p>
     </div>
   );

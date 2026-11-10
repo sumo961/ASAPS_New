@@ -21,6 +21,7 @@ import { useAIFeatures } from '../../utils/aiFeatures';
 import { useProjectAssets } from '../../contexts/ProjectAssetsContext';
 import type { FontDefinition } from '../../utils/fontRegistry';
 import { READING_FONTS, readingFontFile } from '../../utils/readingFont';
+import { ScrollableTabStrip } from '../common/ScrollableTabStrip';
 
 // ONE canonical GlobalSettings type (UX-Eval §1.2 structural hazard): this
 // file used to declare its own copy, which App and a dozen other modules
@@ -844,8 +845,10 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
         )}
 
         {/* Tabs */}
-        <div className="flex border-b overflow-x-auto">
+        <ScrollableTabStrip className="border-b" activeKey={activeTab}>
           <button
+            role="tab"
+            aria-selected={activeTab === 'project'}
             onClick={() => setActiveTab('project')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'project' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -856,6 +859,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             Project
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'colors'}
             onClick={() => setActiveTab('colors')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'colors' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -866,6 +871,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             Colors
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'fonts'}
             onClick={() => setActiveTab('fonts')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'fonts' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -876,6 +883,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             Fonts
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'textbox'}
             onClick={() => setActiveTab('textbox')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'textbox' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -886,6 +895,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             Text Box
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'effects'}
             onClick={() => setActiveTab('effects')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'effects' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -896,6 +907,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             Effects
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'hud'}
             onClick={() => setActiveTab('hud')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'hud' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -906,6 +919,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             HUD
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'sound'}
             onClick={() => setActiveTab('sound')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'sound' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -916,6 +931,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             Sound
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'xr'}
             onClick={() => setActiveTab('xr')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'xr' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -926,6 +943,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             Location & XR
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'copyright'}
             onClick={() => setActiveTab('copyright')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'copyright' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -936,6 +955,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             Copyright
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'variables'}
             onClick={() => setActiveTab('variables')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'variables' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -946,6 +967,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             Variables
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'roles'}
             onClick={() => setActiveTab('roles')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'roles' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -956,6 +979,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             Roles
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'translation'}
             onClick={() => setActiveTab('translation')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'translation' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -966,6 +991,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             Translation
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'debug'}
             onClick={() => setActiveTab('debug')}
             className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'debug' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
@@ -975,7 +1002,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             <Monitor className="w-4 h-4" />
             Debug
           </button>
-        </div>
+        </ScrollableTabStrip>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">

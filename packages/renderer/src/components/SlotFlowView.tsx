@@ -33,7 +33,7 @@ import { slotIntentFor, slotAnimationsFor, uiString, formatUIString, type Dialog
 import { thoughtBoxStyle } from '../utils/innerVoice';
 import { pillSafeRadius } from '../utils/pillRadius';
 import { useReservedHudRects } from '../utils/useReservedHudRects';
-import { DEFAULT_THEME, type RenderThemeSettings, type SpriteSheetData } from './PositionedBeatView';
+import { DEFAULT_THEME, speechLineStyle, type RenderThemeSettings, type SpriteSheetData } from './PositionedBeatView';
 import type { SlotSpec } from '../utils/slotLayout';
 import { KeypadElement } from './KeypadElement';
 import { QRScanElement } from './QRScanElement';
@@ -1844,9 +1844,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   ...(ovRotation ? { transform: `rotate(${ovRotation}deg)`, transformOrigin: 'center center' } : null),
                   ...(ovWidthPx ? { maxWidth: ovWidthPx } : null),
                   // Shown as a speech bubble: the card keeps its place (the
-                  // buttons stay put) but isn't seen; faint in the editor.
-                  ...(bodySpeechLine === 'hidden' ? { visibility: 'hidden' as const } : null),
-                  ...(bodySpeechLine === 'ghost' ? { opacity: 0.3 } : null),
+                  // buttons stay put) but isn't seen; an empty outline in the editor.
+                  ...speechLineStyle(bodySpeechLine),
                 }}
               >
                 {beatType === 'hyperText' && Array.isArray((content as any).links) && (content as any).links.length > 0

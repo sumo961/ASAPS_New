@@ -30,6 +30,86 @@ export function speakPoint(rect: BubbleRect, speakFrom?: SpeakFrom | null, flipX
   return { x: rect.x + rect.width * fx, y: rect.y + rect.height * fy };
 }
 
+/**
+ * Where the head is on a cut-out picture, found from its see-through pixels,
+ * as fractions of the picture: the middle of the topmost part of the figure,
+ * down to about the eyes. Used when the author hasn't set a point: the top
+ * middle of the picture's box often misses the head (a figure drawn
+ * off-centre, a hat brim), and the bubble then covers the face.
+ *
+ * `alpha` is one value (0–255) per pixel, row by row, of a picture scaled to
+ * w × h. Returns null for a picture with no see-through background (a photo)
+ * or nothing drawn, where the plain default is as good a guess. `r` is half
+ * the head's width, as a share of the picture's width.
+ */
+export function headPointFromAlpha(alpha: ArrayLike<number>, w: number, h: number): (SpeakFrom & { r: number }) | null {
+  if (!(w > 0 && h > 0) || alpha.length < w * h) return null;
+  const OPAQUE = 128;
+  const rowLeft = new Array<number>(h).fill(-1);
+  const rowRight = new Array<number>(h).fill(-1);
+  const rowCount = new Array<number>(h).fill(0);
+  let opaque = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (alpha[y * w + x] < OPAQUE) continue;
+      opaque++;
+      rowCount[y]++;
+      if (rowLeft[y] < 0) rowLeft[y] = x;
+      rowRight[y] = x;
+    }
+  }
+  if (opaque > w * h * 0.97 || opaque === 0) return null;
+  const minCount = Math.max(1, Math.round(w * 0.01));
+  let top = -1;
+  let bottom = -1;
+  for (let y = 0; y < h; y++) {
+    if (rowCount[y] < minCount) continue;
+    if (top < 0) top = y;
+    bottom = y;
+  }
+  if (top < 0) return null;
+  const figure = bottom - top + 1;
+  if (figure < 4) return null;
+  // The head: the rows at the top of the figure. Its middle is the middle of
+  // what is drawn there, its size the widest of those rows.
+  const band = Math.max(1, Math.round(figure * 0.1));
+  let sumX = 0;
+  let n = 0;
+  let headWidth = 0;
+  for (let y = top; y < top + band && y <= bottom; y++) {
+    if (rowCount[y] < minCount) continue;
+    for (let x = rowLeft[y]; x <= rowRight[y]; x++) {
+      if (alpha[y * w + x] >= OPAQUE) { sumX += x; n++; }
+    }
+    headWidth = Math.max(headWidth, rowRight[y] - rowLeft[y] + 1);
+  }
+  if (n === 0) return null;
+  const cx = sumX / n + 0.5;
+  // About the eyes: half a head down from its top, never below a third of the figure.
+  const cy = top + Math.min(headWidth * 0.55, figure * 0.33);
+  const round = (n: number) => Math.round(n * 1000) / 1000;
+  // r: half the head's width, as a share of the picture's width.
+  return { x: round(cx / w), y: round(cy / h), r: round(headWidth / 2 / w) };
+}
+
+/**
+ * The part of an <img> box its picture is drawn in, for object-fit contain,
+ * scale-down and cover (centred); the whole box otherwise.
+ */
+export function drawnPictureRect(box: BubbleRect, natural: { width: number; height: number }, fit: string | undefined): BubbleRect {
+  if (!(natural.width > 0 && natural.height > 0 && box.width > 0 && box.height > 0)) return box;
+  const sx = box.width / natural.width;
+  const sy = box.height / natural.height;
+  let s: number;
+  if (fit === 'contain') s = Math.min(sx, sy);
+  else if (fit === 'scale-down') s = Math.min(1, sx, sy);
+  else if (fit === 'cover') s = Math.max(sx, sy);
+  else return box;
+  const width = natural.width * s;
+  const height = natural.height * s;
+  return { x: box.x + (box.width - width) / 2, y: box.y + (box.height - height) / 2, width, height };
+}
+
 /** The widest a bubble's text runs before wrapping, for a stage this wide. */
 export function bubbleTextMaxWidth(stageWidth: number): number {
   // About a quarter of the stage: a line of any length wraps into a rounder
@@ -98,8 +178,15 @@ export function placeSpeechBubble(opts: {
   speaker?: BubbleRect;
   obstacles?: BubbleObstacle[];
   margin?: number;
+  /**
+   * How far short of the point the tail stops: for a point found in the
+   * middle of the face, about the head's half-width, so the tail ends at
+   * the head instead of across the face.
+   */
+  stopShort?: number;
 }): BubblePlacement | null {
   const { stage, size, mouth, speaker, obstacles = [] } = opts;
+  const stopShort = Math.max(0, opts.stopShort ?? 0);
   const margin = opts.margin ?? 8;
   const w = size.width;
   const h = size.height;
@@ -161,8 +248,8 @@ export function placeSpeechBubble(opts: {
     let score = Math.hypot(x - wantX, y - wantY) * 1.5;
     // The tail needs room: the bubble must not sit on the point itself.
     const reach = Math.hypot(mouth.x - cx, mouth.y - cy) - ovalRadius(rx, ry, mouth.x - cx, mouth.y - cy);
-    if (reach < 8) score += 10000;
-    score += Math.abs(reach - tail);
+    if (reach - stopShort < 8) score += 10000;
+    score += Math.abs(reach - stopShort - tail);
     let heavy = 0;
     for (const o of obstacles) {
       const share = overlap(rect, o.rect) / area;
@@ -184,7 +271,8 @@ export function placeSpeechBubble(opts: {
   const cy = rect.y + ry;
   // The tail stops just short of the point, so it doesn't stab the face.
   const d = Math.hypot(mouth.x - cx, mouth.y - cy) || 1;
-  const gap = Math.min(6, d * 0.1);
+  const edge = ovalRadius(rx, ry, mouth.x - cx, mouth.y - cy);
+  const gap = Math.min(Math.max(stopShort, Math.min(6, d * 0.1)), Math.max(0, d - edge - 8));
   return { rect, tip: { x: mouth.x - ((mouth.x - cx) / d) * gap, y: mouth.y - ((mouth.y - cy) / d) * gap } };
 }
 

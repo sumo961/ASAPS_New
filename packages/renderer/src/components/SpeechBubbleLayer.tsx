@@ -20,6 +20,8 @@ import type { StageCharacterLike } from '../utils/speakerDimming';
 import {
   bubblePath,
   bubbleSize,
+  drawnPictureRect,
+  headPointFromAlpha,
   bubbleTextMaxWidth,
   HEAVY,
   LIGHT,
@@ -82,6 +84,58 @@ interface BubbleLayout {
   textWidth: number;
   textHeight: number;
   lettering: Lettering;
+}
+
+/**
+ * Where the head is on each picture (headPointFromAlpha), found once per
+ * picture. undefined: not looked at yet; null: no head found (a photo, a
+ * picture the browser won't let us read), so the plain default is used.
+ */
+type HeadPoint = SpeakFrom & { r: number };
+const headPoints = new Map<string, HeadPoint | null | 'pending'>();
+const headWaiters = new Map<string, Set<() => void>>();
+
+function findHead(img: HTMLImageElement, onFound: () => void): HeadPoint | null | undefined {
+  const src = img.currentSrc || img.src;
+  if (!src) return null;
+  const known = headPoints.get(src);
+  if (known === 'pending') {
+    let waiters = headWaiters.get(src);
+    if (!waiters) headWaiters.set(src, (waiters = new Set()));
+    waiters.add(onFound);
+    return undefined;
+  }
+  if (known !== undefined) return known;
+  if (!(img.complete && img.naturalWidth > 0)) {
+    // Look again once the picture has loaded.
+    img.addEventListener('load', onFound, { once: true });
+    return undefined;
+  }
+  headPoints.set(src, 'pending');
+  let found: HeadPoint | null = null;
+  try {
+    const scale = Math.min(1, 128 / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true } as CanvasRenderingContext2DSettings);
+    if (ctx) {
+      ctx.drawImage(img, 0, 0, w, h);
+      const data = ctx.getImageData(0, 0, w, h).data;
+      const alpha = new Uint8ClampedArray(w * h);
+      for (let i = 0; i < w * h; i++) alpha[i] = data[i * 4 + 3];
+      found = headPointFromAlpha(alpha, w, h);
+    }
+  } catch {
+    found = null; // a picture from another site the browser won't let us read
+  }
+  headPoints.set(src, found);
+  const waiters = headWaiters.get(src);
+  headWaiters.delete(src);
+  waiters?.forEach((fn) => fn());
+  return found;
 }
 
 const quoteAttr = (s: string) => s.replace(/["\\]/g, '\\$&');
@@ -147,6 +201,9 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
   onPlacedRef.current = onPlaced;
   const onShownRef = React.useRef(onShown);
   onShownRef.current = onShown;
+  // Bumped when a picture's head has been found, to place the bubble again.
+  const [headTick, setHeadTick] = React.useState(0);
+  const headFound = React.useCallback(() => setHeadTick((t) => t + 1), []);
 
   const stroke = Math.max(0, theme.textBox?.borderWidth ?? 2);
 
@@ -224,18 +281,35 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
       });
     }
 
+    // Where the tail aims: the author's point on the picture, or else the
+    // head found on the picture as drawn, or else the top middle of its box.
+    let mouth = speakPoint(speakerRect, speakFrom, flipX);
+    let stopShort = 0;
+    if (!speakFrom) {
+      const img = speakerEl instanceof HTMLImageElement ? speakerEl : speakerEl?.querySelector<HTMLImageElement>('img');
+      const head = img ? findHead(img, headFound) : null;
+      if (img && head) {
+        const fit = typeof getComputedStyle === 'function' ? getComputedStyle(img).objectFit : undefined;
+        const drawn = drawnPictureRect(toStage(img.getBoundingClientRect()), { width: img.naturalWidth, height: img.naturalHeight }, fit);
+        // A picture mirrored by its own transform, or by the speaker's.
+        mouth = speakPoint(drawn, head, flipX);
+        stopShort = head.r * drawn.width * 0.9;
+      }
+    }
+
     const placement = placeSpeechBubble({
       stage: { width: stageW, height: stageH },
       size,
-      mouth: speakPoint(speakerRect, speakFrom, flipX),
+      mouth,
       speaker: speakerRect,
       obstacles,
+      stopShort,
     });
     if (!placement) return fail();
     const next: BubbleLayout = { ...placement, textWidth, textHeight, lettering };
     if (!sameLayout(layoutRef.current, next)) { layoutRef.current = next; setLayout(next); }
     report(true);
-  }, [speakerElementName, speakFrom?.x, speakFrom?.y, flipX, stroke, avoidRects, theme.fonts?.textFont, theme.fonts?.textFontSize, report, !!thought, earlier]);
+  }, [speakerElementName, speakFrom?.x, speakFrom?.y, flipX, stroke, avoidRects, theme.fonts?.textFont, theme.fonts?.textFontSize, report, !!thought, earlier, headFound, headTick]);
 
   // Place it before the first paint (no flash of the text box), then follow
   // the stage: a resized window, a picture that finished loading, a speaker

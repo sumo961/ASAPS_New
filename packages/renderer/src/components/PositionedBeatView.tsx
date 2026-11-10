@@ -2605,12 +2605,18 @@ interface PositionedElementProps {
  */
 export type SpeechLineMode = 'shown' | 'hidden' | 'ghost';
 
+/** How the text box of a line in a speech bubble looks (see SpeechLineMode). */
+export function speechLineStyle(mode: SpeechLineMode | undefined): React.CSSProperties {
+  // The ghost is an empty dashed outline: a faded copy of the line showed
+  // through and beside the bubble, reading as the same line twice.
+  if (mode === 'hidden') return { visibility: 'hidden' };
+  if (mode === 'ghost') return { opacity: 1, color: 'transparent', textShadow: 'none', backgroundColor: 'transparent', backgroundImage: 'none', boxShadow: 'none', border: '1px dashed rgba(128,128,128,0.6)' };
+  return {};
+}
+
 function speechLineProps(mode: SpeechLineMode | undefined): { attrs: Record<string, string>; style: React.CSSProperties } {
   if (!mode) return { attrs: {}, style: {} };
-  return {
-    attrs: { 'data-speech-line': mode },
-    style: mode === 'hidden' ? { visibility: 'hidden' } : mode === 'ghost' ? { opacity: 0.3 } : {},
-  };
+  return { attrs: { 'data-speech-line': mode }, style: speechLineStyle(mode) };
 }
 
 const PositionedElement: React.FC<PositionedElementProps> = ({

@@ -28,7 +28,7 @@ function open(themeGraphics?: any) {
       <GlobalSettingsInspector settings={settings} onUpdate={onUpdate} onClose={() => {}} assets={[frame]} themeId="builtin-ink-and-brass" />
     </ProjectAssetsProvider>,
   );
-  fireEvent.click(screen.getByRole('button', { name: /Text Box/ }));
+  fireEvent.click(screen.getByRole('tab', { name: /Text Box/ }));
   return onUpdate;
 }
 
