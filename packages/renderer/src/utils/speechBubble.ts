@@ -161,6 +161,25 @@ function ovalRadius(rx: number, ry: number, dx: number, dy: number): number {
   return 1 / Math.sqrt((c / rx) ** 2 + (s / ry) ** 2);
 }
 
+/** How far from the middle of a box (half-sizes rx, ry) its edge is, in the direction (dx, dy). */
+function boxRadius(rx: number, ry: number, dx: number, dy: number): number {
+  const len = Math.hypot(dx, dy) || 1;
+  const c = Math.abs(dx / len);
+  const s = Math.abs(dy / len);
+  return Math.min(c > 1e-6 ? rx / c : Infinity, s > 1e-6 ? ry / s : Infinity);
+}
+
+/**
+ * The box around a list of the player's replies (its measured width and
+ * height): a rounded box rather than an oval, since a list of lines fills a
+ * box and would leave an oval's corners empty.
+ */
+export function replyBubbleSize(textWidth: number, textHeight: number, fontPx: number, stroke = 2): { width: number; height: number } {
+  const padX = Math.max(12, fontPx * 0.8);
+  const padY = Math.max(8, fontPx * 0.5);
+  return { width: Math.ceil(textWidth + 2 * padX + stroke), height: Math.ceil(textHeight + 2 * padY + stroke) };
+}
+
 /**
  * Where the bubble goes: above the speaker, leaning away from the middle of
  * the stage (so two speakers' bubbles don't meet in the middle), or beside
@@ -184,8 +203,11 @@ export function placeSpeechBubble(opts: {
    * the head instead of across the face.
    */
   stopShort?: number;
+  /** 'box': a rounded box (the player's replies), whose edge reaches further at the corners than an oval's. */
+  shape?: 'oval' | 'box';
 }): BubblePlacement | null {
   const { stage, size, mouth, speaker, obstacles = [] } = opts;
+  const edgeAt = opts.shape === 'box' ? boxRadius : ovalRadius;
   const stopShort = Math.max(0, opts.stopShort ?? 0);
   const margin = opts.margin ?? 8;
   const w = size.width;
@@ -247,7 +269,7 @@ export function placeSpeechBubble(opts: {
 
     let score = Math.hypot(x - wantX, y - wantY) * 1.5;
     // The tail needs room: the bubble must not sit on the point itself.
-    const reach = Math.hypot(mouth.x - cx, mouth.y - cy) - ovalRadius(rx, ry, mouth.x - cx, mouth.y - cy);
+    const reach = Math.hypot(mouth.x - cx, mouth.y - cy) - edgeAt(rx, ry, mouth.x - cx, mouth.y - cy);
     if (reach - stopShort < 8) score += 10000;
     score += Math.abs(reach - stopShort - tail);
     let heavy = 0;
@@ -271,7 +293,7 @@ export function placeSpeechBubble(opts: {
   const cy = rect.y + ry;
   // The tail stops just short of the point, so it doesn't stab the face.
   const d = Math.hypot(mouth.x - cx, mouth.y - cy) || 1;
-  const edge = ovalRadius(rx, ry, mouth.x - cx, mouth.y - cy);
+  const edge = edgeAt(rx, ry, mouth.x - cx, mouth.y - cy);
   const gap = Math.min(Math.max(stopShort, Math.min(6, d * 0.1)), Math.max(0, d - edge - 8));
   return { rect, tip: { x: mouth.x - ((mouth.x - cx) / d) * gap, y: mouth.y - ((mouth.y - cy) / d) * gap } };
 }
@@ -303,6 +325,46 @@ export function bubblePath(width: number, height: number, tip?: BubblePoint | nu
   const p1 = at(phi - delta);
   const p2 = at(phi + delta);
   return `M ${f(p1.x)} ${f(p1.y)} L ${f(tip.x)} ${f(tip.y)} L ${f(p2.x)} ${f(p2.y)} A ${f(rx)} ${f(ry)} 0 1 1 ${f(p1.x)} ${f(p1.y)} Z`;
+}
+
+/**
+ * A rounded box in its own box (width × height) with a tail to `tip` (in the
+ * same coordinates, outside the box), as one closed path. The tail leaves
+ * the side facing the tip, as near the tip as the rounded corners allow.
+ * Without a tip, or one inside the box, a plain rounded box.
+ */
+export function boxBubblePath(width: number, height: number, tip?: BubblePoint | null, stroke = 2, radius = 14): string {
+  const s = stroke / 2;
+  const x0 = s;
+  const y0 = s;
+  const x1 = Math.max(x0 + 2, width - s);
+  const y1 = Math.max(y0 + 2, height - s);
+  const r = Math.max(0, Math.min(radius, (x1 - x0) / 2, (y1 - y0) / 2));
+  type Side = 'top' | 'right' | 'bottom' | 'left';
+  let side: Side | null = null;
+  if (tip && (tip.x < x0 || tip.x > x1 || tip.y < y0 || tip.y > y1)) {
+    const dx = (tip.x - width / 2) / (width / 2);
+    const dy = (tip.y - height / 2) / (height / 2);
+    side = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'bottom' : 'top');
+  }
+  const halfBase = Math.min(16, Math.max(6, Math.min(x1 - x0, y1 - y0) * 0.18));
+  // Where along a side the tail's base is centred: level with the tip, kept off the corners.
+  const along = (from: number, to: number, want: number) => {
+    const lo = from + r + halfBase;
+    const hi = to - r - halfBase;
+    return lo <= hi ? Math.min(hi, Math.max(lo, want)) : (from + to) / 2;
+  };
+  const t = tip ?? { x: 0, y: 0 };
+  let d = `M ${f(x0 + r)} ${f(y0)}`;
+  if (side === 'top') { const c = along(x0, x1, t.x); d += ` L ${f(c - halfBase)} ${f(y0)} L ${f(t.x)} ${f(t.y)} L ${f(c + halfBase)} ${f(y0)}`; }
+  d += ` L ${f(x1 - r)} ${f(y0)} A ${f(r)} ${f(r)} 0 0 1 ${f(x1)} ${f(y0 + r)}`;
+  if (side === 'right') { const c = along(y0, y1, t.y); d += ` L ${f(x1)} ${f(c - halfBase)} L ${f(t.x)} ${f(t.y)} L ${f(x1)} ${f(c + halfBase)}`; }
+  d += ` L ${f(x1)} ${f(y1 - r)} A ${f(r)} ${f(r)} 0 0 1 ${f(x1 - r)} ${f(y1)}`;
+  if (side === 'bottom') { const c = along(x0, x1, t.x); d += ` L ${f(c + halfBase)} ${f(y1)} L ${f(t.x)} ${f(t.y)} L ${f(c - halfBase)} ${f(y1)}`; }
+  d += ` L ${f(x0 + r)} ${f(y1)} A ${f(r)} ${f(r)} 0 0 1 ${f(x0)} ${f(y1 - r)}`;
+  if (side === 'left') { const c = along(y0, y1, t.y); d += ` L ${f(x0)} ${f(c + halfBase)} L ${f(t.x)} ${f(t.y)} L ${f(x0)} ${f(c - halfBase)}`; }
+  d += ` L ${f(x0)} ${f(y0 + r)} A ${f(r)} ${f(r)} 0 0 1 ${f(x0 + r)} ${f(y0)} Z`;
+  return d;
 }
 
 /** How far a thought cloud's bumps reach out from its oval; the cloud's box is this much bigger on each side. */
@@ -388,6 +450,12 @@ export interface BubbleHistory {
   player?: string;
   /** The stage showed this line in a bubble. */
   onShown?: (line: BubbleLine) => void;
+  /**
+   * The replies the player can pick now, in a Dialog Tree (the choices'
+   * text): with Speaker Display ▸ replies as one bubble, they are listed in
+   * a bubble at the player's character instead of as buttons.
+   */
+  replies?: string[];
 }
 
 export const bubbleLineKey = (line: BubbleLine): string => `${line.speaker}\u0000${line.text}`;

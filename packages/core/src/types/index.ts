@@ -49,6 +49,8 @@ export interface BeatLook {
   };
   /** 'on'/'off': this beat's spoken lines as speech bubbles or in the text box, over Speaker Display's choice. */
   speechBubbles?: 'on' | 'off';
+  /** 'on'/'off': this beat's Dialog Tree replies in one bubble at the player's character, or as buttons, over Speaker Display's choice. */
+  replyBubble?: 'on' | 'off';
   /** Font names as an element's font (the renderer resolves the family); sizes in px. */
   fonts?: {
     titleFont?: string;

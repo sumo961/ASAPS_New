@@ -6,6 +6,8 @@ import {
   thoughtPath,
   thoughtTrail,
   bubblePath,
+  boxBubblePath,
+  replyBubbleSize,
   drawnPictureRect,
   headPointFromAlpha,
   bubbleSize,
@@ -237,5 +239,45 @@ describe('finding the head on a cut-out picture', () => {
     const d = Math.hypot(p.tip.x - mouth.x, p.tip.y - mouth.y);
     expect(d).toBeGreaterThan(35);
     expect(d).toBeLessThan(41);
+  });
+});
+
+describe("the player's replies in one bubble", () => {
+  it('draws a rounded box with its tail leaving the side facing the player', () => {
+    const below = boxBubblePath(200, 100, { x: 150, y: 160 });
+    expect(below).toContain('L 150 160');
+    // The tail's base sits on the bottom edge (y = height - stroke/2).
+    expect(below).toMatch(/L [\d.]+ 99 L 150 160 L [\d.]+ 99/);
+    const left = boxBubblePath(200, 100, { x: -60, y: 50 });
+    expect(left).toMatch(/L 1 [\d.]+ L -60 50 L 1 [\d.]+/);
+    expect(boxBubblePath(200, 100)).not.toContain('NaN');
+  });
+
+  it('sizes the box to the list with padding, not an oval around it', () => {
+    const box = replyBubbleSize(200, 90, 18, 2);
+    expect(box.width).toBeLessThan(250);
+    expect(box.height).toBeLessThan(120);
+  });
+
+  it('places a box so its tail has room past the corners', () => {
+    const p = placeSpeechBubble({
+      stage: { width: 1024, height: 768 },
+      size: { width: 260, height: 120 },
+      mouth: { x: 700, y: 300 },
+      speaker: { x: 620, y: 260, width: 160, height: 480 },
+      shape: 'box',
+    });
+    expect(p).not.toBeNull();
+    const { rect, tip } = p!;
+    const outside = tip.x < rect.x || tip.x > rect.x + rect.width || tip.y < rect.y || tip.y > rect.y + rect.height;
+    expect(outside).toBe(true);
+  });
+
+  it('a beat can turn the reply bubble on or off over the project', () => {
+    const on = applyBeatLook(DEFAULT_THEME, { replyBubble: 'on' });
+    expect(on.speakerDisplay?.replyStyle).toBe('bubble');
+    const off = applyBeatLook({ ...DEFAULT_THEME, speakerDisplay: { ...(DEFAULT_THEME.speakerDisplay as any), replyStyle: 'bubble', lineStyle: 'bubble' } }, { replyBubble: 'off' });
+    expect(off.speakerDisplay?.replyStyle).toBe('buttons');
+    expect(off.speakerDisplay?.lineStyle).toBe('bubble');
   });
 });

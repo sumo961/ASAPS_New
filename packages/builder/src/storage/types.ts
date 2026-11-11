@@ -182,6 +182,8 @@ export interface GlobalSettings {
     dimStrength?: number;
     /** 'bubble': a line said by a character on the stage shows as a speech bubble pointing at them (default 'box': the text box). */
     lineStyle?: 'box' | 'bubble';
+    /** Dialog Tree replies: buttons, or one bubble at the player's character listing them. */
+    replyStyle?: 'buttons' | 'bubble';
   };
   translation?: {
     sourceLanguage: string;  // BCP 47 code, default 'en'

@@ -17,6 +17,7 @@ import { runSpatialPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer, type ResponsiveCharacterLayerHandle } from './ResponsiveCharacterLayer';
 import { TimerProgressBar } from './TimerProgressBar';
 import { StageBubbles, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
+import { ReplyBubble } from './ReplyBubbleLayer';
 import { bubbleSpeakerFor, type BubbleHistory } from '../utils/speechBubble';
 import type { SpeechLineMode } from './PositionedBeatView';
 import type { Location, AnimationPath } from '@asaps/core';
@@ -1019,6 +1020,16 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           theme={theme}
           avoidRects={reservedHudRects}
           zIndex={5}
+        />
+      )}
+      {theme && (
+        <ReplyBubble
+          locations={characterLocations as BubbleSpeakerLocation[] | undefined}
+          history={bubbleHistory}
+          theme={theme}
+          avoidRects={reservedHudRects}
+          editorMode={editorMode}
+          zIndex={6}
         />
       )}
     </div>

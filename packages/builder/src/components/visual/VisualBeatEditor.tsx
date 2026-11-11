@@ -482,6 +482,15 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     return findSpeakerCharacterId(beatContent.speaker, characters) ?? beatContent.speaker;
   }, [beatContent?.speaker, characters]);
 
+  // Speaker Display → the player's replies in one bubble: a Dialog Tree's
+  // replies and the player's character, as the Preview passes them.
+  const bubbleHistory = React.useMemo(() => {
+    if (beatType !== 'dialogTree' && beatType !== 'aiDialogTree') return undefined;
+    const player = (characters as Array<{ id?: string; role?: string }> | undefined)?.find((c) => c?.role === 'player')?.id;
+    const replies = (beatContent?.choices ?? []).map((c) => c.text).filter((t): t is string => !!t?.trim());
+    return player && replies.length > 0 ? { player, replies } : undefined;
+  }, [beatType, characters, beatContent?.choices]);
+
   // Resolve translated speaker name when a translation language is active
   const translationState = useTranslationState();
   const resolvedSpeakerName = React.useMemo(() => {
@@ -1688,6 +1697,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   speakerName={effectiveShowSpeaker && beatContent?.speaker ? resolvedSpeakerName : undefined}
                   speakerPortraitUrl={speakerPortraitUrl}
                   speakingCharacter={speakingCharacter}
+                  bubbleHistory={bubbleHistory}
                   theme={globalSettings ? (() => {
                     const baseTheme = applyTextBoxBorder(applyBeatLook(convertGlobalSettingsToTheme(globalSettings), look), textBoxBorder);
                     return {

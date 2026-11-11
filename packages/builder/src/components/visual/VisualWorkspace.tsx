@@ -2019,6 +2019,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const name = previewRoles(raw, previewHolder);
     return findSpeakerCharacterId(name, characters) ?? name;
   })();
+  // Speaker Display → the player's replies in one bubble: the current Dialog
+  // Tree node's replies and the player's character, as the Preview passes them.
+  const slotPreviewBubbleHistory = (() => {
+    if (!beat || (beat.type !== 'dialogTree' && beat.type !== 'aiDialogTree')) return undefined;
+    const player = (characters as Array<{ id?: string; role?: string }> | undefined)?.find((c) => c?.role === 'player')?.id;
+    if (!player) return undefined;
+    const node = dialogNodeAt((slotPreviewParams as any)?.dialogTree, dialogTreeNodePath) ?? (slotPreviewParams as any)?.dialogTree;
+    const replies = (Array.isArray(node?.choices) ? node.choices as Array<{ text?: string; continue?: boolean }> : [])
+      .filter((c) => !c.continue && c.text?.trim())
+      .map((c) => previewRoles(c.text as string, previewHolder));
+    return replies.length > 0 ? { player, replies } : undefined;
+  })();
   const slotPreviewContent: Record<string, any> | null =
     !isSlotPreview || !beat || !slotPreviewParams
       ? null
@@ -7028,6 +7040,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     characterLocations={freePositionedLocations(beat)}
                     characterResolver={stageCharacterResolver}
                     speakingCharacter={slotPreviewSpeakingCharacter}
+                    bubbleHistory={slotPreviewBubbleHistory}
                     assetResolver={previewAssetResolver}
                     spriteDataResolver={previewSpriteDataResolver}
                     selectedElementName={(() => {

@@ -99,7 +99,7 @@ export const BeatLookSection: React.FC<Props> = ({ value, globalSettings, fonts,
     (n, v) => n + (v && typeof v === 'object' ? Object.keys(v).length : 1), 0,
   ) + (value.textBoxBorder ? 1 : 0);
 
-  const setTop = (key: 'stageColor' | 'textColor' | 'speechBubbles', v: string | undefined) =>
+  const setTop = (key: 'stageColor' | 'textColor' | 'speechBubbles' | 'replyBubble', v: string | undefined) =>
     onChange({ ...value, look: tidyLook({ ...look, [key]: v }) });
   const setIn = (group: Group, key: string, v: string | number | undefined) =>
     onChange({ ...value, look: tidyLook({ ...look, [group]: { ...(look as any)[group], [key]: v } }) });
@@ -177,6 +177,19 @@ export const BeatLookSection: React.FC<Props> = ({ value, globalSettings, fonts,
                 <option value="">Project ({globalSettings?.speakerDisplay?.lineStyle === 'bubble' ? 'speech bubbles' : 'text box'})</option>
                 <option value="on">Speech bubbles on this beat</option>
                 <option value="off">Text box on this beat</option>
+              </select>
+            </Row>
+            <Row label="Replies" changed={!!look.replyBubble} onReset={() => setTop('replyBubble', undefined)}>
+              <select
+                data-testid="beat-reply-bubble"
+                value={look.replyBubble ?? ''}
+                onChange={(e) => setTop('replyBubble', e.target.value || undefined)}
+                className="w-full px-1 py-0.5 text-xs border border-gray-300 rounded"
+                title="Dialog Tree replies in one bubble at the player's character, or as buttons (Project Settings ▸ Speaker Display)."
+              >
+                <option value="">Project ({globalSettings?.speakerDisplay?.replyStyle === 'bubble' ? 'in a bubble' : 'buttons'})</option>
+                <option value="on">In a bubble on this beat</option>
+                <option value="off">Buttons on this beat</option>
               </select>
             </Row>
           </div>

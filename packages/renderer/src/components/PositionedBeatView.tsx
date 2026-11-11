@@ -27,6 +27,7 @@ import { thoughtBoxStyle } from '../utils/innerVoice';
 import { DIM_TRANSITION, dimFilter, showsSpeaker, silentCharacterFilters } from '../utils/speakerDimming';
 import { bubbleSpeakerFor, type BubbleHistory } from '../utils/speechBubble';
 import { StageBubbles, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
+import { ReplyBubble } from './ReplyBubbleLayer';
 
 /** A frame picture's edge height on a fixed stage: the picture's share of the stage width, never taller than in the picture. */
 const stageFrameBand = (stageWidth: number) => (f: number, naturalPx: number) =>
@@ -595,6 +596,8 @@ export interface RenderThemeSettings {
      * stays for narration and wherever no bubble fits). Default 'box'.
      */
     lineStyle?: 'box' | 'bubble';
+    /** Dialog Tree replies: buttons, or one bubble at the player's character listing them. */
+    replyStyle?: 'buttons' | 'bubble';
   };
 }
 
@@ -2508,6 +2511,15 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           theme={theme}
           avoidRects={reservedHudRects}
           skipAnimation={effectiveSkipAnimation}
+        />
+      )}
+      {!previewMode && (
+        <ReplyBubble
+          locations={elements.map((e) => e.location) as BubbleSpeakerLocation[]}
+          history={bubbleHistory}
+          theme={theme}
+          avoidRects={reservedHudRects}
+          editorMode={editorMode}
         />
       )}
     </div>

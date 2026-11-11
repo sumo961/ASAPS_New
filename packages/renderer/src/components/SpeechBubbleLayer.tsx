@@ -138,7 +138,36 @@ function findHead(img: HTMLImageElement, onFound: () => void): HeadPoint | null 
   return found;
 }
 
-const quoteAttr = (s: string) => s.replace(/["\\]/g, '\\$&');
+export const quoteAttr = (s: string) => s.replace(/["\\]/g, '\\$&');
+
+/**
+ * Where a bubble's tail aims at a speaker on the stage: the author's point
+ * on the picture, or else the head found on the picture as drawn (and the
+ * tail stops at the head's edge), or else the top middle of its box.
+ */
+export function aimAtSpeaker(
+  speakerEl: HTMLElement | null,
+  speakerRect: BubbleRect,
+  speakFrom: SpeakFrom | undefined,
+  flipX: boolean | undefined,
+  toStage: (r: DOMRect) => BubbleRect,
+  onHeadFound: () => void,
+): { mouth: BubblePoint; stopShort: number } {
+  let mouth = speakPoint(speakerRect, speakFrom, flipX);
+  let stopShort = 0;
+  if (!speakFrom) {
+    const img = speakerEl instanceof HTMLImageElement ? speakerEl : speakerEl?.querySelector<HTMLImageElement>('img');
+    const head = img ? findHead(img, onHeadFound) : null;
+    if (img && head) {
+      const fit = typeof getComputedStyle === 'function' ? getComputedStyle(img).objectFit : undefined;
+      const drawn = drawnPictureRect(toStage(img.getBoundingClientRect()), { width: img.naturalWidth, height: img.naturalHeight }, fit);
+      // A picture mirrored by its own transform, or by the speaker's.
+      mouth = speakPoint(drawn, head, flipX);
+      stopShort = head.r * drawn.width * 0.9;
+    }
+  }
+  return { mouth, stopShort };
+}
 
 function sameLayout(a: BubbleLayout | null, b: BubbleLayout | null): boolean {
   if (!a || !b) return a === b;
@@ -264,7 +293,8 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
     const obstacles: BubbleObstacle[] = [];
     for (const r of avoidRects ?? []) obstacles.push({ rect: { x: r.x, y: r.y, width: r.width, height: r.height }, weight: HEAVY });
     root.querySelectorAll<HTMLElement>('button, [role="button"]').forEach((el) => {
-      if (layer.contains(el)) return;
+      // Bubbles' own lines (the player's replies) are not in the way: that bubble keeps clear of this one.
+      if (el.closest('[data-speech-bubble-layer]')) return;
       const r = el.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: HEAVY });
     });
@@ -273,29 +303,15 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
       const r = el.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: LIGHT });
     });
-    // The line before makes way for the current one.
+    // The line before makes way for the current one, and for the player's replies.
     if (earlier) {
-      root.querySelectorAll<HTMLElement>('[data-speech-bubble="current"]').forEach((el) => {
+      root.querySelectorAll<HTMLElement>('[data-speech-bubble="current"], [data-speech-bubble="replies"]').forEach((el) => {
         const r = el.getBoundingClientRect();
         if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: HEAVY });
       });
     }
 
-    // Where the tail aims: the author's point on the picture, or else the
-    // head found on the picture as drawn, or else the top middle of its box.
-    let mouth = speakPoint(speakerRect, speakFrom, flipX);
-    let stopShort = 0;
-    if (!speakFrom) {
-      const img = speakerEl instanceof HTMLImageElement ? speakerEl : speakerEl?.querySelector<HTMLImageElement>('img');
-      const head = img ? findHead(img, headFound) : null;
-      if (img && head) {
-        const fit = typeof getComputedStyle === 'function' ? getComputedStyle(img).objectFit : undefined;
-        const drawn = drawnPictureRect(toStage(img.getBoundingClientRect()), { width: img.naturalWidth, height: img.naturalHeight }, fit);
-        // A picture mirrored by its own transform, or by the speaker's.
-        mouth = speakPoint(drawn, head, flipX);
-        stopShort = head.r * drawn.width * 0.9;
-      }
-    }
+    const { mouth, stopShort } = aimAtSpeaker(speakerEl, speakerRect, speakFrom, flipX, toStage, headFound);
 
     const placement = placeSpeechBubble({
       stage: { width: stageW, height: stageH },

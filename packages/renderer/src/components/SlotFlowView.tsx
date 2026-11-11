@@ -46,6 +46,7 @@ import { ARSceneElement } from './ARSceneElement';
 import { runSlotPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer } from './ResponsiveCharacterLayer';
 import { StageBubbles, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
+import { ReplyBubble } from './ReplyBubbleLayer';
 import { bubbleSpeakerFor, type BubbleHistory } from '../utils/speechBubble';
 import type { SpeechLineMode } from './PositionedBeatView';
 
@@ -2675,6 +2676,14 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           zIndex={5}
         />
       )}
+      <ReplyBubble
+        locations={characterLocations as BubbleSpeakerLocation[] | undefined}
+        history={bubbleHistory}
+        theme={theme}
+        avoidRects={reservedHudRects}
+        editorMode={editorMode}
+        zIndex={6}
+      />
     </div>
   );
 };

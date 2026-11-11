@@ -1688,7 +1688,15 @@ export class ReactRenderer extends BaseRenderer {
       ...(this.bubbleEarlier ? { earlier: this.bubbleEarlier, earlierAnchor: this.bubbleEarlierAnchor } : null),
       player: this.playerCharacterResolver?.(),
       onShown: this.onBubbleShown,
+      ...(this.dialogReplies() ? { replies: this.dialogReplies() } : null),
     };
+  }
+
+  /** A Dialog Tree's replies the player can pick now (a Continue button is not one). */
+  private dialogReplies(): string[] | undefined {
+    const beatType = this.getState('currentBeatType') as string | undefined;
+    if (beatType !== 'dialogTree' && beatType !== 'aiDialogTree') return undefined;
+    return this.choiceTextMap.size > 0 ? [...this.choiceTextMap.values()] : undefined;
   }
 
   private onBubbleShown = (line: BubbleLine): void => {

@@ -2317,6 +2317,23 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     </p>
                   </div>
 
+                  {/* Dialog Tree replies in one bubble at the player's character */}
+                  <div className="mt-3" data-testid="reply-bubbles">
+                    <label className="block text-sm font-medium text-gray-600 mb-1" htmlFor="speaker-reply-style">Show the player's replies as</label>
+                    <select
+                      id="speaker-reply-style"
+                      value={settings.speakerDisplay?.replyStyle ?? 'buttons'}
+                      onChange={(e) => handleChange('speakerDisplay', 'replyStyle', e.target.value)}
+                      className="w-full px-3 py-2 border rounded"
+                    >
+                      <option value="buttons">Buttons</option>
+                      <option value="bubble">One bubble at the player's character</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      In a Dialog Tree, the replies the player can pick appear as lines in one bubble pointing at the player's character (the character whose role is "player"), and the reply picked stays up as their line. Other choices, and any Dialog Tree whose player character isn't on the stage or whose bubble doesn't fit, keep the buttons.
+                    </p>
+                  </div>
+
                   {/* Dim the characters on the stage who aren't speaking */}
                   <div className="mt-3" data-testid="dim-silent-characters">
                     <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
