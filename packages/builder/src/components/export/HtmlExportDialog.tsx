@@ -2,11 +2,12 @@
  * HTML Export Dialog - Configure and trigger HTML export
  */
 
+import { isAppleFmServe } from '../../services/providers/appleFoundationModels';
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff, Settings, Globe, Sparkles } from 'lucide-react';
 import { downloadHtmlExport, previewStoryZip, SINGLE_FILE_LIMIT_BYTES, singleFileTooLargeMessage, type HtmlExportOptions, type AIProvider } from '../../export/HtmlExporter';
 import { DEFAULT_RELAY_PATH } from '../../export/relayKit';
-import { getSavedAIConfig } from '../../hooks/useAI';
+import { getSavedAIConfig, getRuntimeAIConfig } from '../../hooks/useAI';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { buildManifestEntry, type TranslationResource } from '@asaps/core';
@@ -129,7 +130,8 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   useEffect(() => {
     if (isOpen && !hasPopulatedRef.current) {
       hasPopulatedRef.current = true;
-      const globalConfig = getSavedAIConfig();
+      // Exported players are RUNTIME: start from the in-story provider.
+      const globalConfig = getRuntimeAIConfig(getSavedAIConfig());
       if (globalConfig) {
         // Map providerType to AIProvider
         const providerMap: Record<string, AIProvider> = {
@@ -141,12 +143,11 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         setAiProvider(mappedProvider);
         if (globalConfig.apiKey) setAiApiKey(globalConfig.apiKey);
         if (globalConfig.baseUrl) setAiBaseUrl(globalConfig.baseUrl);
-        // Exported players are RUNTIME — prefer the runtime override.
-        const exportModel = globalConfig.runtimeModel || globalConfig.model;
+        const exportModel = globalConfig.model;
         if (exportModel) setAiModel(exportModel);
         setUsingGlobalConfig(true);
         // Show advanced options if model or baseUrl were set
-        if (globalConfig.runtimeModel || globalConfig.model || globalConfig.baseUrl) {
+        if (globalConfig.model || globalConfig.baseUrl) {
           setShowAdvanced(true);
         }
       }
@@ -499,6 +500,13 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                           : 'OpenAI-compatible API endpoint (Azure OpenAI, proxy, etc.)'
                         }
                       </p>
+                      {isAppleFmServe(aiBaseUrl, aiModel) && (
+                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mt-2" data-testid="export-apple-fm-warning">
+                          Apple's built-in model (fm serve) can't be reached from an exported web story: it
+                          only answers the ASAPS app itself. Choose a cloud provider or a relay for the
+                          story you share, or the AI beats will show their fallback.
+                        </p>
+                      )}
                     </div>
                   )}
 

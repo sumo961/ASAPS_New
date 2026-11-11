@@ -98,6 +98,10 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
   const [runtimeModel, setRuntimeModel] = useState('');
+  // A separate provider for in-story AI ('' = the provider above).
+  const [runtimeProvider, setRuntimeProvider] = useState<'' | ProviderType>('');
+  const [runtimeApiKey, setRuntimeApiKey] = useState('');
+  const [runtimeBaseUrl, setRuntimeBaseUrl] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [maxTokens, setMaxTokens] = useState('');
   const [reasoningEffort, setReasoningEffort] = useState<
@@ -126,7 +130,10 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
         setProvider(savedProviderType as ProviderType);
         setApiKey(savedConfig.apiKey || '');
         setModel(savedConfig.model || '');
-        setRuntimeModel(savedConfig.runtimeModel || '');
+        setRuntimeModel(savedConfig.runtime ? (savedConfig.runtime.model || '') : (savedConfig.runtimeModel || ''));
+        setRuntimeProvider(savedConfig.runtime?.providerType || '');
+        setRuntimeApiKey(savedConfig.runtime?.apiKey || '');
+        setRuntimeBaseUrl(savedConfig.runtime?.baseUrl || '');
         setBaseUrl(savedConfig.baseUrl || '');
         setMaxTokens(savedConfig.maxTokens?.toString() || '');
         setReasoningEffort(savedConfig.reasoningEffort || '');
@@ -199,7 +206,19 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
       // merge it into the saved config afterwards (undefined clears it).
       // A typed Max Tokens is deliberate: stamp it so the legacy-value
       // migration (utils/aiConfigBudget.ts) never drops it.
-      updateSavedAIConfig({ runtimeModel: runtimeModel.trim() || undefined, maxTokensUserSet: maxTokensNum ? true : undefined });
+      // With a separate in-story provider its model lives with it.
+      updateSavedAIConfig({
+        runtimeModel: !runtimeProvider ? (runtimeModel.trim() || undefined) : undefined,
+        runtime: runtimeProvider
+          ? {
+              providerType: runtimeProvider,
+              ...(runtimeApiKey.trim() ? { apiKey: runtimeApiKey.trim() } : {}),
+              ...(runtimeBaseUrl.trim() ? { baseUrl: runtimeBaseUrl.trim() } : {}),
+              ...(runtimeModel.trim() ? { model: runtimeModel.trim() } : {}),
+            }
+          : undefined,
+        maxTokensUserSet: maxTokensNum ? true : undefined,
+      });
 
       setSuccess(true);
 
@@ -209,7 +228,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
           provider: actualProvider,
           providerType: provider,
           ...(model ? { model } : {}),
-          ...(runtimeModel.trim() ? { runtimeModel: runtimeModel.trim() } : {}),
+          ...(!runtimeProvider && runtimeModel.trim() ? { runtimeModel: runtimeModel.trim() } : {}),
           ...(baseUrl ? { baseUrl } : {}),
           ...(maxTokensNum ? { maxTokens: maxTokensNum, maxTokensUserSet: true } : {}),
           ...(reasoningEffort ? { reasoningEffort } : {}),
@@ -233,6 +252,9 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
     setApiKey('');
     setModel('');
     setRuntimeModel('');
+    setRuntimeProvider('');
+    setRuntimeApiKey('');
+    setRuntimeBaseUrl('');
     setBaseUrl('');
     setMaxTokens('');
     setReasoningEffort('');
@@ -407,23 +429,98 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
             {/* Runtime model override — the measured case (2026-09-01,
                 Environmental Choices dialog trees): the best authoring
                 model is not the best in-story model; players wait live. */}
-            <div className="mt-3">
-              <label htmlFor="runtimeModel" className="block text-sm font-medium text-gray-700 mb-2">
-                Model for in-story AI <span className="text-gray-400">(Optional)</span>
-              </label>
-              <input
-                id="runtimeModel"
-                type="text"
-                value={runtimeModel}
-                onChange={(e) => setRuntimeModel(e.target.value)}
-                placeholder="Same as the model above"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Used while a story plays — AI Dialog Tree, AI Conversation, AI Condition — in the
-                Preview Window and in exported players. Authoring tools keep using the model above.
-                {provider === 'claude' ? ' Measured on dialog trees: claude-opus-4-8 was both fastest and best here.' : ''}
-              </p>
+            <div className="mt-3 space-y-3" data-testid="runtime-provider">
+              <div>
+                <label htmlFor="runtimeProvider" className="block text-sm font-medium text-gray-700 mb-2">
+                  Provider for in-story AI
+                </label>
+                <select
+                  id="runtimeProvider"
+                  value={runtimeProvider}
+                  onChange={(e) => {
+                    const next = e.target.value as '' | ProviderType;
+                    setRuntimeProvider(next);
+                    setRuntimeApiKey('');
+                    setRuntimeModel('');
+                    setRuntimeBaseUrl(next ? PROVIDER_PRESETS[next].defaultBaseUrl || '' : '');
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">Same as above</option>
+                  <option value="claude">Claude</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="local">Local (Ollama · Apple Intelligence)</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Used while a story plays — AI Dialog Tree, AI Conversation, AI Condition — in the
+                  Preview Window, and what an export starts from. Write with one provider and play
+                  with another: for example a cloud model for authoring and a free local one for play-testing.
+                </p>
+              </div>
+
+              {runtimeProvider === 'local' && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label htmlFor="runtimeBaseUrl" className="block text-sm font-medium text-gray-700">Base URL for in-story AI</label>
+                    <button
+                      type="button"
+                      data-testid="runtime-use-apple"
+                      onClick={() => { setRuntimeBaseUrl('http://127.0.0.1:1976/v1'); setRuntimeModel('system'); }}
+                      className="text-xs text-purple-600 hover:underline"
+                      title="Apple's built-in model on macOS 27: run fm serve in Terminal and keep it open"
+                    >
+                      Use Apple Intelligence (fm serve)
+                    </button>
+                  </div>
+                  <input
+                    id="runtimeBaseUrl"
+                    type="text"
+                    value={runtimeBaseUrl}
+                    onChange={(e) => setRuntimeBaseUrl(e.target.value)}
+                    placeholder="http://localhost:11434/v1"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  {runtimeModel.trim() === 'system' && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Apple's built-in model needs <code className="bg-gray-100 px-1 rounded">fm serve</code> running
+                      in Terminal. It works in the Preview Window, not in exported web stories.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {(runtimeProvider === 'claude' || runtimeProvider === 'openai') && (
+                <div>
+                  <label htmlFor="runtimeApiKey" className="block text-sm font-medium text-gray-700 mb-2">API key for in-story AI</label>
+                  <input
+                    id="runtimeApiKey"
+                    type="password"
+                    value={runtimeApiKey}
+                    onChange={(e) => setRuntimeApiKey(e.target.value)}
+                    placeholder={runtimeProvider === provider ? 'Leave empty to use the key above' : 'API key'}
+                    autoComplete="off"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="runtimeModel" className="block text-sm font-medium text-gray-700 mb-2">
+                  Model for in-story AI <span className="text-gray-400">(Optional)</span>
+                </label>
+                <input
+                  id="runtimeModel"
+                  type="text"
+                  value={runtimeModel}
+                  onChange={(e) => setRuntimeModel(e.target.value)}
+                  placeholder={!runtimeProvider ? 'Same as the model above' : runtimeProvider === 'local' ? 'e.g. llama3.1:8b, or system for Apple' : "The provider's default"}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Authoring tools keep using the provider and model above.
+                  {(runtimeProvider || provider) === 'claude' ? ' Measured on dialog trees: claude-opus-4-8 was both fastest and best here.' : ''}
+                </p>
+              </div>
             </div>
           </div>
 

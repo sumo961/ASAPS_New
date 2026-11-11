@@ -50,6 +50,21 @@ export interface SavedAIConfig {
   reasoningMode?: 'standard' | 'pro';
   // Track the original provider type for UI (local uses openai provider)
   providerType?: 'claude' | 'openai' | 'local';
+  /**
+   * A different provider for RUNTIME AI (in-story beats in the Preview
+   * Window and exported players): e.g. author with a cloud model and play
+   * with a local one (Ollama, or Apple's built-in model through fm serve).
+   * Unset = the provider above, with `runtimeModel`. An empty apiKey reuses
+   * the key above when the provider is the same.
+   */
+  runtime?: RuntimeAIProvider;
+}
+
+export interface RuntimeAIProvider {
+  providerType: 'claude' | 'openai' | 'local';
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
 }
 
 /**
@@ -128,7 +143,30 @@ export function updateSavedAIConfig(partial: Partial<SavedAIConfig>): void {
 /** The model runtime AI beats should use: the runtime override when set,
  *  else the authoring model. */
 export function getRuntimeAIModel(config: SavedAIConfig | null): string | undefined {
-  return config?.runtimeModel || config?.model;
+  return getRuntimeAIConfig(config)?.model;
+}
+
+/**
+ * The provider, key, address and model in-story AI uses (the Preview
+ * Window, and the settings an export starts from): the separate runtime
+ * provider when one is chosen, else the authoring provider with the
+ * runtime model override. `model` is already resolved.
+ */
+export function getRuntimeAIConfig(config: SavedAIConfig | null): SavedAIConfig | null {
+  if (!config) return null;
+  const rt = config.runtime;
+  if (!rt) return { ...config, model: config.runtimeModel || config.model };
+  const sameProvider = (config.providerType || config.provider) === rt.providerType;
+  const apiKey = rt.apiKey?.trim()
+    || (sameProvider ? config.apiKey : '')
+    || (rt.providerType === 'local' ? 'ollama' : '');
+  return {
+    provider: rt.providerType === 'claude' ? 'claude' : 'openai',
+    providerType: rt.providerType,
+    apiKey,
+    baseUrl: rt.baseUrl?.trim() || undefined,
+    model: rt.model?.trim() || undefined,
+  };
 }
 
 /**

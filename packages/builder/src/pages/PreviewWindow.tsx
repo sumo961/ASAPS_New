@@ -26,7 +26,7 @@ import type { Asset } from '../components/assets/AssetManager';
 import type { Character } from '../types/character';
 import { generatePathPresetsAsync, groupPresetsByOutcome, type GeneratedPreset, type InputTextBeatInfo } from '../services/PathBasedPresetGenerator';
 import { InputTextValuesModal } from '../components/preview/InputTextValuesModal';
-import { getSavedAIConfig } from '../hooks/useAI';
+import { getSavedAIConfig, getRuntimeAIConfig } from '../hooks/useAI';
 import { getTTSService, WebSpeechProvider, OpenAITTSProvider, ElevenLabsProvider, CustomTTSProvider, LocalTTSProvider } from '../services/tts';
 import { getSavedTTSConfig } from '../hooks/useTTS';
 import { getSTTService, WebSpeechSTTProvider, WhisperSTTProvider, LocalSTTProvider, VoskSTTProvider, WhisperCppSTTProvider } from '../services/stt';
@@ -155,7 +155,9 @@ function reportAuthErrors(service: IAIService, provider: string): IAIService {
 }
 
 function createAIServiceAdapter(): IAIService | null {
-  const savedConfig = getSavedAIConfig();
+  // In-story AI: the runtime provider when one is chosen (AI settings ▸
+  // Provider for in-story AI), else the authoring one with its runtime model.
+  const savedConfig = getRuntimeAIConfig(getSavedAIConfig());
   console.log('[PreviewWindow] Loaded AI config:', savedConfig ? {
     provider: savedConfig.provider,
     providerType: savedConfig.providerType,
@@ -178,7 +180,7 @@ function createAIServiceAdapter(): IAIService | null {
   // Apple's `fm serve` is local but refuses browser requests, so it goes
   // through the relay like a remote URL (appleFoundationModels.ts).
   const isLocalUrl = (savedConfig.baseUrl?.includes('localhost') || savedConfig.baseUrl?.includes('127.0.0.1'))
-    && !isAppleFmServe(savedConfig.baseUrl, savedConfig.model, savedConfig.runtimeModel);
+    && !isAppleFmServe(savedConfig.baseUrl, savedConfig.model);
   const useProxy = !!savedConfig.baseUrl && !isLocalUrl;
 
   if (savedConfig.provider === 'claude') {
@@ -198,7 +200,7 @@ function createAIServiceAdapter(): IAIService | null {
       family: 'anthropic',
       // Runtime override first — the authoring flagship is measurably the
       // wrong model for a player waiting mid-story (see AI settings).
-      model: savedConfig.runtimeModel || savedConfig.model,
+      model: savedConfig.model,
       transport,
       logPrefix: '[PreviewWindow]',
     }), 'Claude');
@@ -217,7 +219,7 @@ function createAIServiceAdapter(): IAIService | null {
       });
   return reportAuthErrors(createRuntimeAIService({
     family: 'openai',
-    model: savedConfig.runtimeModel || savedConfig.model,
+    model: savedConfig.model,
     transport,
     logPrefix: '[PreviewWindow]',
   }), savedConfig.baseUrl ? 'the AI provider' : 'OpenAI');
