@@ -327,3 +327,21 @@ describe('structured replies', () => {
     expect(schema.additionalProperties).toBe(false);
   });
 });
+
+describe('direction evaluation prompt for small models', () => {
+  it('gives no example indices (a 3B model copied "[0, 2]" and fired every direction)', () => {
+    const prompt = buildDirectionEvaluationPrompt(
+      'Hello, thanks for coming in.',
+      [{ id: 'd', trigger: { type: 'custom', description: 'The player says goodbye.' } } as any],
+      [],
+      1,
+    );
+    expect(prompt).not.toMatch(/Example:\s*\[/);
+    expect(prompt).toContain('return: []');
+  });
+
+  it('reads an answer wrapped in a json code fence', () => {
+    expect(parseDirectionEvaluationResponse('```json\n[0]\n```')).toEqual([0]);
+    expect(parseDirectionEvaluationResponse('```json\n[]\n```')).toEqual([]);
+  });
+});

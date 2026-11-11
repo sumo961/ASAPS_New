@@ -458,11 +458,11 @@ describe('generateChatWithTools — Responses API on the official endpoint', () 
 });
 
 describe('direct (local) calls send an explicit stream:false', () => {
-  // Apple's `fm serve` (macOS 27) answers an OMITTED stream flag with an
-  // event stream; the SDK's non-streaming call omits it. Ollama etc. are
-  // indifferent. Pin the flag on every direct call site.
+  // Servers modelled on Apple's `fm serve` answer an OMITTED stream flag
+  // with an event stream; the SDK's non-streaming call omits it. Ollama etc.
+  // are indifferent. Pin the flag on every direct call site.
   it('callOpenAI and the tool loop both pass stream:false to the SDK client', async () => {
-    p.configure(cfg({ baseUrl: 'http://localhost:8000/v1', model: 'system', apiKey: 'ollama' }));
+    p.configure(cfg({ baseUrl: 'http://localhost:11434/v1', model: 'llama3.2', apiKey: 'ollama' }));
     const create = vi.fn(async () => ({ choices: [{ finish_reason: 'stop', message: { content: 'hi' } }] }));
     (p as any).client = { chat: { completions: { create } } };
     expect((p as any).useProxy).toBe(false);
@@ -476,5 +476,16 @@ describe('direct (local) calls send an explicit stream:false', () => {
       executeTool: async () => '',
     });
     expect(create.mock.calls[1][0].stream).toBe(false);
+  });
+});
+
+describe("Apple's fm serve goes through the relay", () => {
+  // fm serve refuses browser requests (Sec-Fetch-Site same-site/cross-site:
+  // 403 "Cross-site requests are not allowed"), so it can't be called direct.
+  it('uses the proxy for a local URL serving system', () => {
+    p.configure(cfg({ baseUrl: 'http://127.0.0.1:1976/v1', model: 'system', apiKey: 'ollama' }));
+    expect((p as any).useProxy).toBe(true);
+    p.configure(cfg({ baseUrl: 'http://localhost:11434/v1', model: 'llama3.2', apiKey: 'ollama' }));
+    expect((p as any).useProxy).toBe(false);
   });
 });

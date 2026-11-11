@@ -506,7 +506,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
             </div>
             <p className="mt-1 text-xs text-gray-500">
               {provider === 'local'
-                ? 'Ollama default: localhost:11434/v1. Apple Intelligence (macOS 27, fm serve): the URL fm prints, e.g. http://localhost:8000/v1. For remote: http://your-server:11434/v1'
+                ? 'Ollama default: localhost:11434/v1. Apple Intelligence (macOS 27, fm serve): the URL fm prints plus /v1, normally http://127.0.0.1:1976/v1. For remote: http://your-server:11434/v1'
                 : 'For alternative API-compatible providers (leave empty for default)'}
             </p>
           </div>
@@ -635,7 +635,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
             <p className="text-sm text-green-900 font-medium mt-4 mb-2">Or Apple Intelligence on macOS 27 (built-in, no download):</p>
             <ol className="text-sm text-green-800 list-decimal list-inside space-y-1">
               <li>Turn on Apple Intelligence in System Settings (Apple silicon Mac, signed in)</li>
-              <li>In Terminal: <code className="bg-green-100 px-1 rounded">fm serve</code> — it prints the local URL</li>
+              <li>In Terminal: <code className="bg-green-100 px-1 rounded">fm serve</code> — it prints the local URL (normally http://127.0.0.1:1976). Keep that Terminal window open.</li>
               <li>Base URL: that URL plus <code className="bg-green-100 px-1 rounded">/v1</code>; Model: <code className="bg-green-100 px-1 rounded">system</code></li>
             </ol>
             <p className="text-xs text-green-700 mt-2">

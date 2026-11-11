@@ -5,6 +5,7 @@
  * and renders the preview. It auto-reloads when the story changes.
  */
 
+import { isAppleFmServe } from '../services/providers/appleFoundationModels';
 import { cancelSimulation } from '../services/storySimulation';
 import { simulationProgressShort } from '../components/debug/debugWording';
 import type { SimulationProgress } from '@asaps/core';
@@ -174,7 +175,10 @@ function createAIServiceAdapter(): IAIService | null {
   console.log('[PreviewWindow] Creating AI service adapter for provider:', savedConfig.provider);
 
   // Use proxy only for remote custom URLs (not localhost)
-  const isLocalUrl = savedConfig.baseUrl?.includes('localhost') || savedConfig.baseUrl?.includes('127.0.0.1');
+  // Apple's `fm serve` is local but refuses browser requests, so it goes
+  // through the relay like a remote URL (appleFoundationModels.ts).
+  const isLocalUrl = (savedConfig.baseUrl?.includes('localhost') || savedConfig.baseUrl?.includes('127.0.0.1'))
+    && !isAppleFmServe(savedConfig.baseUrl, savedConfig.model, savedConfig.runtimeModel);
   const useProxy = !!savedConfig.baseUrl && !isLocalUrl;
 
   if (savedConfig.provider === 'claude') {

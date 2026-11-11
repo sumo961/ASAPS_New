@@ -4,6 +4,7 @@
  * Implementation using OpenAI's GPT API
  */
 
+import { isAppleFmServe } from './appleFoundationModels';
 import { recordAIUsage } from '@asaps/core';
 import OpenAI from 'openai';
 import type { ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat/completions';
@@ -83,7 +84,10 @@ export class OpenAIProvider extends BaseAIProvider {
     if (this._isReady) {
       // Use proxy for all remote URLs (to avoid CORS issues in browser/Electron)
       // Skip proxy only for localhost/local network - direct connection is faster
-      const isLocalUrl = config.baseUrl && this.isLocalhostUrl(config.baseUrl);
+      // Apple's `fm serve` is local but refuses browser requests (see
+      // appleFoundationModels.ts): it goes through the relay like a remote URL.
+      const isLocalUrl = config.baseUrl && this.isLocalhostUrl(config.baseUrl)
+        && !isAppleFmServe(config.baseUrl, config.model, (config as any).runtimeModel);
       // Use proxy unless it's a local URL (default OpenAI and remote URLs need proxy)
       this.useProxy = !isLocalUrl;
 

@@ -163,7 +163,7 @@ MATCHING RULES:
 - A clear paraphrase of a keyword's topic counts as mentioning it; an unrelated word that merely shares letters does not.
 - For NOT conditions, apply the same rules first, then invert.
 
-Return a JSON array of triggered direction indices. Example: [0, 2]
+Return a JSON array of triggered direction indices.
 If none are triggered, return: []
 Only return the JSON array, nothing else.`;
 }
