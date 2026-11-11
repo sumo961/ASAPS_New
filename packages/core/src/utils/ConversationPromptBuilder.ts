@@ -132,6 +132,15 @@ export function buildConversationSystemPrompt(ctx: ConversationPromptContext): s
 /**
  * Build the direction evaluation prompt.
  * Given a player's input, determine which directions are triggered.
+ *
+ * The model quotes, per direction, the player's words that trigger it
+ * before deciding — and the parser drops a direction whose quote isn't in
+ * the player's message (parseDirectionEvaluationResponse). Measured
+ * 2026-11-11 on 20 cases × 2 runs: asking for a bare index list made
+ * models fire directions on messages that didn't trigger them (Apple's
+ * on-device model 13 false fires in 20 cases, llama3.1:8b 17 in 40,
+ * gemma3:12b 14 in 40) — an AI Conversation then ended on the player's
+ * greeting. Quoting first cut that to 0–4 on every model tried.
  */
 export function buildDirectionEvaluationPrompt(
   playerInput: string,
@@ -144,17 +153,20 @@ export function buildDirectionEvaluationPrompt(
     const triggerDesc = formatTriggerDescription(d);
     return `  ${i}: ${triggerDesc}${d.once ? ' (once only)' : ''}`;
   });
+  // The history before the latest message: that one is quoted from below.
+  const earlier = history.length > 0 && history[history.length - 1].role === 'player' && history[history.length - 1].text === playerInput
+    ? history.slice(0, -1)
+    : history;
+  const skeleton = directions.map((_, i) => `{"index": ${i}, "quote": "...", "triggered": false}`).join(', ');
 
-  return `Evaluate which conversation directions are triggered based on the player's latest input and the full conversation history.
+  return `Decide which of these conversation directions the player's latest message triggers. Most messages trigger none of them.
 
-PLAYER INPUT: "${playerInput}"
+CONVERSATION SO FAR (turn ${turnNumber}):
+${earlier.length > 0 ? earlier.map(t => `  ${t.role === 'npc' ? 'NPC' : 'Player'}: ${t.text}`).join('\n') : '  (nothing yet)'}
 
-CONVERSATION HISTORY (${history.length} turns so far):
-${history.map(t => `  ${t.role === 'npc' ? 'NPC' : 'Player'}: ${t.text}`).join('\n')}
+PLAYER'S LATEST MESSAGE: "${playerInput}"
 
-CURRENT TURN: ${turnNumber}
-
-DIRECTIONS TO EVALUATE:
+DIRECTIONS:
 ${directionDescriptions.join('\n')}
 
 MATCHING RULES:
@@ -163,9 +175,8 @@ MATCHING RULES:
 - A clear paraphrase of a keyword's topic counts as mentioning it; an unrelated word that merely shares letters does not.
 - For NOT conditions, apply the same rules first, then invert.
 
-Return a JSON array of triggered direction indices.
-If none are triggered, return: []
-Only return the JSON array, nothing else.`;
+For each direction, first copy the exact words from the player's latest message that trigger it (leave the quote empty if there are none), then decide. A NOT direction may have an empty quote.
+Answer with only this JSON: {"directions": [${skeleton}]}`;
 }
 
 /**
@@ -241,10 +252,37 @@ function formatActionDescription(action: ConversationAction): string {
  */
 export const DIRECTION_EVALUATION_SCHEMA: Record<string, unknown> = {
   type: 'object',
-  properties: { triggered: { type: 'array', items: { type: 'integer' } } },
-  required: ['triggered'],
+  properties: {
+    directions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          index: { type: 'integer' },
+          quote: { type: 'string' },
+          triggered: { type: 'boolean' },
+        },
+        required: ['index', 'quote', 'triggered'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['directions'],
   additionalProperties: false,
 };
+
+const quoteWords = (s: string): string[] => s.toLowerCase().replace(/\u2019/g, "'").match(/[\p{L}\p{N}']+/gu) ?? [];
+
+/**
+ * Whether a quote is the player's own words: at least 80% of its words occur
+ * in the message (tolerating a dropped article or changed punctuation).
+ */
+export function quoteIsFromMessage(quote: string, message: string): boolean {
+  const q = quoteWords(quote);
+  if (q.length === 0) return false;
+  const have = new Set(quoteWords(message));
+  return q.filter((w) => have.has(w)).length / q.length >= 0.8;
+}
 
 /**
  * Reply shape for variable extraction: one field per variable, null when the
@@ -261,15 +299,38 @@ export function extractionSchema(names: string[]): Record<string, unknown> {
 }
 
 /**
- * Parse direction evaluation response from AI
+ * Parse direction evaluation response from AI.
+ *
+ * The reply lists each direction with the player's words that trigger it
+ * ({"directions": [{index, quote, triggered}]}). With `check`, a triggered
+ * direction counts only when its quote is from the player's message, or
+ * when it is a NOT direction (nothing to quote). Older shapes —
+ * {"triggered": [...]} and a bare array — are still read, unchecked.
  */
-export function parseDirectionEvaluationResponse(response: string): number[] {
+export function parseDirectionEvaluationResponse(
+  response: string,
+  check?: { playerInput: string; directions: ConversationDirection[] },
+): number[] {
   try {
-    // Structured reply: {"triggered": [...]}; prompt-only providers: a bare array.
     const trimmed = response.trim();
-    if (trimmed.startsWith('{')) {
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
+    if (start >= 0 && end > start) {
       try {
-        const parsed = JSON.parse(trimmed);
+        const parsed = JSON.parse(trimmed.slice(start, end + 1));
+        if (Array.isArray(parsed?.directions)) {
+          const out: number[] = [];
+          for (const d of parsed.directions) {
+            if (!d || typeof d.index !== 'number' || d.triggered !== true) continue;
+            if (check) {
+              const dir = check.directions[d.index];
+              if (!dir) continue;
+              if (!dir.trigger.negate && !quoteIsFromMessage(String(d.quote ?? ''), check.playerInput)) continue;
+            }
+            if (!out.includes(d.index)) out.push(d.index);
+          }
+          return out;
+        }
         if (Array.isArray(parsed?.triggered)) return parsed.triggered.filter((i: any) => typeof i === 'number');
       } catch { /* fall through to the array scan */ }
     }

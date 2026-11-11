@@ -7,6 +7,7 @@ import {
   buildConversationSystemPrompt,
   buildDirectionEvaluationPrompt,
   parseDirectionEvaluationResponse,
+  quoteIsFromMessage,
   collectActions,
 } from '../../src/utils/ConversationPromptBuilder';
 import type { ConversationDirection } from '../../src/types';
@@ -328,20 +329,52 @@ describe('structured replies', () => {
   });
 });
 
-describe('direction evaluation prompt for small models', () => {
-  it('gives no example indices (a 3B model copied "[0, 2]" and fired every direction)', () => {
-    const prompt = buildDirectionEvaluationPrompt(
-      'Hello, thanks for coming in.',
-      [{ id: 'd', trigger: { type: 'custom', description: 'The player says goodbye.' } } as any],
-      [],
-      1,
-    );
+describe('direction evaluation: the player\'s words first', () => {
+  const dirs = [
+    { id: 'bye', trigger: { type: 'custom', description: 'The player says goodbye.' } },
+    { id: 'lamp', trigger: { type: 'topic-mention', keywords: ['lamp'] } },
+    { id: 'nosorry', trigger: { type: 'topic-mention', keywords: ['sorry'], negate: true } },
+  ] as any[];
+
+  it('asks for a quote per direction and gives no example indices', () => {
+    const prompt = buildDirectionEvaluationPrompt('Hello, thanks for coming in.', dirs, [
+      { role: 'npc', text: 'What is the next step?', turnNumber: 0 },
+      { role: 'player', text: 'Hello, thanks for coming in.', turnNumber: 1 },
+    ] as any, 1);
     expect(prompt).not.toMatch(/Example:\s*\[/);
-    expect(prompt).toContain('return: []');
+    expect(prompt).toContain('PLAYER\'S LATEST MESSAGE: "Hello, thanks for coming in."');
+    expect(prompt).toContain('"quote"');
+    // The latest message is not repeated in the history above it.
+    expect(prompt.match(/Hello, thanks for coming in\./g)).toHaveLength(1);
   });
 
-  it('reads an answer wrapped in a json code fence', () => {
+  it('drops a direction whose quote is not the player\'s words', () => {
+    const reply = JSON.stringify({ directions: [
+      { index: 0, quote: 'says goodbye', triggered: true },
+      { index: 1, quote: '', triggered: true },
+      { index: 2, quote: '', triggered: true },
+    ] });
+    const got = parseDirectionEvaluationResponse(reply, { playerInput: 'Where were you last night?', directions: dirs });
+    expect(got).toEqual([2]); // only the NOT direction, which has nothing to quote
+  });
+
+  it('keeps a direction quoted from the message, tolerating case and punctuation', () => {
+    const reply = '```json\n' + JSON.stringify({ directions: [
+      { index: 0, quote: 'Goodbye', triggered: true },
+      { index: 1, quote: 'the LAMP', triggered: true },
+      { index: 2, quote: '', triggered: false },
+    ] }) + '\n```';
+    expect(parseDirectionEvaluationResponse(reply, { playerInput: 'Fine, I took the lamp. Goodbye!', directions: dirs })).toEqual([0, 1]);
+  });
+
+  it('still reads the older reply shapes', () => {
     expect(parseDirectionEvaluationResponse('```json\n[0]\n```')).toEqual([0]);
-    expect(parseDirectionEvaluationResponse('```json\n[]\n```')).toEqual([]);
+    expect(parseDirectionEvaluationResponse('{"triggered": [1]}')).toEqual([1]);
+  });
+
+  it('quoteIsFromMessage wants most of the words', () => {
+    expect(quoteIsFromMessage('I took it', 'Fine. I took it.')).toBe(true);
+    expect(quoteIsFromMessage('says goodbye', 'Where were you?')).toBe(false);
+    expect(quoteIsFromMessage('', 'anything')).toBe(false);
   });
 });

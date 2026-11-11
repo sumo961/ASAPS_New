@@ -615,7 +615,7 @@ export class AIConversationBeat extends Beat {
                 turnNumber,
               );
               const evalResponse = await this.callAI(aiService, evalPrompt, 'Evaluate which directions triggered', DIRECTION_EVALUATION_SCHEMA);
-              for (const fi of parseDirectionEvaluationResponse(evalResponse)) {
+              for (const fi of parseDirectionEvaluationResponse(evalResponse, { playerInput, directions: fuzzyDirections })) {
                 const activeIdx = fuzzyToActiveIdx[fi];
                 if (activeIdx !== undefined) triggeredIndices.push(activeIdx);
               }
@@ -692,7 +692,7 @@ export class AIConversationBeat extends Beat {
                 playerInput, newlyActive, conversationHistory, turnNumber,
               );
               const reEvalResponse = await this.callAI(aiService, reEvalPrompt, 'Re-evaluate directions', DIRECTION_EVALUATION_SCHEMA);
-              const reTriggered = parseDirectionEvaluationResponse(reEvalResponse);
+              const reTriggered = parseDirectionEvaluationResponse(reEvalResponse, { playerInput, directions: newlyActive });
 
               if (reTriggered.length > 0) {
                 const reActions = collectActions(newlyActive, reTriggered);
