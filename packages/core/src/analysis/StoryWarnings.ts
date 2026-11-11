@@ -32,6 +32,9 @@ export type StoryWarningCode =
   | 'choices-all-hidden'              // no choice on offer: the beat is skipped by its own link
   | 'reply-nowhere'                   // a reply with no next line and no exit: picking it ends the scene
   | 'restart-keeps-values'            // an end screen's Restart resets nothing: checked values carry into the next run
+  | 'placeholder-text'                // a new beat's stand-in text left where players see it ("Character", "New Choice 1")
+  | 'meter-never-changes'             // a counter shown on a HUD that nothing in the story changes
+  | 'missing-asset'                   // a beat uses a sound or picture no longer in the project
   | 'role';                           // cast roles: unknown role, non-candidate cast, recast, used before cast, bare AI partner
 
 export interface StoryWarning {
@@ -56,6 +59,8 @@ export interface DetectConfig {
   shownReplies?: ReadonlySet<string>;
   /** The search ran out of budget: what it didn't see may still happen. */
   searchLimited?: boolean;
+  /** The ids of the project's sounds and pictures. Given, beats using any other asset id are named. */
+  assetIds?: ReadonlySet<string>;
 }
 
 /** What a search of the story saw players do. */
@@ -141,11 +146,14 @@ export function detectStoryWarnings(cfg: DetectConfig): StoryWarning[] {
 
   warnings.push(...detectStateWiring(story, evidence.played));
   warnings.push(...detectRestartCarryOver(story, evidence.played));
+  warnings.push(...detectStillMeters(story));
+  if (cfg.assetIds) warnings.push(...detectMissingAssets(story, cfg.assetIds));
 
   // 4. Mistakes only a read of the beat shows: the simulator plays them as written.
   const played = evidence.played;
   for (const beat of story.getAllBeats()) {
     warnings.push(...detectCounterText(beat));
+    if (played.size === 0 || played.has(beat.id)) warnings.push(...detectPlaceholderText(beat, story));
     if (beat.type === 'dialogTree') warnings.push(...detectDialogShape(beat, cfg.shownReplies, played, cfg.searchLimited));
   }
 
@@ -314,6 +322,153 @@ function detectRestartCarryOver(story: Story, played: ReadonlySet<string>): Stor
     message: `Restart on ${where} starts the story again without resetting anything: ${names} ${carried.length === 1 ? 'carries' : 'carry'} into the next run, so checks on ${carried.length === 1 ? 'it' : 'them'} can come out differently on a replay. If that's meant, leave it; otherwise turn on Reset in the settings of ${these}.`,
     detail: { carried, endScreens: screens.map((b) => b.id) },
   }];
+  return out;
+}
+
+// ============================================================================
+// What a new beat starts with, left in
+// ============================================================================
+
+const PLACEHOLDER_CHOICE = /^New Choice \d+$/;
+const PLACEHOLDER_PROP = /^New Prop \d+$/;
+const PLACEHOLDER_REPLY = 'Player response...';
+const PLACEHOLDER_SPEAKER = 'Character';
+
+/**
+ * The stand-in words a new Dialog Tree, choice or prop starts with, still
+ * there where players see them. Easy to miss: the editor shows them as if
+ * they were written.
+ */
+function detectPlaceholderText(beat: Beat, story: Story): StoryWarning[] {
+  const params = beat.getParameters() as any;
+  // A character really called "Character" is a name, not a stand-in.
+  const castHasCharacter = (story.getCharacters?.() ?? []).some((c: any) =>
+    [c?.name, c?.displayName].some((n) => typeof n === 'string' && n.trim() === PLACEHOLDER_SPEAKER));
+  let speakerLines = 0;
+  const found = new Map<string, number>();
+  const note = (text: string) => found.set(text, (found.get(text) ?? 0) + 1);
+  const walk = (o: any, key?: string): void => {
+    if (Array.isArray(o)) { o.forEach((v) => walk(v, key)); return; }
+    if (!o || typeof o !== 'object') return;
+    if (!castHasCharacter && typeof o.speaker === 'string' && o.speaker.trim() === PLACEHOLDER_SPEAKER && !o.characterRef) speakerLines++;
+    const text = typeof o.text === 'string' ? o.text.trim() : '';
+    if (text === PLACEHOLDER_REPLY || PLACEHOLDER_CHOICE.test(text)) note(text);
+    if (key === 'props' && typeof o.name === 'string' && PLACEHOLDER_PROP.test(o.name.trim())) note(o.name.trim());
+    for (const [k, v] of Object.entries(o)) if (v && typeof v === 'object') walk(v, k);
+  };
+  walk(params);
+  if (speakerLines === 0 && found.size === 0) return [];
+  const parts: string[] = [];
+  if (speakerLines > 0) parts.push(`the speaker "${PLACEHOLDER_SPEAKER}"${speakerLines > 1 ? ` (on ${speakerLines} lines)` : ''}`);
+  for (const [text, n] of found) parts.push(`"${text}"${n > 1 ? ` (${n} times)` : ''}`);
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+  const advice = speakerLines > 0
+    ? 'Write your own words in their place, and link each line to the character who says it, so their picture and HUD come with them.'
+    : 'Write your own words in their place.';
+  return [{
+    code: 'placeholder-text', severity: 'warn', beatId: beat.id, beatName: beat.name,
+    message: `Players see stand-in text a new beat starts with: ${list}. ${advice}`,
+    detail: { speakerLines, texts: [...found.keys()] },
+  }];
+}
+
+// ============================================================================
+// Meters that never move
+// ============================================================================
+
+/**
+ * A counter shown on a character's HUD that no effect, Set Variable or
+ * input ever changes: its bar sits at the start value all game. Often the
+ * Player template's Health and Energy, kept without being used, or a story
+ * changing story-wide counters while the HUD shows the character's own.
+ */
+function detectStillMeters(story: Story): StoryWarning[] {
+  const { sets, key } = stateWiring(story);
+  const characters = (story.getCharacters?.() ?? []) as any[];
+  if (characters.length === 0) return [];
+  const beats = story.getAllBeats();
+  const out: StoryWarning[] = [];
+  for (const c of characters) {
+    const still = ((c?.counters ?? []) as any[])
+      .filter((k) => k?.visible && !k.source && typeof k.name === 'string' && k.name.trim() && !sets.has(key('value', k.name)));
+    if (still.length === 0) continue;
+    // Said where the HUD first shows: the first beat that features them.
+    const names = [c.name, c.displayName].filter((n) => typeof n === 'string' && n.trim()).map((n: string) => n.trim().toLowerCase());
+    const features = (b: Beat): boolean => {
+      let hit = false;
+      const walk = (o: any): void => {
+        if (hit || !o || typeof o !== 'object') return;
+        if (Array.isArray(o)) { o.forEach(walk); return; }
+        for (const f of ['characterRef', 'characterId', 'character', 'speaker', 'npcName']) {
+          const v = o[f];
+          if (typeof v === 'string' && (v === c.id || names.includes(v.trim().toLowerCase()))) { hit = true; return; }
+        }
+        for (const v of Object.values(o)) if (v && typeof v === 'object') walk(v);
+      };
+      walk({ speaker: (b as any).speaker, characterRef: (b as any).characterRef, p: b.getParameters() });
+      return hit;
+    };
+    const at = beats.find(features);
+    const fromStart = c.role === 'player' || c.hudReveal === 'fromStart';
+    // Never on stage and not shown from the start: the HUD never appears.
+    if (!at && !fromStart) continue;
+    const beat = at ?? story.getBeat(story.getFirstBeatId?.() ?? '') ?? beats[0];
+    if (!beat) continue;
+    const label = (k: any) => `"${(k.displayName || k.name).trim()}"`;
+    const list = still.length === 1 ? label(still[0]) : `${still.slice(0, -1).map(label).join(', ')} and ${label(still[still.length - 1])}`;
+    const who = (c.displayName || c.name || c.id || 'A character').trim();
+    out.push({
+      code: 'meter-never-changes', severity: 'warn', beatId: beat.id, beatName: beat.name,
+      message: `${who}'s HUD shows ${list}, but nothing in the story changes ${still.length === 1 ? 'it' : 'them'}: players see ${still.length === 1 ? 'it' : 'them'} stay at the start value all game. Change ${still.length === 1 ? 'it' : 'them'} with an effect, or hide ${still.length === 1 ? 'it' : 'them'} with the eye toggle on the character's Counters tab.`,
+      detail: { character: c.id, counters: still.map((k) => k.name) },
+    });
+  }
+  return out;
+}
+
+// ============================================================================
+// Sounds and pictures no longer in the project
+// ============================================================================
+
+const ASSET_ID = /^asset_\d{6,}(?:_[A-Za-z0-9_-]+)?$/;
+
+/**
+ * Beats that name a sound or picture the project doesn't have (deleted, or
+ * lost when it was added): players hear silence or see nothing there. Said
+ * once per missing asset, on the first beat that uses it.
+ */
+function detectMissingAssets(story: Story, assetIds: ReadonlySet<string>): StoryWarning[] {
+  const users = new Map<string, { sound: boolean; beats: Beat[] }>();
+  for (const beat of story.getAllBeats()) {
+    const seen = new Set<string>();
+    const walk = (o: any, k: string, soundy: boolean): void => {
+      if (typeof o === 'string') {
+        if (!ASSET_ID.test(o) || assetIds.has(o) || seen.has(o)) return;
+        seen.add(o);
+        const u = users.get(o) ?? { sound: false, beats: [] };
+        u.sound ||= soundy;
+        u.beats.push(beat);
+        users.set(o, u);
+        return;
+      }
+      if (Array.isArray(o)) { o.forEach((v) => walk(v, k, soundy)); return; }
+      if (!o || typeof o !== 'object') return;
+      for (const [key, v] of Object.entries(o)) walk(v, key, soundy || /sound|music|audio|voice/i.test(key));
+    };
+    const plain = (beat as any).toJSON?.() ?? beat;
+    walk({ ...plain, id: undefined }, '', false);
+  }
+  const out: StoryWarning[] = [];
+  for (const [id, { sound, beats }] of users) {
+    const first = beats[0];
+    const what = sound ? 'a sound' : 'a picture';
+    const others = beats.length - 1;
+    out.push({
+      code: 'missing-asset', severity: 'warn', beatId: first.id, beatName: first.name,
+      message: `${others > 0 ? `This beat and ${others} other${others === 1 ? '' : 's'} use` : 'Uses'} ${what} that is no longer in the project (${id}), so players ${sound ? 'hear nothing' : 'see nothing'} there. It was deleted, or lost when it was added. Pick ${sound ? 'the sound' : 'the picture'} again on ${others > 0 ? 'these beats' : 'this beat'}.`,
+      detail: { assetId: id, beats: beats.map((b) => b.id) },
+    });
+  }
   return out;
 }
 

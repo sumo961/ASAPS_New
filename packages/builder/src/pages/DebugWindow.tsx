@@ -238,7 +238,7 @@ export const DebugWindow: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4">
         <SimulationGate story={story} needs={activeTab === 'paths' ? 'paths' : 'situations'}>
         {activeTab === 'problems' && (
-          <ProblemsPanel story={story} onHighlightBeat={handleHighlightBeat} />
+          <ProblemsPanel story={story} assetIds={context?.assetIds} onHighlightBeat={handleHighlightBeat} />
         )}
         {activeTab === 'reachability' && (
           <ReachabilityReport story={story} onHighlightBeat={handleHighlightBeat} />

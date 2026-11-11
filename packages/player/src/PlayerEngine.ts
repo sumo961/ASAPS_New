@@ -273,6 +273,8 @@ export interface PlayerEvents {
   storyLoaded: (story: Story) => void;
   storyStarted: () => void;
   storyEnded: () => void;
+  /** The story stopped on a beat with no way on that isn't an End Screen. */
+  deadEnd: (info: { beatId: string; beatName: string }) => void;
   beatChanged: (beatId: string) => void;
   saved: (slot: SaveSlot) => void;
   loaded: (slot: SaveSlot) => void;
@@ -394,6 +396,7 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
 
       // Forward engine events
       this.engine.on('storyEnded', () => this.emit('storyEnded'));
+      this.engine.on('deadEnd', (info: { beatId: string; beatName: string }) => this.emit('deadEnd', info));
 
       // Handle restart request from EndScreen
       this.engine.on('restartRequested', async () => {

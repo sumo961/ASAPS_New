@@ -65,6 +65,9 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   const rendererRef = useRef<ReactRenderer | null>(null);
   const [state, setState] = useState<PlayerState>('splash');
   const [error, setError] = useState<string | null>(null);
+  // The story stopped on a beat with no way on (not an End Screen): say so,
+  // instead of leaving a screen whose buttons do nothing.
+  const [stoppedHere, setStoppedHere] = useState(false);
   const [splashFading, setSplashFading] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
   const [aiStatus, setAiStatus] = useState(() => getAIConfigStatus());
@@ -504,6 +507,8 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           renderer,
         });
         playerRef.current = player;
+        player.on('deadEnd', () => { if (mounted) setStoppedHere(true); });
+        player.on('storyStarted', () => { if (mounted) setStoppedHere(false); });
 
         // Load the story (with shared asset base when provided)
         console.log('[WebPlayer] Loading story...');
@@ -825,6 +830,8 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
                     // Handle restart request from EndScreen
                     console.log('[WebPlayer] Restart requested');
                     await engine.start();
+                  } else if (beat.type !== 'endScreen' && mounted) {
+                    setStoppedHere(true);
                   }
                 } catch (error) {
                   console.error('[WebPlayer] Error executing timer target beat:', error);
@@ -1147,6 +1154,29 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           <div style={{ color: '#ff6b6b', maxWidth: 400 }}>
             {error || 'An error occurred'}
           </div>
+        </div>
+      )}
+
+      {stoppedHere && state !== 'error' && (
+        <div
+          role="status"
+          data-asaps-chrome
+          style={{
+            position: 'absolute', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', gap: 16, maxWidth: 'calc(100% - 32px)',
+            padding: '12px 16px', borderRadius: 12, background: 'rgba(20, 20, 40, 0.92)', color: '#fff',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', fontSize: 15,
+          }}
+        >
+          <span>The story ends here.</span>
+          <button
+            type="button"
+            onClick={() => { setStoppedHere(false); void playerRef.current?.restart(); }}
+            style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#6366f1', color: '#fff', fontSize: 14, cursor: 'pointer' }}
+          >
+            Start again
+          </button>
         </div>
       )}
 

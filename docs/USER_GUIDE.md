@@ -1808,6 +1808,11 @@ A counter that's only in the data does nothing for your interactor. The **Meter 
 
 The frame draws every counter whose eye toggle is on, in the order they're listed, and it carries a **header with the character's name and their colour dot** *(new in v0.9.89)*. That header matters as soon as you have two characters with meters: two frames docked in the same screen corner used to look like one character's counters duplicated, and since only one set responded to anything, the other looked broken. Now the HUD says whose meters it is.
 
+<a id="hud-contents"></a>
+**What a character's HUD can show.** Three things, and only these: the counters on this tab whose eye toggle is on (drawn in the Meter Frame), the character's inventory when its **Inventory Frame (HUD Overlay)** is enabled, and their mood when the [Mood HUD](#mood-hud--show-a-characters-mood-on-stage) is on. A character with none of them has an empty HUD: the Preview's Debug panel then says *nothing to show* next to their name, rather than *shown*.
+
+Counters that belong to no character (*Global*, or *Story-global (no character)*, in the counter pickers) are story-wide, so no character's HUD shows them. If the player should watch a value, make it a counter on this tab, turn its eye on, and pick this character's counter when you change it. The other way round, a counter whose eye is on but which nothing in the story changes sits at its start value all game; Debug ▸ Problems names it (*Meter never changes*). The Player template's Health and Energy are the usual example: delete them or hide them if your story doesn't use them.
+
 <a id="hud-reveal"></a>
 **When the HUD appears — "Show HUD".** Right under the Meter Frame header sits a **Show HUD** dropdown that decides when *all* of this character's HUDs (meters, mood pad, inventory) come on screen:
 
@@ -3520,6 +3525,9 @@ These are the entries Problems can show beyond unreachable beats, dead ends, loo
 | **Text assumes something** (warning or note) | The beat's words assume something some players may not have. See [Story Logic](#story-logic) below. | Check the text against the ways in. |
 | **Item not described** (note) | A Pick Prop item that no beat describes. | Describe it, if players should know what they picked up. |
 | **Restart keeps values** (note) | An end screen players reach restarts the story without resetting anything (its **Reset** is off), while the story checks values it changes, so those checks can come out differently on a replay. Told once, on the first such end screen, naming the others. | If that's your New Game+, leave it. Otherwise turn on **Reset** for those end screens ([reset options](#keep-across-restarts)). |
+| **Stand-in text left in** (warning) | Words a new beat starts with are still there for players to see: the speaker *Character* on Dialog Tree lines linked to no one, a reply that still says *Player response...*, *New Choice 2*, *New Prop 1*. | Write your own words. For a speaker, pick the character who says the line, so their picture and HUD come with it. |
+| **Meter never changes** (warning) | A counter shown on a character's HUD (eye on) that nothing in the story changes, so players watch it stay at its start value. Often the Player template's Health and Energy, or a story that changes [story-wide counters](#hud-contents) while the HUD shows the character's own. | Change it with an effect that picks this character's counter, or turn its eye off. |
+| **Sound or picture missing** (warning) | Beats use a sound or picture that is no longer among the project's assets: it was deleted, or lost when it was added. Players hear silence or see nothing there. Told once per missing file, with how many beats use it. | Pick the sound or picture again on those beats. |
 | **Role** (warning) | A [role](#roles) problem: a role that doesn't exist, a character who isn't on a role's list, a role cast in two beats without *Can be recast later*, a role used before anything chooses who plays it, or an AI partner role with nothing to go on. | Add the role, tick the character, set a default, or tick *Can be recast later*. The message says which. |
 
 These are advice only: nothing changes at runtime. The checks explore the same routes players can take, including a replay when your story tests the built-in [playthrough](#keep-across-restarts). In Path Analysis's **Tree** view, a small warning triangle marks the branch that contains a beat with a warning; hover over it for the same explanation.
@@ -3565,7 +3573,7 @@ Enumerates the possible journeys through your story. Three modes:
 Path Analysis follows whole paths, one by one, so it runs its own search the first time you open it (the other tabs share a faster one). It plays the story the way a player would: it follows every link the flowchart draws, lets a screen's timer run out as well as taking its button, only takes a choice when its conditions would show it, sends the player to a requirement's fallback when the requirement isn't met, and keeps track of how many of an item the player holds and which character holds what. Each outcome carries a label saying how the path ends:
 
 - **Ending** (green): it reaches an End Screen or an AI Summary. Only those two count as endings.
-- **Dead end** (red): the story stops here without an end screen: the beat has no way on.
+- **Dead end** (red): the story stops here without an end screen: the beat has no way on. If players reach one anyway, the Preview tells you which beat it was, and a published story shows *The story ends here* with a **Start again** button instead of a screen whose buttons do nothing.
 - **Stuck in a loop** (red): the player keeps coming back here and no way on gets out.
 - **Back to a menu** (purple): the path came back to a choice with nothing new to find, for example a hub where every choice has already been tried. The player can still leave by another choice, so it's a loop, not a trap.
 - **Cut off** (orange): the path grew so long that the analysis stopped following it. That's a limit of the analysis, not a fault in your story; hover over the badge for a reminder.

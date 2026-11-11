@@ -569,6 +569,8 @@ export const PreviewWindow: React.FC = () => {
       variants: Array<{ id: string; name: string }>;
       drawn: boolean;
       hud: 'shown' | 'until first appearance' | 'until a variant is chosen';
+      /** No visible counter, inventory or mood frame: the HUD has nothing to show. */
+      hudEmpty: boolean;
     }>;
     /** Cast roles: who plays each now, and whether anything has cast it yet. */
     roles?: Array<{ id: string; name: string; holder: string | null; cast: boolean; source: RoleHolderSource | 'default'; candidates: Array<{ id: string; name: string }> }>;
@@ -2086,6 +2088,7 @@ export const PreviewWindow: React.FC = () => {
             variants,
             drawn: c.variantSelectionPolicy === 'random' && !anyCtx.hasExplicitlySetVariant?.(c.id),
             hud,
+            hudEmpty: !(c.counters || []).some((k: any) => k?.visible) && !c.inventoryFrame && !c.moodFrame,
           };
         });
 
@@ -3644,7 +3647,11 @@ export const PreviewWindow: React.FC = () => {
                           )}
                           <div className="flex items-center justify-between gap-2 text-gray-500">
                             <span>{c.code} HUD{c.drawn ? ' · variant drawn at random' : ''}</span>
-                            <span className={c.hud === 'shown' ? 'text-green-700' : 'text-amber-700'}>{c.hud === 'shown' ? 'shown' : `hidden ${c.hud}`}</span>
+                            {c.hudEmpty ? (
+                              <span className="text-gray-400" title="This character has no counter set to show, no inventory frame and no mood frame, so there is nothing for a HUD to show. Add them in the Character Manager.">nothing to show</span>
+                            ) : (
+                              <span className={c.hud === 'shown' ? 'text-green-700' : 'text-amber-700'}>{c.hud === 'shown' ? 'shown' : `hidden ${c.hud}`}</span>
+                            )}
                           </div>
                         </div>
                       ))}

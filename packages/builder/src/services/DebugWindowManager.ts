@@ -49,6 +49,8 @@ export interface DebugStoryContext {
   characters?: any[];
   emotionPalette?: any[];
   traitModulations?: any;
+  /** The project's sounds and pictures, so beats using a missing one are named. */
+  assetIds?: string[];
 }
 
 export interface DebugWindowState {

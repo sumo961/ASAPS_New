@@ -1816,7 +1816,9 @@ export const Inspector: React.FC<InspectorProps> = ({
       expanded={expanded}
       dialogTree={localBeat.parameters?.dialogTree || {
         id: 'root',
-        speaker: 'Character',
+        // Empty, not a stand-in name: "Character" was left in where players
+        // saw it, linked to no one (the speaker box asks for a character).
+        speaker: '',
         text: 'Hello...',
         emotion: 'neutral'
       }}

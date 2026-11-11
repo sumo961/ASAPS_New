@@ -747,6 +747,8 @@ function App() {
 
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
+  // The Debug window names beats using a sound or picture not in this list.
+  const debugAssetIds = useMemo(() => assets.map((a) => a.id), [assets]);
   /** The project whose assets have finished loading (the theme copy waits for it). */
   const [assetsLoadedFor, setAssetsLoadedFor] = useState<string | null>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -5284,11 +5286,11 @@ function App() {
       const storyData = getSerializedStoryData();
       debugWindowManager.sendStoryUpdate(
         storyData as unknown as import('./services/PreviewWindowManager').SerializedStoryData,
-        { settings: globalSettings, characters, emotionPalette, traitModulations },
+        { settings: globalSettings, characters, emotionPalette, traitModulations, assetIds: debugAssetIds },
       );
     }, 300);
     return () => clearTimeout(timeout);
-  }, [showDebugPanel, state.beats, state.connections, getSerializedStoryData, globalSettings, characters, emotionPalette, traitModulations]);
+  }, [showDebugPanel, state.beats, state.connections, getSerializedStoryData, globalSettings, characters, emotionPalette, traitModulations, debugAssetIds]);
 
   // Asset and character handlers
   const handleAssetSelect = useCallback((type: 'background' | 'character' | 'prop' | 'sound', callback: (asset: Asset) => void) => {
@@ -6700,9 +6702,9 @@ function App() {
    */
   const handleOpenDebugPanel = useCallback(() => {
     const storyData = getSerializedStoryData() as unknown as import('./services/PreviewWindowManager').SerializedStoryData;
-    debugWindowManager.open(storyData, { settings: globalSettings, characters, emotionPalette, traitModulations });
+    debugWindowManager.open(storyData, { settings: globalSettings, characters, emotionPalette, traitModulations, assetIds: debugAssetIds });
     setShowDebugPanel(true); // kept for backwards-compatible state tracking
-  }, [getSerializedStoryData, globalSettings, characters, emotionPalette, traitModulations]);
+  }, [getSerializedStoryData, globalSettings, characters, emotionPalette, traitModulations, debugAssetIds]);
   openDebugPanelRef.current = handleOpenDebugPanel;
 
   /**

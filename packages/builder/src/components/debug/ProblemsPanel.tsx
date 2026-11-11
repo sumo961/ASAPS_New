@@ -12,10 +12,12 @@ const SECTION: Record<ProblemSeverity, { title: string; icon: React.ReactNode; b
 };
 
 /** Everything the debug tools found wrong, in one list. */
-export const ProblemsPanel: React.FC<{ story: Story; onHighlightBeat?: (beatId: string) => void }> = ({ story, onHighlightBeat }) => {
+export const ProblemsPanel: React.FC<{ story: Story; assetIds?: string[]; onHighlightBeat?: (beatId: string) => void }> = ({ story, assetIds, onHighlightBeat }) => {
   const [search, setSearch] = useState('');
   const simulation = useMemo(() => searchSituations(story), [story]);
-  const problems = useMemo(() => collectProblems(story, simulation), [story, simulation]);
+  // No list (an older editor, or assets not loaded yet): nothing to compare against.
+  const knownAssets = useMemo(() => (assetIds?.length ? new Set(assetIds) : undefined), [assetIds]);
+  const problems = useMemo(() => collectProblems(story, simulation, knownAssets), [story, simulation, knownAssets]);
   const term = search.trim().toLowerCase();
   const shown = term
     ? problems.filter((p) => `${p.label} ${p.beatName} ${p.message}`.toLowerCase().includes(term))

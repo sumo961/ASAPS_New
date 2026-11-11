@@ -16,6 +16,9 @@ const LABELS: Record<StoryWarning['code'], string> = {
   'setup-unreached': 'Setup never played',
   'reply-hidden-by-next-line': 'Reply hidden by a next line',
   'restart-keeps-values': 'Restart keeps values',
+  'placeholder-text': 'Stand-in text left in',
+  'meter-never-changes': 'Meter never changes',
+  'missing-asset': 'Sound or picture missing',
   'role': 'Role',
 };
 

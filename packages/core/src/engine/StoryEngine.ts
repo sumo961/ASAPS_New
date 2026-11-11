@@ -80,6 +80,7 @@ export class StoryEngine extends EventEmitter {
     this.currentBeatId = startBeatId || this.story.getFirstBeatId();
     // Keep context in sync for save/load
     this.context.setCurrentBeatId(this.currentBeatId);
+    let lastBeat: { id: string; name?: string; type: string } | null = null;
 
     while (this.running && current() && this.currentBeatId) {
       // Check for timer interrupts
@@ -96,6 +97,7 @@ export class StoryEngine extends EventEmitter {
 
       try {
         console.log(`[StoryEngine] Executing beat ${this.currentBeatId} (type: ${beat.type})`);
+        lastBeat = beat;
         const nextBeatId = await beat.execute(this.context, this.renderer);
         // Replaced by a newer start() while this beat waited: that run owns
         // the story now.
@@ -130,6 +132,12 @@ export class StoryEngine extends EventEmitter {
     }
 
     if (!current()) return;
+    // Ran out of beats on its own (not stopped or paused) somewhere other
+    // than an End Screen: a beat with no way on. Players would be left on
+    // its screen with nothing to do, so the players say so.
+    if (this.running && !this.currentBeatId && lastBeat && lastBeat.type !== 'endScreen') {
+      this.emit('deadEnd', { beatId: lastBeat.id, beatName: lastBeat.name || lastBeat.id });
+    }
     this.emit('storyEnded');
   }
 

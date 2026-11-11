@@ -89,7 +89,7 @@ const RANK: Record<ProblemSeverity, number> = { error: 0, warning: 1, note: 2 };
  * and what can't be reached. Unreachable beats are told by their cause: the
  * first one on the way, with how many more are behind it.
  */
-export function collectProblems(story: Story, simulation: StorySituations): Problem[] {
+export function collectProblems(story: Story, simulation: StorySituations, assetIds?: ReadonlySet<string>): Problem[] {
   const out = new Map<string, Problem>();
   const beatName = (id: string) => story.getBeat(id)?.name?.trim() || id;
   const add = (severity: ProblemSeverity, label: string, beatId: string, message: string, behindIt = 0) => {
@@ -100,7 +100,7 @@ export function collectProblems(story: Story, simulation: StorySituations): Prob
   };
 
   const { analyzer, playedBeats } = simulation;
-  for (const w of detectStoryWarnings({ evidence: simulation.evidence, story, shownReplies: analyzer.shownReplies, searchLimited: analyzer.searchLimited })) {
+  for (const w of detectStoryWarnings({ evidence: simulation.evidence, story, shownReplies: analyzer.shownReplies, searchLimited: analyzer.searchLimited, assetIds })) {
     // A cast that doesn't take leaves the player playing on: worth checking, not a stop.
     add(w.severity === 'note' ? 'note' : w.severity === 'error' && w.code !== 'role' ? 'error' : 'warning', storyWarningLabel(w.code), w.beatId, w.message);
   }

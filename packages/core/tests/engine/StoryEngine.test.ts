@@ -137,6 +137,20 @@ describe('StoryEngine', () => {
       expect(onEnded).toHaveBeenCalledOnce();
     });
 
+    it('says when the story stops on a beat with no way on, not at an End Screen', async () => {
+      const deadEnd = vi.fn();
+      engine.on('deadEnd', deadEnd);
+      await engine.loadStory(makeLinearStory());
+      await engine.start();
+      expect(deadEnd).not.toHaveBeenCalled();
+
+      const story = makeLinearStory();
+      story.addBeat(createTestBeat({ id: 'b', name: 'B', type: 'infoText', parameters: { text: 'B' }, connections: [] }));
+      await engine.loadStory(story);
+      await engine.start();
+      expect(deadEnd).toHaveBeenCalledWith({ beatId: 'b', beatName: 'B' });
+    });
+
     it('starts from explicit startBeatId when provided', async () => {
       // Jump straight to 'b' — the title screen never renders.
       await engine.loadStory(makeLinearStory());
