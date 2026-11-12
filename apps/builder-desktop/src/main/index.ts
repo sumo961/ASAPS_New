@@ -183,7 +183,7 @@ function extractProjectFileFromArgv(argv: string[]): string | null {
 
 function openProjectFile(path: string): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    currentProjectPath = path;
+    currentProjectPath = path; currentProjectPathOwner = null;
     mainWindow.webContents.send('project:open', path);
   } else {
     pendingOpenFile = path;
@@ -471,6 +471,11 @@ let debugWindow: BrowserWindow | null = null;
 let ideatorWindow: BrowserWindow | null = null;
 let codesignerWindow: BrowserWindow | null = null;
 let currentProjectPath: string | null = null;
+// The project currentProjectPath belongs to. A path set by the menu (Open,
+// Save As…) is unclaimed until the renderer reports the project it opened;
+// when the renderer moves to another project, the path no longer applies.
+let currentProjectPathOwner: string | null = null;
+let currentProjectName: string | null = null;
 
 function createWindow(intent?: Record<string, string>): void {
   // If a previous editor window is still around (e.g. user picked
@@ -921,7 +926,7 @@ async function handleOpenProject(): Promise<void> {
 
   if (!result.canceled && result.filePaths.length > 0) {
     const filePath = result.filePaths[0];
-    currentProjectPath = filePath;
+    currentProjectPath = filePath; currentProjectPathOwner = null;
     mainWindow?.webContents.send('project:open', filePath);
   }
 }
@@ -935,7 +940,7 @@ async function handleOpenProjectFolder(): Promise<void> {
 
   if (!result.canceled && result.filePaths.length > 0) {
     const folderPath = result.filePaths[0];
-    currentProjectPath = folderPath;
+    currentProjectPath = folderPath; currentProjectPathOwner = null;
     mainWindow?.webContents.send('project:open-folder', folderPath);
   }
 }
@@ -949,7 +954,7 @@ async function handleSaveAsFolder(): Promise<void> {
 
   if (!result.canceled && result.filePaths.length > 0) {
     const folderPath = result.filePaths[0];
-    currentProjectPath = folderPath;
+    currentProjectPath = folderPath; currentProjectPathOwner = null;
     mainWindow?.webContents.send('project:save-as-folder', folderPath);
   }
 }
@@ -960,7 +965,8 @@ async function handleSaveAs(): Promise<void> {
     filters: [
       { name: 'ASAPS Project', extensions: ['asaps'] },
     ],
-    defaultPath: currentProjectPath || 'untitled.asaps',
+    defaultPath: currentProjectPath
+      || `${(currentProjectName || 'untitled').replace(/[\\/:*?"<>|]+/g, '-').trim() || 'untitled'}.asaps`,
   });
 
   if (!result.canceled && result.filePath) {
@@ -973,10 +979,24 @@ async function handleSaveAs(): Promise<void> {
 // Pending-open handshake: the renderer calls this right after it registers
 // its 'project:open' listener, collecting any file that arrived before the
 // listener existed (cold-start double-click on any platform).
+ipcMain.on('project:set-current', (_, info: { projectId: string | null; directoryPath?: string | null; name?: string }) => {
+  const id = info?.projectId ?? null;
+  currentProjectName = info?.name ?? null;
+  if (info?.directoryPath) {
+    currentProjectPath = info.directoryPath;
+    currentProjectPathOwner = id;
+  } else if (currentProjectPathOwner === null) {
+    currentProjectPathOwner = id; // claims the path the menu just set
+  } else if (currentProjectPathOwner !== id) {
+    currentProjectPath = null;
+    currentProjectPathOwner = id;
+  }
+});
+
 ipcMain.handle('project:get-pending-open', () => {
   const path = pendingOpenFile;
   pendingOpenFile = null;
-  if (path) currentProjectPath = path;
+  if (path) { currentProjectPath = path; currentProjectPathOwner = null; }
   return path;
 });
 

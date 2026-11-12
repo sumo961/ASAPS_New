@@ -173,6 +173,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
    *  registering onProjectOpen; main clears the slot on read. */
   getPendingProjectOpen: (): Promise<string | null> =>
     ipcRenderer.invoke('project:get-pending-open'),
+  /** Which project is open (its folder, if any), for Save As's suggestion. */
+  setCurrentProject: (info: { projectId: string | null; directoryPath?: string | null; name?: string }): void =>
+    ipcRenderer.send('project:set-current', info),
   onProjectSaveAs: (callback: (path: string) => void) => {
     const handler = (_: unknown, path: string) => callback(path);
     ipcRenderer.on('project:save-as', handler);

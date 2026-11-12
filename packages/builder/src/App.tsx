@@ -175,6 +175,7 @@ declare global {
       onProjectOpen: (callback: (path: string) => void) => () => void;
       /** Collects a file double-clicked before the listener existed (cold start). */
       getPendingProjectOpen?: () => Promise<string | null>;
+      setCurrentProject?: (info: { projectId: string | null; directoryPath?: string | null; name?: string }) => void;
       onProjectSaveAs: (callback: (path: string) => void) => () => void;
       onProjectOpenFolder?: (callback: (path: string) => void) => () => void;
       onProjectSaveAsFolder?: (callback: (path: string) => void) => () => void;
@@ -2150,6 +2151,16 @@ function App() {
       }
     }
   }, [currentProject?.id]);
+
+  // Desktop: tell the main process which project is open, so File ▸ Save As
+  // suggests this project's folder or name, not the last one opened.
+  useEffect(() => {
+    window.electronAPI?.setCurrentProject?.({
+      projectId: currentProject?.id ?? null,
+      directoryPath: projectFormat === 'directory' ? projectPath : null,
+      name: currentProject?.name,
+    });
+  }, [currentProject?.id, currentProject?.name, projectFormat, projectPath]);
 
   // Validate external assets on project open (Electron only)
   useEffect(() => {
