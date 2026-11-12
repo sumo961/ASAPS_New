@@ -92,6 +92,8 @@ export function useCoDesigner() {
   const { isConfigured, currentProvider, generateConversationTurn, generateChatWithTools } = useAI();
 
   const seededRef = useRef(false);
+  // Set below, once the session helpers exist (the wire listener needs them).
+  const projectSwitchRef = useRef<(ctx: CoDesignerContext) => Promise<void>>(async () => {});
 
   // Read the story context once on mount, then seed the opening message.
   useEffect(() => {
@@ -123,6 +125,13 @@ export function useCoDesigner() {
         // Main window wrote a fresh snapshot (refresh button, menu reopen,
         // or post-apply) — re-read and tell the author.
         const ctx = readContextFromStorage();
+        const before = useCoDesignerStore.getState().context;
+        if (before?.projectId && ctx?.projectId && before.projectId !== ctx.projectId) {
+          // The author switched projects: keep this conversation with the
+          // project it was about, and start a new one for the open project.
+          void projectSwitchRef.current(ctx);
+          return;
+        }
         useCoDesignerStore.getState().setContext(ctx);
         if (ctx) {
           addMessage({
@@ -231,6 +240,12 @@ export function useCoDesigner() {
     addMessage({ role: 'assistant', content: buildOpeningTurn(ctx) });
     setStatus('interviewing');
   }, [reset, addMessage, setStatus]);
+
+  projectSwitchRef.current = async (ctx: CoDesignerContext) => {
+    await persistCurrentSession();
+    useCoDesignerStore.getState().setContext(ctx);
+    startNewSession();
+  };
 
   const sendMessage = useCallback(
     async (userText: string) => {

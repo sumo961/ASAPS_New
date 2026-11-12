@@ -1194,6 +1194,10 @@ function App() {
 
         // Helper function to handle import with conflict resolution
         const doImport = async (options: { overwrite?: boolean; generateNewId?: boolean; newName?: string } = {}): Promise<void> => {
+          // Replacing a project (maybe the open one): no auto-save of what's
+          // on screen may land between the import and the reload.
+          if (options.overwrite) pauseAutoSave();
+          try {
           const result = await importProjectFromZip(file, options);
 
           if (result.conflict) {
@@ -1223,10 +1227,16 @@ function App() {
               await makeProjectFolderFrom(result.projectId, makeFolderIn);
               return;
             }
+            // The open project replaced by the file: load it again (the load
+            // effect skips a project it already shows).
+            if (result.projectId === currentProjectRef2.current?.id) loadedProjectIdRef.current = null;
             await loadProject(result.projectId);
             console.log('[Electron] Project loaded successfully');
           } else if (result.error) {
             throw new Error(result.error);
+          }
+          } finally {
+            if (options.overwrite) resumeAutoSave();
           }
         };
 
@@ -1817,8 +1827,7 @@ function App() {
 
       // Shared applier for both AI import paths (see applyGeneratedStory).
       // MCP input is raw JSON, so the normalize pipeline runs in here.
-      ideatorSessionsRef.current = [];
-      coDesignerSessionsRef.current = [];
+      forgetOpenProjectRef.current({ keepSettings: true });
       const applied = await applyGeneratedStory(story, makeApplyStoryDeps(), { fallbackTitle: storyTitle, normalize: true });
       setGenerationReview(createGenerationReview({
         source: 'mcp', title: applied.title, original: applied.original,
@@ -2144,10 +2153,14 @@ function App() {
 
   // Validate external assets on project open (Electron only)
   useEffect(() => {
+    // The previous project's "assets missing" dialog doesn't belong to this one.
+    setMissingAssetsInfo(null);
     const assetsPathToCheck = currentProject?.assetsPath || (currentProject as any)?.directoryPath;
     if (!assetsPathToCheck || !(window as any).electronAPI?.fs) return;
 
+    let stale = false;
     validateProjectAssets(assetsPathToCheck).then(result => {
+      if (stale) return;
       if (result.missing.length > 0) {
         console.warn(`[App] ${result.missing.length} missing assets detected in ${assetsPathToCheck}`);
         setMissingAssetsInfo({ missing: result.missing, path: assetsPathToCheck });
@@ -2155,6 +2168,7 @@ function App() {
     }).catch(err => {
       console.warn('[App] Asset validation failed:', err);
     });
+    return () => { stale = true; };
   }, [currentProject?.id]); // Re-validate when project changes
 
   // Initialize with a basic story and create untitled project on mount
@@ -2393,6 +2407,59 @@ function App() {
    
   }, [currentProject, state.beats.length, storage, loadProject, storageInitialized]);
 
+  // What belongs to the open project without being part of its story: the
+  // selection, panels showing its data, the Debug and Preview traces on the
+  // flowchart, roles cast in the Preview, an open diff. Every path that puts
+  // a different project on screen (switching, importing, generating, deleting)
+  // clears them, so nothing of the old project shows over the new one.
+  const resetProjectUi = useCallback(() => {
+    setSelectedBeat(null);
+    setSelectedCluster(null);
+    setShowCharacterManager(false);
+    setShowAssetManager(false);
+    setShowSettings(false);
+    setFindChange(null);
+    setHighlightedBeatIds([]);
+    setPwVisitedBeatIds([]);
+    setPwCurrentBeatId(null);
+    setRolePreviewCasting({});
+    setDiffViewerFile(null);
+  }, []);
+  const resetProjectUiRef = useRef(resetProjectUi);
+  resetProjectUiRef.current = resetProjectUi;
+
+  // A story about to become a NEW project (an import, an AI-generated or
+  // MCP-sent story) starts from nothing of the open project's: not its
+  // assets, characters, feelings model, AI changes, Story Logic results or
+  // AI sessions, and (unless the caller keeps them) not its settings, theme
+  // or translations. These paths skip the load effect, so they must clear
+  // what it would have replaced; otherwise the next save writes the old
+  // project's things into the new one.
+  const forgetOpenProject = useCallback((opts: { keepSettings?: boolean } = {}) => {
+    resetProjectUi();
+    setAssets([]);
+    setCharacters([]);
+    setEmotionPalette(DEFAULT_EMOTION_PALETTE.map((e) => ({ ...e })));
+    setTraitModulations(DEFAULT_TRAIT_MODULATIONS.map((m) => ({ ...m })));
+    generationReviewRef.current = null;
+    setGenerationReviewTick((t) => t + 1);
+    aiEditsRef.current = null;
+    storyLogicRef.current = null;
+    debugWindowManager.setStoryLogic(null);
+    setAiEditsTick((t) => t + 1);
+    ideatorSessionsRef.current = [];
+    coDesignerSessionsRef.current = [];
+    if (!opts.keepSettings) {
+      const fresh = normalizeGlobalSettings(undefined);
+      globalSettingsRef.current = fresh;
+      setGlobalSettings(fresh);
+      setCurrentThemeId(undefined);
+      translationActionsRef.current?.clearTranslations();
+    }
+  }, [resetProjectUi]);
+  const forgetOpenProjectRef = useRef(forgetOpenProject);
+  forgetOpenProjectRef.current = forgetOpenProject;
+
   // Load project data when currentProject changes
   useEffect(() => {
     // Skip if no change or already loaded
@@ -2461,16 +2528,10 @@ function App() {
         console.log('[App] >>> SWITCHING to different project - loading its data');
 
         // CRITICAL: Clear UI selections before loading new project data
-        // This prevents stale beat/cluster references from leaking across projects
-        setSelectedBeat(null);
-        setSelectedCluster(null);
-
-        // Close overlay panels that show project-specific data
-        setShowCharacterManager(false);
-        setShowAssetManager(false);
-        setShowSettings(false);
-        setShowDebugPanel(false);
-        setFindChange(null);
+        // This prevents stale beat/cluster references from leaking across projects.
+        // The Debug window stays open and follows the new project (it used to
+        // be marked closed here while still open, and then showed the old one).
+        resetProjectUiRef.current();
         // Clear assets immediately — async loadAssets() below replaces them
         // for the new project, but the gap was long enough for the previous
         // project's blob URLs to flash in panels that opened during the switch.
@@ -2810,15 +2871,9 @@ function App() {
       } else if (!isNewUntitledProject) {
         // This is an existing saved project - load its data
         console.log('[App] >>> REPLACING state with loaded project data');
-        setSelectedBeat(null);
-        setSelectedCluster(null);
-        // Mirror the "switching" branch: close overlay panels and clear assets
+        // Mirror the "switching" branch: clear the old project's UI and assets
         // so a previously-open project's UI doesn't bleed into the new one.
-        setShowCharacterManager(false);
-        setShowAssetManager(false);
-        setShowSettings(false);
-        setShowDebugPanel(false);
-        setFindChange(null);
+        resetProjectUiRef.current();
         setAssets([]);
         const projectData = loadProjectData(currentProject);
         reportDroppedBeats(
@@ -3556,6 +3611,14 @@ function App() {
   // AI Story Logic in the Debug window: results are saved with the project;
   // a fix the author accepted there is applied here, as one undo step.
   useEffect(() => debugWindowManager.subscribeToStoryLogic(async (evt) => {
+    // Results and fixes from a check about another project (the window was
+    // still on it when the author switched) must not land in this one.
+    const openId = currentProjectRef2.current?.id;
+    if (evt.projectId && openId && evt.projectId !== openId) {
+      console.warn('[App] Ignored Story Logic', evt.kind, 'for project', evt.projectId, '(open:', openId, ')');
+      if (evt.kind === 'fix') debugWindowManager.sendFixResult(evt.suggestion.findingId, false, 'That fix was for another project.');
+      return;
+    }
     if (evt.kind === 'save') {
       storyLogicRef.current = evt.store;
       markChanged();
@@ -4585,26 +4648,41 @@ function App() {
           setImportAsmlManifest(manifest);
           setShowImportAsmlDialog(true);
         } else {
-          // No assets, import directly
-          // CRITICAL: Clear existing assets and characters first to start fresh
-          setAssets([]);
-          setCharacters([]);
+          // No assets, import directly. Save the open project, keep auto-save
+          // from writing the imported story into it, and start from nothing
+          // of its own (settings, translations, AI records included).
+          if (!(await flushPendingSave())) console.warn('[App] Could not save the current project before the ASML import');
+          pauseAutoSave();
+          forgetOpenProject();
+          pendingNewProjectIdRef.current = 'pending';
 
-          const importResult = await actions.importStory(text);
-          setSelectedBeat(null);
+          let importResult;
+          try {
+            importResult = await actions.importStory(text);
+          } catch (err) {
+            pendingNewProjectIdRef.current = null;
+            resumeAutoSave();
+            throw err;
+          }
 
           // CRITICAL: Create a new project for the imported story
           // Use the title from the import result (not state, which is async)
           const importedTitle = importResult.title || 'Imported Story';
-          pendingNewProjectIdRef.current = 'pending';
           const newProjectId = await createProject(importedTitle, `Imported from ASML`);
           pendingNewProjectIdRef.current = newProjectId;
           loadedProjectIdRef.current = newProjectId;
+          syncProjectData();
+          resumeAutoSave();
+          markChanged();
           console.log('[App] ASML import - Created new project:', newProjectId, 'with title:', importedTitle);
 
           notify.success(`Imported "${importedTitle}".`);
         }
       } catch (error) {
+        if (pendingNewProjectIdRef.current === 'pending') {
+          pendingNewProjectIdRef.current = null;
+          resumeAutoSave();
+        }
         // Log full error details for debugging
         console.error('Import failed:', error);
         if (error instanceof Error) {
@@ -4619,7 +4697,7 @@ function App() {
     };
 
     input.click();
-  }, [actions, createProject]);
+  }, [actions, createProject, flushPendingSave, pauseAutoSave, resumeAutoSave, forgetOpenProject, syncProjectData, markChanged]);
 
   /**
    * Handle import dialog completion (with or without assets)
@@ -4631,9 +4709,13 @@ function App() {
   }) => {
     setShowImportAsmlDialog(false);
 
-    // CRITICAL: Clear existing assets and characters first to start fresh
-    setAssets([]);
-    setCharacters([]);
+    // Save the open project, keep auto-save from writing the imported story
+    // into it, and start from nothing of its own: the imported settings are
+    // merged onto defaults below, not onto the open project's.
+    if (!(await flushPendingSave())) console.warn('[App] Could not save the current project before the ASML import');
+    pauseAutoSave();
+    forgetOpenProject();
+    pendingNewProjectIdRef.current = 'pending';
 
     try {
       // Create a temporary project ID for asset storage during import
@@ -4782,10 +4864,12 @@ function App() {
       // CRITICAL: Create a new project for the imported story
       // Use the title from the import result (not state, which is async)
       const importedTitle = importResult.title || 'Imported Story';
-      pendingNewProjectIdRef.current = 'pending';
       const newProjectId = await createProject(importedTitle, `Imported from ASML`);
       pendingNewProjectIdRef.current = newProjectId;
       loadedProjectIdRef.current = newProjectId;
+      syncProjectData();
+      resumeAutoSave();
+      markChanged();
       console.log('[App] ASML import with assets - Created new project:', newProjectId, 'with title:', importedTitle);
 
       // CRITICAL: Reassociate assets from tempProjectId to the actual project ID
@@ -4819,6 +4903,10 @@ function App() {
       );
     } catch (error) {
       console.error('Import failed:', error);
+      if (pendingNewProjectIdRef.current === 'pending') {
+        pendingNewProjectIdRef.current = null;
+        resumeAutoSave();
+      }
       const errorMsg = error instanceof Error ? error.message : String(error);
       notify.error('Could not import the story.', { detail: errorMsg });
     }
@@ -4826,7 +4914,7 @@ function App() {
     // Clear import state
     setImportAsmlContent('');
     setImportAsmlManifest(null);
-  }, [actions, importAsmlContent, createProject]);
+  }, [actions, importAsmlContent, createProject, flushPendingSave, pauseAutoSave, resumeAutoSave, forgetOpenProject, syncProjectData, markChanged]);
 
   /**
    * Handle import dialog cancellation
@@ -4944,6 +5032,16 @@ function App() {
   const handleImportTwineComplete = useCallback(async (result: ImportResult) => {
     setShowImportTwineDialog(false);
 
+    // The import becomes a new project of its own. It used to be saved as a
+    // copy of the open project (its characters, settings, translations and
+    // AI records came along, its assets moved over, and on the desktop the
+    // copy kept the open project's folder). Save the open project as it is,
+    // stop auto-save writing the Twine beats into it, then start clean.
+    if (!(await flushPendingSave())) console.warn('[App] Could not save the current project before the Twine import');
+    pauseAutoSave();
+    forgetOpenProject();
+    pendingNewProjectIdRef.current = 'pending';
+
     try {
       // Import beats from Twine result
       actions.importBeats(result.beats, {
@@ -4954,20 +5052,20 @@ function App() {
 
       setSelectedBeat(null);
 
-      // CRITICAL: Set pending flag BEFORE saveCurrent to prevent load effect
-      // from reloading the old project during the transition
-      pendingNewProjectIdRef.current = 'pending';
-      console.log('[App] Twine import - Set pendingNewProjectIdRef to "pending"');
-
-      // Save as named project (converts from "Untitled Project" to named project)
       const projectName = result.title || 'Imported Twine Story';
-      const newProjectId = await saveCurrent(projectName, `Imported from Twine: ${result.title}`);
+      const newProjectId = await createProject(projectName, `Imported from Twine: ${result.title}`);
 
       // CRITICAL: Update refs to complete the transition
       // This prevents the load effect from treating this as a project switch
       pendingNewProjectIdRef.current = newProjectId;
       loadedProjectIdRef.current = newProjectId;
-      console.log('[App] Twine import - Updated refs to new project ID:', newProjectId);
+      console.log('[App] Twine import - Created new project:', newProjectId);
+
+      // Now the beats go to the new project (createProject updated the ref).
+      syncProjectData();
+      resumeAutoSave();
+      markChanged();
+      void saveNow();
 
       // Show success message with stats
       const warningCount = result.warnings.length;
@@ -4982,10 +5080,11 @@ function App() {
       console.error('Twine import failed:', error);
       // Clear pending flag on error
       pendingNewProjectIdRef.current = null;
+      resumeAutoSave();
       const errorMsg = error instanceof Error ? error.message : String(error);
       notify.error('Could not import the Twine story.', { detail: errorMsg });
     }
-  }, [actions, saveCurrent]);
+  }, [actions, createProject, flushPendingSave, pauseAutoSave, resumeAutoSave, forgetOpenProject, syncProjectData, markChanged, saveNow]);
 
   /**
    * Handle Twine import cancellation
@@ -5065,6 +5164,10 @@ function App() {
   // import flow stays consistent across entry points.
   const handleImportZipFile = useCallback(async (file: File, importOptions?: { newName?: string }) => {
     const doImport = async (options: { overwrite?: boolean; generateNewId?: boolean; newName?: string } = {}) => {
+      // Replacing a project (maybe the open one): no auto-save of what's on
+      // screen may land between the import and the reload.
+      if (options.overwrite) pauseAutoSave();
+      try {
       const result = await importProjectFromZip(file, options);
 
       if (result.conflict) {
@@ -5089,10 +5192,16 @@ function App() {
       }
 
       if (result.success && result.projectId) {
+        // The open project replaced by the file: load it again (the load
+        // effect skips a project it already shows).
+        if (result.projectId === currentProjectRef2.current?.id) loadedProjectIdRef.current = null;
         await loadProject(result.projectId);
         notify.success('Project opened.');
       } else if (result.error) {
         throw new Error(result.error);
+      }
+      } finally {
+        if (options.overwrite) resumeAutoSave();
       }
     };
 
@@ -5102,7 +5211,7 @@ function App() {
       console.error('ZIP import failed:', error);
       notify.error('Could not open the project file.', { detail: errorMessage(error) });
     }
-  }, [loadProject]);
+  }, [loadProject, pauseAutoSave, resumeAutoSave]);
   handleImportZipFileRef.current = handleImportZipFile;
 
   const handleImportZip = useCallback(async () => {
@@ -5287,11 +5396,11 @@ function App() {
       const storyData = getSerializedStoryData();
       debugWindowManager.sendStoryUpdate(
         storyData as unknown as import('./services/PreviewWindowManager').SerializedStoryData,
-        { settings: globalSettings, characters, emotionPalette, traitModulations, assetIds: debugAssetIds },
+        { settings: globalSettings, characters, emotionPalette, traitModulations, assetIds: debugAssetIds, projectId: currentProject?.id },
       );
     }, 300);
     return () => clearTimeout(timeout);
-  }, [showDebugPanel, state.beats, state.connections, getSerializedStoryData, globalSettings, characters, emotionPalette, traitModulations, debugAssetIds]);
+  }, [showDebugPanel, state.beats, state.connections, getSerializedStoryData, globalSettings, characters, emotionPalette, traitModulations, debugAssetIds, currentProject?.id]);
 
   // Asset and character handlers
   const handleAssetSelect = useCallback((type: 'background' | 'character' | 'prop' | 'sound', callback: (asset: Asset) => void) => {
@@ -6104,6 +6213,8 @@ function App() {
       // the load effect saves current beats into a new untitled project, so
       // leaving them in place would resurrect the story we just discarded.
       actions.clearStory();
+      // Its characters, assets, settings, AI records… go with it.
+      forgetOpenProject();
       // Forget the discarded project so the load effect treats the fresh
       // scratch as a cold boot (seed the starter story), not as a project
       // switch (which would load the empty row as a blank grid).
@@ -6112,7 +6223,7 @@ function App() {
     } catch (error) {
       console.error('[App] Failed to discard untitled project:', error);
     }
-  }, [discardUntitled, actions, createProject]);
+  }, [discardUntitled, actions, createProject, forgetOpenProject]);
 
   const handleCancelSaveDialog = useCallback(() => {
     // Just close the dialog, don't execute any action
@@ -6202,8 +6313,7 @@ function App() {
 
     // Shared applier for both AI import paths (see applyGeneratedStory).
     // AIService.generateStory already ran the normalize pipeline.
-    ideatorSessionsRef.current = [];
-    coDesignerSessionsRef.current = [];
+    forgetOpenProjectRef.current({ keepSettings: true });
     const applied = await applyGeneratedStory(story, makeApplyStoryDeps(), { fallbackTitle: storyTitle });
     setGenerationReview(createGenerationReview({
       source: 'generator', title: applied.title, original: applied.original,
@@ -6303,7 +6413,9 @@ function App() {
    * no handshake needed. Reopening (or the window's Refresh button after
    * this handler runs again) picks up the latest story state.
    */
+  const coDesignerProjectRef = useRef<string | undefined>(undefined);
   const writeCoDesignerContext = useCallback((): boolean => {
+    coDesignerProjectRef.current = currentProject?.id;
     try {
       // Systemic KG → structural summary: state dependencies, choice
       // inventory, narrative vectors, and flow warnings. Derived from the
@@ -6355,6 +6467,17 @@ function App() {
     // snapshot at it explicitly.
     if (wasOpen) coDesignerWindowManager.notifyContextUpdated();
   }, [writeCoDesignerContext, state.title]);
+
+  // An open Co-Designer follows a project switch: once the new project's
+  // beats are on screen (state caught up with what the load effect put in
+  // beatsRef), write its snapshot and tell the window, which starts a new
+  // conversation for it.
+  useEffect(() => {
+    if (!currentProject?.id || coDesignerProjectRef.current === currentProject.id) return;
+    if (!coDesignerWindowManager.isWindowOpen()) return;
+    if (state.beats !== beatsRef.current || loadedProjectIdRef.current !== currentProject.id) return;
+    if (writeCoDesignerContext()) coDesignerWindowManager.notifyContextUpdated();
+  }, [writeCoDesignerContext, currentProject?.id, state.beats]);
 
   // Pop-out's Refresh button: rebuild the digest from live state and tell
   // the pop-out to re-read it.
@@ -6717,9 +6840,9 @@ function App() {
    */
   const handleOpenDebugPanel = useCallback(() => {
     const storyData = getSerializedStoryData() as unknown as import('./services/PreviewWindowManager').SerializedStoryData;
-    debugWindowManager.open(storyData, { settings: globalSettings, characters, emotionPalette, traitModulations, assetIds: debugAssetIds });
+    debugWindowManager.open(storyData, { settings: globalSettings, characters, emotionPalette, traitModulations, assetIds: debugAssetIds, projectId: currentProject?.id });
     setShowDebugPanel(true); // kept for backwards-compatible state tracking
-  }, [getSerializedStoryData, globalSettings, characters, emotionPalette, traitModulations, debugAssetIds]);
+  }, [getSerializedStoryData, globalSettings, characters, emotionPalette, traitModulations, debugAssetIds, currentProject?.id]);
   openDebugPanelRef.current = handleOpenDebugPanel;
 
   /**
@@ -6831,11 +6954,12 @@ function App() {
   const handleCurrentProjectDeleted = useCallback(() => {
     console.log('[App] Current project deleted - resetting to empty state');
     actions.clearStory();
+    // Nothing of the deleted project stays on screen or gets saved into the
+    // next scratch project: characters, assets, settings, AI records…
+    forgetOpenProject();
     initializeStory();
     setIsUntitledProject(true);
-    setSelectedBeat(null);
-    setSelectedCluster(null);
-  }, [actions, initializeStory, setIsUntitledProject]);
+  }, [actions, initializeStory, setIsUntitledProject, forgetOpenProject]);
 
   // Derive active TTS provider key: localStorage (canonical) → globalSettings → fallback
   const getActiveProviderKey = useCallback(() => {

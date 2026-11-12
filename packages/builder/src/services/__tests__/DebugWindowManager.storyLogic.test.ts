@@ -22,6 +22,22 @@ describe('Story Logic messages', () => {
     m.destroy();
   });
 
+  it('drops results saved for a project that is no longer open', () => {
+    const m = new DebugWindowManager();
+    const cb = vi.fn();
+    m.subscribeToStoryLogic(cb);
+    m.sendStoryUpdate({ beats: [] } as any, { projectId: 'b' });
+    const store = { version: 1 as const, dismissed: [], checked: {} };
+    deliver(m, { type: 'SAVE_STORY_LOGIC', payload: { storyLogic: store, projectId: 'a' } });
+    expect(cb).not.toHaveBeenCalled();
+    deliver(m, { type: 'SAVE_STORY_LOGIC', payload: { storyLogic: store, projectId: 'b' } });
+    expect(cb).toHaveBeenLastCalledWith({ kind: 'save', store, projectId: 'b' });
+    // Fixes carry the id on, so the builder can refuse one for another project.
+    deliver(m, { type: 'STORY_LOGIC_FIX', payload: { suggestion, decision: 'accepted', projectId: 'a' } });
+    expect(cb).toHaveBeenLastCalledWith({ kind: 'fix', suggestion, decision: 'accepted', projectId: 'a' });
+    m.destroy();
+  });
+
   it('sends the stored results with each story update', () => {
     const m = new DebugWindowManager();
     const postMessage = vi.fn();

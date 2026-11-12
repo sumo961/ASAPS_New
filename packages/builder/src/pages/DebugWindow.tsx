@@ -154,12 +154,12 @@ export const DebugWindow: React.FC = () => {
 
   const handleStoryLogicChange = (store: StoryLogicStore) => {
     setStoryLogic(store);
-    postToOpener({ type: 'SAVE_STORY_LOGIC', payload: { storyLogic: store } });
+    postToOpener({ type: 'SAVE_STORY_LOGIC', payload: { storyLogic: store, projectId: context?.projectId } });
   };
 
   const handleFixDecision = (suggestion: AIFixSuggestion, decision: 'accepted' | 'rejected') => {
     setFixResult(null);
-    postToOpener({ type: 'STORY_LOGIC_FIX', payload: { suggestion, decision } });
+    postToOpener({ type: 'STORY_LOGIC_FIX', payload: { suggestion, decision, projectId: context?.projectId } });
   };
 
   if (!story) {
@@ -248,6 +248,9 @@ export const DebugWindow: React.FC = () => {
         )}
         {activeTab === 'logic' && (
           <LogicValidationReport
+            // A new project starts its own Story Logic: a check still running
+            // for the old one reports with the old project's id and is dropped.
+            key={context?.projectId ?? 'project'}
             story={story}
             onHighlightBeat={handleHighlightBeat}
             onHighlightPath={handleHighlightPath}

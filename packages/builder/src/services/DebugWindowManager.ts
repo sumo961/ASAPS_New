@@ -35,6 +35,8 @@ export interface DebugMessage {
     context?: DebugStoryContext;
     beatIds?: string[];
     beatId?: string;
+    /** The project the window's results belong to (see DebugStoryContext.projectId). */
+    projectId?: string;
   };
 }
 
@@ -51,6 +53,12 @@ export interface DebugStoryContext {
   traitModulations?: any;
   /** The project's sounds and pictures, so beats using a missing one are named. */
   assetIds?: string[];
+  /**
+   * The project this story belongs to. The window sends it back with Story
+   * Logic results and fixes, so results that arrive after a project switch
+   * are dropped instead of landing in the next project.
+   */
+  projectId?: string;
 }
 
 export interface DebugWindowState {
@@ -58,8 +66,8 @@ export interface DebugWindowState {
 }
 
 type StoryLogicEvent =
-  | { kind: 'save'; store: StoryLogicStore }
-  | { kind: 'fix'; suggestion: AIFixSuggestion; decision: 'accepted' | 'rejected' };
+  | { kind: 'save'; store: StoryLogicStore; projectId?: string }
+  | { kind: 'fix'; suggestion: AIFixSuggestion; decision: 'accepted' | 'rejected'; projectId?: string };
 
 type StateChangeCallback = (state: DebugWindowState) => void;
 type HighlightCallback =
@@ -275,15 +283,17 @@ class DebugWindowManager {
         break;
       case 'SAVE_STORY_LOGIC': {
         const store = message.payload?.storyLogic;
-        if (store) {
+        const projectId = message.payload?.projectId;
+        // Results about a project that's no longer open are dropped.
+        if (store && (!projectId || !this.latestContext?.projectId || projectId === this.latestContext.projectId)) {
           this.latestStoryLogic = store;
-          this.storyLogicListeners.forEach(cb => cb({ kind: 'save', store }));
+          this.storyLogicListeners.forEach(cb => cb({ kind: 'save', store, projectId }));
         }
         break;
       }
       case 'STORY_LOGIC_FIX': {
-        const { suggestion, decision } = message.payload ?? {};
-        if (suggestion && decision) this.storyLogicListeners.forEach(cb => cb({ kind: 'fix', suggestion, decision }));
+        const { suggestion, decision, projectId } = message.payload ?? {};
+        if (suggestion && decision) this.storyLogicListeners.forEach(cb => cb({ kind: 'fix', suggestion, decision, projectId }));
         break;
       }
     }

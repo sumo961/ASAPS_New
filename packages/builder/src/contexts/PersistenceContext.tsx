@@ -410,6 +410,23 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     notify.warning(warning, { sticky: true });
   }, []);
 
+  /**
+   * Let go of the project being left: stop watching its folder (a pull there
+   * later raised "files changed outside ASAPS" over the next project, and
+   * could pause ITS auto-save), and lift the auto-save pauses that were about
+   * that project (saved by a newer ASAPS; files changed outside). Opening a
+   * folder project starts its own watch and checks its own version after.
+   */
+  const leaveProjectFolder = useCallback(() => {
+    unwatchRef.current?.();
+    unwatchRef.current = null;
+    if (pausedForNewerRef.current || pausedForExternalRef.current) {
+      pausedForNewerRef.current = false;
+      pausedForExternalRef.current = false;
+      autoSaveCtlRef.current?.resume();
+    }
+  }, []);
+
   const startExternalWatch = useCallback((adapter: DirectoryAdapter, projectId: string) => {
     // A passive instance (Preview Window) never watches: with two windows
     // armed, the main window's own autosave read as an "external" change
@@ -701,6 +718,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       // Then reset save state so the old project's pending/error status
       // doesn't carry over to the new one (the reason this cancel exists).
       cancelPending();
+      leaveProjectFolder();
 
       // If currently on an untitled project, clean up before loading the new
       // one — but only DELETE it when it's the pristine starter seed. An
@@ -830,7 +848,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       console.error('[PersistenceProvider] Failed to load project:', error);
       return false;
     }
-  }, [storage, commandManager, cancelPending, flushPending, syncCallback, repairRunawayBeatIds, reportDuplicateBeatIds, guardNewerVersion]);
+  }, [storage, commandManager, cancelPending, flushPending, syncCallback, repairRunawayBeatIds, reportDuplicateBeatIds, guardNewerVersion, leaveProjectFolder]);
 
   /**
    * Create a new project
@@ -905,6 +923,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
       // Reset directory format state — new projects start as IndexedDB and
       // are adopted into a folder by the save pipeline.
+      leaveProjectFolder();
       setProjectFormat('indexeddb');
       setProjectPath(null);
       directoryAdapterRef.current = null;
@@ -935,7 +954,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       console.error('[PersistenceProvider] Failed to create project:', error);
       throw error;
     }
-  }, [storage, commandManager]);
+  }, [storage, commandManager, leaveProjectFolder]);
 
   /**
    * Delete a project
@@ -950,6 +969,10 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
       // If deleting current project, clear state
       if (projectId === currentProject?.id) {
+        leaveProjectFolder();
+        directoryAdapterRef.current = null;
+        setProjectFormat('indexeddb');
+        setProjectPath(null);
         currentProjectRef.current = null;
         setCurrentProject(null);
         setProjectId(null);
@@ -961,7 +984,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       console.error('[PersistenceProvider] Failed to delete project:', error);
       return false;
     }
-  }, [storage, commandManager, currentProject]);
+  }, [storage, commandManager, currentProject, leaveProjectFolder]);
 
   /**
    * Update project metadata
