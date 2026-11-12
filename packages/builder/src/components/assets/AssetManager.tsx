@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { notify, errorMessage } from '../../utils/notify';
 import { ACCEPT, ACCEPT_ANY, assetTypeForFile, withMimeFromName } from '../../utils/assetAccept';
+import type { AssetUse } from '../../utils/assetReferences';
 
 /**
  * Phase 3.3 — iOS-style multi-resource asset variant. Points to
@@ -63,15 +64,62 @@ interface AssetManagerProps {
   onAssetRemove: (assetId: string) => void;
   onAssetUpdate: (assetId: string, updates: Partial<Asset>) => void;
   projectPath?: string;
+  /** Which beats use which asset id (see utils/assetReferences). */
+  assetUses?: Map<string, AssetUse>;
+  /** Make every beat that uses `fromId` use `toId` instead (one undo step). */
+  onReplaceEverywhere?: (fromId: string, toId: string) => void;
 }
+
+/** Pick another asset of the same kind and swap it in on every beat. */
+const ReplaceEverywhere: React.FC<{
+  fromId: string;
+  kind: 'sound' | 'picture';
+  assets: Asset[];
+  beatCount: number;
+  onReplace: (fromId: string, toId: string) => void;
+}> = ({ fromId, kind, assets, beatCount, onReplace }) => {
+  const [toId, setToId] = useState('');
+  const options = assets.filter((a) => a.id !== fromId && (kind === 'sound' ? a.type === 'audio' : a.type === 'image' || a.type === 'video'));
+  if (!options.length) {
+    return <span className="text-xs text-gray-500">Add {kind === 'sound' ? 'a sound' : 'a picture'} to the project first, then pick it here.</span>;
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <select
+        value={toId}
+        onChange={(e) => setToId(e.target.value)}
+        className="px-2 py-0.5 border border-gray-300 rounded text-xs max-w-[14rem]"
+        aria-label={`Replacement ${kind}`}
+      >
+        <option value="">Choose {kind === 'sound' ? 'a sound' : 'a picture'}…</option>
+        {options.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+      </select>
+      <button
+        type="button"
+        disabled={!toId}
+        onClick={() => { onReplace(fromId, toId); setToId(''); }}
+        className="px-2 py-0.5 rounded text-xs bg-blue-500 text-white disabled:opacity-40 hover:bg-blue-600"
+        title={`Use the chosen ${kind} on ${beatCount === 1 ? 'the beat' : `all ${beatCount} beats`} instead. One Undo puts it back.`}
+      >
+        Use on {beatCount === 1 ? '1 beat' : `all ${beatCount} beats`}
+      </button>
+    </span>
+  );
+};
 
 export const AssetManager: React.FC<AssetManagerProps> = ({
   assets,
   onAssetAdd,
   onAssetRemove,
   onAssetUpdate,
-  projectPath = ''
+  projectPath = '',
+  assetUses,
+  onReplaceEverywhere,
 }) => {
+  const known = new Set(assets.map((a) => a.id));
+  const missing = assetUses && onReplaceEverywhere
+    ? [...assetUses].filter(([id]) => !known.has(id))
+    : [];
   const [selectedType, setSelectedType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -485,6 +533,28 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
 
       {/* Asset Grid/List */}
       <div className="flex-1 overflow-y-auto p-4">
+        {missing.length > 0 && (
+          <div className="mb-4 p-3 rounded-lg border border-amber-300 bg-amber-50 text-sm" role="region" aria-label="Missing sounds and pictures">
+            <p className="font-medium text-amber-900">
+              {missing.length === 1 ? 'A sound or picture the story uses is' : `${missing.length} sounds or pictures the story uses are`} no longer in the project
+            </p>
+            <p className="text-xs text-amber-800 mb-2">
+              Players hear or see nothing where they're used. Choose what to use instead; every beat that used the lost one gets it.
+            </p>
+            <ul className="space-y-1.5">
+              {missing.map(([id, use]) => (
+                <li key={id} className="flex flex-wrap items-center gap-2 text-xs">
+                  {use.sound ? <Music className="w-3.5 h-3.5 text-blue-600" /> : <Image className="w-3.5 h-3.5 text-green-600" />}
+                  <span className="text-gray-800">
+                    {use.sound ? 'Sound' : 'Picture'} on {use.beats.length === 1 ? '1 beat' : `${use.beats.length} beats`}
+                  </span>
+                  <code className="text-[10px] text-gray-500">{id}</code>
+                  <ReplaceEverywhere fromId={id} kind={use.sound ? 'sound' : 'picture'} assets={assets} beatCount={use.beats.length} onReplace={onReplaceEverywhere!} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {filteredAssets.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <Folder className="w-12 h-12 mx-auto mb-3 text-gray-300" />
@@ -662,7 +732,24 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
               <p>Duration: {Math.round(selectedAsset.duration)} seconds</p>
             )}
             <p>Uploaded: {selectedAsset.uploadedAt.toLocaleString()}</p>
+            {assetUses && (() => {
+              const n = assetUses.get(selectedAsset.id)?.beats.length ?? 0;
+              return <p>Used on: {n === 0 ? 'no beats' : n === 1 ? '1 beat' : `${n} beats`}</p>;
+            })()}
           </div>
+          {onReplaceEverywhere && (assetUses?.get(selectedAsset.id)?.beats.length ?? 0) > 0
+            && (selectedAsset.type === 'audio' || selectedAsset.type === 'image' || selectedAsset.type === 'video') && (
+            <div className="mt-2 text-xs flex flex-wrap items-center gap-2">
+              <span className="text-gray-700">Replace everywhere with</span>
+              <ReplaceEverywhere
+                fromId={selectedAsset.id}
+                kind={selectedAsset.type === 'audio' ? 'sound' : 'picture'}
+                assets={assets}
+                beatCount={assetUses!.get(selectedAsset.id)!.beats.length}
+                onReplace={onReplaceEverywhere}
+              />
+            </div>
+          )}
           <div className="flex gap-2 mt-3">
             <a
               href={selectedAsset.url}

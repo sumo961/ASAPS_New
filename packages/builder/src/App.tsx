@@ -106,6 +106,7 @@ import { listSessions as listIdeatorSessions, saveSession as saveIdeatorSession 
 import { listSessions as listCoDesignerSessions, saveSession as saveCoDesignerSession } from './components/ai/codesigner/coDesignerSessionStore';
 import { ApplyFixProposalCommand } from './commands/BeatCommands';
 import { BatchCommand } from './commands/BatchCommand';
+import { collectAssetUses, planAssetReplace } from './utils/assetReferences';
 import type { Command } from './commands/Command';
 import { UpdateCharactersCommand, UpdateGlobalSettingsCommand } from './commands/ProjectStateCommands';
 import { AIDebugModal } from './components/ai/AIDebugModal';
@@ -5419,6 +5420,20 @@ function App() {
     markChanged();
   }, [markChanged, deleteAssetFromDirectory]);
 
+  // Asset Manager ▸ "Use on all N beats": swap one sound or picture for
+  // another on every beat, as one undo step (a lost sound used on hundreds
+  // of beats can't be re-picked beat by beat).
+  const handleReplaceAssetEverywhere = useCallback(async (fromId: string, toId: string) => {
+    const beatsNow = (beatsRef.current || state.beats) as any[];
+    const edits = planAssetReplace(beatsNow, fromId, toId);
+    if (!edits.length) return;
+    const cmds = edits.map((e) => new UpdateBeatCommand(e.beatId, e.oldValues as any, e.updates as any, stableMutations.current));
+    const name = assets.find((a) => a.id === toId)?.name ?? toId;
+    await getCommandManager().execute(cmds.length === 1 ? cmds[0] : new BatchCommand(cmds, `Use ${name} on ${cmds.length} beats`));
+    markChanged();
+    notify.success(`${name} is now used on ${edits.length === 1 ? '1 beat' : `${edits.length} beats`}. Undo puts the old one back.`);
+  }, [state.beats, assets, markChanged]);
+
   const handleAssetUpdate = useCallback((assetId: string, updates: Partial<Asset>) => {
     setAssets(prev => prev.map(a => a.id === assetId ? { ...a, ...updates } : a));
     markChanged();
@@ -7402,6 +7417,8 @@ function App() {
                 onAssetAdd={handleAssetAdd}
                 onAssetRemove={handleAssetRemove}
                 onAssetUpdate={handleAssetUpdate}
+                assetUses={collectAssetUses(state.beats)}
+                onReplaceEverywhere={handleReplaceAssetEverywhere}
               />
             </div>
           </div>

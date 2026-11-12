@@ -465,7 +465,7 @@ function detectMissingAssets(story: Story, assetIds: ReadonlySet<string>): Story
     const others = beats.length - 1;
     out.push({
       code: 'missing-asset', severity: 'warn', beatId: first.id, beatName: first.name,
-      message: `${others > 0 ? `This beat and ${others} other${others === 1 ? '' : 's'} use` : 'Uses'} ${what} that is no longer in the project (${id}), so players ${sound ? 'hear nothing' : 'see nothing'} there. It was deleted, or lost when it was added. Pick ${sound ? 'the sound' : 'the picture'} again on ${others > 0 ? 'these beats' : 'this beat'}.`,
+      message: `${others > 0 ? `This beat and ${others} other${others === 1 ? '' : 's'} use` : 'Uses'} ${what} that is no longer in the project (${id}), so players ${sound ? 'hear nothing' : 'see nothing'} there. It was deleted, or lost when it was added. ${others > 0 ? `In the Asset Manager, choose what to use instead: every one of these beats gets it at once.` : `Pick ${sound ? 'the sound' : 'the picture'} again, or choose a replacement in the Asset Manager.`}`,
       detail: { assetId: id, beats: beats.map((b) => b.id) },
     });
   }

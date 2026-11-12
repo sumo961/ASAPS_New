@@ -2482,6 +2482,13 @@ If a file can't be saved with your project, an error notice tells you so. The fi
 - Delete unused assets to keep projects lean
 - Keep source files backed up outside ASAPS
 
+<a id="replace-asset"></a>
+### Swapping a Sound or Picture Everywhere
+
+Select an asset and its details show how many beats use it. To use a different sound or picture on all of them, choose it under **Replace everywhere with** and click **Use on all N beats**. One **Undo** puts the old one back on every beat.
+
+If the story uses a sound or picture the project no longer has (it was deleted, or lost when it was added), a yellow box at the top of the Asset Manager lists it with the number of beats that use it. Add the file again (or pick another one) and choose it there: every one of those beats gets it at once. The Debug window's **Problems** list names the same files as **Sound or picture missing**.
+
 <a id="asset-variants"></a>
 ### Image Asset Variants — Orientation and Device Class (v0.9.59)
 
@@ -3527,7 +3534,7 @@ These are the entries Problems can show beyond unreachable beats, dead ends, loo
 | **Restart keeps values** (note) | An end screen players reach restarts the story without resetting anything (its **Reset** is off), while the story checks values it changes, so those checks can come out differently on a replay. Told once, on the first such end screen, naming the others. | If that's your New Game+, leave it. Otherwise turn on **Reset** for those end screens ([reset options](#keep-across-restarts)). |
 | **Stand-in text left in** (warning) | Words a new beat starts with are still there for players to see: the speaker *Character* on Dialog Tree lines linked to no one, a reply that still says *Player response...*, *New Choice 2*, *New Prop 1*. | Write your own words. For a speaker, pick the character who says the line, so their picture and HUD come with it. |
 | **Meter never changes** (warning) | A counter shown on a character's HUD (eye on) that nothing in the story changes, so players watch it stay at its start value. Often the Player template's Health and Energy, or a story that changes [story-wide counters](#hud-contents) while the HUD shows the character's own. | Change it with an effect that picks this character's counter, or turn its eye off. |
-| **Sound or picture missing** (warning) | Beats use a sound or picture that is no longer among the project's assets: it was deleted, or lost when it was added. Players hear silence or see nothing there. Told once per missing file, with how many beats use it. | Pick the sound or picture again on those beats. |
+| **Sound or picture missing** (warning) | Beats use a sound or picture that is no longer among the project's assets: it was deleted, or lost when it was added. Players hear silence or see nothing there. Told once per missing file, with how many beats use it. | In the [Asset Manager](#replace-asset), choose what to use instead: every beat that used the lost file gets it at once. |
 | **Role** (warning) | A [role](#roles) problem: a role that doesn't exist, a character who isn't on a role's list, a role cast in two beats without *Can be recast later*, a role used before anything chooses who plays it, or an AI partner role with nothing to go on. | Add the role, tick the character, set a default, or tick *Can be recast later*. The message says which. |
 
 These are advice only: nothing changes at runtime. The checks explore the same routes players can take, including a replay when your story tests the built-in [playthrough](#keep-across-restarts). In Path Analysis's **Tree** view, a small warning triangle marks the branch that contains a beat with a warning; hover over it for the same explanation.
