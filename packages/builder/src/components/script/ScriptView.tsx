@@ -12,6 +12,11 @@
  * Save as Markdown writes what is shown to a .md file; Update from Markdown
  * reads one back (written in Obsidian, Google Docs …), shows the changes,
  * and applies them as one undo step (utils/scriptMarkdown.ts).
+ *
+ * With a language chosen in the header, each field shows and edits that
+ * language's text (as the Properties panel does), the source under it.
+ * Save as Markdown saves the translated text; reading a file back works on
+ * the source only.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Beat, Cluster } from '@asaps/core';
@@ -21,6 +26,23 @@ import { setAtPath } from '../../utils/linkOutputs';
 import { downloadMarkdown } from '../ai/ideator/exportTranscript';
 import { notify } from '../../utils/notify';
 import { usePersistedState } from '../../utils/persistedState';
+import { useTranslationState, useTranslationActions } from '../../contexts/TranslationContext';
+
+/** A field as the chosen language has it (see Props, translation mode). */
+interface Translated {
+  /** Translation key (`beat:<id>.parameters.<path>`); absent = not translatable. */
+  key?: string;
+  /** The translated text ('' when not translated yet). */
+  value: string;
+  /** The source text, shown under the field. */
+  source: string;
+  stale: boolean;
+}
+
+/** Script paths use `a[1].b`; translation keys use `a.1.b`. */
+export function translationKeyFor(beatId: string, path: string): string {
+  return `beat:${beatId}.parameters.${path.replace(/\[(\d+)\]/g, '.$1')}`;
+}
 
 interface Props {
   beats: Beat[];
@@ -42,6 +64,22 @@ export const ScriptView: React.FC<Props> = ({ beats, clusters, selectedBeat, fir
   const [showEmpty, setShowEmpty] = usePersistedState('asaps_ui_script_show_empty', false);
   const scopeValid = scope === ALL || clusters.some((c) => c.id === scope);
   const activeScope = scopeValid ? scope : ALL;
+
+  const translationState = useTranslationState();
+  const translationActions = useTranslationActions();
+  const resource = translationState.activeLanguage
+    ? translationState.translations.find((t) => t.languageCode === translationState.activeLanguage) ?? null
+    : null;
+  const translatedField = (beatId: string, f: ScriptField): Translated | undefined => {
+    if (!resource) return undefined;
+    // Choices are translated into their displayText (the runtime shows that
+    // over the text, which links and conditions match on).
+    const plain = translationKeyFor(beatId, f.path);
+    const key = resource.strings[plain] ? plain : plain.replace(/\.text$/, '.displayText');
+    const entry = resource.strings[key];
+    if (!entry) return { value: '', source: f.value, stale: false };
+    return { key, value: entry.status === 'untranslated' ? '' : entry.value, source: f.value, stale: entry.status === 'stale' };
+  };
 
   const ordered = useMemo(() => storyOrder(beats, firstBeatId), [beats, firstBeatId]);
   const rows = useMemo(() => ordered
@@ -65,7 +103,12 @@ export const ScriptView: React.FC<Props> = ({ beats, clusters, selectedBeat, fir
   const saveMarkdown = () => {
     const title = [storyTitle, scopeName].filter(Boolean).join(' — ') || 'Script';
     const file = `${title.replace(/[\\/:*?"<>|]+/g, '').trim() || 'Script'}.md`;
-    downloadMarkdown(file, exportScriptMarkdown(rows, title, projectId));
+    const shownRows = resource
+      ? rows.map((r) => ({ ...r, fields: r.fields.map((f) => ({ ...f, value: translatedField(r.beat.id, f)?.value || f.value })) }))
+      : rows;
+    const langTitle = resource ? `${title} (${resource.languageName || resource.languageCode})` : title;
+    const langFile = resource ? file.replace(/\.md$/, ` (${resource.languageCode}).md`) : file;
+    downloadMarkdown(langFile, exportScriptMarkdown(shownRows, langTitle, projectId));
   };
   const readMarkdown = async (file: File) => {
     const result = importScriptMarkdown(await file.text(), beats, projectId);
@@ -99,7 +142,10 @@ export const ScriptView: React.FC<Props> = ({ beats, clusters, selectedBeat, fir
     notify.success(`Updated ${n} text${n === 1 ? '' : 's'} from Markdown.`);
   };
 
-  const words = useMemo(() => rows.reduce((n, r) => n + r.fields.reduce((m, f) => m + (f.value.trim() ? f.value.trim().split(/\s+/).length : 0), 0), 0), [rows]);
+  const words = useMemo(() => rows.reduce((n, r) => n + r.fields.reduce((m, f) => {
+    const v = (resource ? translatedField(r.beat.id, f)?.value || '' : f.value).trim();
+    return m + (v ? v.split(/\s+/).length : 0);
+  }, 0), 0), [rows, resource]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
@@ -135,8 +181,11 @@ export const ScriptView: React.FC<Props> = ({ beats, clusters, selectedBeat, fir
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="px-2.5 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
-            title="Read back a Markdown file saved here and edited elsewhere — you see the changes before they are made"
+            disabled={!!resource}
+            className="px-2.5 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40"
+            title={resource
+              ? 'Reading a Markdown file back changes the source text. Switch the language in the header to Source first.'
+              : 'Read back a Markdown file saved here and edited elsewhere — you see the changes before they are made'}
           >
             Update from Markdown…
           </button>
@@ -189,14 +238,25 @@ export const ScriptView: React.FC<Props> = ({ beats, clusters, selectedBeat, fir
                 </header>
                 {fields.length === 0 && <p className="text-xs text-gray-400 italic">No text in this beat.</p>}
                 <div className="space-y-1.5">
-                  {fields.map((f) => (
-                    <ScriptLine
-                      key={f.path}
-                      field={f}
-                      onCommit={(value) => onBeatUpdate?.(beat.id, scriptEdit(beat, f.path, value) as Partial<Beat>)}
-                      readOnly={!onBeatUpdate}
-                    />
-                  ))}
+                  {fields.map((f) => {
+                    const tr = translatedField(beat.id, f);
+                    return (
+                      <ScriptLine
+                        key={f.path}
+                        field={f}
+                        translated={tr}
+                        onCommit={(value) => {
+                          // Translation mode: the chosen language's text, never the source.
+                          if (tr) {
+                            if (tr.key && translationState.activeLanguage) translationActions.updateTranslation(translationState.activeLanguage, tr.key, value);
+                            return;
+                          }
+                          onBeatUpdate?.(beat.id, scriptEdit(beat, f.path, value) as Partial<Beat>);
+                        }}
+                        readOnly={tr ? !tr.key : !onBeatUpdate}
+                      />
+                    );
+                  })}
                 </div>
               </section>
             );
@@ -264,12 +324,13 @@ const INDENT_PX = 14;
 const MAX_INDENT_LEVELS = 6;
 
 /** One field: its label and a text area that grows with the text. */
-const ScriptLine: React.FC<{ field: ScriptField; onCommit: (value: string) => void; readOnly: boolean }> = ({ field, onCommit, readOnly }) => {
+const ScriptLine: React.FC<{ field: ScriptField; translated?: Translated; onCommit: (value: string) => void; readOnly: boolean }> = ({ field, translated, onCommit, readOnly }) => {
   const [draft, setDraft] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   // Escape blurs the field too; the blur must not save what Escape threw away.
   const cancelledRef = useRef(false);
-  const shown = draft ?? field.value;
+  const current = translated ? translated.value : field.value;
+  const shown = draft ?? current;
 
   useEffect(() => {
     const el = ref.current;
@@ -279,7 +340,7 @@ const ScriptLine: React.FC<{ field: ScriptField; onCommit: (value: string) => vo
   }, [shown]);
 
   const commit = () => {
-    if (!cancelledRef.current && draft !== null && draft !== field.value) onCommit(draft);
+    if (!cancelledRef.current && draft !== null && draft !== current) onCommit(draft);
     cancelledRef.current = false;
     setDraft(null);
   };
@@ -293,20 +354,29 @@ const ScriptLine: React.FC<{ field: ScriptField; onCommit: (value: string) => vo
         {field.depth > MAX_INDENT_LEVELS && <span className="mr-1 text-[10px] text-gray-400">{field.depth} ›</span>}
         {field.kind === 'reply' ? '→ ' : ''}{field.label}
       </span>
-      <textarea
-        ref={ref}
-        rows={1}
-        value={shown}
-        readOnly={readOnly}
-        aria-label={field.label}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') { cancelledRef.current = true; setDraft(null); e.currentTarget.blur(); }
-        }}
-        placeholder="(empty)"
-        className="flex-1 min-w-0 resize-none overflow-hidden px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 text-[15px] leading-relaxed text-gray-900 font-serif"
-      />
+      <div className="flex-1 min-w-0">
+        <textarea
+          ref={ref}
+          rows={1}
+          value={translated && !translated.key ? translated.source : shown}
+          readOnly={readOnly}
+          aria-label={field.label}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') { cancelledRef.current = true; setDraft(null); e.currentTarget.blur(); }
+          }}
+          placeholder={translated ? '(not translated yet)' : '(empty)'}
+          className={`w-full resize-none overflow-hidden px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 text-[15px] leading-relaxed font-serif ${translated && !translated.key ? 'text-gray-500' : 'text-gray-900'}`}
+        />
+        {translated && (
+          <p className="px-2 text-xs text-gray-400 italic whitespace-pre-wrap">
+            {translated.key
+              ? <>Source: {translated.source || '(empty)'}{translated.stale && <span className="not-italic text-amber-600"> · the source changed since this was translated</span>}</>
+              : 'Not in this translation (this text stays as written in every language).'}
+          </p>
+        )}
+      </div>
     </div>
   );
 };

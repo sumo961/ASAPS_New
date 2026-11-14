@@ -4808,6 +4808,8 @@ Create localized versions of your story with AI-assisted translation:
 
 **How Translation Mode Works:**
 - The Inspector shows translatable fields with the source text as reference
+- The **Visual Editor** shows the beat in the chosen language, in both layout modes, as players of that language will see it
+- The **Script** tab lists every text in the chosen language, with the source under each line. What you write there goes into the translation, never the source. **Save as Markdown** saves the translated text; **Update from Markdown** works on the source only, so switch back to **Source** to read a file back
 - AI can auto-translate all strings for a beat or the entire project
 - Translations are stored alongside the story data
 - **Staleness detection** highlights translations that may be outdated when the source text changes

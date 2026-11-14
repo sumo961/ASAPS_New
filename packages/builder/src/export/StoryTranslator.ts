@@ -1375,6 +1375,27 @@ export function getTranslationsForBeat(
 }
 
 /**
+ * A beat's parameters as players of `resource`'s language see them: a copy
+ * with every translated string of this beat put in place (the same strings
+ * the Preview and exported stories use). For DISPLAY only — the editors keep
+ * writing to the beat's own parameters. Returns `params` itself when the
+ * language has nothing translated for this beat.
+ */
+export function translateBeatParameters<T extends Record<string, any>>(
+  params: T,
+  resource: TranslationResource | null | undefined,
+  beatId: string
+): T {
+  if (!resource || !params) return params;
+  const translations = getTranslationsForBeat(resource, beatId);
+  const paths = Object.keys(translations);
+  if (paths.length === 0) return params;
+  const copy = JSON.parse(JSON.stringify(params));
+  for (const path of paths) setNestedValue(copy, path, translations[path]);
+  return copy;
+}
+
+/**
  * Get all translation entries for a single beat (including untranslated).
  * Returns entries with their status for display in the Inspector.
  */

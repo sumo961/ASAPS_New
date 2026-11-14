@@ -65,7 +65,8 @@ const SLOT_PREVIEW_SAMPLE_BODY = [
   "Replace the prompt or add a fallback on the beat to preview your own wording instead of this placeholder.",
 ].join('\n\n');
 import { useTranslationState } from '../../contexts/TranslationContext';
-import { getTranslationsForBeat } from '../../export/StoryTranslator';
+import { getTranslationsForBeat, translateBeatParameters } from '../../export/StoryTranslator';
+import { resolveTranslatedSpeakerName } from '../../utils/speakerUtils';
 
 import type { GlobalSettings } from '../../storage/types';
 import type { Character } from '../../types/character';
@@ -1797,8 +1798,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // identity — a useMemo keyed on `beat` would go stale on text edits.
   // VisualWorkspace re-renders on beat updates, so recomputing here is both
   // correct and cheap.
+  // The responsive preview shows the language chosen in the header, like the
+  // fixed-canvas path (getBeatContent) and the Preview. Display only: edits
+  // (slot intent, hotspots) re-read the beat's own parameters.
+  const activeTranslation = translationState.activeLanguage
+    ? translationState.translations.find(r => r.languageCode === translationState.activeLanguage) ?? null
+    : null;
   const slotPreviewParams =
-    isSlotPreview && beat ? previewRoles(beat.getParameters(), previewHolder) : undefined;
+    isSlotPreview && beat
+      ? previewRoles(translateBeatParameters(beat.getParameters(), activeTranslation, beat.id), previewHolder)
+      : undefined;
 
   // A dialog line's look ("angry") switches its speaker's picture from that
   // line on, as in play: walk the stepped-in path and apply the latest look
@@ -2005,7 +2014,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const globalOn = !!(globalSettings as any)?.speakerDisplay?.showNames;
     const show = override === true ? true : override === false ? false : globalOn;
     if (!show) return '';
-    return previewRoles(((beat as any).speaker as string) || '', previewHolder);
+    const raw = previewRoles(((beat as any).speaker as string) || '', previewHolder);
+    return raw ? resolveTranslatedSpeakerName(raw, characters, translationState.activeLanguage) ?? raw : raw;
   })();
   // Speaker Display → "Dim characters who aren't speaking": who speaks in the
   // previewed line (a Dialog Tree's current line), as a character id.
