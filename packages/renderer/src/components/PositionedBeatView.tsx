@@ -1820,7 +1820,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // said first, and the line answering it and its buttons wait; the dimming
   // leaves the one whose turn it is lit. (Decided per location, not per
   // index: the elements below are copies.)
-  const { leadIn, litCharacter, setRepliesShown } = useStageTurn({
+  const { leadIn, repliesHeld, endRepliesHold, litCharacter, setRepliesShown } = useStageTurn({
     bubbleSpeaker: bubbleSpeaker as BubbleSpeakerLocation | undefined,
     text: bubbleSpeaker ? elements.find((el) => el.location.kind === 'text' || el.location.kind === 'dialog')?.content : undefined,
     thought,
@@ -2324,7 +2324,9 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   totalTextElementsRef.current = sortedTextElements.length;
 
   // Determine if buttons should be visible
-  const shouldShowButtons = !leadIn && (effectiveAnimationsComplete || animation === 'none' || sortedTextElements.length === 0);
+  // A Dialog Tree's replies also wait while the line in the bubble is read.
+  const repliesWaiting = repliesHeld && !!bubbleHistory?.replies?.length;
+  const shouldShowButtons = !leadIn && !repliesWaiting && (effectiveAnimationsComplete || animation === 'none' || sortedTextElements.length === 0);
 
   // The spoken line shown as a speech bubble: the first text box (the one the
   // speaker's name and portrait go with). Its box is hidden while the bubble
@@ -2343,7 +2345,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
     <div
       style={containerStyle}
       dir={textDirection === 'rtl' ? 'rtl' : undefined}
-      onClick={!effectiveAnimationsComplete && animation === 'typewriter' ? handleSkipAnimations : undefined}
+      onClick={!effectiveAnimationsComplete && animation === 'typewriter' ? handleSkipAnimations
+        : repliesWaiting ? endRepliesHold : undefined}
     >
       {/* Timer progress bar for default target countdown */}
       {timerState && timerState.visible && (
@@ -2529,7 +2532,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           repliesUp={!!bubbleHistory?.replies?.length && shouldShowButtons}
         />
       )}
-      {!previewMode && !leadIn && (
+      {!previewMode && !leadIn && !repliesWaiting && (
         <ReplyBubble
           locations={elements.map((e) => e.location) as BubbleSpeakerLocation[]}
           history={bubbleHistory}

@@ -534,7 +534,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const lineInBubble = bodySpeechLine === 'hidden' || bodySpeechLine === 'ghost';
   // Whose turn it is: the reply just picked is said first (the line and the
   // buttons wait), and the dimming leaves the one whose turn it is lit.
-  const { leadIn, litCharacter, setRepliesShown } = useStageTurn({
+  const { leadIn, repliesHeld, endRepliesHold, litCharacter, setRepliesShown } = useStageTurn({
     bubbleSpeaker: bubbleOn ? bubbleSpeaker as BubbleSpeakerLocation | undefined : undefined,
     text: bodyText,
     thought: exchange?.inner ? { color: exchange.color } : undefined,
@@ -543,6 +543,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     speakingCharacter,
     editorMode,
   });
+  // A Dialog Tree's replies also wait while the line in the bubble is read.
+  const repliesWaiting = repliesHeld && !!bubbleHistory?.replies?.length;
 
   // ── preferredLines honoring for the title (soft) ──────────────────────
   // The author can ask a title to be N lines. We bias toward it with a
@@ -1382,7 +1384,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     <div
       ref={rootRef}
       className={`${scope} slotflow-root`}
-      {...(leadIn ? { [LEAD_IN_ATTR]: '' } : null)}
+      {...(leadIn || repliesWaiting ? { [LEAD_IN_ATTR]: '' } : null)}
+      onClickCapture={repliesWaiting ? endRepliesHold : undefined}
       style={{
         ...rootStyle,
         // Single inner scrollable surface (.slotflow-scroll). The action
@@ -2686,12 +2689,12 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           theme={theme}
           avoidRects={reservedHudRects}
           leadIn={leadIn}
-          repliesUp={!!bubbleHistory?.replies?.length}
+          repliesUp={!!bubbleHistory?.replies?.length && !repliesWaiting}
           zIndex={5}
         />
       )}
-      {leadIn && <style>{LEAD_IN_STYLE}</style>}
-      {!leadIn && (
+      {(leadIn || repliesWaiting) && <style>{LEAD_IN_STYLE}</style>}
+      {!leadIn && !repliesWaiting && (
         <ReplyBubble
           locations={characterLocations as BubbleSpeakerLocation[] | undefined}
           history={bubbleHistory}

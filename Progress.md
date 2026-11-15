@@ -13,6 +13,8 @@ Tested with speech bubbles turned on in the Red story:
 - **The reply is said first:** the line answering a picked reply waits about as long as reading the reply takes (1 to 3 s). The reply is shown unfaded, then the answer appears, and only then its buttons. Clicking through the typewriter skips the wait. Works in fixed, slot and spatial layouts.
 - **The reply buttons no longer flash before the bubble:** theme buttons ease every property, visibility included, so a hidden button stayed visible for its 0.2 s easing. Hiding now turns its transition off. The layer also re-checks as soon as the stage changes, not on the next frame.
 - **The line before goes when the next replies come up:** the faded earlier bubble (e.g. Red's last reply) stays while the answer is said and leaves when the player's next replies appear, as buttons or in their bubble.
+- **Replies wait until the line is read:** after an NPC line shows in its bubble, the Dialog Tree's replies (buttons or reply bubble) wait 300 ms a word plus 1.5 s (2.5–10 s); a click on the stage shows them at once.
+- **Empty stage after a Dialog Tree fixed:** beats that don't set `currentBeatType` (Movement Choice) kept the Dialog Tree's type, so a hotspot choice with no text was taken for a reply and `.trim()` on null crashed the stage (only the HUDs stayed; "Grandma's wolf met"). The reply logic now reads the playing beat's type from `currentBeatInfo` and skips choices without text.
 - **Inventory panels can be folded anywhere:** a character's inventory panel folds into its badge when its title is clicked, on any screen size, and stays folded across beats. Phones still start folded.
 - **Bubbles keep clear of inventory and meter panels:** they now count as obstacles for both kinds of bubble.
 

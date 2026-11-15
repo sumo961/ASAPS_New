@@ -32,6 +32,7 @@ import {
   thoughtTrail,
   bubbleLineKey,
   earlierLineFor,
+  bubbleReadingMs,
   replyLeadInMs,
   speakerLocation,
   type BubbleHistory,
@@ -490,7 +491,7 @@ export function stageBubbleLine(speaker: BubbleSpeakerLocation, text: string, th
  * The player's reply said first, then the line answering it (replyLeadInMs):
  * true while that line waits. Clicking through (skip) ends the wait.
  */
-export function useReplyLeadIn(ms: number, key: string, skip = false): boolean {
+export function useReplyLeadIn(ms: number, key: string, skip = false): [waiting: boolean, end: () => void] {
   const [doneKey, setDoneKey] = React.useState<string | null>(null);
   const waiting = ms > 0 && !skip && doneKey !== key;
   React.useEffect(() => {
@@ -498,7 +499,8 @@ export function useReplyLeadIn(ms: number, key: string, skip = false): boolean {
     const handle = setTimeout(() => setDoneKey(key), ms);
     return () => clearTimeout(handle);
   }, [waiting, ms, key]);
-  return waiting;
+  const end = React.useCallback(() => setDoneKey(key), [key]);
+  return [waiting, end];
 }
 
 /**
@@ -520,17 +522,27 @@ export function useStageTurn(args: {
   editorMode?: boolean;
   /** The player clicked through: no wait. */
   skip?: boolean;
-}): { leadIn: boolean; litCharacter: string | undefined; setRepliesShown: (shown: boolean) => void } {
+}): {
+  leadIn: boolean;
+  /** The player's replies wait while the line is read (bubbleReadingMs); a click can end it. */
+  repliesHeld: boolean;
+  endRepliesHold: () => void;
+  litCharacter: string | undefined;
+  setRepliesShown: (shown: boolean) => void;
+} {
   const { bubbleSpeaker, text, thought, history, locations, speakingCharacter, editorMode, skip } = args;
   const [repliesShown, setRepliesShown] = React.useState(false);
   const current = bubbleSpeaker && text?.trim() ? stageBubbleLine(bubbleSpeaker, text, thought) : undefined;
   const ms = current && !editorMode ? replyLeadInMs(history, current, locations) : 0;
   const reply = ms > 0 ? earlierLineFor(history, current) : undefined;
-  const leadIn = useReplyLeadIn(ms, current ? `${bubbleLineKey(current)}\u0000${reply?.text ?? ''}` : '', skip);
+  const lineKey = current ? `${bubbleLineKey(current)}\u0000${reply?.text ?? ''}` : '';
+  const [leadIn] = useReplyLeadIn(ms, lineKey, skip);
+  // The reading time starts when the line shows (after the reply before it).
+  const [repliesHeld, endRepliesHold] = useReplyLeadIn(current && !editorMode && !leadIn ? bubbleReadingMs(current.text) : 0, `${lineKey}\u0000read`);
   const litCharacter = leadIn && reply ? reply.speaker
     : repliesShown && history?.player ? history.player
     : speakingCharacter;
-  return { leadIn, litCharacter, setRepliesShown };
+  return { leadIn, repliesHeld, endRepliesHold, litCharacter, setRepliesShown };
 }
 
 /** While the reply is said first: a stage's buttons wait, unseen (put on the stage root). */

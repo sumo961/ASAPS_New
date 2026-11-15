@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   bubbleLineKey,
   replyLeadInMs,
+  bubbleReadingMs,
   bubbleSpeakerFor,
   earlierLineFor,
   thoughtPath,
@@ -308,5 +309,14 @@ describe('replyLeadInMs: the reply the player picked is said first', () => {
   it('does not wait once the story has moved past the line that answered', () => {
     expect(replyLeadInMs({ earlier: reply, earlierAnchor: bubbleLineKey({ speaker: 'mom', text: 'Something else.' }) }, mom, stage)).toBe(0);
     expect(replyLeadInMs({ earlier: reply, earlierAnchor: bubbleLineKey(mom) }, mom, stage)).toBeGreaterThan(0);
+  });
+});
+
+describe('bubbleReadingMs: the replies wait while the line is read', () => {
+  it('gives 300 ms a word plus 1.5 s, between 2.5 and 10 s', () => {
+    expect(bubbleReadingMs("Well I've been told they're my finest feature.")).toBe(3900);
+    expect(bubbleReadingMs('Hi.')).toBe(2500);
+    expect(bubbleReadingMs('word '.repeat(80))).toBe(10000);
+    expect(bubbleReadingMs('  ')).toBe(0);
   });
 });

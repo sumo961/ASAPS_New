@@ -1692,11 +1692,22 @@ export class ReactRenderer extends BaseRenderer {
     };
   }
 
+  /**
+   * The type of the beat playing now. Every beat sets currentBeatInfo when
+   * it starts; currentBeatType is only set by some beat types, so after a
+   * Dialog Tree it still said "dialogTree" on, say, a Movement Choice.
+   */
+  private playingBeatType(): string | undefined {
+    return (this.getState('currentBeatInfo') as { type?: string } | undefined)?.type
+      ?? (this.getState('currentBeatType') as string | undefined);
+  }
+
   /** A Dialog Tree's replies the player can pick now (a Continue button is not one). */
   private dialogReplies(): string[] | undefined {
-    const beatType = this.getState('currentBeatType') as string | undefined;
+    const beatType = this.playingBeatType();
     if (beatType !== 'dialogTree' && beatType !== 'aiDialogTree') return undefined;
-    return this.choiceTextMap.size > 0 ? [...this.choiceTextMap.values()] : undefined;
+    const replies = [...this.choiceTextMap.values()].filter((t): t is string => typeof t === 'string' && t.trim() !== '');
+    return replies.length > 0 ? replies : undefined;
   }
 
   private onBubbleShown = (line: BubbleLine): void => {
@@ -1715,10 +1726,10 @@ export class ReactRenderer extends BaseRenderer {
     const shown = this.bubbleShown;
     this.bubbleShown = null;
     this.bubbleEarlierAnchor = undefined;
-    const beatType = this.getState('currentBeatType') as string | undefined;
+    const beatType = this.playingBeatType();
     if (choiceText !== undefined) {
-      const player = beatType === 'dialogTree' ? this.playerCharacterResolver?.() : undefined;
-      this.bubbleEarlier = player && choiceText.trim() ? { speaker: player, text: choiceText, reply: true } : null;
+      const player = beatType === 'dialogTree' || beatType === 'aiDialogTree' ? this.playerCharacterResolver?.() : undefined;
+      this.bubbleEarlier = player && typeof choiceText === 'string' && choiceText.trim() ? { speaker: player, text: choiceText, reply: true } : null;
     } else {
       this.bubbleEarlier = shown;
     }

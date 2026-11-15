@@ -465,7 +465,7 @@ export const bubbleLineKey = (line: BubbleLine): string => `${line.speaker}\u000
 /** The earlier line to show beside `current`, when it still belongs with it. */
 export function earlierLineFor(history: BubbleHistory | undefined, current: BubbleLine | undefined): BubbleLine | undefined {
   const earlier = history?.earlier;
-  if (!earlier || !current || !earlier.text.trim()) return undefined;
+  if (!earlier || !current || typeof earlier.text !== 'string' || !earlier.text.trim()) return undefined;
   if (history.earlierAnchor !== undefined && history.earlierAnchor !== bubbleLineKey(current)) return undefined;
   return earlier;
 }
@@ -486,6 +486,17 @@ export function replyLeadInMs<T extends StageCharacterLike>(
   if (!speakerLocation(locations, earlier.speaker)) return 0;
   const words = earlier.text.trim().split(/\s+/).length;
   return Math.round(Math.min(3000, Math.max(1000, 600 + words * 120)));
+}
+
+/**
+ * How long the player's replies wait after a line shows in a bubble, so it
+ * can be read with some margin first: 300 ms a word (200 words a minute)
+ * plus 1.5 s, at least 2.5 s and at most 10 s.
+ */
+export function bubbleReadingMs(text: string | undefined): number {
+  const words = (text ?? '').trim().split(/\s+/).filter(Boolean).length;
+  if (words === 0) return 0;
+  return Math.round(Math.min(10000, Math.max(2500, 1500 + words * 300)));
 }
 
 /** Which placed character shows the speaker, by character id or by the name it was placed with. */

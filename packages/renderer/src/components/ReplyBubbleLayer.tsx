@@ -371,7 +371,7 @@ export const ReplyBubble: React.FC<{
   zIndex?: number;
 }> = ({ locations, history, theme, avoidRects, editorMode, onShown, zIndex = 151 }) => {
   if (theme?.speakerDisplay?.replyStyle !== 'bubble') return null;
-  const replies = history?.replies?.filter((r) => r.trim());
+  const replies = history?.replies?.filter((r) => typeof r === 'string' && r.trim());
   if (!replies || replies.length === 0) return null;
   const player = speakerLocation(locations, history?.player);
   if (!player) return null;

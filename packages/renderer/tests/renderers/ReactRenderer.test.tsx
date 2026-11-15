@@ -443,6 +443,17 @@ describe('ReactRenderer speech bubble history', () => {
     expect(r().bubbleHistory().player).toBe('char_you');
   });
 
+  it('offers no replies on a beat after a Dialog Tree that does not set its type (a Movement Choice)', () => {
+    renderer.setPlayerCharacterResolver(() => 'char_you');
+    renderer.setState('currentBeatType', 'dialogTree'); // left over from the Dialog Tree
+    renderer.setState('currentBeatInfo', { id: '33', name: 'Door', type: 'movementChoice' });
+    (r() as any).choiceTextMap.set('1', null); // a hotspot choice has no text
+    expect(r().bubbleHistory().replies).toBeUndefined();
+    renderer.setState('currentBeatInfo', { id: '11', name: 'Wolf', type: 'dialogTree' });
+    (r() as any).choiceTextMap.set('2', 'Hello.');
+    expect(r().bubbleHistory().replies).toEqual(['Hello.']);
+  });
+
   it('keeps nothing up after a choice that is not a line, or a screen without a bubble', () => {
     renderer.setPlayerCharacterResolver(() => 'char_you');
     renderer.setState('currentBeatType', 'multiChoice');

@@ -403,7 +403,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
     : undefined;
   // Whose turn it is: the reply just picked is said first (the line and the
   // buttons wait), and the dimming leaves the one whose turn it is lit.
-  const { leadIn, litCharacter, setRepliesShown } = useStageTurn({
+  const { leadIn, repliesHeld, endRepliesHold, litCharacter, setRepliesShown } = useStageTurn({
     bubbleSpeaker: bubbleOn ? bubbleSpeaker as BubbleSpeakerLocation | undefined : undefined,
     text: bubbleText,
     history: bubbleHistory,
@@ -411,6 +411,8 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
     speakingCharacter,
     editorMode,
   });
+  // A Dialog Tree's replies also wait while the line in the bubble is read.
+  const repliesWaiting = repliesHeld && !!bubbleHistory?.replies?.length;
 
   // Default-target countdown — mirror of SlotFlowView's subscription
   // wiring so a spatial beat (titleScreen, dialogTree spatial node,
@@ -568,7 +570,8 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
       ref={containerRef}
       data-layer="spatial-composite"
       className={scope}
-      {...(leadIn ? { [LEAD_IN_ATTR]: '' } : null)}
+      {...(leadIn || repliesWaiting ? { [LEAD_IN_ATTR]: '' } : null)}
+      onClickCapture={repliesWaiting ? endRepliesHold : undefined}
       style={{
         position: 'absolute',
         inset: 0,
@@ -1031,12 +1034,12 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           theme={theme}
           avoidRects={reservedHudRects}
           leadIn={leadIn}
-          repliesUp={!!bubbleHistory?.replies?.length}
+          repliesUp={!!bubbleHistory?.replies?.length && !repliesWaiting}
           zIndex={5}
         />
       )}
-      {leadIn && <style>{LEAD_IN_STYLE}</style>}
-      {theme && !leadIn && (
+      {(leadIn || repliesWaiting) && <style>{LEAD_IN_STYLE}</style>}
+      {theme && !leadIn && !repliesWaiting && (
         <ReplyBubble
           locations={characterLocations as BubbleSpeakerLocation[] | undefined}
           history={bubbleHistory}
