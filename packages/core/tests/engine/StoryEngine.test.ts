@@ -18,7 +18,8 @@
  *   - start() walks beat → beat → ... → end via getNextBeat
  *   - currentBeatId tracked + context kept in sync
  *   - '__restart__' return value restarts from firstBeatId
- *   - missing beat id throws "Beat not found"
+ *   - missing start beat id throws "Beat not found"; a link to a missing
+ *     beat stops on the beat that took it (deadEnd with missingBeatId)
  *   - beat execution errors propagate + stop the engine
  *   - stop() / pause() / resume() lifecycle + isRunning/isPaused
  *   - getSerializedState round-trips through loadState
@@ -164,6 +165,20 @@ describe('StoryEngine', () => {
       await engine.loadStory(story);
       await expect(engine.start('does-not-exist'))
         .rejects.toThrow(/beat not found.*does-not-exist/i);
+    });
+
+    it('stops on the beat whose link goes nowhere, and says which beat is missing', async () => {
+      const story = makeLinearStory();
+      story.addBeat(createTestBeat({ id: 'b', name: 'B', type: 'infoText', parameters: { text: 'B' }, connections: [{ targetId: 'gone' }] }));
+      await engine.loadStory(story);
+      const deadEnd = vi.fn();
+      const ended = vi.fn();
+      engine.on('deadEnd', deadEnd);
+      engine.on('storyEnded', ended);
+      await engine.start('b');
+      expect(deadEnd).toHaveBeenCalledWith({ beatId: 'b', beatName: 'B', missingBeatId: 'gone' });
+      expect(ended).toHaveBeenCalledOnce();
+      expect(engine.getContext().getCurrentBeatId()).toBe('b');
     });
 
     it('isRunning stays true after a natural end until stop() is called', async () => {

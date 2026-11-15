@@ -81,6 +81,42 @@ function linesUnderHiddenReplies(story: Story, shown: ReadonlySet<string>, playe
   return out;
 }
 
+/**
+ * Whether a Dialog Tree can end on a line with no exit, the only time it
+ * follows its beat's own links (it otherwise leaves through a reply's or a
+ * line's exit). Gated replies and lines count as possibly ending it.
+ */
+export function dialogCanEndWithoutExit(tree: any): boolean {
+  const gated = (x: any) => Array.isArray(x?.conditions) && x.conditions.length > 0;
+  const seen = new Set<any>();
+  const ends = (node: any): boolean => {
+    if (!node || typeof node !== 'object') return true;
+    if (seen.has(node)) return false;
+    seen.add(node);
+    if (gated(node)) return true;
+    if (node.target) return false;
+    const choices: any[] = (Array.isArray(node.choices) ? node.choices : []).filter(Boolean);
+    if (choices.length === 0 || choices.every(gated)) return true;
+    return choices.some((c) => (c.dialogNode ? ends(c.dialogNode) : !c.target));
+  };
+  return ends(tree);
+}
+
+/** Every beat a Dialog Tree's replies and lines name as an exit. */
+function dialogExitTargets(tree: any): Set<string> {
+  const out = new Set<string>();
+  const walk = (node: any, depth: number): void => {
+    if (!node || typeof node !== 'object' || depth > 1000) return;
+    if (typeof node.target === 'string') out.add(node.target);
+    for (const c of Array.isArray(node.choices) ? node.choices : []) {
+      if (typeof c?.target === 'string') out.add(c.target);
+      walk(c?.dialogNode, depth + 1);
+    }
+  };
+  walk(tree, 0);
+  return out;
+}
+
 const RANK: Record<ProblemSeverity, number> = { error: 0, warning: 1, note: 2 };
 
 /**
@@ -115,7 +151,16 @@ export function collectProblems(story: Story, simulation: StorySituations, asset
 
   const reach = reachabilityOf(story, simulation);
   for (const link of reach.brokenConnections) {
-    add('error', 'Broken link', link.sourceBeatId, `Links to a beat that no longer exists (${link.targetId}). Players who take it get an error and the story stops.`);
+    // A Dialog Tree follows its own links only when a line ends with no exit.
+    // Stories brought in from ASML 1.0 kept links to the beats their lines
+    // were merged from; while every line has a way out, nothing takes them.
+    const source = story.getBeat(link.sourceBeatId);
+    const tree = source?.type === 'dialogTree' ? (source.getParameters() as any)?.dialogTree : undefined;
+    if (tree && !dialogExitTargets(tree).has(link.targetId) && !dialogCanEndWithoutExit(tree)) {
+      add('note', 'Unused old link', link.sourceBeatId, `Keeps a link to a beat that no longer exists (${link.targetId}). Nothing takes it now: every line in this scene ends in a reply or an exit. It would be taken if a line were left without one, and the story would stop there.`);
+      continue;
+    }
+    add('error', 'Broken link', link.sourceBeatId, `Links to a beat that no longer exists (${link.targetId}). Players who take it see "The story ends here".`);
   }
 
   // Where playthroughs stop. A warning above may already say why.

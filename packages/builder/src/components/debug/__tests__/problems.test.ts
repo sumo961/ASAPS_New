@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Story, BeatTypeRegistry } from '@asaps/core';
-import { collectProblems } from '../problems';
+import { collectProblems, dialogCanEndWithoutExit } from '../problems';
 import { searchSituations } from '../../../services/storySimulation';
 
 beforeEach(() => vi.stubGlobal('setInterval', vi.fn()));
@@ -49,5 +49,32 @@ describe('collectProblems', () => {
     const replies = collectProblems(story, searchSituations(story)).filter((p) => p.label === 'Reply goes nowhere');
     expect(replies).toHaveLength(1);
     expect(replies[0].more).toHaveLength(1);
+  });
+
+  it('calls an imported scene\'s link to a merged beat unused while every line has a way out', () => {
+    // As ASML 1.0 imports leave them: the beat's links name the beats its
+    // lines were merged from (12), the tree's own exits go elsewhere.
+    const tree = (last: any) => ({ id: 'r', speaker: 'Wolf', text: 'Hello.', choices: [
+      { id: 'a', text: 'Hi.', dialogNode: { id: 'n', speaker: 'Wolf', text: 'Seymour.', choices: [{ id: 'b', text: 'Odd name', target: 'end' }, ...last] } },
+    ] });
+    const scene = (last: any[]) => build([{ id: 'd', name: 'Wolf', type: 'dialogTree', parameters: { dialogTree: tree(last) }, connections: [{ targetId: '12', label: 'Hi.' }] }, end]);
+
+    const quiet = collectProblems(scene([]), searchSituations(scene([])));
+    expect(quiet.map((p) => [p.label, p.severity])).toEqual([['Unused old link', 'note']]);
+    expect(quiet[0].message).toContain('(12)');
+
+    // A next line with no exit now ends the scene, and the old link is taken.
+    const gran = [{ id: 'c', text: '', continue: true, dialogNode: { id: 'g', speaker: 'Gran', text: '', choices: [] } }];
+    const broken = collectProblems(scene(gran), searchSituations(scene(gran)));
+    expect(broken.find((p) => p.label === 'Broken link')).toMatchObject({ severity: 'error', beatId: 'd' });
+    expect(broken.find((p) => p.label === 'Line without words')?.message).toContain('A line by Gran after "Seymour."');
+  });
+
+  it('knows when a Dialog Tree can end on a line with no exit', () => {
+    expect(dialogCanEndWithoutExit({ text: 'a', choices: [{ text: 'x', target: 'e' }] })).toBe(false);
+    expect(dialogCanEndWithoutExit({ text: 'a', target: 'e', choices: [] })).toBe(false);
+    expect(dialogCanEndWithoutExit({ text: 'a', choices: [] })).toBe(true);
+    expect(dialogCanEndWithoutExit({ text: 'a', choices: [{ text: 'x', target: 'e', conditions: [{ type: 'hasItem', item: 'k' }] }] })).toBe(true);
+    expect(dialogCanEndWithoutExit({ text: 'a', choices: [{ text: 'x' }] })).toBe(true);
   });
 });

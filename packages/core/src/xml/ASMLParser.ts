@@ -1,3 +1,4 @@
+import { normalizeTransition } from '../utils/transition';
 import { Story } from '../engine/Story';
 import { Beat } from '../beats/Beat';
 import { BeatTypeRegistry } from '../beats/BeatRegistry';
@@ -2663,12 +2664,13 @@ export class ASMLParser {
    * Parse transition element
    */
   private parseTransition(transitionElement: Element): Transition {
-    return {
-      type: (transitionElement.getAttribute('type') || 'none') as any,
-      duration: parseFloat(transitionElement.getAttribute('duration') || '500'), // Convert to ms
-      direction: (transitionElement.getAttribute('direction') || 'in') as any,
-      easing: (transitionElement.getAttribute('easing') || 'ease-in-out') as any
-    };
+    // ASML 1.0 gives the duration in seconds ("0.5") and names types in any case.
+    return normalizeTransition({
+      type: transitionElement.getAttribute('type') || 'none',
+      duration: parseFloat(transitionElement.getAttribute('duration') || '0.5'),
+      direction: transitionElement.getAttribute('direction') || 'in',
+      easing: transitionElement.getAttribute('easing') || 'ease-in-out',
+    })!;
   }
 
   /**

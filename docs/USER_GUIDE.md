@@ -3491,9 +3491,9 @@ Every tab works by playing your story the way players can: it follows every link
 
 The list comes in three groups:
 
-- **Errors: players get stuck or miss something** (red): a dead end without an end screen, a loop with no way out, a link to a beat that no longer exists, a check that can never see what it's looking for.
+- **Errors: players get stuck or miss something** (red): a dead end without an end screen, a loop with no way out, a link to a beat that no longer exists (**Broken link**; players who take it see *The story ends here*), a check that can never see what it's looking for.
 - **Warnings: worth checking** (amber): something that probably isn't what you meant, such as a beat that is never on offer or a reply with no words.
-- **Notes: may be intended** (blue): things a story can do on purpose, such as a beat nothing links to yet, or a Restart that keeps values for a New Game+.
+- **Notes: may be intended** (blue): things a story can do on purpose, such as a beat nothing links to yet, or a Restart that keeps values for a New Game+. **Unused old link** is a note too: a Dialog Tree keeps a link to a beat that no longer exists, but every line of the scene ends in a reply or an exit, so nothing takes it. Stories brought in from ASML 1.0 have these where their lines were merged into one scene. It only matters if you later leave a line without an exit: then the scene ends by that link, and the story stops there.
 
 Each entry names the problem and the beat (*Dead end: The cellar*) and says in a sentence what was found. **Click the name to highlight the beat** in the flowchart. When the same problem turns up several times on one beat, it is listed once with a count (×3) and **Show 2 more** for the rest. The search box at the top (*Search 12 problems…*) filters by problem, beat name or message.
 
@@ -3528,6 +3528,7 @@ These are the entries Problems can show beyond unreachable beats, dead ends, loo
 | **Reply hidden by a next line** (warning) | After a line, some replies never show, because a next line (*Then another character speaks*) plays instead every time. When the story is too large to try every way through, the message says so, and you should check by hand. | Put a condition on the next line, or move the replies. |
 | **Next line never plays** (warning) | Of two next lines under one line, the first has no condition, so it always plays and the second never does. | Give the first one a condition, or remove the second. |
 | **Reply without words** (warning) | A reply has no text, so players see a blank button. | Give it words, or make it a next line (*Then another character speaks*). |
+| **Line without words** (warning) | A Dialog Tree line has no text, often a next line (*Then another character speaks*) added and never written. Players see no box for it, only the buttons after it, or nothing at all. A line said only by a sound is fine. The message names the speaker and the line before it. | Write what the character says, or delete the line. |
 | **Line without exit** (warning) | A Dialog Tree line with no replies and no exit link. Players still read it: it stays on screen with a **Continue** button (or until the reading time is up, where lines move on by themselves), then the scene ends and the story goes on by the beat's own link, or stops there if the beat has none. The same happens when every reply under a line is hidden by its conditions. | Give the line an exit link (or replies) so the scene says where it goes. |
 | **Text assumes something** (warning or note) | The beat's words assume something some players may not have. See [Story Logic](#story-logic) below. | Check the text against the ways in. |
 | **Item not described** (note) | A Pick Prop item that no beat describes. | Describe it, if players should know what they picked up. |
@@ -3535,6 +3536,7 @@ These are the entries Problems can show beyond unreachable beats, dead ends, loo
 | **Stand-in text left in** (warning) | Words a new beat starts with are still there for players to see: the speaker *Character* on Dialog Tree lines linked to no one, a reply that still says *Player response...*, *New Choice 2*, *New Prop 1*. | Write your own words. For a speaker, pick the character who says the line, so their picture and HUD come with it. |
 | **Meter never changes** (warning) | A counter shown on a character's HUD (eye on) that nothing in the story changes, so players watch it stay at its start value. Often the Player template's Health and Energy, or a story that changes [story-wide counters](#hud-contents) while the HUD shows the character's own. | Change it with an effect that picks this character's counter, or turn its eye off. |
 | **Sound or picture missing** (warning) | Beats use a sound or picture that is no longer among the project's assets: it was deleted, or lost when it was added. Players hear silence or see nothing there. Told once per missing file, with how many beats use it. | In the [Asset Manager](#replace-asset), choose what to use instead: every beat that used the lost file gets it at once. |
+| **Sound or picture lost** (warning) | An older version saved a sound or picture on this beat (often a button's click sound) only as a temporary link, which stopped working when the app was closed. Players hear or see nothing there. The message names the element. | Select the element in the Visual Editor and pick its sound or picture again. |
 | **Role** (warning) | A [role](#roles) problem: a role that doesn't exist, a character who isn't on a role's list, a role cast in two beats without *Can be recast later*, a role used before anything chooses who plays it, or an AI partner role with nothing to go on. | Add the role, tick the character, set a default, or tick *Can be recast later*. The message says which. |
 
 These are advice only: nothing changes at runtime. The checks explore the same routes players can take, including a replay when your story tests the built-in [playthrough](#keep-across-restarts). In Path Analysis's **Tree** view, a small warning triangle marks the branch that contains a beat with a warning; hover over it for the same explanation.
@@ -3580,7 +3582,7 @@ Enumerates the possible journeys through your story. Three modes:
 Path Analysis follows whole paths, one by one, so it runs its own search the first time you open it (the other tabs share a faster one). It plays the story the way a player would: it follows every link the flowchart draws, lets a screen's timer run out as well as taking its button, only takes a choice when its conditions would show it, sends the player to a requirement's fallback when the requirement isn't met, and keeps track of how many of an item the player holds and which character holds what. Each outcome carries a label saying how the path ends:
 
 - **Ending** (green): it reaches an End Screen or an AI Summary. Only those two count as endings.
-- **Dead end** (red): the story stops here without an end screen: the beat has no way on. If players reach one anyway, the Preview tells you which beat it was, and a published story shows *The story ends here* with a **Start again** button instead of a screen whose buttons do nothing.
+- **Dead end** (red): the story stops here without an end screen: the beat has no way on. If players reach one anyway, the Preview tells you which beat it was (or, when the beat links to a beat that no longer exists, which one is missing), and a published story shows *The story ends here* with a **Start again** button instead of a screen whose buttons do nothing.
 - **Stuck in a loop** (red): the player keeps coming back here and no way on gets out.
 - **Back to a menu** (purple): the path came back to a choice with nothing new to find, for example a hub where every choice has already been tried. The player can still leave by another choice, so it's a loop, not a trap.
 - **Cut off** (orange): the path grew so long that the analysis stopped following it. That's a limit of the analysis, not a fault in your story; hover over the badge for a reminder.
@@ -3873,6 +3875,8 @@ When you host an HTML export online (rather than just double-clicking a single-f
 2. For ASAPS's own files pick **Open Project File…** (`.asaps` / `.asapst` / zip); for conversions pick ASML 1.0 (XML) or Twine (HTML) under *Import from other formats*
 3. Select the file
 4. For asset-heavy imports, you'll be guided through asset mapping
+
+**Transitions from ASML 1.0** (*Fade*, durations in seconds) are read as today's: a 0.5 s Fade becomes a 500 ms fade, and the old *Wipe*, *Rotate* and *Blinds* become Slide, Zoom and Fade. Projects imported earlier are corrected when they open, and saved that way the next time the project is saved. Before, those transitions didn't play at all.
 
 **ASML 1.0 stays fully importable.** Freezing the XML *export* changes nothing here — old `.asml` files keep opening, forever. And to be precise about names: ASML didn't go away, it moved on. The JSON your project zip carries **is ASML 2.0** — same language, new serialization.
 

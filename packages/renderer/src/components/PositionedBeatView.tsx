@@ -2211,6 +2211,12 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // Apply collision detection to adjust button positions when text boxes grow
   // Always run in both editor and preview modes for unified layout
   let adjustedElements = adjustElementsForCollisions(elements, stageWidth, stageHeight, theme, calculatedButtonHeight, hudBottomY, beatType, reservedHudRects);
+  // A Dialog Tree line with no words: players see no empty box (the editor
+  // keeps it, to be filled in; Story Warnings name it: "Line without words").
+  if (!editorMode && beatType === 'dialogTree') {
+    adjustedElements = adjustedElements.filter(el =>
+      !((el.location.kind === 'text' || el.location.kind === 'dialog') && !String(el.content ?? '').trim()));
+  }
 
   // When portrait is "above" text box, ensure text elements are pushed down if portrait would clip at top
   if (speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'above-left' || theme.speakerDisplay?.graphicPosition === 'above-right')) {

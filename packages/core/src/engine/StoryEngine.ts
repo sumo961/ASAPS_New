@@ -92,7 +92,17 @@ export class StoryEngine extends EventEmitter {
 
       const beat = this.story.getBeat(this.currentBeatId);
       if (!beat) {
-        throw new Error(`Beat not found: ${this.currentBeatId}`);
+        if (!lastBeat) throw new Error(`Beat not found: ${this.currentBeatId}`);
+        // A link to a beat that no longer exists: the story stops on the
+        // beat that took it, which stays on screen, and says so, instead of
+        // ending in an error nobody sees (a frozen stage).
+        console.error(`[StoryEngine] "${lastBeat.name || lastBeat.id}" links to a beat that doesn't exist: ${this.currentBeatId}`);
+        const missingBeatId = this.currentBeatId;
+        this.currentBeatId = lastBeat.id;
+        this.context.setCurrentBeatId(lastBeat.id);
+        this.running = false;
+        this.emit('deadEnd', { beatId: lastBeat.id, beatName: lastBeat.name || lastBeat.id, missingBeatId });
+        break;
       }
 
       try {

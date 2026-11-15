@@ -106,7 +106,33 @@ describe('sounds and pictures no longer in the project', () => {
     expect(w[0].detail?.beats).toEqual(['a', 'b']);
   });
 
+  it('names sounds kept only as a temporary link, and leaves a link beside its id alone', () => {
+    const button = (extra: any) => ({ id: 'b1', kind: 'button', name: 'button1', x: 0, y: 0, width: 100, height: 40, sound: 'blob:http://localhost:5173/b127', ...extra });
+    const beat = (extra: any) => ({ ...screen('a', ''), locations: [button(extra)] });
+    const w = of(build([beat({}), end]), 'temporary-asset-link');
+    expect(w).toHaveLength(1);
+    expect(w[0].message).toContain('Has a sound saved only as a temporary link');
+    expect(w[0].message).toContain('(button "button1")');
+    expect(of(build([beat({ soundAssetId: kept }), end]), 'temporary-asset-link')).toEqual([]);
+  });
+
   it('runs only when the project list is given', () => {
     expect(of(build([screen('a', lost), end]), 'missing-asset')).toEqual([]);
+  });
+});
+
+describe('lines with no words', () => {
+  const scene = (line: any) => ({ id: 'd', name: 'Wolf', type: 'dialogTree', parameters: { dialogTree: {
+    id: 'r', speaker: 'Wolf', text: 'Seymour.', choices: [{ id: 'c', text: '', continue: true, dialogNode: { id: 'g', choices: [], target: 'end', ...line } }],
+  } } });
+
+  it('names the speaker and the line before it', () => {
+    const w = of(build([scene({ speaker: 'Gran', text: '  ' }), end]), 'wordless-line');
+    expect(w).toHaveLength(1);
+    expect(w[0].message).toBe('A line by Gran after "Seymour." has no words, so players see an empty box. Write what Gran says, or delete the line.');
+  });
+
+  it('leaves a line said by a sound alone', () => {
+    expect(of(build([scene({ speaker: 'Wolf', text: '', voiceAssetId: 'asset_1792155258311_growl' }), end]), 'wordless-line')).toEqual([]);
   });
 });

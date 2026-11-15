@@ -30,6 +30,16 @@ describe('PositionedBeatView', () => {
     await waitFor(() => expect(container.textContent).toContain('A quiet morning in the harbor.'));
   });
 
+  it('draws no empty box for a Dialog Tree line with no words (the editor keeps it)', async () => {
+    const box = (c: HTMLElement) => [...c.querySelectorAll('div')].filter((d) => d.style.position === 'absolute' && d.style.top === '100px');
+    const played = render(<PositionedBeatView stageWidth={1024} stageHeight={768} beatType="dialogTree" elements={[textEl({ content: ' ' }), buttonEl()]} />);
+    await waitFor(() => expect(played.container.textContent).toContain('Continue'));
+    expect(box(played.container)).toHaveLength(0);
+    played.unmount();
+    const edited = render(<PositionedBeatView stageWidth={1024} stageHeight={768} beatType="dialogTree" editorMode elements={[textEl({ content: ' ' })]} />);
+    await waitFor(() => expect(box(edited.container)).toHaveLength(1));
+  });
+
   it('renders a button and fires onAction on click', async () => {
     const onAction = vi.fn();
     const { getByText } = render(

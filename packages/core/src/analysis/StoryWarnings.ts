@@ -25,6 +25,7 @@ export type StoryWarningCode =
   | 'requires-violated-on-path'       // a specific path reaches the gated beat without satisfying requires
   | 'counter-text'                    // a counter checked against, or set to, text
   | 'wordless-reply'                  // a Dialog Tree reply button with no words
+  | 'wordless-line'                   // a Dialog Tree line with no words (and no sound)
   | 'line-never-plays'                // a next line behind one that always plays
   | 'name-mismatch'                   // a condition reads a name nothing sets; a very similar name is set
   | 'setup-unreached'                 // what a played beat checks is only ever set on beats nobody reaches
@@ -35,6 +36,7 @@ export type StoryWarningCode =
   | 'placeholder-text'                // a new beat's stand-in text left where players see it ("Character", "New Choice 1")
   | 'meter-never-changes'             // a counter shown on a HUD that nothing in the story changes
   | 'missing-asset'                   // a beat uses a sound or picture no longer in the project
+  | 'temporary-asset-link'            // a sound or picture kept only as a browser's temporary blob: link
   | 'role';                           // cast roles: unknown role, non-candidate cast, recast, used before cast, bare AI partner
 
 export interface StoryWarning {
@@ -153,6 +155,7 @@ export function detectStoryWarnings(cfg: DetectConfig): StoryWarning[] {
   const played = evidence.played;
   for (const beat of story.getAllBeats()) {
     warnings.push(...detectCounterText(beat));
+    warnings.push(...detectTemporaryAssetLinks(beat));
     if (played.size === 0 || played.has(beat.id)) warnings.push(...detectPlaceholderText(beat, story));
     if (beat.type === 'dialogTree') warnings.push(...detectDialogShape(beat, cfg.shownReplies, played, cfg.searchLimited));
   }
@@ -472,6 +475,41 @@ function detectMissingAssets(story: Story, assetIds: ReadonlySet<string>): Story
   return out;
 }
 
+/**
+ * Sounds and pictures kept only as a temporary browser link (`blob:…`), with
+ * no asset id beside it. Older versions saved some element sounds this way;
+ * the link stops working when the app closes, so players get nothing there.
+ * (A link beside its asset id is fine: the id is used.)
+ */
+function detectTemporaryAssetLinks(beat: Beat): StoryWarning[] {
+  let sounds = 0;
+  let pictures = 0;
+  const where = new Set<string>();
+  const walk = (o: any, place: string | undefined): void => {
+    if (Array.isArray(o)) { o.forEach((v) => walk(v, place)); return; }
+    if (!o || typeof o !== 'object') return;
+    const here = typeof o.kind === 'string' && typeof o.name === 'string' ? `${o.kind} "${o.name}"` : place;
+    const withId = Object.entries(o).some(([k, v]) => /asset/i.test(k) && typeof v === 'string' && !!v.trim());
+    for (const [k, v] of Object.entries(o)) {
+      if (typeof v === 'string' && v.startsWith('blob:')) {
+        if (withId) continue;
+        if (/sound|music|audio|voice/i.test(k)) sounds++; else pictures++;
+        if (here) where.add(here);
+      } else walk(v, here);
+    }
+  };
+  const plain = (beat as any).toJSON?.() ?? beat;
+  walk(plain, undefined);
+  if (sounds + pictures === 0) return [];
+  const what = [sounds && (sounds === 1 ? 'a sound' : `${sounds} sounds`), pictures && (pictures === 1 ? 'a picture' : `${pictures} pictures`)].filter(Boolean).join(' and ');
+  const one = sounds + pictures === 1;
+  return [{
+    code: 'temporary-asset-link', severity: 'warn', beatId: beat.id, beatName: beat.name,
+    message: `Has ${what} saved only as ${one ? 'a temporary link' : 'temporary links'} (by an older version), which stopped working when the app was closed, so players ${sounds ? 'hear' : 'see'} nothing there${where.size ? ` (${[...where].join(', ')})` : ''}. Pick ${one ? 'it' : 'them'} again in the Visual Editor.`,
+    detail: { sounds, pictures, where: [...where] },
+  }];
+}
+
 // ============================================================================
 // Counters and text
 // ============================================================================
@@ -518,10 +556,20 @@ function detectDialogShape(beat: Beat, shownReplies?: ReadonlySet<string>, playe
   const tree = (beat.getParameters() as any).dialogTree;
   const onRoute = new Set<any>();
   const preview = (node: any) => String(node?.text ?? '').trim().slice(0, 50);
-  const walk = (node: any): void => {
+  // A line said only by a sound (a voice recording, a growl) has no words on purpose.
+  const heard = (node: any): boolean => Object.entries(node).some(([k, v]) => /sound|audio|voice/i.test(k) && !!v);
+  const walk = (node: any, before?: any): void => {
     if (!node || typeof node !== 'object' || onRoute.has(node)) return;
     onRoute.add(node);
     const choices: any[] = Array.isArray(node.choices) ? node.choices.filter(Boolean) : [];
+    if (!String(node.text ?? '').trim() && !heard(node)) {
+      const who = String(node.speaker ?? '').trim();
+      out.push({
+        code: 'wordless-line', severity: 'warn', beatId: beat.id, beatName: beat.name,
+        message: `${who ? `A line by ${who}` : 'A line'}${before ? ` after "${preview(before)}"` : ''} has no words, so players see an empty box. Write what ${who || 'the speaker'} says, or delete the line.`,
+        detail: { nodeId: node.id },
+      });
+    }
     const wordless = choices.filter((c) => !c.continue && c.id !== 'auto_continue' && !String(c.text ?? '').trim());
     if (wordless.length > 0) {
       out.push({
@@ -570,7 +618,7 @@ function detectDialogShape(beat: Beat, shownReplies?: ReadonlySet<string>, playe
         detail: { nodeId: node.id, choiceId: dead.id },
       });
     }
-    for (const c of choices) walk(c.dialogNode);
+    for (const c of choices) walk(c.dialogNode, node);
   };
   walk(tree);
   return out;

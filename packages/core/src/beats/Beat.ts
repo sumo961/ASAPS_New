@@ -11,6 +11,7 @@ import type { IRenderer } from '../types';
 
 import { StoryContext } from '../engine/StoryContext';
 import { resolveCharacter } from '../utils/characterRef';
+import { normalizeTransition } from '../utils/transition';
 import { isRoleRef, rolePlaceholderText } from '../engine/roles';
 
 /**
@@ -141,7 +142,7 @@ export abstract class Beat {
     this.name = config.name;
     this.type = config.type;
     this.cluster = config.cluster;
-    this.transition = config.transition;
+    this.transition = normalizeTransition(config.transition);
     this.sound = config.sound;
     this.defaultTarget = config.defaultTarget;
     // Keep BEAT_BASE_PARAMETERS in step with the parameters read here.

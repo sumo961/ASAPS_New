@@ -9,6 +9,7 @@ const LABELS: Record<StoryWarning['code'], string> = {
   'requires-violated-on-path': 'Requirement not met on some paths',
   'counter-text': 'Counter used with text',
   'wordless-reply': 'Reply without words',
+  'wordless-line': 'Line without words',
   'line-never-plays': 'Next line never plays',
   'reply-nowhere': 'Reply goes nowhere',
   'choices-all-hidden': 'Every choice hidden',
@@ -19,6 +20,7 @@ const LABELS: Record<StoryWarning['code'], string> = {
   'placeholder-text': 'Stand-in text left in',
   'meter-never-changes': 'Meter never changes',
   'missing-asset': 'Sound or picture missing',
+  'temporary-asset-link': 'Sound or picture lost',
   'role': 'Role',
 };
 

@@ -437,6 +437,7 @@ export const PreviewWindow: React.FC = () => {
   // show a visible "story ended here" notice instead of a silent stop,
   // which reads as a dead click on beats with no outgoing connection.
   const [endedNotice, setEndedNotice] = useState<string | null>(null);
+  const missingLinkRef = useRef<{ beatId: string; missingBeatId: string } | null>(null);
   // A choice the author hasn't linked yet was clicked: the beat stays, this says which choice.
   const [unlinkedNotice, setUnlinkedNotice] = useState<string | null>(null);
   const stopRequestedRef = useRef(false);
@@ -1659,6 +1660,11 @@ export const PreviewWindow: React.FC = () => {
       const engine = new StoryEngine(reactRenderer as any, { mockMode: true });
       rendererRef.current = reactRenderer;
       engineRef.current = engine;
+      // A link to a beat that doesn't exist: the run ends on the beat that
+      // took it, and the notice names the missing beat.
+      engine.on('deadEnd', (info: { beatId: string; missingBeatId?: string }) => {
+        missingLinkRef.current = info.missingBeatId ? { beatId: info.beatId, missingBeatId: info.missingBeatId } : null;
+      });
 
       // playSound Effect bridge: core emits the signal, the renderer owns
       // the audio pipeline (preset/asset/URL resolution + mute state).
@@ -1921,6 +1927,7 @@ export const PreviewWindow: React.FC = () => {
     }
     setStartBlockedReason(null);
     setEndedNotice(null);
+    missingLinkRef.current = null;
     stopRequestedRef.current = false;
     // A Restart starts a new run while the old one is still waiting inside a
     // beat; when the old one returns, its clean-up must not touch this one.
@@ -2516,7 +2523,14 @@ export const PreviewWindow: React.FC = () => {
           try {
             const lastId = engineRef.current.getContext().getCurrentBeatId();
             const lastBeat = lastId ? story?.getBeat(lastId) : null;
-            if (lastBeat && lastBeat.type !== 'endScreen') {
+            // (Set by the engine's deadEnd listener while the run played.)
+            const stop = missingLinkRef.current as { beatId: string; missingBeatId: string } | null;
+            const missing = stop?.beatId === lastId ? stop.missingBeatId : null;
+            if (lastBeat && missing) {
+              setEndedNotice(
+                `Story stopped at "${lastBeat.name || lastId}": it leads to a beat that no longer exists (${missing}). Players would see "The story ends here". Link it to a beat that exists — Debug ▸ Problems lists every link like this.`
+              );
+            } else if (lastBeat && lastBeat.type !== 'endScreen') {
               setEndedNotice(
                 `Story ended at "${lastBeat.name || lastId}" — this beat has no outgoing connection. Wire it onward in the flowchart (or make it an End Screen).`
               );
