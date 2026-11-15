@@ -14,7 +14,7 @@
  */
 import React from 'react';
 import type { RenderThemeSettings } from './PositionedBeatView';
-import { renderMarkdownLite } from '../utils/markdownLite';
+import { renderMarkdownLite, markdownLiteToPlain } from '../utils/markdownLite';
 import { revealBoundary } from '../utils/typewriterGranularity';
 import type { StageCharacterLike } from '../utils/speakerDimming';
 import {
@@ -68,6 +68,13 @@ export interface SpeechBubbleLayerProps {
    * rather than cover it). It has no text box of its own to hide.
    */
   role?: 'current' | 'earlier';
+  /**
+   * The Dialog Tree replies the player's reply bubble shows instead of
+   * buttons: their buttons never show, so they are not in the way. (The
+   * bubble used to make way for them while they waited, unseen, then stay
+   * there: it jumped aside when the replies were laid out.)
+   */
+  repliesInBubble?: readonly string[];
   zIndex?: number;
 }
 
@@ -185,6 +192,8 @@ function fillOf(color: string | undefined, opacity: number | undefined): { fill:
   return { fill: c, fillOpacity: /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(c) ? Math.max(0, Math.min(100, opacity ?? 100)) / 100 : 1 };
 }
 
+const flat = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
+
 /**
  * The line's own reveal: as the text box's typewriter, so both finish together.
  * The count belongs to the text it was counted for: a bubble that stays up
@@ -227,6 +236,7 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
   onShown,
   thought,
   role = 'current',
+  repliesInBubble,
   zIndex = 150,
 }) => {
   const earlier = role === 'earlier';
@@ -301,9 +311,11 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
 
     const obstacles: BubbleObstacle[] = [];
     for (const r of avoidRects ?? []) obstacles.push({ rect: { x: r.x, y: r.y, width: r.width, height: r.height }, weight: HEAVY });
+    const unseen = new Set((repliesInBubble ?? []).map((r) => flat(markdownLiteToPlain(r))).filter(Boolean));
     root.querySelectorAll<HTMLElement>('button, [role="button"]').forEach((el) => {
       // Bubbles' own lines (the player's replies) are not in the way: that bubble keeps clear of this one.
       if (el.closest('[data-speech-bubble-layer]')) return;
+      if (unseen.size > 0 && (unseen.has(flat(el.textContent)) || unseen.has(flat(el.getAttribute('aria-label'))))) return;
       const r = el.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: HEAVY });
     });
@@ -339,7 +351,7 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
     const next: BubbleLayout = { ...placement, textWidth, textHeight, lettering };
     if (!sameLayout(layoutRef.current, next)) { layoutRef.current = next; setLayout(next); }
     report(true);
-  }, [speakerElementName, speakFrom?.x, speakFrom?.y, flipX, stroke, avoidRects, theme.fonts?.textFont, theme.fonts?.textFontSize, report, !!thought, earlier, headFound, headTick]);
+  }, [speakerElementName, speakFrom?.x, speakFrom?.y, flipX, stroke, avoidRects, theme.fonts?.textFont, theme.fonts?.textFontSize, report, !!thought, earlier, headFound, headTick, (repliesInBubble ?? []).join('\u0000')]);
 
   // Place it before the first paint (no flash of the text box), then follow
   // the stage: a resized window, a picture that finished loading, a speaker
@@ -595,6 +607,7 @@ export const StageBubbles: React.FC<{
         skipAnimation={skipAnimation}
         onPlaced={onPlaced}
         onShown={onShown}
+        repliesInBubble={theme.speakerDisplay?.replyStyle === 'bubble' && speakerLocation(locations, history?.player) ? history?.replies : undefined}
         zIndex={zIndex}
       />
     </>
