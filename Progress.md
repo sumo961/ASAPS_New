@@ -5,6 +5,18 @@
 ### Overview
 Characters on the stage who aren't speaking can be dimmed, as visual novels do (a student request), and a speaking character's lines can show as comic speech bubbles pointing at them — with the line before (or the player's own Dialog Tree reply) kept up beside the current one, and inner voices thinking in clouds, and a Dialog Tree's replies can be listed in one bubble at the player's character. Apple's built-in model (macOS 27 `fm serve`) now works for the in-story AI beats in the Preview, in-story AI can use its own provider, and AI Conversation directions fire wrongly far less often on small models. Review fixes to the v0.9.156 replay limit and role-check wording. From an audit of the Södertörn student projects: three new Story Warnings (stand-in text left in, meters nothing changes, sounds and pictures no longer in the project, with a way to swap one on every beat at once), exported stories say so when they stop at a dead end, and the Preview's Debug panel says when a character's HUD has nothing to show. Switching, importing or deleting a project no longer leaves the old one behind: the Debug and Co-Designer windows follow, imports start clean, and auto-save pauses end with their project.
 
+### Fixed: speech bubbles follow the turn (Red story test)
+
+Tested with speech bubbles turned on in the Red story:
+- **The reply lines look clickable:** in the player's reply bubble each line is drawn like the story's buttons (colours, border, corners, hover colour), in place of the ▸ marker.
+- **The dimming follows the turn:** the light moves to the player's character while their replies are up and while the reply they picked is said, then back to the character answering. It also does this with only two characters on the stage.
+- **The reply is said first:** the line answering a picked reply waits about as long as reading the reply takes (1 to 3 s). The reply is shown unfaded, then the answer appears, and only then its buttons. Clicking through the typewriter skips the wait. Works in fixed, slot and spatial layouts.
+- **The reply buttons no longer flash before the bubble:** theme buttons ease every property, visibility included, so a hidden button stayed visible for its 0.2 s easing. Hiding now turns its transition off. The layer also re-checks as soon as the stage changes, not on the next frame.
+- **Inventory panels can be folded anywhere:** a character's inventory panel folds into its badge when its title is clicked, on any screen size, and stays folded across beats. Phones still start folded.
+- **Bubbles keep clear of inventory and meter panels:** they now count as obstacles for both kinds of bubble.
+
+**Files modified:** `packages/renderer/src/components/{SpeechBubbleLayer,ReplyBubbleLayer,PositionedBeatView,SlotFlowView,SpatialFlowView,CharacterInventoryFrame,CharacterMeterFrame}.tsx`, `renderers/ReactRenderer.tsx`, `utils/speechBubble.ts`, tests (`speechBubble.test.ts`, `ReactRenderer.test.tsx`, `CharacterInventoryFrame.test.tsx`), `packages/builder/public/player-web.js`, `docs/USER_GUIDE.md`
+
 ### Fixed: the Visual Editor and Script tab show the chosen language
 User report: with Afrikaans chosen, the Properties panel showed Afrikaans and the Visual Editor and Script tab English.
 - **Visual Editor, responsive layout:** the slot preview built its text from the beat's own parameters; the fixed canvas already translated (`getBeatContent`). It now reads `translateBeatParameters(params, resource, beatId)` (new in `export/StoryTranslator.ts`: the beat's translated strings put into a copy, as the Preview applies them; display only, edits still read the beat). The beat's speaker name is translated too (`resolveTranslatedSpeakerName`). The left panel's element summaries still show the source.

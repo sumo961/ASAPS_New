@@ -29,10 +29,15 @@ import { aimAtSpeaker, quoteAttr, type BubbleSpeakerLocation } from './SpeechBub
 
 const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
 
-/** What a reply button looks like while its line is in the bubble. */
-const HIDDEN: Record<string, string> = { visibility: 'hidden' };
+/**
+ * What a reply button looks like while its line is in the bubble. Without
+ * its transition: theme buttons ease every property, visibility included,
+ * so they would stay visible for the length of the easing first.
+ */
+const HIDDEN: Record<string, string> = { transition: 'none', visibility: 'hidden' };
 /** In the Visual Editor: an empty outline, still there to select. */
 const GHOST: Record<string, string> = {
+  transition: 'none',
   color: 'transparent',
   'background-color': 'transparent',
   'background-image': 'none',
@@ -79,8 +84,9 @@ const ReplyBubbleLayer: React.FC<{
   theme: RenderThemeSettings;
   avoidRects?: ReadonlyArray<{ x: number; y: number; width: number; height: number }>;
   editorMode?: boolean;
+  onShown?: (shown: boolean) => void;
   zIndex: number;
-}> = ({ player, replies, theme, avoidRects, editorMode, zIndex }) => {
+}> = ({ player, replies, theme, avoidRects, editorMode, onShown, zIndex }) => {
   const layerRef = React.useRef<HTMLDivElement>(null);
   const measureRef = React.useRef<HTMLDivElement>(null);
   const [layout, setLayout] = React.useState<ReplyLayout | null>(null);
@@ -172,6 +178,11 @@ const ReplyBubbleLayer: React.FC<{
       const r = el.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: HEAVY });
     });
+    // A character's own meters and inventory, drawn on the stage.
+    root.querySelectorAll<HTMLElement>('[data-hud-frame]').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: HEAVY });
+    });
     root.querySelectorAll<HTMLElement>('[data-character-name]').forEach((el) => {
       if (el === playerEl) return;
       const r = el.getBoundingClientRect();
@@ -226,8 +237,11 @@ const ReplyBubbleLayer: React.FC<{
     const resize = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null;
     resize?.observe(root);
     root.querySelectorAll('[data-character-name]').forEach((el) => resize?.observe(el));
+    // At once, not on the next frame: a reply button the stage has just put
+    // up (or drawn again) is hidden before it is ever painted. Hiding it is a
+    // change too, but the next pass changes nothing and it stops there.
     const moves = typeof MutationObserver !== 'undefined' ? new MutationObserver((records) => {
-      if (records.some((r) => !layerRef.current?.contains(r.target))) schedule();
+      if (records.some((r) => !layerRef.current?.contains(r.target))) compute();
     }) : null;
     moves?.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'src', 'disabled'] });
     return () => {
@@ -240,24 +254,37 @@ const ReplyBubbleLayer: React.FC<{
   // Gone (a reply picked, the beat over): the buttons as they were.
   React.useEffect(() => () => restore(), [restore]);
 
+  // The stage lights the player's character while their replies are up.
+  const shown = !!layout;
+  const onShownRef = React.useRef(onShown);
+  onShownRef.current = onShown;
+  React.useEffect(() => { onShownRef.current?.(shown); }, [shown]);
+  React.useEffect(() => () => onShownRef.current?.(false), []);
+
   const textColor = theme.colors?.textColor || '#1f2937';
   const fill = theme.textBox?.backgroundColor || '#ffffff';
   const fillOpacity = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(fill) ? Math.max(0, Math.min(100, theme.textBox?.opacity ?? 100)) / 100 : 1;
   const outline = stroke > 0 ? (theme.textBox?.borderColor || '#1f2937') : 'none';
 
-  const lineStyle: React.CSSProperties = {
-    display: 'flex', gap: '0.4em', alignItems: 'baseline', boxSizing: 'border-box', width: '100%',
-    margin: 0, padding: '0.15em 0.35em', border: 0, borderRadius: 6, background: 'transparent',
-    font: 'inherit', color: 'inherit', textAlign: 'start', lineHeight: 'inherit', letterSpacing: 'inherit',
-  };
+  // Each reply looks like the story's buttons (their colours, border and
+  // corners, a little smaller), so it reads as something to click.
+  const btn = theme.button;
+  const btnBorder = Math.min(2, Math.max(1, btn?.borderWidth ?? 1));
+  const lineStyle = (i: number): React.CSSProperties => ({
+    display: 'block', boxSizing: 'border-box', width: '100%',
+    margin: i > 0 ? '0.35em 0 0' : 0, padding: '0.25em 0.6em',
+    border: `${btnBorder}px solid ${btn?.borderColor || 'rgba(127,127,127,0.6)'}`,
+    borderRadius: Math.min(12, Math.max(4, btn?.borderRadius ?? 8)),
+    backgroundColor: btn?.backgroundColor || 'rgba(127,127,127,0.15)',
+    color: btn?.textColor || 'inherit',
+    font: 'inherit', textAlign: 'start', lineHeight: 'inherit', letterSpacing: 'inherit',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+  });
   const lines = (interactive: boolean) => replies.map((reply, i) => {
     const content = (
-      <>
-        <span aria-hidden style={{ opacity: 0.55, flex: 'none' }}>▸</span>
-        <span style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word', minWidth: 0 }} dangerouslySetInnerHTML={{ __html: renderMarkdownLite(reply) }} />
-      </>
+      <span style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word', minWidth: 0 }} dangerouslySetInnerHTML={{ __html: renderMarkdownLite(reply) }} />
     );
-    if (!interactive) return <div key={i} style={lineStyle}>{content}</div>;
+    if (!interactive) return <div key={i} style={lineStyle(i)}>{content}</div>;
     // In the Visual Editor the stage's buttons are inert; the lines stay readable.
     const off = !editorMode && !!disabled[i];
     return (
@@ -268,7 +295,7 @@ const ReplyBubbleLayer: React.FC<{
         data-reply-line={i}
         disabled={off}
         onClick={(e) => { e.stopPropagation(); buttonsRef.current[i]?.click(); }}
-        style={{ ...lineStyle, cursor: off ? 'default' : 'pointer', ...(off ? { opacity: 0.45 } : null) }}
+        style={{ ...lineStyle(i), cursor: off ? 'default' : 'pointer', ...(off ? { opacity: 0.45 } : null) }}
       >
         {content}
       </button>
@@ -293,7 +320,7 @@ const ReplyBubbleLayer: React.FC<{
             aria-label="Your reply"
             style={{ position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height, pointerEvents: 'auto' }}
           >
-            <style>{'.asaps-reply-line:not(:disabled):hover{background:rgba(127,127,127,0.2)!important}.asaps-reply-line:focus-visible{outline:2px solid currentColor;outline-offset:1px}'}</style>
+            <style>{`.asaps-reply-line:not(:disabled):hover{background-color:${btn?.hoverBackgroundColor || 'rgba(127,127,127,0.3)'}!important;filter:brightness(1.05)}.asaps-reply-line:focus-visible{outline:2px solid currentColor;outline-offset:1px}`}</style>
             <svg
               width={rect.width}
               height={rect.height}
@@ -339,8 +366,10 @@ export const ReplyBubble: React.FC<{
   theme: RenderThemeSettings;
   avoidRects?: ReadonlyArray<{ x: number; y: number; width: number; height: number }>;
   editorMode?: boolean;
+  /** The bubble is up (true) or gone (false): the stage lights the player's character meanwhile. */
+  onShown?: (shown: boolean) => void;
   zIndex?: number;
-}> = ({ locations, history, theme, avoidRects, editorMode, zIndex = 151 }) => {
+}> = ({ locations, history, theme, avoidRects, editorMode, onShown, zIndex = 151 }) => {
   if (theme?.speakerDisplay?.replyStyle !== 'bubble') return null;
   const replies = history?.replies?.filter((r) => r.trim());
   if (!replies || replies.length === 0) return null;
@@ -354,6 +383,7 @@ export const ReplyBubble: React.FC<{
       theme={theme}
       avoidRects={avoidRects}
       editorMode={editorMode}
+      onShown={onShown}
       zIndex={zIndex}
     />
   );

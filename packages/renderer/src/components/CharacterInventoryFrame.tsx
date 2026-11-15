@@ -386,6 +386,12 @@ const InventoryItem: React.FC<{
  *
  * Renders inventory items in a grid layout with hover tooltips.
  */
+/**
+ * Inventories the player folded, by title and place: each beat draws its
+ * frames afresh, and one folded away stays folded until the player opens it.
+ */
+const foldedFrames = new Set<string>();
+
 export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = ({
   items,
   config,
@@ -401,7 +407,14 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
   // HUD chrome default is a UI string so translated stories don't show
   // an English "Inventory" header; an explicit title prop still wins.
   const frameTitle = title || uiString('inventoryTitle');
-  const [minimized, setMinimized] = React.useState(autoMinimize);
+  const foldKey = `${frameTitle}\u0000${config.dockMode ?? 'screen'}\u0000${config.screenPosition ?? config.anchor ?? ''}`;
+  const [minimized, setMinimizedState] = React.useState(() => autoMinimize || foldedFrames.has(foldKey));
+  // The player can fold it on any screen (a full frame can cover the story,
+  // speech bubbles included); phones start folded (autoMinimize).
+  const setMinimized = (fold: boolean) => {
+    if (fold) foldedFrames.add(foldKey); else foldedFrames.delete(foldKey);
+    setMinimizedState(fold);
+  };
 
   // Hide if no items or not visible
   if (items.length === 0 || !isVisible) {
@@ -469,6 +482,7 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
     const previewItems = resolvedItems.slice(0, 4);
     return (
       <div
+        data-hud-frame="inventory"
         style={{
           position: 'absolute',
           left: position.x,
@@ -552,7 +566,7 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
     paddingBottom: 4,
     borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
     textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
-    cursor: autoMinimize ? 'pointer' : undefined,
+    cursor: 'pointer',
   };
 
   const gridStyle: React.CSSProperties = {
@@ -562,9 +576,9 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
   };
 
   return (
-    <div style={frameStyle}>
-      <div style={headerStyle} onClick={autoMinimize ? () => setMinimized(true) : undefined}>
-        {frameTitle}{autoMinimize ? ' \u25BC' : ''}
+    <div style={frameStyle} data-hud-frame="inventory">
+      <div style={headerStyle} onClick={() => setMinimized(true)}>
+        <span>{frameTitle}</span><span aria-hidden style={{ marginLeft: 4, opacity: 0.7 }}>{'\u25BC'}</span>
       </div>
       <div style={gridStyle}>
         {resolvedItems.map((item) => (

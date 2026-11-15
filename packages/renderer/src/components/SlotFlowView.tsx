@@ -45,7 +45,7 @@ import { WebViewElement } from './WebViewElement';
 import { ARSceneElement } from './ARSceneElement';
 import { runSlotPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer } from './ResponsiveCharacterLayer';
-import { StageBubbles, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
+import { StageBubbles, useStageTurn, LEAD_IN_ATTR, LEAD_IN_STYLE, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
 import { ReplyBubble } from './ReplyBubbleLayer';
 import { bubbleSpeakerFor, type BubbleHistory } from '../utils/speechBubble';
 import type { SpeechLineMode } from './PositionedBeatView';
@@ -532,6 +532,17 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const bodySpeechLine: SpeechLineMode | undefined = speechLineProp
     ?? (bubbleOn ? (bubblePlaced ? (editorMode ? 'ghost' : 'hidden') : 'shown') : undefined);
   const lineInBubble = bodySpeechLine === 'hidden' || bodySpeechLine === 'ghost';
+  // Whose turn it is: the reply just picked is said first (the line and the
+  // buttons wait), and the dimming leaves the one whose turn it is lit.
+  const { leadIn, litCharacter, setRepliesShown } = useStageTurn({
+    bubbleSpeaker: bubbleOn ? bubbleSpeaker as BubbleSpeakerLocation | undefined : undefined,
+    text: bodyText,
+    thought: exchange?.inner ? { color: exchange.color } : undefined,
+    history: bubbleHistory,
+    locations: characterLocations,
+    speakingCharacter,
+    editorMode,
+  });
 
   // ── preferredLines honoring for the title (soft) ──────────────────────
   // The author can ask a title to be N lines. We bias toward it with a
@@ -1371,6 +1382,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     <div
       ref={rootRef}
       className={`${scope} slotflow-root`}
+      {...(leadIn ? { [LEAD_IN_ATTR]: '' } : null)}
       style={{
         ...rootStyle,
         // Single inner scrollable surface (.slotflow-scroll). The action
@@ -2654,7 +2666,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           animations={animations}
           characterResolver={characterResolver}
           assetResolver={assetResolver}
-          speakingCharacter={speakingCharacter}
+          speakingCharacter={litCharacter}
           dimSettings={theme?.speakerDisplay}
           spriteDataResolver={spriteDataResolver}
           editorMode={editorMode}
@@ -2673,17 +2685,22 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           onPlaced={setBubblePlaced}
           theme={theme}
           avoidRects={reservedHudRects}
+          leadIn={leadIn}
           zIndex={5}
         />
       )}
-      <ReplyBubble
-        locations={characterLocations as BubbleSpeakerLocation[] | undefined}
-        history={bubbleHistory}
-        theme={theme}
-        avoidRects={reservedHudRects}
-        editorMode={editorMode}
-        zIndex={6}
-      />
+      {leadIn && <style>{LEAD_IN_STYLE}</style>}
+      {!leadIn && (
+        <ReplyBubble
+          locations={characterLocations as BubbleSpeakerLocation[] | undefined}
+          history={bubbleHistory}
+          theme={theme}
+          avoidRects={reservedHudRects}
+          editorMode={editorMode}
+          onShown={setRepliesShown}
+          zIndex={6}
+        />
+      )}
     </div>
   );
 };

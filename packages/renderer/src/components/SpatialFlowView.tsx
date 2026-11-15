@@ -16,7 +16,7 @@ import { SlotFlowView, applyAlphaToHex, buttonPictureStyle } from './SlotFlowVie
 import { runSpatialPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer, type ResponsiveCharacterLayerHandle } from './ResponsiveCharacterLayer';
 import { TimerProgressBar } from './TimerProgressBar';
-import { StageBubbles, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
+import { StageBubbles, useStageTurn, LEAD_IN_ATTR, LEAD_IN_STYLE, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
 import { ReplyBubble } from './ReplyBubbleLayer';
 import { bubbleSpeakerFor, type BubbleHistory } from '../utils/speechBubble';
 import type { SpeechLineMode } from './PositionedBeatView';
@@ -401,6 +401,16 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   const bodySpeechLine: SpeechLineMode | undefined = bubbleOn
     ? (bubblePlaced ? (editorMode ? 'ghost' : 'hidden') : 'shown')
     : undefined;
+  // Whose turn it is: the reply just picked is said first (the line and the
+  // buttons wait), and the dimming leaves the one whose turn it is lit.
+  const { leadIn, litCharacter, setRepliesShown } = useStageTurn({
+    bubbleSpeaker: bubbleOn ? bubbleSpeaker as BubbleSpeakerLocation | undefined : undefined,
+    text: bubbleText,
+    history: bubbleHistory,
+    locations: characterLocations,
+    speakingCharacter,
+    editorMode,
+  });
 
   // Default-target countdown — mirror of SlotFlowView's subscription
   // wiring so a spatial beat (titleScreen, dialogTree spatial node,
@@ -558,6 +568,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
       ref={containerRef}
       data-layer="spatial-composite"
       className={scope}
+      {...(leadIn ? { [LEAD_IN_ATTR]: '' } : null)}
       style={{
         position: 'absolute',
         inset: 0,
@@ -1000,7 +1011,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
             animations={animations}
             characterResolver={characterResolver}
             assetResolver={assetResolver}
-            speakingCharacter={speakingCharacter}
+            speakingCharacter={litCharacter}
             dimSettings={theme?.speakerDisplay}
             spriteDataResolver={spriteDataResolver}
             editorMode={editorMode}
@@ -1019,16 +1030,19 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           onPlaced={setBubblePlaced}
           theme={theme}
           avoidRects={reservedHudRects}
+          leadIn={leadIn}
           zIndex={5}
         />
       )}
-      {theme && (
+      {leadIn && <style>{LEAD_IN_STYLE}</style>}
+      {theme && !leadIn && (
         <ReplyBubble
           locations={characterLocations as BubbleSpeakerLocation[] | undefined}
           history={bubbleHistory}
           theme={theme}
           avoidRects={reservedHudRects}
           editorMode={editorMode}
+          onShown={setRepliesShown}
           zIndex={6}
         />
       )}

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   bubbleLineKey,
+  replyLeadInMs,
   bubbleSpeakerFor,
   earlierLineFor,
   thoughtPath,
@@ -279,5 +280,33 @@ describe("the player's replies in one bubble", () => {
     const off = applyBeatLook({ ...DEFAULT_THEME, speakerDisplay: { ...(DEFAULT_THEME.speakerDisplay as any), replyStyle: 'bubble', lineStyle: 'bubble' } }, { replyBubble: 'off' });
     expect(off.speakerDisplay?.replyStyle).toBe('buttons');
     expect(off.speakerDisplay?.lineStyle).toBe('bubble');
+  });
+});
+
+describe('replyLeadInMs: the reply the player picked is said first', () => {
+  const stage = [
+    { kind: 'character', name: 'Red', characterId: 'red' },
+    { kind: 'character', name: 'Mom', characterId: 'mom' },
+  ];
+  const mom = { speaker: 'mom', text: 'Red, darling, I was a perfectly dreadful student.' };
+  const reply = { speaker: 'red', text: 'Mother, before I go, I would like to ask you about a book.', reply: true };
+
+  it('waits about as long as reading the reply takes, 1 to 3 seconds', () => {
+    const ms = replyLeadInMs({ earlier: reply }, mom, stage);
+    expect(ms).toBeGreaterThanOrEqual(1000);
+    expect(ms).toBeLessThanOrEqual(3000);
+    expect(replyLeadInMs({ earlier: { ...reply, text: 'Yes.' } }, mom, stage)).toBe(1000);
+    expect(replyLeadInMs({ earlier: { ...reply, text: 'word '.repeat(60) } }, mom, stage)).toBe(3000);
+  });
+
+  it('does not wait after a line carried over by Continue, or when the replier is not on the stage', () => {
+    expect(replyLeadInMs({ earlier: { ...reply, reply: undefined } }, mom, stage)).toBe(0);
+    expect(replyLeadInMs({ earlier: reply }, mom, [stage[1]])).toBe(0);
+    expect(replyLeadInMs(undefined, mom, stage)).toBe(0);
+  });
+
+  it('does not wait once the story has moved past the line that answered', () => {
+    expect(replyLeadInMs({ earlier: reply, earlierAnchor: bubbleLineKey({ speaker: 'mom', text: 'Something else.' }) }, mom, stage)).toBe(0);
+    expect(replyLeadInMs({ earlier: reply, earlierAnchor: bubbleLineKey(mom) }, mom, stage)).toBeGreaterThan(0);
   });
 });

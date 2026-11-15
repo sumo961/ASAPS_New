@@ -122,3 +122,18 @@ describe('auto-minimize', () => {
     expect(screen.getByTitle(/click to expand/i)).toBeDefined();
   });
 });
+
+describe('folding on any screen', () => {
+  it('folds when its title is clicked and stays folded on the next beat', () => {
+    const first = renderInv({ title: 'Satchel', config: config({ screenPosition: 'screen-top-right' } as any) });
+    fireEvent.click(screen.getByText('Satchel'));
+    expect(first.container.querySelector('[data-hud-frame]')?.getAttribute('title')).toContain('Satchel');
+    first.unmount();
+    // The next beat draws the frame again: still folded until opened.
+    const next = renderInv({ title: 'Satchel', config: config({ screenPosition: 'screen-top-right' } as any) });
+    const badge = next.container.querySelector('[data-hud-frame]') as HTMLElement;
+    expect(screen.queryByText('Satchel')).toBeNull();
+    fireEvent.click(badge);
+    expect(screen.getByText('Satchel')).toBeTruthy();
+  });
+});

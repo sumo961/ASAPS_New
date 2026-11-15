@@ -439,7 +439,7 @@ describe('ReactRenderer speech bubble history', () => {
     renderer.setState('currentBeatType', 'dialogTree');
     r().bubbleHistory().onShown(line('char_stan', 'You okay?'));
     r().noteBubbleTurn('Not really.');
-    expect(r().bubbleHistory().earlier).toEqual(line('char_you', 'Not really.'));
+    expect(r().bubbleHistory().earlier).toEqual({ ...line('char_you', 'Not really.'), reply: true });
     expect(r().bubbleHistory().player).toBe('char_you');
   });
 

@@ -1718,7 +1718,7 @@ export class ReactRenderer extends BaseRenderer {
     const beatType = this.getState('currentBeatType') as string | undefined;
     if (choiceText !== undefined) {
       const player = beatType === 'dialogTree' ? this.playerCharacterResolver?.() : undefined;
-      this.bubbleEarlier = player && choiceText.trim() ? { speaker: player, text: choiceText } : null;
+      this.bubbleEarlier = player && choiceText.trim() ? { speaker: player, text: choiceText, reply: true } : null;
     } else {
       this.bubbleEarlier = shown;
     }

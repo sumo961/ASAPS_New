@@ -442,7 +442,7 @@ export const CharacterMeterFrame: React.FC<CharacterMeterFrameProps> = ({
   };
 
   return (
-    <div style={frameStyle} data-meter-frame={characterName || ''}>
+    <div style={frameStyle} data-meter-frame={characterName || ''} data-hud-frame="meters">
       {showHeader && (
         <div
           data-meter-frame-name=""

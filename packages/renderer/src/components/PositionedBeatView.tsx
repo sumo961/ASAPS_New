@@ -26,7 +26,7 @@ import { revealBoundary } from '../utils/typewriterGranularity';
 import { thoughtBoxStyle } from '../utils/innerVoice';
 import { DIM_TRANSITION, dimFilter, showsSpeaker, silentCharacterFilters } from '../utils/speakerDimming';
 import { bubbleSpeakerFor, type BubbleHistory } from '../utils/speechBubble';
-import { StageBubbles, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
+import { StageBubbles, useStageTurn, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
 import { ReplyBubble } from './ReplyBubbleLayer';
 
 /** A frame picture's edge height on a fixed stage: the picture's share of the stage width, never taller than in the picture. */
@@ -1441,16 +1441,6 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   speakingCharacter,
   bubbleHistory,
 }) => {
-  // Speaker Display → "Dim characters who aren't speaking": a filter per
-  // character element that isn't the speaker, when the speaker is on the stage.
-  // (Decided per location, not per index: the elements below are copies.)
-  const silentFilter = React.useMemo(
-    () => silentCharacterFilters(elements.map((e) => e.location), speakingCharacter, theme.speakerDisplay).size > 0
-      ? dimFilter(theme.speakerDisplay?.dimStrength) : undefined,
-    [elements, speakingCharacter, theme.speakerDisplay],
-  );
-  const dimFor = (element: PositionedElementData): string | undefined =>
-    silentFilter && element.location.kind === 'character' && !showsSpeaker(element.location, speakingCharacter) ? silentFilter : undefined;
   // Speaker Display → "Show lines as: speech bubbles": the placed character
   // saying this line, when there is one. Narration keeps the text box.
   const bubbleSpeaker = theme.speakerDisplay?.lineStyle === 'bubble' && !previewMode
@@ -1825,6 +1815,28 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   // The effective animation complete state - false if elements just changed
   const effectiveAnimationsComplete = elementsChanged ? false : animationsComplete;
   const effectiveSkipAnimation = elementsChanged ? false : skipAnimation;
+
+  // Whose turn it is (useStageTurn): the reply the player just picked is
+  // said first, and the line answering it and its buttons wait; the dimming
+  // leaves the one whose turn it is lit. (Decided per location, not per
+  // index: the elements below are copies.)
+  const { leadIn, litCharacter, setRepliesShown } = useStageTurn({
+    bubbleSpeaker: bubbleSpeaker as BubbleSpeakerLocation | undefined,
+    text: bubbleSpeaker ? elements.find((el) => el.location.kind === 'text' || el.location.kind === 'dialog')?.content : undefined,
+    thought,
+    history: bubbleHistory,
+    locations: elements.map((e) => e.location),
+    speakingCharacter,
+    editorMode,
+    skip: effectiveSkipAnimation,
+  });
+  const silentFilter = React.useMemo(
+    () => silentCharacterFilters(elements.map((e) => e.location), litCharacter, theme.speakerDisplay).size > 0
+      ? dimFilter(theme.speakerDisplay?.dimStrength) : undefined,
+    [elements, litCharacter, theme.speakerDisplay],
+  );
+  const dimFor = (element: PositionedElementData): string | undefined =>
+    silentFilter && element.location.kind === 'character' && !showsSpeaker(element.location, litCharacter) ? silentFilter : undefined;
 
   // Reset the actual state after render (for subsequent renders)
   React.useEffect(() => {
@@ -2295,7 +2307,9 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
 
   // Build a map of element name to animation delay
   const animationDelayMap = new Map<string, number>();
-  let cumulativeDelay = 0;
+  // While the reply before is being said the lines don't start (the wait
+  // ends by re-rendering with no delay, which starts them).
+  let cumulativeDelay = leadIn ? 3_600_000 : 0;
 
   for (const element of sortedTextElements) {
     animationDelayMap.set(element.location.name, cumulativeDelay);
@@ -2310,7 +2324,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   totalTextElementsRef.current = sortedTextElements.length;
 
   // Determine if buttons should be visible
-  const shouldShowButtons = effectiveAnimationsComplete || animation === 'none' || sortedTextElements.length === 0;
+  const shouldShowButtons = !leadIn && (effectiveAnimationsComplete || animation === 'none' || sortedTextElements.length === 0);
 
   // The spoken line shown as a speech bubble: the first text box (the one the
   // speaker's name and portrait go with). Its box is hidden while the bubble
@@ -2511,15 +2525,17 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           theme={theme}
           avoidRects={reservedHudRects}
           skipAnimation={effectiveSkipAnimation}
+          leadIn={leadIn}
         />
       )}
-      {!previewMode && (
+      {!previewMode && !leadIn && (
         <ReplyBubble
           locations={elements.map((e) => e.location) as BubbleSpeakerLocation[]}
           history={bubbleHistory}
           theme={theme}
           avoidRects={reservedHudRects}
           editorMode={editorMode}
+          onShown={setRepliesShown}
         />
       )}
     </div>
