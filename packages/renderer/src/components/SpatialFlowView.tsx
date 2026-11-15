@@ -16,7 +16,7 @@ import { SlotFlowView, applyAlphaToHex, buttonPictureStyle } from './SlotFlowVie
 import { runSpatialPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer, type ResponsiveCharacterLayerHandle } from './ResponsiveCharacterLayer';
 import { TimerProgressBar } from './TimerProgressBar';
-import { StageBubbles, useStageTurn, LEAD_IN_ATTR, LEAD_IN_STYLE, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
+import { StageBubbles, useStageTurn, REPLIES_WAIT_ATTR, REPLIES_WAIT_STYLE, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
 import { ReplyBubble } from './ReplyBubbleLayer';
 import { bubbleSpeakerFor, type BubbleHistory } from '../utils/speechBubble';
 import type { SpeechLineMode } from './PositionedBeatView';
@@ -401,13 +401,11 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   const bodySpeechLine: SpeechLineMode | undefined = bubbleOn
     ? (bubblePlaced ? (editorMode ? 'ghost' : 'hidden') : 'shown')
     : undefined;
-  // Whose turn it is: the reply just picked is said first (the line and the
-  // buttons wait), and the dimming leaves the one whose turn it is lit.
-  const { leadIn, repliesHeld, endRepliesHold, litCharacter, setRepliesShown } = useStageTurn({
+  // Whose turn it is: the dimming leaves the one whose turn it is lit.
+  const { repliesHeld, endRepliesHold, litCharacter, setRepliesShown } = useStageTurn({
     bubbleSpeaker: bubbleOn ? bubbleSpeaker as BubbleSpeakerLocation | undefined : undefined,
     text: bubbleText,
     history: bubbleHistory,
-    locations: characterLocations,
     speakingCharacter,
     editorMode,
   });
@@ -570,7 +568,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
       ref={containerRef}
       data-layer="spatial-composite"
       className={scope}
-      {...(leadIn || repliesWaiting ? { [LEAD_IN_ATTR]: '' } : null)}
+      {...(repliesWaiting ? { [REPLIES_WAIT_ATTR]: '' } : null)}
       onClickCapture={repliesWaiting ? endRepliesHold : undefined}
       style={{
         position: 'absolute',
@@ -1033,13 +1031,12 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           onPlaced={setBubblePlaced}
           theme={theme}
           avoidRects={reservedHudRects}
-          leadIn={leadIn}
           repliesUp={!!bubbleHistory?.replies?.length && !repliesWaiting}
           zIndex={5}
         />
       )}
-      {(leadIn || repliesWaiting) && <style>{LEAD_IN_STYLE}</style>}
-      {theme && !leadIn && !repliesWaiting && (
+      {repliesWaiting && <style>{REPLIES_WAIT_STYLE}</style>}
+      {theme && !repliesWaiting && (
         <ReplyBubble
           locations={characterLocations as BubbleSpeakerLocation[] | undefined}
           history={bubbleHistory}

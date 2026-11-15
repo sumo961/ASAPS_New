@@ -434,12 +434,12 @@ describe('ReactRenderer speech bubble history', () => {
     expect(h.earlierAnchor).toBe(`char_billie\u0000Leave me alone.`);
   });
 
-  it("shows the player's Dialog Tree reply at the player's character", () => {
+  it("doesn't say a picked Dialog Tree reply again: the line answering it comes at once", () => {
     renderer.setPlayerCharacterResolver(() => 'char_you');
     renderer.setState('currentBeatType', 'dialogTree');
     r().bubbleHistory().onShown(line('char_stan', 'You okay?'));
     r().noteBubbleTurn('Not really.');
-    expect(r().bubbleHistory().earlier).toEqual({ ...line('char_you', 'Not really.'), reply: true });
+    expect(r().bubbleHistory().earlier).toBeUndefined();
     expect(r().bubbleHistory().player).toBe('char_you');
   });
 

@@ -33,7 +33,6 @@ import {
   bubbleLineKey,
   earlierLineFor,
   bubbleReadingMs,
-  replyLeadInMs,
   speakerLocation,
   type BubbleHistory,
   type BubbleLine,
@@ -69,12 +68,6 @@ export interface SpeechBubbleLayerProps {
    * rather than cover it). It has no text box of its own to hide.
    */
   role?: 'current' | 'earlier';
-  /**
-   * Placed but not shown yet: the line waits while the player's reply before
-   * it is said (replyLeadInMs). Its typewriter starts when the wait ends.
-   * On an 'earlier' bubble: that reply is being said now, so it is not faded.
-   */
-  hold?: boolean;
   zIndex?: number;
 }
 
@@ -192,27 +185,34 @@ function fillOf(color: string | undefined, opacity: number | undefined): { fill:
   return { fill: c, fillOpacity: /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(c) ? Math.max(0, Math.min(100, opacity ?? 100)) / 100 : 1 };
 }
 
-/** The line's own reveal: as the text box's typewriter, so both finish together. */
-function useReveal(text: string, theme: RenderThemeSettings, skip: boolean, hold = false): number {
+/**
+ * The line's own reveal: as the text box's typewriter, so both finish together.
+ * The count belongs to the text it was counted for: a bubble that stays up
+ * for the next line (the same speaker again, or the next character after
+ * Continue) starts that line at 0 in its first frame. It used to show the
+ * new line whole for a frame, then type it again (user report, 2026-11-16).
+ */
+export function useReveal(text: string, theme: RenderThemeSettings, skip: boolean): number {
   // Players who asked for less motion get the whole line at once, as in the text box.
   const reducedMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const animation = reducedMotion ? 'none' : theme.textEffects?.animation || 'none';
   const speed = theme.textEffects?.typewriterSpeed || 30;
-  const [count, setCount] = React.useState(animation === 'typewriter' && !skip ? 0 : text.length);
+  const typing = animation === 'typewriter' && !skip;
+  const [counted, setCounted] = React.useState<{ text: string; count: number }>({ text, count: 0 });
   React.useEffect(() => {
-    if (animation !== 'typewriter' || skip) { setCount(text.length); return; }
-    if (hold) { setCount(0); return; }
-    setCount(0);
+    if (!typing) return;
+    setCounted({ text, count: 0 });
     let i = 0;
     const handle = setInterval(() => {
       i += 1;
-      setCount(i);
+      setCounted({ text, count: i });
       if (i >= text.length) clearInterval(handle);
     }, 1000 / Math.max(1, speed));
     return () => clearInterval(handle);
-  }, [text, animation, speed, skip, hold]);
-  return count;
+  }, [text, typing, speed]);
+  if (!typing) return text.length;
+  return counted.text === text ? Math.min(counted.count, text.length) : 0;
 }
 
 export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
@@ -227,13 +227,9 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
   onShown,
   thought,
   role = 'current',
-  hold = false,
   zIndex = 150,
 }) => {
   const earlier = role === 'earlier';
-  // A current line waiting for the reply before it; an earlier line being said now.
-  const waiting = hold && !earlier;
-  const saying = hold && earlier;
   const layerRef = React.useRef<HTMLDivElement>(null);
   const measureRef = React.useRef<HTMLDivElement>(null);
   const [layout, setLayout] = React.useState<BubbleLayout | null>(null);
@@ -382,13 +378,13 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
   // next line, when the same speaker keeps the same bubble).
   const shown = !!layout;
   React.useEffect(() => {
-    if (shown && !earlier && !waiting) onShownRef.current?.();
-  }, [shown, text, earlier, waiting]);
+    if (shown && !earlier) onShownRef.current?.();
+  }, [shown, text, earlier]);
 
-  const revealed = useReveal(text, theme, skipAnimation || earlier, waiting);
+  const revealed = useReveal(text, theme, skipAnimation || earlier);
   const typing = revealed < text.length;
   const cut = typing ? revealBoundary(text, revealed, theme.textEffects?.typewriterGranularity) : text.length;
-  const fade = !earlier && !waiting && theme.textEffects?.animation === 'fade'
+  const fade = !earlier && theme.textEffects?.animation === 'fade'
     && !(typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   const { fill, fillOpacity } = fillOf(theme.textBox?.backgroundColor, theme.textBox?.opacity);
@@ -420,8 +416,7 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
             {...(thought ? { 'data-thought': '' } : null)}
             style={{
               position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height,
-              ...(earlier && !saying ? { opacity: 0.8 } : null),
-              ...(waiting ? { visibility: 'hidden' as const } : null),
+              ...(earlier ? { opacity: 0.8 } : null),
               ...(fade ? { animation: `asaps-bubble-in ${theme.textEffects?.fadeInDuration || 500}ms ease-in both` } : null),
             }}
           >
@@ -430,7 +425,7 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
               width={rect.width}
               height={rect.height}
               aria-hidden
-              style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible', ...(earlier && !saying ? null : { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))' }) }}
+              style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible', ...(earlier ? null : { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))' }) }}
             >
               <path
                 d={thought ? thoughtPath(rect.width, rect.height, stroke) : bubblePath(rect.width, rect.height, localTip, stroke)}
@@ -482,16 +477,16 @@ export type BubbleSpeakerLocation = StageCharacterLike & {
   flipX?: boolean;
 };
 
-/** The current line as the bubble history knows it (see earlierLineFor, replyLeadInMs). */
+/** The current line as the bubble history knows it (see earlierLineFor). */
 export function stageBubbleLine(speaker: BubbleSpeakerLocation, text: string, thought?: { color?: string }): BubbleLine {
   return { speaker: speaker.characterId || speaker.characterName || speaker.name, text, ...(thought ? { thought } : null) };
 }
 
 /**
- * The player's reply said first, then the line answering it (replyLeadInMs):
- * true while that line waits. Clicking through (skip) ends the wait.
+ * True for `ms` after `key` comes up (0: never); `end` stops it early.
+ * Clicking through (skip) ends it too.
  */
-export function useReplyLeadIn(ms: number, key: string, skip = false): [waiting: boolean, end: () => void] {
+export function useTimedWait(ms: number, key: string, skip = false): [waiting: boolean, end: () => void] {
   const [doneKey, setDoneKey] = React.useState<string | null>(null);
   const waiting = ms > 0 && !skip && doneKey !== key;
   React.useEffect(() => {
@@ -505,11 +500,12 @@ export function useReplyLeadIn(ms: number, key: string, skip = false): [waiting:
 
 /**
  * Whose turn it is on a stage with speech bubbles, for every stage view:
- * - `leadIn`: the reply the player just picked is being said first, so the
- *   line answering it, and the buttons, wait (replyLeadInMs);
  * - `litCharacter`: who "Dim characters who aren't speaking" leaves lit —
- *   the player while their reply is said or their replies are up
- *   (`setRepliesShown`, from ReplyBubble), else the speaker.
+ *   the player while their replies are up (`setRepliesShown`, from
+ *   ReplyBubble), else the speaker;
+ * - `repliesHeld`: a Dialog Tree's replies wait while the line is read
+ *   (bubbleReadingMs); a click can end it (`endRepliesHold`).
+ * A picked reply is not said again: the line answering it comes at once.
  */
 export function useStageTurn(args: {
   /** The character saying the current line, when it is drawn as a bubble. */
@@ -517,37 +513,26 @@ export function useStageTurn(args: {
   text: string | undefined;
   thought?: { color?: string };
   history: BubbleHistory | undefined;
-  locations: ReadonlyArray<StageCharacterLike> | undefined;
   speakingCharacter: string | undefined;
   editorMode?: boolean;
-  /** The player clicked through: no wait. */
-  skip?: boolean;
 }): {
-  leadIn: boolean;
-  /** The player's replies wait while the line is read (bubbleReadingMs); a click can end it. */
   repliesHeld: boolean;
   endRepliesHold: () => void;
   litCharacter: string | undefined;
   setRepliesShown: (shown: boolean) => void;
 } {
-  const { bubbleSpeaker, text, thought, history, locations, speakingCharacter, editorMode, skip } = args;
+  const { bubbleSpeaker, text, thought, history, speakingCharacter, editorMode } = args;
   const [repliesShown, setRepliesShown] = React.useState(false);
   const current = bubbleSpeaker && text?.trim() ? stageBubbleLine(bubbleSpeaker, text, thought) : undefined;
-  const ms = current && !editorMode ? replyLeadInMs(history, current, locations) : 0;
-  const reply = ms > 0 ? earlierLineFor(history, current) : undefined;
-  const lineKey = current ? `${bubbleLineKey(current)}\u0000${reply?.text ?? ''}` : '';
-  const [leadIn] = useReplyLeadIn(ms, lineKey, skip);
-  // The reading time starts when the line shows (after the reply before it).
-  const [repliesHeld, endRepliesHold] = useReplyLeadIn(current && !editorMode && !leadIn ? bubbleReadingMs(current.text) : 0, `${lineKey}\u0000read`);
-  const litCharacter = leadIn && reply ? reply.speaker
-    : repliesShown && history?.player ? history.player
-    : speakingCharacter;
-  return { leadIn, repliesHeld, endRepliesHold, litCharacter, setRepliesShown };
+  const lineKey = current ? bubbleLineKey(current) : '';
+  const [repliesHeld, endRepliesHold] = useTimedWait(current && !editorMode ? bubbleReadingMs(current.text) : 0, `${lineKey}\u0000read`);
+  const litCharacter = repliesShown && history?.player ? history.player : speakingCharacter;
+  return { repliesHeld, endRepliesHold, litCharacter, setRepliesShown };
 }
 
-/** While the reply is said first: a stage's buttons wait, unseen (put on the stage root). */
-export const LEAD_IN_ATTR = 'data-reply-lead-in';
-export const LEAD_IN_STYLE = `[${LEAD_IN_ATTR}] button{visibility:hidden!important;pointer-events:none!important}`;
+/** While a Dialog Tree's replies wait to be shown: the stage's buttons wait, unseen (put on the stage root). */
+export const REPLIES_WAIT_ATTR = 'data-replies-wait';
+export const REPLIES_WAIT_STYLE = `[${REPLIES_WAIT_ATTR}] button{visibility:hidden!important;pointer-events:none!important}`;
 
 /**
  * The bubbles on a stage: the current line's, and beside it the line before
@@ -567,8 +552,6 @@ export const StageBubbles: React.FC<{
   theme: RenderThemeSettings;
   avoidRects?: SpeechBubbleLayerProps['avoidRects'];
   skipAnimation?: boolean;
-  /** The player's reply is being said first (replyLeadInMs): the current line waits. */
-  leadIn?: boolean;
   /**
    * The player's next replies are up (as buttons or in their bubble): the
    * line before has done its job and goes, so only the line being answered
@@ -576,9 +559,9 @@ export const StageBubbles: React.FC<{
    */
   repliesUp?: boolean;
   zIndex?: number;
-}> = ({ text, speaker, locations, thought, history, placed, onPlaced, theme, avoidRects, skipAnimation, leadIn = false, repliesUp = false, zIndex = 150 }) => {
+}> = ({ text, speaker, locations, thought, history, placed, onPlaced, theme, avoidRects, skipAnimation, repliesUp = false, zIndex = 150 }) => {
   const current = stageBubbleLine(speaker, text, thought);
-  const earlier = placed && !(repliesUp && !leadIn) ? earlierLineFor(history, current) : undefined;
+  const earlier = placed && !repliesUp ? earlierLineFor(history, current) : undefined;
   const earlierAt = earlier ? speakerLocation(locations, earlier.speaker) : undefined;
   const onShownRef = React.useRef(history?.onShown);
   onShownRef.current = history?.onShown;
@@ -598,7 +581,6 @@ export const StageBubbles: React.FC<{
           thought={earlier.thought}
           theme={theme}
           avoidRects={avoidRects}
-          hold={leadIn}
           zIndex={zIndex - 1}
         />
       )}
@@ -613,7 +595,6 @@ export const StageBubbles: React.FC<{
         skipAnimation={skipAnimation}
         onPlaced={onPlaced}
         onShown={onShown}
-        hold={leadIn}
         zIndex={zIndex}
       />
     </>

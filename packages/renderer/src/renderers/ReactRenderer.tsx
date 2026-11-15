@@ -1680,8 +1680,7 @@ export class ReactRenderer extends BaseRenderer {
 
   /**
    * Speech bubbles: what the stage keeps up beside the current line — the
-   * line before it (another character's, or the reply the player picked in
-   * a Dialog Tree) — and the player's character. Built per render.
+   * line before it, after Continue — and the player's character. Built per render.
    */
   protected bubbleHistory(): BubbleHistory {
     return {
@@ -1718,21 +1717,16 @@ export class ReactRenderer extends BaseRenderer {
 
   /**
    * The player moved on (clicked a button): which line stays up beside the
-   * next one. A Dialog Tree reply is the player's line; Continue keeps the
-   * line just shown; any other choice (going somewhere, doing something) is
-   * not a line, and nothing stays.
+   * next one. Continue keeps the line just shown. A picked choice keeps
+   * nothing: a Dialog Tree reply was just read and clicked, so the line
+   * answering it comes at once rather than the reply said again (user
+   * feedback, 2026-11-16); any other choice is not a line.
    */
   private noteBubbleTurn(choiceText: string | undefined): void {
     const shown = this.bubbleShown;
     this.bubbleShown = null;
     this.bubbleEarlierAnchor = undefined;
-    const beatType = this.playingBeatType();
-    if (choiceText !== undefined) {
-      const player = beatType === 'dialogTree' || beatType === 'aiDialogTree' ? this.playerCharacterResolver?.() : undefined;
-      this.bubbleEarlier = player && typeof choiceText === 'string' && choiceText.trim() ? { speaker: player, text: choiceText, reply: true } : null;
-    } else {
-      this.bubbleEarlier = shown;
-    }
+    this.bubbleEarlier = choiceText !== undefined ? null : shown;
   }
 
   /**

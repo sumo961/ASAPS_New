@@ -429,15 +429,14 @@ export interface BubbleLine {
   text: string;
   /** Thought, not spoken (an inner voice): a cloud. */
   thought?: { color?: string };
-  /** The reply the player just picked: said first, before the line answering it. */
-  reply?: boolean;
 }
 
 /**
  * What the stage needs to keep the line before up beside the current one,
  * as comics do (the renderer keeps it; see ReactRenderer.bubbleHistory):
- * the line just before — another character's, or the player's own reply in
- * a Dialog Tree — and the player's character, at whom inner voices point.
+ * the line just before (another character's, kept when the player clicked
+ * Continue; a reply the player picked is not shown again) — and the
+ * player's character, at whom inner voices point.
  */
 export interface BubbleHistory {
   /** The line before the current one. */
@@ -468,24 +467,6 @@ export function earlierLineFor(history: BubbleHistory | undefined, current: Bubb
   if (!earlier || !current || typeof earlier.text !== 'string' || !earlier.text.trim()) return undefined;
   if (history.earlierAnchor !== undefined && history.earlierAnchor !== bubbleLineKey(current)) return undefined;
   return earlier;
-}
-
-/**
- * How long the line answering the player's reply waits, so the reply is
- * said first (then the answer, then the buttons): about the time it takes to
- * read the reply, 1–3 seconds. 0 when the line before isn't a reply, or its
- * speaker isn't on the stage to say it.
- */
-export function replyLeadInMs<T extends StageCharacterLike>(
-  history: BubbleHistory | undefined,
-  current: BubbleLine | undefined,
-  locations: ReadonlyArray<T> | undefined,
-): number {
-  const earlier = earlierLineFor(history, current);
-  if (!earlier?.reply || !current || earlier.speaker === current.speaker) return 0;
-  if (!speakerLocation(locations, earlier.speaker)) return 0;
-  const words = earlier.text.trim().split(/\s+/).length;
-  return Math.round(Math.min(3000, Math.max(1000, 600 + words * 120)));
 }
 
 /**
