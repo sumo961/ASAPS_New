@@ -1031,6 +1031,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           theme={theme}
           avoidRects={reservedHudRects}
           leadIn={leadIn}
+          repliesUp={!!bubbleHistory?.replies?.length}
           zIndex={5}
         />
       )}

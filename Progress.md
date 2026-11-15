@@ -12,6 +12,7 @@ Tested with speech bubbles turned on in the Red story:
 - **The dimming follows the turn:** the light moves to the player's character while their replies are up and while the reply they picked is said, then back to the character answering. It also does this with only two characters on the stage.
 - **The reply is said first:** the line answering a picked reply waits about as long as reading the reply takes (1 to 3 s). The reply is shown unfaded, then the answer appears, and only then its buttons. Clicking through the typewriter skips the wait. Works in fixed, slot and spatial layouts.
 - **The reply buttons no longer flash before the bubble:** theme buttons ease every property, visibility included, so a hidden button stayed visible for its 0.2 s easing. Hiding now turns its transition off. The layer also re-checks as soon as the stage changes, not on the next frame.
+- **The line before goes when the next replies come up:** the faded earlier bubble (e.g. Red's last reply) stays while the answer is said and leaves when the player's next replies appear, as buttons or in their bubble.
 - **Inventory panels can be folded anywhere:** a character's inventory panel folds into its badge when its title is clicked, on any screen size, and stays folded across beats. Phones still start folded.
 - **Bubbles keep clear of inventory and meter panels:** they now count as obstacles for both kinds of bubble.
 

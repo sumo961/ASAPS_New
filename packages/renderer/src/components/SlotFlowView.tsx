@@ -2686,6 +2686,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           theme={theme}
           avoidRects={reservedHudRects}
           leadIn={leadIn}
+          repliesUp={!!bubbleHistory?.replies?.length}
           zIndex={5}
         />
       )}

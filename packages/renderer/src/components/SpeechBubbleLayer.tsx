@@ -557,10 +557,16 @@ export const StageBubbles: React.FC<{
   skipAnimation?: boolean;
   /** The player's reply is being said first (replyLeadInMs): the current line waits. */
   leadIn?: boolean;
+  /**
+   * The player's next replies are up (as buttons or in their bubble): the
+   * line before has done its job and goes, so only the line being answered
+   * and the replies are on the stage.
+   */
+  repliesUp?: boolean;
   zIndex?: number;
-}> = ({ text, speaker, locations, thought, history, placed, onPlaced, theme, avoidRects, skipAnimation, leadIn = false, zIndex = 150 }) => {
+}> = ({ text, speaker, locations, thought, history, placed, onPlaced, theme, avoidRects, skipAnimation, leadIn = false, repliesUp = false, zIndex = 150 }) => {
   const current = stageBubbleLine(speaker, text, thought);
-  const earlier = placed ? earlierLineFor(history, current) : undefined;
+  const earlier = placed && !(repliesUp && !leadIn) ? earlierLineFor(history, current) : undefined;
   const earlierAt = earlier ? speakerLocation(locations, earlier.speaker) : undefined;
   const onShownRef = React.useRef(history?.onShown);
   onShownRef.current = history?.onShown;

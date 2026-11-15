@@ -2526,6 +2526,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           avoidRects={reservedHudRects}
           skipAnimation={effectiveSkipAnimation}
           leadIn={leadIn}
+          repliesUp={!!bubbleHistory?.replies?.length && shouldShowButtons}
         />
       )}
       {!previewMode && !leadIn && (
