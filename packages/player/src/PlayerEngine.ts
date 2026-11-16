@@ -1,7 +1,7 @@
 import { StoryEngine, Story, SerializedStoryState, ASMLParser, BeatTypeRegistry, findSpeakerCharacter, findSpeakerCharacterId } from '@asaps/core';
 import type { IRenderer, StoryMetadata, BeatConfig, ConversationLine, ConversationRecord } from '@asaps/core';
 import type { RenderThemeSettings } from '@asaps/renderer';
-import { toMeterCounterData, harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, getAudioManager } from '@asaps/renderer';
+import { toMeterCounterData, resolveMeterFrame, harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, getAudioManager } from '@asaps/renderer';
 import { AssetResolver } from './AssetResolver';
 import { fontFamilyFromAssetFilename, registerFontAsset } from './utils/customFonts';
 import { SaveSystem, SaveSlot, ISaveStorageAdapter } from './SaveSystem';
@@ -264,6 +264,13 @@ export interface PlayerConfig {
   autoSaveEnabled?: boolean;
   /** Auto-save interval in milliseconds */
   autoSaveIntervalMs?: number;
+  /**
+   * The host draws screen-docked meters and inventories itself (the web
+   * player's ScreenHudLayer). The character resolvers then leave them out,
+   * or each panel is drawn twice at the same spot (and the inventory took
+   * two clicks to fold).
+   */
+  screenHudsDrawnByHost?: boolean;
 }
 
 /**
@@ -1090,6 +1097,7 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
           console.log(`[InventoryResolver] Character "${characterId}" not found or has no inventoryFrame`);
           return null;
         }
+        if (this.config.screenHudsDrawnByHost && character.inventoryFrame.dockMode === 'screen') return null;
 
         // Get runtime inventory from context
         const ctx = this.engine?.getContext();
@@ -1154,6 +1162,7 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         if (!character || !character.meterFrame) {
           return null;
         }
+        if (this.config.screenHudsDrawnByHost && resolveMeterFrame(character as any)?.dockMode === 'screen') return null;
 
         // Filter to visible counters
         const visibleCounters = (character.counters || []).filter((c: any) => c.visible);

@@ -508,6 +508,8 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         const player = new PlayerEngine({
           container: containerRef.current,
           renderer,
+          // ScreenHudLayer below draws screen-docked meters and inventories.
+          screenHudsDrawnByHost: true,
         });
         playerRef.current = player;
         player.on('deadEnd', () => { if (mounted) setStoppedHere(true); });
