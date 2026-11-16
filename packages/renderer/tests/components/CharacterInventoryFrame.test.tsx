@@ -136,4 +136,15 @@ describe('folding on any screen', () => {
     fireEvent.click(badge);
     expect(screen.getByText('Satchel')).toBeTruthy();
   });
+
+  it('folds into the open frame\'s top-right corner', () => {
+    const view = renderInv({ title: 'Pouch', config: config({ screenPosition: 'screen-top-left', offset: { x: 20, y: 30 } } as any) });
+    const open = view.container.querySelector('[data-hud-frame]') as HTMLElement;
+    const right = parseFloat(open.style.left) + parseFloat(open.style.width);
+    const top = open.style.top;
+    fireEvent.click(screen.getByText('Pouch'));
+    const badge = view.container.querySelector('[data-hud-frame]') as HTMLElement;
+    expect(parseFloat(badge.style.left) + parseFloat(badge.style.width)).toBe(right);
+    expect(badge.style.top).toBe(top);
+  });
 });

@@ -1434,6 +1434,11 @@ export const PreviewWindow: React.FC = () => {
         if (!character || !character.inventoryFrame) {
           return null;
         }
+        // Screen-docked inventories are drawn by the screen HUD layer; a
+        // second copy here sat on top of it, so folding took two clicks.
+        if ((character.inventoryFrame as any).dockMode === 'screen') {
+          return null;
+        }
 
         // Get current inventory from runtime context
         const ctx = engineRef.current?.getContext();

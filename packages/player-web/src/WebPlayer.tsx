@@ -433,6 +433,9 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           const chars = (story as any).getCharacters?.() || [];
           const character = chars.find((c: any) => c.id === characterId);
           if (!character || !character.inventoryFrame) return null;
+          // Screen-docked ones are drawn by the screen HUD layer (a second
+          // copy sat on top of it, so folding took two clicks).
+          if (character.inventoryFrame.dockMode === 'screen') return null;
 
           const ctxAny = context as any;
           const runtimeInventory = ctxAny.getCharacterInventoryEntries?.(character.id) || [];

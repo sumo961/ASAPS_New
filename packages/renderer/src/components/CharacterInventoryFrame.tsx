@@ -485,7 +485,8 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
         data-hud-frame="inventory"
         style={{
           position: 'absolute',
-          left: position.x,
+          // Folds into the open frame's top-right corner.
+          left: position.x + frameWidth - badgeWidth,
           top: position.y,
           width: badgeWidth,
           height: badgeHeight,

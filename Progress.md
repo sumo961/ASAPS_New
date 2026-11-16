@@ -28,6 +28,13 @@ User feedback on the Red story with speech bubbles:
 - Recorded frame by frame in the Preview afterwards: the Wolf's bubble stays at one place from its first frame to the answer, the replies come up after the reading time, and the answer to "What pretty eyes you have." replaces the line in the same bubble at once.
 - **Files:** `packages/renderer/src/components/{SpeechBubbleLayer,PositionedBeatView,SlotFlowView,SpatialFlowView}.tsx`, `renderers/ReactRenderer.tsx`, `utils/speechBubble.ts`, `packages/builder/public/player-web.js`, `docs/USER_GUIDE.md`; tests `useReveal.test.tsx` (new), `speechBubble.test.ts`, `ReactRenderer.test.tsx`.
 
+### Fixed: the inventory folds with one click, into its top-right corner
+User report on the Red story:
+- **One click folds it.** The Preview and exported web stories drew a screen-docked inventory twice, at the same spot: once from the screen HUD layer and once from the character on the stage. The first click folded the copy on top and showed the one under it. The character resolvers now leave screen-docked inventories to the HUD layer, as the meter resolver already did. The standalone player has no HUD layer and still draws them from the character.
+- **The badge sits in the panel's top-right corner**, not its top-left.
+- Checked in the Preview: one panel after picking the book, one click folds it, and the badge's right edge and top match the open panel's.
+- **Files:** `packages/builder/src/pages/PreviewWindow.tsx`, `packages/player-web/src/WebPlayer.tsx`, `packages/renderer/src/components/CharacterInventoryFrame.tsx`, `packages/builder/public/player-web.js`; test `CharacterInventoryFrame.test.tsx`.
+
 ### Fixed: the Red story checked from end to end (ASML 1.0 leftovers)
 The Wolf scene froze on an empty box: a next line (*Then Gran speaks*) added and never written ended the scene with no exit, so the Dialog Tree fell back to its beat-level link, which still pointed at beat 12 from the XML import. That beat was merged into the scene long ago; the engine threw `Beat not found: 12` and the stage stayed on the empty line. The step was removed from the story (it was an uncommitted change in the project folder). A full check of the story with the app's own Problems list, then by hand, found more:
 - **A link to a missing beat stops the story visibly.** `StoryEngine` no longer throws when a beat's link goes to a beat that doesn't exist (a missing *start* beat still throws): it stops on the beat that took the link, which stays on screen, and emits `deadEnd` with `missingBeatId`. The Preview names both beats ("Story stopped at … it leads to a beat that no longer exists (12)"); published stories show *The story ends here* with *Start again*.
