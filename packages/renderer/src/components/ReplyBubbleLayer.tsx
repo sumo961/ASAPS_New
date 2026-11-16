@@ -24,6 +24,7 @@ import {
   type BubbleHistory,
   type BubbleObstacle,
   type BubbleRect,
+  hudFramesOver,
 } from '../utils/speechBubble';
 import { aimAtSpeaker, quoteAttr, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
 
@@ -178,11 +179,10 @@ const ReplyBubbleLayer: React.FC<{
       const r = el.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: HEAVY });
     });
-    // A character's own meters and inventory, drawn on the stage.
-    root.querySelectorAll<HTMLElement>('[data-hud-frame]').forEach((el) => {
-      const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: HEAVY });
-    });
+    // Meters and inventories over the stage: a character's own, drawn on
+    // the stage, and screen-docked ones, which the screen HUD layer draws
+    // outside it (looking only inside the stage missed those).
+    hudFramesOver(root, rootBox).forEach((r) => obstacles.push({ rect: toStage(r), weight: HEAVY }));
     root.querySelectorAll<HTMLElement>('[data-character-name]').forEach((el) => {
       if (el === playerEl) return;
       const r = el.getBoundingClientRect();

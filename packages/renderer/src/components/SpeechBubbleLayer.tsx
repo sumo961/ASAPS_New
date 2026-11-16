@@ -40,6 +40,7 @@ import {
   type BubblePoint,
   type BubbleRect,
   type SpeakFrom,
+  hudFramesOver,
 } from '../utils/speechBubble';
 
 export interface SpeechBubbleLayerProps {
@@ -319,11 +320,10 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
       const r = el.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: HEAVY });
     });
-    // A character's own meters and inventory, drawn on the stage.
-    root.querySelectorAll<HTMLElement>('[data-hud-frame]').forEach((el) => {
-      const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: HEAVY });
-    });
+    // Meters and inventories over the stage: a character's own, drawn on
+    // the stage, and screen-docked ones, which the screen HUD layer draws
+    // outside it (looking only inside the stage missed those).
+    hudFramesOver(root, rootBox).forEach((r) => obstacles.push({ rect: toStage(r), weight: HEAVY }));
     root.querySelectorAll<HTMLElement>('[data-character-name]').forEach((el) => {
       if (el === speakerEl) return;
       const r = el.getBoundingClientRect();

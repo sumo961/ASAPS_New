@@ -504,3 +504,20 @@ export function bubbleSpeakerFor<T extends StageCharacterLike>(
     ?? (thought && history?.player ? speakerLocation(locations, history.player) : undefined);
 }
 
+
+/**
+ * Where the meter and inventory panels over the stage are, in page
+ * coordinates: a character's own, drawn inside the stage, and screen-docked
+ * ones, which the screen HUD layer draws outside it. Bubbles keep clear of
+ * both. Panels that don't overlap the stage (another view's) are left out.
+ */
+export function hudFramesOver(root: HTMLElement, rootBox: { left: number; top: number; right: number; bottom: number }): DOMRect[] {
+  const out: DOMRect[] = [];
+  root.ownerDocument.querySelectorAll<HTMLElement>('[data-hud-frame]').forEach((el) => {
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return;
+    if (r.right <= rootBox.left || r.left >= rootBox.right || r.bottom <= rootBox.top || r.top >= rootBox.bottom) return;
+    out.push(r);
+  });
+  return out;
+}
