@@ -1,5 +1,34 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.157, 2026-11-17)
+
+### Overview
+First changes from the UX review of 2026-11-16 (the app walked through as a new user, in the browser and in Electron): the New / Browse loop on a fresh starter story, and Project Settings regrouped by what a setting does.
+
+### Fixed: New and Browse all projects on a fresh starter story
+- **No prompt on an untouched starter.** The starter story gained a third link (End → Restart) and the "is this still the untouched starter?" check allowed two, so **New** and **Browse all projects** asked to save a story nobody had written.
+- **Discard carries on.** After **Discard** in "Unsaved Changes" the picker (for New) or the project library (for Browse) opens. Before, it put a fresh starter in the editor and stopped, so the same click led to the same dialog again.
+- **New no longer opens "Save Project" over the picker** on an untitled project.
+- **An untouched starter is no longer thrown away when New or Browse is clicked.** That left the editor with no project: closing the picker and writing in the starter saved nothing (seen in testing: the text was gone after a reload). Loading or creating another project still removes the untouched starter.
+- Checked in the browser: New and Browse on a fresh starter open the picker / library; after an edit both ask, and Discard opens the picker / library.
+- **Files:** `packages/builder/src/App.tsx`, `components/Header.tsx`
+
+### Changed: Project Settings regrouped
+Thirteen tabs became nine (ten with location beats), none behind the scroll arrow at the default size:
+- **Project:** "Story starts at" (was Debug ▸ "First Beat (for testing)"; it sets where exported stories begin too), then stage size, layout mode, phone behaviour.
+- **Look:** Colours, Fonts, Text box, Text & button motion, Hotspots, as sections of one tab (were Colors, Fonts, Text Box and parts of Effects).
+- **Dialogue:** Speaker Display (names, portraits, speech bubbles, replies, dimming) and Message history (was under HUD).
+- **Screen panels:** the HUD settings.
+- **Languages & culture:** source language, the Knowledge Graph switch (was under Debug) and the cultural setting it shows.
+- **Location & AR:** shown only for a story with location beats, location settings, or a sound placed on the map.
+- **About:** copyright.
+- **Variables** and **Roles** stay as tabs until they move (Story Data window, Characters).
+- **Removed:** the Debug tab, and "Show variable/counter values during preview", which nothing read (the Preview has its own button).
+- Stored settings are unchanged; only where they are edited moved. In-app texts that name a tab were updated.
+- **Files:** `packages/builder/src/components/settings/GlobalSettingsInspector.tsx` (+ `__tests__/GlobalSettingsInspector.tabs.test.tsx`), `components/{Inspector,NewProjectDialog}.tsx`, `components/visual/{BeatLookSection,SpeakFromPicker}.tsx`, `components/knowledgeGraph/KnowledgeGraphView.tsx`, `components/ai/codesigner/systemPrompt.ts`, `editors/{SpatialPositionEditor,XRLocationsEditor}.tsx`
+
+---
+
 ## 2026-11-16: Speech bubbles and dimmed characters (v0.9.157)
 
 ### Overview

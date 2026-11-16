@@ -128,7 +128,7 @@ export const SpatialPositionEditor: React.FC<SpatialPositionEditorProps> = ({
               <option value="azimuth">Azimuth-only (fixed compass direction)</option>
             </select>
             <p className="text-[11px] text-gray-500 mt-1">
-              {mode === 'geographic' && 'Sound has a fixed lat/lng. Bearing recomputes as the player walks. Pair with a story origin in Project Settings → Location & XR.'}
+              {mode === 'geographic' && 'Sound has a fixed lat/lng. Bearing recomputes as the player walks. Pair with a story origin in Project Settings ▸ Location & AR.'}
               {mode === 'azimuth' && 'Sound comes from a fixed compass direction. Spinning the device pans the audio.'}
               {mode === 'none' && 'Standard non-spatial playback. No panning.'}
             </p>

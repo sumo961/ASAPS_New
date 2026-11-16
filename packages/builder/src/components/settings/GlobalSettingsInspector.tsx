@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image, Languages, Search, MapPin, Users } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { Settings, Palette, Type, Monitor, MessageCircle, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image, Languages, Search, MapPin, Users } from 'lucide-react';
 import { RolesSettingsPanel } from './RolesSettingsPanel';
 import type { Asset } from '../assets/AssetManager';
 import { useFonts } from '../../hooks/useFonts';
@@ -120,6 +120,33 @@ interface GlobalSettingsInspectorProps {
   resolvedLayoutMode?: 'fixed' | 'responsive';
 }
 
+type SettingsTab = 'project' | 'look' | 'dialogue' | 'panels' | 'sound' | 'languages' | 'about' | 'xr' | 'variables' | 'roles';
+type LookSection = 'colors' | 'fonts' | 'textbox' | 'motion' | 'hotspots';
+
+const SETTINGS_TABS: Array<{ id: SettingsTab; label: string; title: string; Icon: React.ComponentType<{ className?: string }> }> = [
+  { id: 'project', label: 'Project', title: 'Where the story starts, stage size, layout mode and phone behaviour', Icon: Maximize },
+  { id: 'look', label: 'Look', title: 'Colours, fonts, text box, text and button motion, hotspots', Icon: Palette },
+  { id: 'dialogue', label: 'Dialogue', title: 'Speaker names, portraits, speech bubbles, replies, dimming, message history', Icon: MessageCircle },
+  { id: 'panels', label: 'Screen panels', title: 'HUD panels: timer, fictional time, countdown meter', Icon: Monitor },
+  { id: 'sound', label: 'Sound', title: 'Music and sound', Icon: Music },
+  { id: 'languages', label: 'Languages & culture', title: 'Source language, translations, cultural setting, Knowledge Graph view', Icon: Languages },
+  { id: 'xr', label: 'Location & AR', title: 'Story origin, test location, proximity radius, what happens without location permission', Icon: MapPin },
+  { id: 'variables', label: 'Variables', title: "The story's variables and their starting values", Icon: Variable },
+  { id: 'roles', label: 'Roles', title: 'Roles that characters are cast in', Icon: Users },
+  { id: 'about', label: 'About', title: 'Copyright and credits', Icon: Copyright },
+];
+
+const LOOK_SECTIONS: Array<{ id: LookSection; label: string }> = [
+  { id: 'colors', label: 'Colours' },
+  { id: 'fonts', label: 'Fonts' },
+  { id: 'textbox', label: 'Text box' },
+  { id: 'motion', label: 'Text & button motion' },
+  { id: 'hotspots', label: 'Hotspots' },
+];
+
+/** Beat types that read the project's location settings. */
+const LOCATION_BEAT_TYPES = new Set(['gpsLocation', 'indoorLocation', 'setGpsLocation', 'arBeat']);
+
 export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = ({
   settings: initialSettings,
   defaultSettings,
@@ -150,7 +177,25 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     return initialSettings;
   });
   // Persisted: twelve tabs, and every open used to land on tab 1
-  const [activeTab, setActiveTab] = usePersistedState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'xr' | 'copyright' | 'variables' | 'roles' | 'translation' | 'debug'>('asaps_ui_settings_tab', 'project');
+  // Persisted, so the dialog reopens where the author left it. New key: the
+  // tabs were regrouped, and old stored names no longer exist.
+  const [storedTab, setActiveTab] = usePersistedState<SettingsTab>('asaps_ui_settings_tab_v2', 'project');
+  const [lookSection, setLookSection] = usePersistedState<LookSection>('asaps_ui_settings_look_section', 'colors');
+  // Location & AR only matters to stories that use location beats.
+  // Also shown when the project already has location settings, or a sound
+  // placed at a map position (which pairs with the story origin set there).
+  const showLocationTab = useMemo(() => {
+    if (Object.keys((initialSettings as any).location || {}).length > 0) return true;
+    return beats.some((b: any) => {
+      if (LOCATION_BEAT_TYPES.has(b?.type)) return true;
+      try {
+        return JSON.stringify(b?.getParameters?.() ?? b?.parameters ?? {}).includes('"geographic"');
+      } catch {
+        return false;
+      }
+    });
+  }, [beats, initialSettings]);
+  const activeTab: SettingsTab = storedTab === 'xr' && !showLocationTab ? 'project' : storedTab;
   const [hasChanges, setHasChanges] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [saveThemeDialogOpen, setSaveThemeDialogOpen] = useState(false);
@@ -846,169 +891,63 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
         {/* Tabs */}
         <ScrollableTabStrip className="border-b" activeKey={activeTab}>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'project'}
-            onClick={() => setActiveTab('project')}
-            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'project' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
-            }`}
-            title="Project dimensions, aspect ratio, and scaling mode"
-          >
-            <Maximize className="w-4 h-4" />
-            Project
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'colors'}
-            onClick={() => setActiveTab('colors')}
-            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'colors' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
-            }`}
-            title="Button colors, text box colors, and background color"
-          >
-            <Palette className="w-4 h-4" />
-            Colors
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'fonts'}
-            onClick={() => setActiveTab('fonts')}
-            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'fonts' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
-            }`}
-            title="Font families and sizes for titles, text, and buttons"
-          >
-            <Type className="w-4 h-4" />
-            Fonts
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'textbox'}
-            onClick={() => setActiveTab('textbox')}
-            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'textbox' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
-            }`}
-            title="Text box appearance: corners, padding, borders, and position"
-          >
-            <Box className="w-4 h-4" />
-            Text Box
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'effects'}
-            onClick={() => setActiveTab('effects')}
-            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'effects' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
-            }`}
-            title="Text animations (typewriter, fade) and hotspot visibility"
-          >
-            <Sliders className="w-4 h-4" />
-            Effects
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'hud'}
-            onClick={() => setActiveTab('hud')}
-            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'hud' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
-            }`}
-            title="HUD overlays: timer display, countdown meters"
-          >
-            <Monitor className="w-4 h-4" />
-            HUD
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'sound'}
-            onClick={() => setActiveTab('sound')}
-            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'sound' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
-            }`}
-            title="Background music and volume settings"
-          >
-            <Music className="w-4 h-4" />
-            Sound
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'xr'}
-            onClick={() => setActiveTab('xr')}
-            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'xr' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
-            }`}
-            title="Location & XR — story origin, mock location for desktop testing, default proximity radius, permission-denied policy"
-          >
-            <MapPin className="w-4 h-4" />
-            Location & XR
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'copyright'}
-            onClick={() => setActiveTab('copyright')}
-            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'copyright' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
-            }`}
-            title="Copyright notice displayed at the end of your story"
-          >
-            <Copyright className="w-4 h-4" />
-            Copyright
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'variables'}
-            onClick={() => setActiveTab('variables')}
-            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'variables' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
-            }`}
-            title="Define global variables for tracking story state (use Set Variable beats to modify them)"
-          >
-            <Variable className="w-4 h-4" />
-            Variables
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'roles'}
-            onClick={() => setActiveTab('roles')}
-            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'roles' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
-            }`}
-            title="Parts in the story that one of several characters can play (the player, a companion, …)"
-          >
-            <Users className="w-4 h-4" />
-            Roles
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'translation'}
-            onClick={() => setActiveTab('translation')}
-            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'translation' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
-            }`}
-            title="Translation settings: source language and translation management"
-          >
-            <Languages className="w-4 h-4" />
-            Translation
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'debug'}
-            onClick={() => setActiveTab('debug')}
-            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'debug' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
-            }`}
-            title="Testing options: start beat override and variable display"
-          >
-            <Monitor className="w-4 h-4" />
-            Debug
-          </button>
+          {SETTINGS_TABS.filter((t) => t.id !== 'xr' || showLocationTab).map(({ id, label, title, Icon }) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={activeTab === id}
+              onClick={() => setActiveTab(id)}
+              className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
+                activeTab === id ? 'bg-blue-50 border-b-2 border-blue-500' : ''
+              }`}
+              title={title}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          ))}
         </ScrollableTabStrip>
+
+        {activeTab === 'look' && (
+          <div className="flex flex-wrap gap-1 px-6 pt-3" role="tablist" aria-label="Look sections">
+            {LOOK_SECTIONS.map((s) => (
+              <button
+                key={s.id}
+                role="tab"
+                aria-selected={lookSection === s.id}
+                onClick={() => setLookSection(s.id)}
+                className={`px-3 py-1 rounded-full text-sm ${
+                  lookSection === s.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {activeTab === 'project' && (
             <div className="space-y-4">
-              <h3 className="font-medium text-gray-700 mb-3">Stage &amp; Layout</h3>
+              <h3 className="font-medium text-gray-700 mb-3">Story</h3>
+              <div data-testid="setting-story-start">
+                <label className="block text-sm font-medium text-gray-600 mb-1">
+                  Story starts at
+                </label>
+                <BeatPicker
+                  value={settings.debug.firstbeat}
+                  onChange={(targetId) => handleChange('debug', 'firstbeat', targetId)}
+                  beats={beats}
+                  emptyLabel="The first beat (automatic)"
+                  className="w-full px-3 py-2 border rounded"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  The beat the story opens on, in the Preview and in exported stories.
+                </p>
+              </div>
+
+              <h3 className="font-medium text-gray-700 mb-3 pt-4 border-t">Stage &amp; Layout</h3>
 
               {/* Suggested AI setup (globalSettings.ai) — was saved with the
                   story but visible nowhere (UX-Eval B3). Recorded from the
@@ -1411,7 +1350,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             />
           )}
 
-          {activeTab === 'colors' && (
+          {activeTab === 'look' && lookSection === 'colors' && (
             <div className="space-y-4">
               <h3 className="font-medium text-gray-700 mb-3">Color Settings</h3>
               
@@ -1652,7 +1591,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             </div>
           )}
 
-          {activeTab === 'fonts' && (
+          {activeTab === 'look' && lookSection === 'fonts' && (
             <div className="space-y-4">
               <h3 className="font-medium text-gray-700 mb-3">Font Settings</h3>
               
@@ -1774,7 +1713,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             </div>
           )}
 
-          {activeTab === 'textbox' && (
+          {activeTab === 'look' && lookSection === 'textbox' && (
             <div className="space-y-4">
               <h3 className="font-medium text-gray-700 mb-3">Text Box Appearance</h3>
               
@@ -1983,10 +1922,10 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             </div>
           )}
 
-          {activeTab === 'effects' && (
+          {activeTab === 'look' && lookSection === 'motion' && (
             <div className="space-y-4">
-              <h3 className="font-medium text-gray-700 mb-3">Text Effects</h3>
-              
+              <h3 className="font-medium text-gray-700 mb-3">Text &amp; Button Motion</h3>
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
@@ -2074,8 +2013,26 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   </p>
                 </div>
 
-                <div className="pt-4 border-t">
-                  <h4 className="font-medium text-gray-700 mb-3">Hotspot Settings</h4>
+                <div className="mt-6 p-4 bg-gray-100 rounded">
+                  <div className="text-sm font-medium text-gray-600 mb-2">Animation Preview</div>
+                  <div className="p-4 bg-white rounded">
+                    <p className="text-gray-700">
+                      {settings.textEffects.animation === 'typewriter' && 
+                        `Text will appear one character at a time at ${settings.textEffects.typewriterSpeed} characters per second.`}
+                      {settings.textEffects.animation === 'fade' && 
+                        `Text will fade in over ${settings.textEffects.fadeInDuration} milliseconds.`}
+                      {settings.textEffects.animation === 'none' && 
+                        'Text will appear instantly without animation.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'look' && lookSection === 'hotspots' && (
+            <div className="space-y-4">
+              <h3 className="font-medium text-gray-700 mb-3">Hotspots</h3>
 
                   <div className="space-y-4">
                     <div>
@@ -2129,9 +2086,53 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       </p>
                     </div>
                   </div>
-                </div>
 
-                {/* Speaker Display Settings */}
+                  <div className="p-4 bg-gray-100 rounded">
+                  <div className="p-4 bg-white rounded">
+                    {settings.hotspots.visible && (
+                      <div className="mt-3 space-y-2">
+                        <div className="text-sm text-gray-600">Hotspot Preview (opacity: {settings.hotspots.opacity ?? 30}%)</div>
+                        <div className="flex gap-4">
+                          <div
+                            className="px-4 py-2 rounded border-2"
+                            style={{
+                              borderColor: settings.hotspots.highlightColor,
+                              backgroundColor: `${settings.hotspots.highlightColor}${Math.round((settings.hotspots.opacity ?? 30) * 2.55).toString(16).padStart(2, '0')}`,
+                            }}
+                          >
+                            {settings.hotspots.labels ? 'Normal' : ''}
+                          </div>
+                          <div
+                            className="px-4 py-2 rounded border-2"
+                            style={{
+                              borderColor: settings.hotspots.highlightColor,
+                              backgroundColor: `${settings.hotspots.highlightColor}${Math.round(((settings.hotspots.opacity ?? 30) * 1.5) * 2.55).toString(16).padStart(2, '0')}`,
+                            }}
+                          >
+                            {settings.hotspots.labels ? 'Hovered' : ''}
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-500 space-y-1">
+                          <div>
+                            Hotspot: {(settings.hotspots.showInPreview ?? 'visible') === 'visible' ? 'Always visible' :
+                                   (settings.hotspots.showInPreview ?? 'visible') === 'onHover' ? 'On hover' : 'Invisible'}
+                          </div>
+                          <div>
+                            Labels: {(settings.hotspots.labelDisplay ?? 'hover') === 'none' ? 'Hidden' :
+                                   (settings.hotspots.labelDisplay ?? 'hover') === 'hover' ? 'On hover (tooltip)' : 'Always visible'}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  </div>
+            </div>
+          )}
+
+          {activeTab === 'dialogue' && (
+            <div className="space-y-4">
+              <h3 className="font-medium text-gray-700 mb-3">Dialogue</h3>
+
                 <div className="border rounded-lg p-4 space-y-3">
                   <h4 className="font-medium text-gray-700">Speaker Display</h4>
                   <p className="text-xs text-gray-500">Controls how speaker names and portrait graphics appear during playback. Individual beats can override these settings.</p>
@@ -2396,62 +2397,36 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   )}
                 </div>
 
-                {/* Effects Preview */}
-                <div className="mt-6 p-4 bg-gray-100 rounded">
-                  <div className="text-sm font-medium text-gray-600 mb-2">Animation Preview</div>
-                  <div className="p-4 bg-white rounded">
-                    <p className="text-gray-700">
-                      {settings.textEffects.animation === 'typewriter' && 
-                        `Text will appear one character at a time at ${settings.textEffects.typewriterSpeed} characters per second.`}
-                      {settings.textEffects.animation === 'fade' && 
-                        `Text will fade in over ${settings.textEffects.fadeInDuration} milliseconds.`}
-                      {settings.textEffects.animation === 'none' && 
-                        'Text will appear instantly without animation.'}
-                    </p>
-                    {settings.hotspots.visible && (
-                      <div className="mt-3 space-y-2">
-                        <div className="text-sm text-gray-600">Hotspot Preview (opacity: {settings.hotspots.opacity ?? 30}%)</div>
-                        <div className="flex gap-4">
-                          <div
-                            className="px-4 py-2 rounded border-2"
-                            style={{
-                              borderColor: settings.hotspots.highlightColor,
-                              backgroundColor: `${settings.hotspots.highlightColor}${Math.round((settings.hotspots.opacity ?? 30) * 2.55).toString(16).padStart(2, '0')}`,
-                            }}
-                          >
-                            {settings.hotspots.labels ? 'Normal' : ''}
-                          </div>
-                          <div
-                            className="px-4 py-2 rounded border-2"
-                            style={{
-                              borderColor: settings.hotspots.highlightColor,
-                              backgroundColor: `${settings.hotspots.highlightColor}${Math.round(((settings.hotspots.opacity ?? 30) * 1.5) * 2.55).toString(16).padStart(2, '0')}`,
-                            }}
-                          >
-                            {settings.hotspots.labels ? 'Hovered' : ''}
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-500 space-y-1">
-                          <div>
-                            Hotspot: {(settings.hotspots.showInPreview ?? 'visible') === 'visible' ? 'Always visible' :
-                                   (settings.hotspots.showInPreview ?? 'visible') === 'onHover' ? 'On hover' : 'Invisible'}
-                          </div>
-                          <div>
-                            Labels: {(settings.hotspots.labelDisplay ?? 'hover') === 'none' ? 'Hidden' :
-                                   (settings.hotspots.labelDisplay ?? 'hover') === 'hover' ? 'On hover (tooltip)' : 'Always visible'}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <label className="flex items-start gap-2 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  data-testid="setting-message-history"
+                  checked={settings.hudOverlays?.messageHistory || false}
+                  onChange={(e) => {
+                    setSettings({
+                      ...settings,
+                      hudOverlays: { ...settings.hudOverlays, messageHistory: e.target.checked },
+                    });
+                    setHasChanges(true);
+                  }}
+                />
+                <span>
+                  Message history
+                  <span className="block text-xs text-gray-500">
+                    Players can reopen the conversations they have had so far, like chats in a
+                    messenger: every Dialog Tree played, with the lines as they were shown and the
+                    player's replies. It's history only; nothing replays. Opens from the player's
+                    menu (Messages) and from the Preview Window's toolbar.
+                  </span>
+                </span>
+              </label>
             </div>
           )}
 
-          {activeTab === 'hud' && (
+          {activeTab === 'panels' && (
             <div className="space-y-6">
-              <h3 className="font-medium text-gray-700 mb-3">HUD Overlays</h3>
+              <h3 className="font-medium text-gray-700 mb-3">Screen Panels (HUD)</h3>
               <p className="text-xs text-gray-500">Configure persistent HUD elements that overlay the stage during playback.</p>
 
               {/* Title-screen chrome. HUDs are hidden on the title screen by
@@ -2496,30 +2471,6 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                 </span>
               </label>
 
-              <label className="flex items-start gap-2 cursor-pointer text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  data-testid="setting-message-history"
-                  checked={settings.hudOverlays?.messageHistory || false}
-                  onChange={(e) => {
-                    setSettings({
-                      ...settings,
-                      hudOverlays: { ...settings.hudOverlays, messageHistory: e.target.checked },
-                    });
-                    setHasChanges(true);
-                  }}
-                />
-                <span>
-                  Message history
-                  <span className="block text-xs text-gray-500">
-                    Players can reopen the conversations they have had so far, like chats in a
-                    messenger: every Dialog Tree played, with the lines as they were shown and the
-                    player's replies. It's history only; nothing replays. Opens from the player's
-                    menu (Messages) and from the Preview Window's toolbar.
-                  </span>
-                </span>
-              </label>
 
               {/* Timer HUD Section */}
               <div className="border rounded-lg p-4 space-y-3">
@@ -3361,12 +3312,11 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                 <div>
                   <h3 className="font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
-                    Location & XR Settings
+                    Location &amp; AR
                   </h3>
                   <p className="text-xs text-gray-500">
-                    Project-level location settings used by XR beats (GpsLocation, IndoorLocation, ARDisplay).
-                    Optional — projects without XR beats can leave everything unset.
-                    See <code className="bg-gray-100 px-1 rounded">docs/XR-Roadmap.md</code> for the bigger picture.
+                    Where the story takes place in the real world, for its location beats
+                    (GPS Location, Indoor Location). Everything here is optional.
                   </p>
                 </div>
 
@@ -3707,7 +3657,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             );
           })()}
 
-          {activeTab === 'copyright' && (
+          {activeTab === 'about' && (
             <div className="space-y-4">
               <h3 className="font-medium text-gray-700 mb-3">Copyright Information</h3>
               
@@ -3949,9 +3899,9 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             </div>
           )}
 
-          {activeTab === 'translation' && (
+          {activeTab === 'languages' && (
             <div className="space-y-4">
-              <h3 className="font-medium text-gray-700 mb-3">Translation Settings</h3>
+              <h3 className="font-medium text-gray-700 mb-3">Languages &amp; Culture</h3>
 
               <div className="space-y-4">
                 <div>
@@ -3981,6 +3931,23 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   <p className="text-xs text-gray-500 mt-1">
                     The language your story is authored in. Translation resources will be
                     generated relative to this source language.
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={settings.features?.showKnowledgeGraph ?? false}
+                      onChange={(e) => handleChange('features', 'showKnowledgeGraph', e.target.checked)}
+                      className="rounded"
+                    />
+                    <span className="text-sm">Show Knowledge Graph view (experimental)</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1 ml-6">
+                    Adds a Knowledge Graph tab to the editor that maps this project's structure
+                    and cultural content, for querying and cultural adaptation. Turning it on
+                    shows the project's cultural setting below.
                   </p>
                 </div>
 
@@ -4017,75 +3984,6 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             </div>
           )}
 
-          {activeTab === 'debug' && (
-            <div className="space-y-4">
-              <h3 className="font-medium text-gray-700 mb-3">Debug Settings</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">
-                    First Beat (for testing)
-                  </label>
-                  <BeatPicker
-                    value={settings.debug.firstbeat}
-                    onChange={(targetId) => handleChange('debug', 'firstbeat', targetId)}
-                    beats={beats}
-                    emptyLabel="Story default (auto-detect)"
-                    className="w-full px-3 py-2 border rounded"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Override the starting beat for testing specific sections
-                  </p>
-                </div>
-
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={settings.debug.showvals}
-                    onChange={(e) => handleChange('debug', 'showvals', e.target.checked)}
-                    className="rounded"
-                  />
-                  <span className="text-sm">Show variable/counter values during preview</span>
-                </label>
-
-                <div className="mt-2 pt-4 border-t">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={settings.features?.showKnowledgeGraph ?? false}
-                      onChange={(e) => handleChange('features', 'showKnowledgeGraph', e.target.checked)}
-                      className="rounded"
-                    />
-                    <span className="text-sm">Show Knowledge Graph view (experimental)</span>
-                  </label>
-                  <p className="text-xs text-gray-500 mt-1 ml-6">
-                    Adds a Knowledge Graph tab that maps the project's structure (and,
-                    later, its cultural content) for querying and cultural adaptation.
-                    The project's <strong>Cultural setting</strong> is configured under the
-                    Translation tab.
-                  </p>
-                </div>
-
-                {/* Debug Preview */}
-                <div className="mt-6 p-4 bg-gray-100 rounded">
-                  <div className="text-sm font-medium text-gray-600 mb-2">Debug Display Preview</div>
-                  {settings.debug.showvals ? (
-                    <div className="p-3 bg-white rounded space-y-2 font-mono text-xs">
-                      <div>health: 100</div>
-                      <div>courage: 75</div>
-                      <div>hasKey: true</div>
-                      <div>questComplete: false</div>
-                      <div className="text-gray-500">Debug values will appear like this during preview</div>
-                    </div>
-                  ) : (
-                    <div className="p-3 bg-white rounded text-gray-500 text-sm">
-                      Debug values are hidden
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer */}

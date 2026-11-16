@@ -376,7 +376,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
             </div>
           ) : (
             <p className="text-xs text-amber-700 mb-2">
-              No culture set for this project. Set it in Settings → Translation → Cultural setting.
+              No culture set for this project. Set it in Project Settings ▸ Languages &amp; culture ▸ Cultural setting.
             </p>
           )}
           {specNeedsInfer(sourceSpec) && (

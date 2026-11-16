@@ -73,7 +73,7 @@ export const SpeakFromPicker: React.FC<{
         />
       </div>
       <p className="text-[11px] text-gray-500 mt-1">
-        {automatic ? 'Automatic: the head found on the picture. ' : ''}Click the mouth or head to choose. Used when Project Settings ▸ Speaker Display shows lines as speech bubbles; a flipped character points at the mirrored spot.
+        {automatic ? 'Automatic: the head found on the picture. ' : ''}Click the mouth or head to choose. Used when Project Settings ▸ Dialogue shows lines as speech bubbles; a flipped character points at the mirrored spot.
       </p>
     </div>
   );

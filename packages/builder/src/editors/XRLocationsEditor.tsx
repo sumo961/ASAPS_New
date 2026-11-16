@@ -357,8 +357,8 @@ export const XRLocationsEditor: React.FC<XRLocationsEditorProps> = ({
                     className="w-full px-2 py-1 border border-amber-300 rounded text-xs font-mono"
                   />
                   <p className="text-[11px] text-amber-700 mt-0.5">
-                    No beacons configured. Add some in Project Settings →
-                    Location & XR → Indoor venue → Beacons for a picker.
+                    No beacons configured. Add some in Project Settings ▸
+                    Location &amp; AR ▸ Indoor venue ▸ Beacons for a picker.
                   </p>
                 </>
               )}

@@ -172,7 +172,7 @@ export const BeatLookSection: React.FC<Props> = ({ value, globalSettings, fonts,
                 value={look.speechBubbles ?? ''}
                 onChange={(e) => setTop('speechBubbles', e.target.value || undefined)}
                 className="w-full px-1 py-0.5 text-xs border border-gray-300 rounded"
-                title="Speech bubbles: a line said by a character on the stage appears in a bubble pointing at them (Project Settings ▸ Speaker Display)."
+                title="Speech bubbles: a line said by a character on the stage appears in a bubble pointing at them (Project Settings ▸ Dialogue)."
               >
                 <option value="">Project ({globalSettings?.speakerDisplay?.lineStyle === 'bubble' ? 'speech bubbles' : 'text box'})</option>
                 <option value="on">Speech bubbles on this beat</option>
@@ -185,7 +185,7 @@ export const BeatLookSection: React.FC<Props> = ({ value, globalSettings, fonts,
                 value={look.replyBubble ?? ''}
                 onChange={(e) => setTop('replyBubble', e.target.value || undefined)}
                 className="w-full px-1 py-0.5 text-xs border border-gray-300 rounded"
-                title="Dialog Tree replies in one bubble at the player's character, or as buttons (Project Settings ▸ Speaker Display)."
+                title="Dialog Tree replies in one bubble at the player's character, or as buttons (Project Settings ▸ Dialogue)."
               >
                 <option value="">Project ({globalSettings?.speakerDisplay?.replyStyle === 'bubble' ? 'in a bubble' : 'buttons'})</option>
                 <option value="on">In a bubble on this beat</option>

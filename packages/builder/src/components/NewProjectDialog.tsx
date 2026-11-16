@@ -230,7 +230,7 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
             </select>
             <p className="text-[11px] text-gray-500 mt-1">
               The language you write the story in — used for translations and
-              text-to-speech. Change later in Settings → Translation.
+              text-to-speech. Change later in Project Settings ▸ Languages &amp; culture.
             </p>
           </div>
 

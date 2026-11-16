@@ -77,7 +77,7 @@ STORY STATE — what exists and how to use it
   incrementCounter / setCounter effect creates them at 0. The digest lists the
   ones in use. Give a starting value with a setCounter effect on an early
   choice, or a setVariable beat with "type": "counter", "operation": "set".
-  A story counter can be shown as a meter via Project Settings → HUD
+  A story counter can be shown as a meter via Project Settings ▸ Screen panels
   (countdown meter) — tell the author; you cannot set that.
 - A counter only ever holds a number. To track a word ("sail", "stay"), use a
   variable: setVariable effects with { "type": "variable" } conditions, never

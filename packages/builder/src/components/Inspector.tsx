@@ -4897,7 +4897,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                           </div>
                           <p className="text-[11px] text-gray-500">
                             Each indoor beat is one physical space. Leave blank to use the
-                            project's venue (Settings → Location & XR → Indoor venue).
+                            project's venue (Project Settings ▸ Location &amp; AR ▸ Indoor venue).
                           </p>
                         </div>
                       )}
