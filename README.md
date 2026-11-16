@@ -22,8 +22,21 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.156** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.156 is a fix release**: the Debug
+Current release: **v0.9.157** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.157 is the speech-bubble release**:
+characters who aren't speaking can be dimmed, as in visual novels, and a
+character's lines can appear as comic speech bubbles pointing at them, with
+the line before kept up beside it and inner voices thinking in clouds. A
+Dialog Tree's replies can be listed in one bubble at the player's character;
+clicking one goes straight to the answer. New Story Warnings catch stand-in
+text left in, meters nothing changes, lines without words and sounds or
+pictures the project no longer has (with a way to swap one on every beat at
+once). A link to a beat that no longer exists now stops the story visibly,
+older ASML 1.0 stories' fades play, and Apple's built-in model works for
+in-story AI on macOS 27. Switching projects no longer leaves the old one
+behind, and the inventory folds with one click.
+
+**v0.9.156 was a fix release**: the Debug
 window no longer keeps working forever on a story whose end screen's Restart
 keeps what players did while the story tracks feelings, and it says why it
 stopped early. "Start as if…" names role checks in plain words ("With Tomas as
