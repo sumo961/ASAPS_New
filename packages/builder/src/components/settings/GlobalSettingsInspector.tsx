@@ -2330,7 +2330,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       <option value="bubble">One bubble at the player's character</option>
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
-                      In a Dialog Tree, the replies the player can pick appear as lines in one bubble pointing at the player's character (the character whose role is "player"), and the reply picked stays up as their line. Other choices, and any Dialog Tree whose player character isn't on the stage or whose bubble doesn't fit, keep the buttons.
+                      In a Dialog Tree, the replies the player can pick appear as lines in one bubble pointing at the player's character (the character whose role is "player"); clicking one goes straight to the answer. Other choices, and any Dialog Tree whose player character isn't on the stage or whose bubble doesn't fit, keep the buttons.
                     </p>
                   </div>
 
