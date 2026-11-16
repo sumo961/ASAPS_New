@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Github, Compass, GitMerge, FileInput, FileText, Trash2, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus, History } from 'lucide-react';
 import { AIEditsLogDialog } from './ai/AIEditsLogDialog';
 import type { AIEditLedger } from '../types/aiEdits';
@@ -81,6 +81,9 @@ interface HeaderProps {
   onDebug?: () => void;
   onInterceptNewProject?: () => boolean;
   onInterceptProjectLibrary?: () => boolean;
+  /** Set by the App after "Discard" in the unsaved-work dialog: carry on
+   *  with the action that dialog interrupted. `seq` changes per request. */
+  resumeAction?: { action: 'newProject' | 'projectLibrary'; seq: number } | null;
   onStoryGenerated?: (story: any) => void;
   onBeatCreated?: (beat: any) => void;
   onIdeator?: () => void;
@@ -150,6 +153,7 @@ export const Header: React.FC<HeaderProps> = ({
   onDebug,
   onInterceptNewProject,
   onInterceptProjectLibrary,
+  resumeAction,
   onStoryGenerated,
   onBeatCreated,
   onIdeator,
@@ -191,6 +195,19 @@ export const Header: React.FC<HeaderProps> = ({
   const [showProjectLibrary, setShowProjectLibrary] = useState(false);
   const [showNewProjectPicker, setShowNewProjectPicker] = useState(false);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const openProjectLibrary = useCallback(() => {
+    const electronStart = (window as any).electronAPI?.start;
+    if (electronStart?.open) electronStart.open();
+    else setShowProjectLibrary(true);
+  }, []);
+  const resumeSeq = resumeAction?.seq;
+  useEffect(() => {
+    if (!resumeAction) return;
+    if (resumeAction.action === 'newProject') setShowNewProjectPicker(true);
+    else openProjectLibrary();
+    // Runs once per request (seq), not when the object identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeSeq]);
   const [showAIConfig, setShowAIConfig] = useState(false);
   const [showStoryGenerator, setShowStoryGenerator] = useState(false);
   const [showAIEditsLog, setShowAIEditsLog] = useState(false);
@@ -749,12 +766,7 @@ export const Header: React.FC<HeaderProps> = ({
                 const intercepted = onInterceptProjectLibrary();
                 if (intercepted) return;
               }
-              const electronStart = (window as any).electronAPI?.start;
-              if (electronStart?.open) {
-                electronStart.open();
-              } else {
-                setShowProjectLibrary(true);
-              }
+              openProjectLibrary();
             }}
           />
           {/* Direct + New entry — opens the picker with the same three
@@ -773,7 +785,9 @@ export const Header: React.FC<HeaderProps> = ({
               // Named project with unsaved edits: save, then continue. The
               // old 2-way confirm only offered "save and continue" or "stay"
               // \u2014 saving is the answer either way (UX-Eval B4).
-              if (hasUnsavedChanges && onSave) onSave();
+              // Not for an untitled project: one with real work was caught
+              // above, and the untouched starter has nothing to name.
+              if (hasUnsavedChanges && onSave && !isUntitledProject) onSave();
               setShowNewProjectPicker(true);
             }}
             className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"

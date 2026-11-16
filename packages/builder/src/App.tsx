@@ -442,6 +442,8 @@ function App() {
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [showSaveProjectDialog, setShowSaveProjectDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<string>('');
+  // Set after "Discard" so the Header carries on with what the author asked for.
+  const [resumeHeaderAction, setResumeHeaderAction] = useState<{ action: 'newProject' | 'projectLibrary'; seq: number } | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   // Find & Change (B10): ONE bulk-edit surface. `null` = closed; otherwise
   // the active tab. ⌘F lands on Find, ⌘⇧F on Change with AI.
@@ -6175,8 +6177,9 @@ function App() {
       }
     }
 
-    // Also check if there are any connections beyond the default 2
-    if (state.connections.length > 2) {
+    // Also check for connections beyond the starter's own three (Start,
+    // Finish, Restart). Older untitled starters have two.
+    if (state.connections.length > 3) {
       return false;
     }
 
@@ -6185,11 +6188,11 @@ function App() {
 
   // Save unsaved work dialog handlers
   const handleShowSaveDialog = useCallback((action: string) => {
-    // If it's an untitled project with only default content,
-    // discard it automatically without prompting
+    // The untouched starter has nothing to keep: no prompt. It is NOT
+    // discarded here — the author may close the picker and start writing
+    // in it, and a discarded project would leave that work with nowhere to
+    // be saved. Loading or creating another project removes it.
     if (isUntitledProject && isDefaultEmptyProject()) {
-      console.log('[App] Discarding empty untitled project automatically');
-      discardUntitled();
       return false; // Not intercepted, let Header proceed
     }
 
@@ -6203,7 +6206,7 @@ function App() {
       return true; // Intercepted
     }
     return false; // Not intercepted, let Header proceed
-  }, [isUntitledProject, isDefaultEmptyProject, discardUntitled]);
+  }, [isUntitledProject, isDefaultEmptyProject]);
 
   const handleSaveUnsavedWork = useCallback(async () => {
     // Hand off to the real naming dialog — the author picks the name, and
@@ -6216,6 +6219,7 @@ function App() {
   const handleDiscardUnsavedWork = useCallback(async () => {
     // Discard means discard: delete the untitled row, then put the editor
     // back on a fresh scratch project (same state as a cold start).
+    const resume = pendingAction;
     setShowSaveDialog(false);
     setPendingAction('');
     try {
@@ -6231,10 +6235,15 @@ function App() {
       // switch (which would load the empty row as a blank grid).
       loadedProjectIdRef.current = null;
       await createProject('Untitled Project', 'Auto-saved untitled work');
+      // The author was on their way somewhere (New, or the project library):
+      // take them there now that the old work is out of the way.
+      if (resume === 'newProject' || resume === 'projectLibrary') {
+        setResumeHeaderAction(prev => ({ action: resume, seq: (prev?.seq ?? 0) + 1 }));
+      }
     } catch (error) {
       console.error('[App] Failed to discard untitled project:', error);
     }
-  }, [discardUntitled, actions, createProject, forgetOpenProject]);
+  }, [discardUntitled, actions, createProject, forgetOpenProject, pendingAction]);
 
   const handleCancelSaveDialog = useCallback(() => {
     // Just close the dialog, don't execute any action
@@ -7150,6 +7159,7 @@ function App() {
         onSave={handleSave}
         onInterceptNewProject={() => handleShowSaveDialog('newProject')}
         onInterceptProjectLibrary={() => handleShowSaveDialog('projectLibrary')}
+        resumeAction={resumeHeaderAction}
         onStoryGenerated={handleStoryGenerated}
         onBeatCreated={handleBeatCreated}
         onIdeator={handleOpenIdeator}
