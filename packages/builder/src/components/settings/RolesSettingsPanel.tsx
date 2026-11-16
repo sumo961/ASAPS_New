@@ -1,10 +1,10 @@
 /**
- * Project Settings → Roles: parts in the story that one of several
+ * Characters ▸ Roles: parts in the story that one of several
  * characters fills at runtime (docs/Character-Roles-Design.md). A role is
  * referenced as '@id' in speaker / NPC / character fields and as
  * ${@id.name}, ${@id.they} in text.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Users } from 'lucide-react';
 import type { CastRole, RoleSelection } from '@asaps/core';
 
@@ -33,6 +33,31 @@ function idFromName(name: string, taken: Set<string>): string {
   for (let n = 2; taken.has(id); n++) id = `${base}_${n}`;
   return id;
 }
+
+/**
+ * The id is typed freely and takes effect when the field is left (or on
+ * Enter): each change renames the role in every beat that uses it, which
+ * must not happen once per keystroke. An empty or already-used id is undone.
+ */
+const RoleIdInput: React.FC<{ id: string; taken: string[]; onCommit: (id: string) => void }> = ({ id, taken, onCommit }) => {
+  const [draft, setDraft] = useState(id);
+  useEffect(() => setDraft(id), [id]);
+  const commit = () => {
+    if (!draft || draft === id || taken.includes(draft)) { setDraft(id); return; }
+    onCommit(draft);
+  };
+  return (
+    <input
+      type="text"
+      value={draft}
+      onChange={e => setDraft(e.target.value.replace(/[^A-Za-z0-9_-]/g, ''))}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+      className="w-full px-2 py-1 text-sm border rounded font-mono"
+      title="Used in fields and text: @id, ${@id.name}. Renaming it updates every beat that uses it."
+    />
+  );
+};
 
 export const RolesSettingsPanel: React.FC<Props> = ({ roles = [], characters, onChange }) => {
   const named = characters.filter((c): c is { id: string; name: string; displayName: string } => !!c.id);
@@ -109,16 +134,11 @@ export const RolesSettingsPanel: React.FC<Props> = ({ roles = [], characters, on
                     <label className="block text-xs font-medium text-gray-600 mb-1">Referenced as</label>
                     <div className="flex items-center">
                       <span className="px-1 text-sm text-gray-500">@</span>
-                      <input
-                        type="text"
-                        value={role.id}
-                        onChange={e => update(index, {
-                          id: e.target.value.replace(/[^A-Za-z0-9_-]/g, ''),
-                          // Remember the saved id so Save can move every reference along.
-                          renamedFrom: role.renamedFrom ?? role.id,
-                        })}
-                        className="w-full px-2 py-1 text-sm border rounded font-mono"
-                        title="Used in fields and text: @id, ${@id.name}. Renaming it updates every beat that uses it when you save."
+                      <RoleIdInput
+                        id={role.id}
+                        taken={roles.filter((_, i) => i !== index).map(r => r.id)}
+                        // Remember the old id so every reference moves along.
+                        onCommit={(id) => update(index, { id, renamedFrom: role.renamedFrom ?? role.id })}
                       />
                     </div>
                   </div>

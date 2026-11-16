@@ -777,7 +777,7 @@ export class ReachabilityAnalyzer {
         const role = normalizeRoles((this.story as any).getSettings?.()?.roles).find((r) => r.id === roleId);
         const who = (condition as any).character;
         if (!role) {
-          return { condition, isSatisfiable: false, reason: `There is no role "${roleId}" in Project Settings`, suggestedFix: 'Add the role under Project Settings → Roles' };
+          return { condition, isSatisfiable: false, reason: `There is no role "${roleId}" under Characters ▸ Roles`, suggestedFix: 'Add the role under Characters ▸ Roles' };
         }
         if (operator === '==' && who && !role.candidates.includes(who)) {
           return { condition, isSatisfiable: false, reason: `${who} is not one of the characters who can play @${roleId}`, suggestedFix: `Add ${who} to the role's characters, or test for one of them` };

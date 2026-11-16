@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Settings, Palette, Type, Monitor, MessageCircle, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image, Languages, Search, MapPin, Users } from 'lucide-react';
-import { RolesSettingsPanel } from './RolesSettingsPanel';
+import { Settings, Palette, Type, Monitor, MessageCircle, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image, Languages, Search, MapPin } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import { useFonts } from '../../hooks/useFonts';
 import { useThemes } from '../../hooks/useThemes';
@@ -120,7 +119,7 @@ interface GlobalSettingsInspectorProps {
   resolvedLayoutMode?: 'fixed' | 'responsive';
 }
 
-type SettingsTab = 'project' | 'look' | 'dialogue' | 'panels' | 'sound' | 'languages' | 'about' | 'xr' | 'variables' | 'roles';
+type SettingsTab = 'project' | 'look' | 'dialogue' | 'panels' | 'sound' | 'languages' | 'about' | 'xr' | 'variables';
 type LookSection = 'colors' | 'fonts' | 'textbox' | 'motion' | 'hotspots';
 
 const SETTINGS_TABS: Array<{ id: SettingsTab; label: string; title: string; Icon: React.ComponentType<{ className?: string }> }> = [
@@ -132,7 +131,6 @@ const SETTINGS_TABS: Array<{ id: SettingsTab; label: string; title: string; Icon
   { id: 'languages', label: 'Languages & culture', title: 'Source language, translations, cultural setting, Knowledge Graph view', Icon: Languages },
   { id: 'xr', label: 'Location & AR', title: 'Story origin, test location, proximity radius, what happens without location permission', Icon: MapPin },
   { id: 'variables', label: 'Variables', title: "The story's variables and their starting values", Icon: Variable },
-  { id: 'roles', label: 'Roles', title: 'Roles that characters are cast in', Icon: Users },
   { id: 'about', label: 'About', title: 'Copyright and credits', Icon: Copyright },
 ];
 
@@ -3729,14 +3727,6 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                 </div>
               </div>
             </div>
-          )}
-
-          {activeTab === 'roles' && (
-            <RolesSettingsPanel
-              roles={settings.roles}
-              characters={characters}
-              onChange={(roles) => handleChange('roles', undefined, roles)}
-            />
           )}
 
           {activeTab === 'variables' && (

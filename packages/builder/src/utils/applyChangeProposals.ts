@@ -393,7 +393,7 @@ export function applyChangeProposals(
           }
           const { kind: _kind, note: _note, ...role } = p;
           const how = ctx.defineRole(role);
-          results.push({ index, ok: true, detail: `${how === 'added' ? 'Added' : 'Updated'} role @${p.id} — see Project Settings → Roles` });
+          results.push({ index, ok: true, detail: `${how === 'added' ? 'Added' : 'Updated'} role @${p.id} — see Characters ▸ Roles` });
           return;
         }
 

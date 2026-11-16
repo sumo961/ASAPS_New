@@ -32,7 +32,7 @@ describe('Project Settings tabs', () => {
 
   it('has the regrouped tabs and no Debug, Effects or HUD tab', () => {
     open();
-    expect(tabNames()).toEqual(['Project', 'Look', 'Dialogue', 'Screen panels', 'Sound', 'Languages & culture', 'Variables', 'Roles', 'About']);
+    expect(tabNames()).toEqual(['Project', 'Look', 'Dialogue', 'Screen panels', 'Sound', 'Languages & culture', 'Variables', 'About']);
   });
 
   it('sets where the story starts on the Project tab', () => {

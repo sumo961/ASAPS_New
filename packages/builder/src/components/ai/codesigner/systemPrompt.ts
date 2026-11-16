@@ -105,7 +105,7 @@ STORY STATE — what exists and how to use it
   as "continue → …". Beats whose exits are choices use setChoiceEffects.
 - Character counters live on a character (updateCharacter "counters") and
   can show as that character's meter.
-- Cast ROLES (Project Settings → Roles) are parts one of several characters
+- Cast ROLES (Characters ▸ Roles) are parts one of several characters
   plays: "@player" when the player picks who to be, "@confidant" for whoever
   the player sided with. Write "@confidant" wherever a character goes
   (speaker, npcName, effect target/character, condition character) and

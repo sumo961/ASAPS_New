@@ -406,7 +406,7 @@ export async function extractRenpyAssets(zipFile: File | Blob): Promise<RenpyAss
           : 'there is no text-box picture,',
         'there are no choice-button pictures (choice_idle_background.png),',
         'and there are no fonts or Ren\'Py settings (.rpy files).',
-        'Pictures from it can still be used one by one in Project Settings ▸ Text Box ▸ Pictures.',
+        'Pictures from it can still be used one by one in Project Settings ▸ Look ▸ Text box ▸ Pictures.',
       ].join(' ')
     : undefined;
 
@@ -452,7 +452,7 @@ async function markScreenOverlays(
     if (size.width >= screen.width * 0.9 && size.height >= screen.height * 0.6) {
       g.role = 'screen-overlay';
       notices.push(
-        `${g.filename} is a full-screen picture (${size.width}×${size.height}) that Ren'Py lays over the whole screen, not a frame — it isn't used as the text-box frame. You can choose a frame in Project Settings ▸ Text Box ▸ Pictures.`
+        `${g.filename} is a full-screen picture (${size.width}×${size.height}) that Ren'Py lays over the whole screen, not a frame — it isn't used as the text-box frame. You can choose a frame in Project Settings ▸ Look ▸ Text box ▸ Pictures.`
       );
     }
   }

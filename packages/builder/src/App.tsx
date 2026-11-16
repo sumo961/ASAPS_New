@@ -5696,6 +5696,65 @@ function App() {
     ));
   }, [globalSettings, applyGlobalSettingsChange]);
 
+  // Apply edited project settings as one undo step. A role whose id changed
+  // (marked `renamedFrom` by the Roles editor) takes every reference along:
+  // speakers, AI partners, ${@role…} text, Cast Role effects, conditions,
+  // Choose Your Character.
+  const applyEditedSettings = useCallback((edited: GlobalSettings, plainLabel = 'Update global settings') => {
+    const oldSettings = globalSettingsRef.current ?? globalSettings;
+    // A role whose id changed takes every reference along (speakers,
+    // AI partners, ${@role…} text, Cast Role effects, conditions,
+    // Choose Your Character) — one undo step with the settings.
+    const renames = ((edited as any).roles ?? [])
+      .filter((r: any) => r?.renamedFrom && r.id && r.renamedFrom !== r.id)
+      .map((r: any) => ({ from: r.renamedFrom as string, to: r.id as string }));
+    const newSettings = (edited as any).roles
+      ? { ...edited, roles: (edited as any).roles.map(({ renamedFrom: _from, ...role }: any) => role) } as GlobalSettings
+      : edited;
+    if (renames.length === 0) {
+      applyGlobalSettingsChange(newSettings);
+      getCommandManager().pushWithoutExecute(new UpdateGlobalSettingsCommand(
+        oldSettings,
+        newSettings,
+        globalSettingsMutationsRef.current,
+        plainLabel
+      ));
+      return;
+    }
+    const commands: any[] = [new UpdateGlobalSettingsCommand(oldSettings, newSettings, globalSettingsMutationsRef.current, plainLabel)];
+    for (const beat of (beatsRef.current || state.beats) as any[]) {
+      const before: Record<string, any> = {
+        speaker: beat.speaker,
+        characterRef: beat.characterRef,
+        parameters: beat.getParameters ? beat.getParameters() : beat.parameters,
+        connections: beat.connections,
+        // Requirements ("Who plays a role") live on the beat itself.
+        requires: beat.requires,
+      };
+      let after: Record<string, any> = before;
+      for (const r of renames) after = renameRoleReferences(after, r.from, r.to);
+      if (after === before) continue;
+      const oldValues: Record<string, any> = {};
+      const newValues: Record<string, any> = {};
+      for (const k of Object.keys(after)) {
+        if (after[k] === before[k]) continue;
+        oldValues[k] = before[k] && typeof before[k] === 'object' ? structuredClone(before[k]) : before[k];
+        newValues[k] = after[k];
+      }
+      commands.push(new UpdateBeatCommand(beat.id, oldValues, newValues as any, stableMutations.current));
+    }
+    const label = renames.length === 1 ? `Rename role @${renames[0].from} to @${renames[0].to}` : `Rename ${renames.length} roles`;
+    void getCommandManager().execute(new BatchCommand(commands, label));
+    notify.success(`${label}: ${commands.length - 1} beat${commands.length === 2 ? '' : 's'} updated`);
+  }, [globalSettings, applyGlobalSettingsChange, state.beats]);
+
+  // Cast roles are edited in the Characters window (they are a statement
+  // about characters); they stay in the project's settings.
+  const handleProjectRolesChange = useCallback((roles: NonNullable<GlobalSettings['roles']>) => {
+    const oldSettings = globalSettingsRef.current ?? globalSettings;
+    applyEditedSettings({ ...oldSettings, roles } as GlobalSettings, 'Change roles');
+  }, [globalSettings, applyEditedSettings]);
+
   // The theme's pictures and fonts go into the project once — when a theme
   // is applied, or when a project whose theme is in this computer's library
   // opens without them — so the editor, the Preview, exports and other
@@ -7528,6 +7587,8 @@ function App() {
                 hudOverlays={(globalSettings as any).hudOverlays}
                 items={globalSettings.items || []}
                 onItemsChange={handleProjectItemsChange}
+                roles={globalSettings.roles || []}
+                onRolesChange={handleProjectRolesChange}
               />
             </div>
           </div>
@@ -7610,53 +7671,7 @@ function App() {
       {showSettings && (
         <GlobalSettingsInspector
           settings={globalSettings}
-          onUpdate={(edited) => {
-            const oldSettings = globalSettings;
-            // A role whose id changed takes every reference along (speakers,
-            // AI partners, ${@role…} text, Cast Role effects, conditions,
-            // Choose Your Character) — one undo step with the settings.
-            const renames = ((edited as any).roles ?? [])
-              .filter((r: any) => r?.renamedFrom && r.id && r.renamedFrom !== r.id)
-              .map((r: any) => ({ from: r.renamedFrom as string, to: r.id as string }));
-            const newSettings = (edited as any).roles
-              ? { ...edited, roles: (edited as any).roles.map(({ renamedFrom: _from, ...role }: any) => role) } as GlobalSettings
-              : edited;
-            if (renames.length === 0) {
-              applyGlobalSettingsChange(newSettings);
-              getCommandManager().pushWithoutExecute(new UpdateGlobalSettingsCommand(
-                oldSettings,
-                newSettings,
-                globalSettingsMutationsRef.current,
-                'Update global settings'
-              ));
-              return;
-            }
-            const commands: any[] = [new UpdateGlobalSettingsCommand(oldSettings, newSettings, globalSettingsMutationsRef.current, 'Update global settings')];
-            for (const beat of (beatsRef.current || state.beats) as any[]) {
-              const before: Record<string, any> = {
-                speaker: beat.speaker,
-                characterRef: beat.characterRef,
-                parameters: beat.getParameters ? beat.getParameters() : beat.parameters,
-                connections: beat.connections,
-                // Requirements ("Who plays a role") live on the beat itself.
-                requires: beat.requires,
-              };
-              let after: Record<string, any> = before;
-              for (const r of renames) after = renameRoleReferences(after, r.from, r.to);
-              if (after === before) continue;
-              const oldValues: Record<string, any> = {};
-              const newValues: Record<string, any> = {};
-              for (const k of Object.keys(after)) {
-                if (after[k] === before[k]) continue;
-                oldValues[k] = before[k] && typeof before[k] === 'object' ? structuredClone(before[k]) : before[k];
-                newValues[k] = after[k];
-              }
-              commands.push(new UpdateBeatCommand(beat.id, oldValues, newValues as any, stableMutations.current));
-            }
-            const label = renames.length === 1 ? `Rename role @${renames[0].from} to @${renames[0].to}` : `Rename ${renames.length} roles`;
-            void getCommandManager().execute(new BatchCommand(commands, label));
-            notify.success(`${label}: ${commands.length - 1} beat${commands.length === 2 ? '' : 's'} updated`);
-          }}
+          onUpdate={(edited) => applyEditedSettings(edited)}
           onClose={handleCloseSettings}
           assets={assets}
           themeId={currentThemeId}

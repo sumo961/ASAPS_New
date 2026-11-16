@@ -24,7 +24,7 @@ export const RoleHolderConditionFields: React.FC<Props> = ({ role, character, op
         value={roleId}
         onChange={e => onChange({ role: e.target.value })}
         className="px-1.5 py-1 border border-gray-300 rounded text-xs bg-white"
-        title="A role from Project Settings → Roles"
+        title="A role from Characters ▸ Roles"
       >
         <option value="">Role…</option>
         {roles.map(r => <option key={r.id} value={r.id}>{roleOptionLabel(r)}</option>)}

@@ -20,11 +20,12 @@ import {
 } from 'lucide-react';
 import { Character, CHARACTER_TEMPLATES, type ItemDefinition } from '../../types/character';
 import { ProjectItemsPanel } from './ProjectItemsPanel';
+import { RolesSettingsPanel } from '../settings/RolesSettingsPanel';
 import { CharacterCard } from './CharacterCard';
 import { CharacterEditor } from './CharacterEditor';
 import type { HudOverlaySettings } from './HudLayoutPreview';
 import { EmotionPaletteEditor } from './EmotionPaletteEditor';
-import { DEFAULT_EMOTION_PALETTE, matchPersonalityArchetype, type EmotionDefinition } from '@asaps/core';
+import { DEFAULT_EMOTION_PALETTE, matchPersonalityArchetype, type EmotionDefinition, type CastRole } from '@asaps/core';
 import { notify, errorMessage } from '../../utils/notify';
 import { notifyUndoable } from '../../utils/undoNotice';
 
@@ -84,6 +85,9 @@ interface CharacterManagerProps {
   /** The project's items (the Items tab). Without onItemsChange there is no Items tab. */
   items?: ItemDefinition[];
   onItemsChange?: (items: ItemDefinition[]) => void;
+  /** The story's cast roles (the Roles tab). Without onRolesChange there is no Roles tab. */
+  roles?: CastRole[];
+  onRolesChange?: (roles: CastRole[]) => void;
 }
 
 
@@ -101,11 +105,15 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   hudOverlays,
   items = [],
   onItemsChange,
+  roles = [],
+  onRolesChange,
 }) => {
-  const [view, setView] = useState<'characters' | 'items'>('characters');
-  const tabs = onItemsChange && !selectionMode ? (
+  const [view, setView] = useState<'characters' | 'items' | 'roles'>('characters');
+  const views = (['characters', 'items', 'roles'] as const).filter(v =>
+    v === 'characters' || (v === 'items' ? !!onItemsChange : !!onRolesChange));
+  const tabs = views.length > 1 && !selectionMode ? (
     <div className="flex items-center gap-1 ml-2" role="tablist">
-      {(['characters', 'items'] as const).map(v => (
+      {views.map(v => (
         <button
           key={v}
           role="tab"
@@ -113,7 +121,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
           onClick={() => setView(v)}
           className={`px-2 py-1 text-sm rounded ${view === v ? 'bg-blue-100 text-blue-800 font-medium' : 'text-gray-600 hover:bg-gray-100'}`}
         >
-          {v === 'characters' ? `Characters (${initialCharacters.length})` : `Items (${items.length})`}
+          {v === 'characters' ? `Characters (${initialCharacters.length})` : v === 'items' ? `Items (${items.length})` : `Roles (${roles.length})`}
         </button>
       ))}
     </div>
@@ -381,6 +389,21 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       default: return 'bg-gray-100 text-gray-700';
     }
   };
+
+  if (view === 'roles' && onRolesChange && !selectionMode) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-2 p-4 border-b">
+          <Users className="w-5 h-5" />
+          <h2 className="text-lg font-semibold">Roles</h2>
+          {tabs}
+        </div>
+        <div className="flex-1 overflow-y-auto p-4" data-testid="characters-roles">
+          <RolesSettingsPanel roles={roles} characters={characters} onChange={onRolesChange} />
+        </div>
+      </div>
+    );
+  }
 
   if (view === 'items' && onItemsChange && !selectionMode) {
     return (

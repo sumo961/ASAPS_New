@@ -22,10 +22,18 @@ Thirteen tabs became nine (ten with location beats), none behind the scroll arro
 - **Languages & culture:** source language, the Knowledge Graph switch (was under Debug) and the cultural setting it shows.
 - **Location & AR:** shown only for a story with location beats, location settings, or a sound placed on the map.
 - **About:** copyright.
-- **Variables** and **Roles** stay as tabs until they move (Story Data window, Characters).
+- **Variables** stays as a tab until it moves to the Story Data window.
 - **Removed:** the Debug tab, and "Show variable/counter values during preview", which nothing read (the Preview has its own button).
 - Stored settings are unchanged; only where they are edited moved. In-app texts that name a tab were updated.
 - **Files:** `packages/builder/src/components/settings/GlobalSettingsInspector.tsx` (+ `__tests__/GlobalSettingsInspector.tabs.test.tsx`), `components/{Inspector,NewProjectDialog}.tsx`, `components/visual/{BeatLookSection,SpeakFromPicker}.tsx`, `components/knowledgeGraph/KnowledgeGraphView.tsx`, `components/ai/codesigner/systemPrompt.ts`, `editors/{SpatialPositionEditor,XRLocationsEditor}.tsx`
+
+### Changed: Roles are set up in the Characters window
+- **Characters ▸ Roles** (a third tab beside Characters and Items) replaces Project Settings ▸ Roles: a role says which characters can play a part, so it is edited where the cast is.
+- **Changes apply at once**, each as one Undo step, like Items. A role's id ("Referenced as") takes effect when the field is left or on Enter, so renaming it updates the beats that use it once, not per keystroke; an empty or already-used id is undone.
+- The settings dialog's save and the Characters window now share one routine for role renames (`applyEditedSettings` in `App.tsx`).
+- Hints, findings and AI guidance that named "Project Settings → Roles" now say "Characters ▸ Roles" (Inspector, effect and condition editors, Co-Designer prompt and wiring vocabulary, role findings, reachability, schema descriptions).
+- Checked in the browser on a Last Ferry copy: three roles listed; renaming @confidant to @friend updated 6 beats in one step and Undo brought it back.
+- **Files:** `packages/builder/src/components/characters/CharacterManager.tsx`, `components/settings/{RolesSettingsPanel,GlobalSettingsInspector,RenpyThemeImporter}.tsx`, `App.tsx`, `editors/{ChoiceEffectsEditor,RoleHolderConditionFields}.tsx`, `utils/{applyChangeProposals,wiringVocabulary}.ts`, `components/ai/codesigner/systemPrompt.ts`, `packages/core/src/analysis/{roleFindings,ReachabilityAnalyzer}.ts`, `engine/StoryContext.ts`, `renpy/RenpyAssetExtractor.ts`, `beat-definitions/core-beats.json`
 
 ---
 

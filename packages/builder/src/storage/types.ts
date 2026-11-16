@@ -361,7 +361,7 @@ export interface GlobalSettings {
   }[];
 
   /**
-   * Cast roles (Settings → Roles): parts that one of several characters
+   * Cast roles (Characters ▸ Roles): parts that one of several characters
    * fills at runtime, referenced as '@id' (docs/Character-Roles-Design.md).
    */
   roles?: CastRole[];

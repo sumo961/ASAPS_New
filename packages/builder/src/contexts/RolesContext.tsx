@@ -1,5 +1,5 @@
 /**
- * The project's cast roles (Project Settings → Roles), for every picker that
+ * The project's cast roles (Characters ▸ Roles), for every picker that
  * takes a character: effects, conditions, speakers, AI partners. Roles are
  * listed above characters as "@ The confidant" and stored as '@confidant'.
  *

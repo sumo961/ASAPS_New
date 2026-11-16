@@ -41,7 +41,7 @@ const EFFECT_TYPE_LABELS: Record<EffectType, string> = {
   // v0.9.45 — snapshot mood / emotion / sentiment state under a name so
   // future condition baselines can compare against it.
   bookmarkAffectState: 'Bookmark Affect State',
-  // Fill a cast role (Project Settings → Roles) with a character.
+  // Fill a cast role (Characters ▸ Roles) with a character.
   castRole: 'Cast Role',
 };
 
@@ -354,7 +354,7 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
                   value={effect.target || ''}
                   onChange={(e) => updateEffect(index, { target: e.target.value })}
                   className="px-1.5 py-1 text-xs border rounded bg-white flex-shrink-0"
-                  title="The role to fill (Project Settings → Roles)"
+                  title="The role to fill (Characters ▸ Roles)"
                 >
                   <option value="">Role…</option>
                   {roles.map((r) => <option key={r.id} value={r.id}>{roleOptionLabel(r)}</option>)}

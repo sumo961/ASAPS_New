@@ -492,7 +492,7 @@ export const RenpyThemeImporter: React.FC<RenpyThemeImporterProps> = ({
                       </span>
                     </label>
                     <p className="text-xs text-gray-500">
-                      Untick to keep plain text boxes in the theme's colours. You can still choose a frame later under Text Box ▸ Pictures.
+                      Untick to keep plain text boxes in the theme's colours. You can still choose a frame later under Look ▸ Text box ▸ Pictures.
                     </p>
 
                     {sizeEstimate && (

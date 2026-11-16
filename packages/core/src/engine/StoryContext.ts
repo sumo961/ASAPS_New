@@ -880,7 +880,7 @@ export class StoryContext extends EventEmitter {
   castRole(roleRef: string, characterRef: string): void {
     const role = this.getRole(roleRef);
     if (!role) {
-      console.warn(`castRole: no role '${roleRef}' in Project Settings`);
+      console.warn(`castRole: no role '${roleRef}' under Characters ▸ Roles`);
       return;
     }
     const characters = (this.story as any)?.getCharacters?.() as Array<any> | undefined;

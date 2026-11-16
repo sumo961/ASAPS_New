@@ -50,7 +50,7 @@ export const EFFECT_SPECS: Record<EffectType, EffectSpec> = {
   bookmarkAffectState: { required: ['bookmarkName'], optional: ['target', 'scope'], summary: "bookmarkName; scope? 'all'|'character' (then target = character)" },
   playSound: { required: ['target'], optional: ['value'], summary: 'target = sound asset id / preset / URL; value? = volume 0..1' },
   setVolume: { required: ['target', 'value'], optional: ['fadeSeconds'], summary: "target = 'music' | 'all'; value = percent of the project's level 0..100; fadeSeconds? = fade duration" },
-  castRole: { required: ['target', 'character'], optional: [], summary: "target = role id from Project Settings roles (e.g. 'confidant'); character = character id who fills it from now on" },
+  castRole: { required: ['target', 'character'], optional: [], summary: "target = role id from Characters ▸ Roles (e.g. 'confidant'); character = character id who fills it from now on" },
 };
 
 const GOAL_STATUSES = new Set(['open', 'met', 'failed', 'abandoned']);

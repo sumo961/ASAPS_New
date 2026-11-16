@@ -4371,7 +4371,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                           <p className="text-xs text-gray-500">
                             {role
                               ? `The player's pick plays @${role.id} from here on: speakers, AI partners and text like \${@${role.id}.name} follow it.`
-                              : 'Add roles in Project Settings → Roles. A role lists the characters who can fill it.'}
+                              : 'Add roles in Characters ▸ Roles. A role lists the characters who can fill it.'}
                           </p>
                         </div>
                       );

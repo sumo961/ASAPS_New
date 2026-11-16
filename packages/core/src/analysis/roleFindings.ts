@@ -92,7 +92,7 @@ export function analyzeRoleFindings(
       if (byId.has(role)) continue;
       out.push({
         id: `role:unknown:${beat.id}:${role}`, kind: 'role', problem: 'unknown-role', beatId: beat.id, beatName: beat.name, role,
-        message: `"${beat.name || beat.id}" refers to @${role}, but there is no role "${role}" — add it under Project Settings → Roles, or pick an existing one.`,
+        message: `"${beat.name || beat.id}" refers to @${role}, but there is no role "${role}" — add it under Characters ▸ Roles, or pick an existing one.`,
       });
     }
   }
