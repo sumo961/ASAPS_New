@@ -189,6 +189,9 @@ function buildPhaseTree(dialogTree: DialogNode | undefined): PhaseTreeNode | nul
   return traverse(dialogTree, 0, 'root');
 }
 
+/** Shown when the author clicks a reply on the canvas that has nothing to step into. */
+const NO_NEXT_LINE_NOTICE = 'This reply has no next line in this dialog: it ends the dialog or leaves this beat.';
+
 /**
  * Flatten phase tree to array with depth info for rendering
  */
@@ -7098,13 +7101,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       // nested dialogNode (if any). Mirrors the spatial
                       // path's Step-in behavior so authors can navigate
                       // the tree from either side. Choices without a
-                      // dialogNode are inert (they'd be exits at runtime).
+                      // dialogNode are exits at runtime: a notice says so.
                       if (!id || (beat!.type !== 'dialogTree' && beat!.type !== 'aiDialogTree')) return;
                       const tree = (slotPreviewParams as any)?.dialogTree;
                       const cur = dialogNodeAt(tree, dialogTreeNodePath);
                       const choice = (cur?.choices ?? []).find((c: any) => c?.id === id);
                       if (choice?.dialogNode) {
                         setDialogTreeNodePath(prev => [...prev, id]);
+                      } else if (choice) {
+                        // Say so, or the click looks broken.
+                        notify.info(NO_NEXT_LINE_NOTICE);
                       }
                     }}
                     editorMode={true}
@@ -7453,7 +7459,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 setSelectedElementIds([]);
                 setDialogTreeNodePath(prev => [...prev, id]);
               } else {
-                notify.info('This reply has no next line: it ends the dialog or leaves this beat.');
+                notify.info(NO_NEXT_LINE_NOTICE);
               }
             } : undefined}
             beatType={beat.type === 'endScreen' && selectedPhaseId === 'credits' ? 'endScreenCredits' : beat.type}
