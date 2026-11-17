@@ -491,6 +491,14 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     return player && replies.length > 0 ? { player, replies } : undefined;
   }, [beatType, characters, beatContent?.choices]);
 
+  // The translated words of a reply button, found by the reply as written.
+  const translatedReplyFor = (el: { type?: string; content?: string; text?: string; name?: string }): string | undefined => {
+    if (el.type !== 'button') return undefined;
+    const choices = (beatContent?.choices ?? []) as Array<{ text?: string; sourceText?: string }>;
+    const written = [el.content, el.text, el.name].filter((v): v is string => !!v);
+    return choices.find((c) => !!c.sourceText && written.includes(c.sourceText))?.text;
+  };
+
   // Resolve translated speaker name when a translation language is active
   const translationState = useTranslationState();
   const resolvedSpeakerName = React.useMemo(() => {
@@ -687,7 +695,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       // Pass content directly from visual element (for phase-aware rendering)
       // When a translation is active, omit content so createPositionedElementData
       // falls through to getContentForLocation() which uses the translated beatContent
-      content: translationState.activeLanguage ? undefined : (el.content || el.text),
+      // A reply button is matched to its reply by the words as written, which
+      // a translation changes: hand it the translated reply directly, or every
+      // button would show the first reply.
+      content: translationState.activeLanguage ? translatedReplyFor(el) : (el.content || el.text),
       // Meter-specific fields
       counterName: el.counterName,
       meterOrientation: el.meterOrientation,

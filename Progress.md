@@ -29,7 +29,9 @@ A check of reading aloud (TTS) and voice input (STT), which had not been exercis
 - With a translation chosen in the header, a Dialog Tree's line stayed in the original language on the fixed canvas (text box or speech bubble), while its replies and the Properties panel were translated. The lookup asked for a `text` entry, but the line's translation is stored under `dialogTree.text`, and the fallback to the original won. The Preview and exports were not affected.
 - The editor now translates the beat's parameters as a whole (`translateBeatParameters`) and reads the line it is stepped into, so later lines of the same dialog follow the language too.
 
-**Files modified:** `packages/builder/src/components/visual/VisualWorkspace.tsx`
+- Reply buttons: with a translation chosen, every reply button on the fixed canvas showed the first reply, so "One bubble at the player's character" could not find them and plain buttons stayed. Buttons are matched to replies by the words as written; the editor now hands each button its translated reply (`sourceText` on the choices, `translatedReplyFor` in the editor). Same for Single Choice.
+
+**Files modified:** `packages/builder/src/components/visual/VisualWorkspace.tsx`, `packages/builder/src/components/visual/VisualBeatEditor.tsx`
 
 ---
 

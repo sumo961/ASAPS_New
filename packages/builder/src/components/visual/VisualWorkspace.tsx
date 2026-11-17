@@ -4829,7 +4829,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         return {
           speaker: params.speaker || params.dialogTree?.speaker || 'Character',
           text: stepped ? (stepped.text || '') : (shown.text || shown.dialogTree?.text || ''),
-          choices: (stepped ?? shown.dialogTree)?.choices || []
+          // Reply buttons on the canvas are named after the reply as written;
+          // sourceText lets the editor find a button's translated words.
+          choices: (((stepped ?? shown.dialogTree)?.choices || []) as any[]).map((c, i) => ({
+            ...c,
+            sourceText: ((stepped ? dialogNodeAt(params.dialogTree, dialogTreeNodePath) : params.dialogTree)?.choices?.[i]?.text) ?? c.text,
+          }))
         };
       }
       case 'movementChoice': {
@@ -4851,7 +4856,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           const choice = { ...c, text: translations[`choices.${i}.text`] ?? c.text };
           return beat?.type === 'chooseCharacter'
             ? { ...choice, ...characterOptionView(choice, params.optionStyle) }
-            : choice;
+            : { ...choice, sourceText: c.text };
         });
         const question = t('question', params.question || 'What do you say?');
         return {
