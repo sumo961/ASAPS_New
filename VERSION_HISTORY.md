@@ -5,10 +5,615 @@ for detailed release notes (including file-level changes and the *why* behind
 decisions) see [`Progress.md`](Progress.md). For the latest published build,
 visit the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
 
-Current release: **v0.9.89**. This is a **beta**: core functionality works,
-features below reflect what has been shipped since active development began.
-(Detailed narrative notes for every release, including the v0.9.58–v0.9.65
-entries not yet folded into the matrix below, live in [`Progress.md`](Progress.md).)
+Current release: **v0.9.158**. This is a **beta**: core functionality works,
+and new releases arrive often. The release summaries below cover v0.9.88
+onward, newest first; the feature matrix after them covers the releases up to
+v0.9.89. Detailed notes for every release are in [`Progress.md`](Progress.md).
+
+## Release Summaries
+
+One paragraph per release, as it appeared on the project's front page. The
+latest release is described in the [README](README.md); when a new version
+comes out, its predecessor's paragraph moves to the top of this list.
+
+**v0.9.157 was the speech-bubble release**:
+characters who aren't speaking can be dimmed, as in visual novels, and a
+character's lines can appear as comic speech bubbles pointing at them, with
+the line before kept up beside it and inner voices thinking in clouds. A
+Dialog Tree's replies can be listed in one bubble at the player's character;
+clicking one goes straight to the answer. New Story Warnings catch stand-in
+text left in, meters nothing changes, lines without words and sounds or
+pictures the project no longer has (with a way to swap one on every beat at
+once). A link to a beat that no longer exists now stops the story visibly,
+older ASML 1.0 stories' fades play, and Apple's built-in model works for
+in-story AI on macOS 27. Switching projects no longer leaves the old one
+behind, and the inventory folds with one click.
+
+**v0.9.156 was a fix release**: the Debug
+window no longer keeps working forever on a story whose end screen's Restart
+keeps what players did while the story tracks feelings, and it says why it
+stopped early. "Start as if…" names role checks in plain words ("With Tomas as
+the confidant"), and The Last Ferry template's captain no longer calls the
+player the only passenger awake. The User Guide's Debug pictures are new.
+
+**v0.9.155 was the Problems release**:
+the Debug window opens on a Problems tab that lists everything its tools
+found in one place, worst first, and clicking a problem shows the beat.
+Checking a large story is much faster, and when it is too large to try every
+way through, the tools now say which unreachable beats are certain and why —
+"the check always answers the same way: Money is always 0 there", or "the
+police check always comes first". New notes catch misspelled names, setup
+beats nobody reaches, replies a next line hides and end screens whose Restart
+keeps everything. Story Logic can now Check with AI whether each beat's words
+hold for every way players arrive, with the real cost shown. A counter
+compared with text no longer counts as 0, and projects reopen on the beat you
+left.
+
+**v0.9.154 was the large-project
+release**: big stories stay responsive. Typing a beat's text while the
+flowchart is open no longer keeps the computer busy (it used to redraw the
+whole flowchart on every keystroke), and the flowchart now draws only the
+beats in view, so dropping, selecting and moving beats in a 400-beat story
+is quicker. A Dialog Tree line with no replies and no exit is now shown with
+Continue before the scene moves on. Fixed: in dark mode, NPC lines in the
+Dialog editor turned white when clicked.
+
+**v0.9.153 was the story-logic release**:
+the Debug window's Story Logic tab now knows what players arrive with. A hub
+is a beat players reach in different states, and its card says what differs —
+with or without an item, someone's trust from 0 to 0.8, who plays a role — so
+you can check its text holds for every way in. Text that assumes the key is
+flagged only when some way in arrives without one. The Co-Designer (and Claude
+Desktop) can now give a beat its own look. Fixed: Undo no longer carries over
+into the next project, Undo of a switch between Responsive and Fixed canvas
+switches back, cloning a repository saves your work first, and Path Analysis
+no longer reports some dead ends that aren't there.
+
+**v0.9.152 was the save-before-switching release**: edits you made in the half minute before opening another project
+are no longer lost — the project you leave is now saved first, whether you
+switch from the Projects menu, the start window, a template, Open or a
+dropped file. A beat's look can also turn off the theme's text-box frame
+picture (*This beat's look* ▸ *Frame picture*), so the beat gets a plain box
+in its own colour.
+
+**v0.9.151 was the per-beat look release**: a new *This beat's look* section in the Visual Editor changes the
+project's look for one beat only — the stage and text colours, the text box
+(colour, opacity, corners, padding, border, whether boxes show), the buttons,
+and the fonts and their sizes. Everything about how a beat looks is now set
+in the Visual Editor: the text-box border, the background picture, *Keep
+shape on phones*, *Show options as* and a dialog's layout and chat frame
+moved there from the Properties panel. Dragging a picture's corner now scales it, keeping its
+proportions; hold Option (Alt) to crop it instead. Hiding text boxes works
+again in the Visual Editor for fixed layouts, and Path Analysis marks very
+long paths as "Depth Limit" and loops as "Cycle" instead of dead ends.
+
+**v0.9.150 was the path-analysis release**: the Debug window's Reachability, Path Analysis and Story Logic
+now play a story the way the Preview does. Path Analysis follows every
+button of a Free Layout (it used to follow only the first), a Set Timer's
+"time runs out" link and QR codes, and it respects what decides a real
+playthrough: choices hidden by their conditions, requirements that send
+the player elsewhere, a Condition Check's extra conditions, how many of an
+item the player holds, and each character's own counters and items. A
+choice beat whose options have all been tried is now marked as a cycle,
+not a dead end, and the Preview's "Start as if…" presets give the player
+only their own items.
+
+**v0.9.149 was the easier-reading release**: three free fonts made for easier reading — Lexend, Atkinson
+Hyperlegible and OpenDyslexic — come with ASAPS. Tools ▸ App Preferences ▸
+Reading font puts the builder's own screens in one of them, and Project
+Settings ▸ Fonts offers them for a story's titles, text and buttons, so
+players get them in the Preview, exports and the player too. The User Guide
+now starts with installing ASAPS, a 15-minute first story and a list of
+common hiccups. Undo now also takes back a hotspot or picture made from the
+Properties panel, the speaker picker is light in light mode, and the last
+light spots in dark mode are gone.
+
+**v0.9.148 was the items and dark-mode release**: a story can keep its own list of items (Characters ▸ Items), with
+the name and picture players see, so every beat uses the same sword. App
+Preferences ▸ Appearance switches the builder to dark, or follows your
+system, while your story keeps its own colours. The Beat Types palette shows
+the ten common beats first, the Properties panel shows which beats lead to
+the one you're on, and hovering a beat in the flowchart picks out its links.
+Pending Changes can stage or discard several files at once. Undo works again
+for edits in the Properties panel, and Check for Updates… now tells you when
+you're on the latest version.
+
+**v0.9.147 was the Free Layout release**:
+a new beat type lets you lay out a screen by hand in the Visual Editor, with
+text boxes, buttons, pictures and characters wherever you want them. Each
+button, or a picture you make clickable, leads on like a choice, with its own
+conditions and effects; the usual auto-advance timer and countdown work on it
+too. In a responsive project the screen keeps its proportions on every device
+and the words resize with it. Change type turns an existing beat into a Free
+Layout and back. You can also flip pictures in the Visual Editor, and Add/Remove
+Inventory now offers the items your story already knows.
+
+**v0.9.146 was the class-feedback release**: a new **Script** tab shows the whole story's text on one page in
+reading order, editable in place, and saves it as Markdown to write in
+Obsidian or Google Docs and read it back. Draw a link by dragging from one
+beat onto another (a beat with several choices asks which one), search any
+beat picker by typing, and turn a beat into another type without losing its
+text and links. Fold away Story Beats, hide the overview map, widen the
+Properties panel, and enjoy a shorter header. App Preferences can hide every
+AI feature, or just the beat suggestions. A choice that isn't linked yet no
+longer stops the story.
+
+**v0.9.145 stopped project folders from
+shuffling their pictures**: in a project shared through Git, pictures nobody
+touched kept appearing in Pending Changes as modified or as new `_2`/`_3`
+copies, because every first save after opening wrote all pictures again
+under fresh names. Saving now leaves the folder's pictures alone and only
+adds your new uploads, under names no other picture uses.
+
+**v0.9.144 fitted the text snugly in
+theme frames again**: since v0.9.143 the text in a Ren'Py theme's text-box
+frame had far too much space around it, and on phone-sized stages and in the
+Visual Editor the frame's decorated edges came out much too tall. The text
+now sits between the frame's edges as it did before, at every screen size.
+
+**v0.9.143 made imported Ren'Py themes
+look the same everywhere**: their text-box frame, button pictures and fonts
+are now part of the project, so the Visual Editor, the Preview, exports and
+your teammates' computers all show them — no theme install needed there.
+Choose your own frame and button pictures in **Project Settings ▸ Text Box ▸
+Pictures**; button pictures now work in responsive layouts too, and frames
+keep their decorated edges in proportion instead of stretching across long
+text. **Import Ren'Py** reads many more kits: themes that keep their colours
+and fonts outside gui.rpy, plain picture packs, and RAR or 7z archives as
+well as ZIPs. Cancel in Project Settings now puts back the theme you last
+saved, and themes you no longer want can be deleted together with their
+pictures and fonts. HTML exports now leave out pictures and sounds the
+story never uses, so big projects export as a single file again instead of
+crashing the window. A freshly cloned project folder now shows its pictures,
+sounds and fonts the first time it is opened.
+
+**v0.9.142 made exported stories fast
+again**: stories with many pictures used to make the browser run out of
+memory and crawl (or crash) while loading; they now start in a few seconds.
+Export again to get the fix.
+
+**v0.9.141 was a safety net for your
+beats**: deleted beats stay on your computer for 30 days and come back with
+**Tools → Recently deleted beats…**, whatever removed them; deleting three or
+more beats at once names them first, including the ones you can't see. Groups
+that passed .asaps copies around can bring the latest one back into their
+project folder and Git history with **Open → Update from a copy (.asaps)…**.
+
+**v0.9.140 helped groups working with
+Git**: when a teammate undid a merge, pressing Merge on that branch again now
+offers to bring its beats back, one by one, with the pictures, characters and
+clusters they need. ASAPS no longer warns that files "changed outside ASAPS"
+after its own saves (seen on slow or OneDrive-synced Windows folders), and
+long notices stay inside the window with their close button.
+
+**v0.9.139 added a text-box border per
+beat**: show or hide the border around a single beat's text, whatever the
+project's Text Box settings say. A beat's background fit now also reaches
+the Preview Window and exported stories.
+
+**v0.9.138 fixed stepping through a
+Dialog Tree in the Visual Editor**: clicking a choice on the canvas or a line
+in the Inspector's tree moves the canvas there again, "then" steps read
+"Continue → Billie" instead of an internal id, and each line's look switches
+the character's picture on the stage as in play.
+
+**v0.9.137 let graphics go off the
+edge in responsive projects**: characters and props can be placed partly
+off the stage with X % / Y %, and the Visual Editor's number fields now
+take negative numbers (typing "-" used to snap them back to 0).
+
+**v0.9.136 gave characters an inner
+voice**: tick *Speaks as an inner voice* and their lines read as thoughts —
+italic, in a dashed box in their colour — stacked under the line the player
+is answering, with "Reply to Danny" above the replies. End Screens and
+Multiple Choice beats can now hide the clock, and a story folder that isn't
+on GitHub yet gets **Put it on GitHub…** in the version-control panel.
+
+**v0.9.135 kept generated stories in
+step with their clock**: settings such as hiding the clock on an ending now
+survive the import, the story clock uses the format the story asks for, and
+the review banner flags text that names a time the clock doesn't show
+("At 6:00 the alarm…" under 1:30 AM). Lines a character says before the
+player answers now wait for **Continue** — except in messenger chats — with
+a new **Lines without a reply move on** setting to choose.
+
+**v0.9.134 made one version write a
+project**: an older ASAPS now refuses to save, commit or push a project a
+newer one saved, and tells you to update. A **Condition Check** can test
+several things at once — *has the key **or** is trusted* — with **More
+conditions** and an AND/OR switch, and *Does Not Have Item* checks, which
+branched as if the player had the item, now work.
+
+**v0.9.133 protected newer work from
+older copies of ASAPS**: dialog lines and replies now keep anything a newer
+version added (a teammate's outdated copy had turned every "then" line of a
+group's dialogs into an empty player reply), and an older ASAPS opening a
+project saved by a newer one pauses auto-save and asks before saving.
+
+**v0.9.132 put dialogs into text**: the
+Dialog Editor's **Export text** saves a whole conversation as a readable
+script (characters' lines, player replies, conditions, effects and where each
+reply leads), and **Import text** turns such a script — exported, or written
+by hand — into a new Dialog Tree beat, so a conversation can be kept, shared
+and rebuilt.
+
+**v0.9.131 took you straight to the last
+reply**: a **Last reply** button in the Dialog Editor opens a long
+conversation down to its deepest line and puts the cursor in the last player
+reply, and **Expand all / Collapse all** is now labelled and always does what
+it says.
+
+**v0.9.130 kept long conversations
+readable** in the Dialog Editor: it indents only where a conversation
+branches, so a long back-and-forth runs straight down at full width instead
+of being squeezed into ever narrower boxes, and very deep branches show
+their level rather than indenting further.
+
+**v0.9.129 let merges finish**: when two
+teammates' ASAPS shortened the same copied beat's ID differently, every pull
+ended in a conflict that neither **Keep both** nor **Accept Remote Changes**
+could settle. Now Keep both keeps one beat (the incoming ID, with your links
+following it) and every other file someone still has, Keep My Changes and
+Accept Remote Changes no longer fail on files one side doesn't have, and all
+of it also works for a project folder inside a repository subfolder.
+
+**v0.9.128 fixed the volume slider of a
+cluster's ambient sound**, which snapped back to its old value instead of
+moving.
+
+**v0.9.127 let pulls through and
+made clusters sound**: opening or saving a project no longer marks `project.json`
+as changed, so Git stops refusing teammates' pulls with "would be overwritten
+by merge" (copies an older version marked are put back automatically), and a
+cluster's ambient sound now actually plays — in Preview and in exported
+stories — while the player is in that cluster.
+
+**v0.9.126 made updates finish**:
+**Restart Now** no longer hangs until you force-quit (on macOS an open
+project folder kept the app from closing, and unsaved work could hold the
+quit — ASAPS now saves first and asks only when something can't be saved);
+because the restart into a new version still runs the old one, this helps
+from the update *after* 0.9.126. Teammates opening the same old project now
+shorten long copied-beat IDs the same way instead of conflicting, a beat
+saved twice under one ID is settled and reported instead of one copy
+silently disappearing, and the asset list no longer changes a little on
+every computer.
+
+**v0.9.125 gave chats a messenger
+look and music a fade**: a Dialog Tree in a chat layout can show a frame
+picture (a phone, say) with the chat running inside a chat window you place
+in the Visual Editor; the new **Set Music Volume** effect fades music out,
+under a scene or back in; the Dialog Tree's response buttons can be moved up
+or down; elements can sit partly off the stage; large sounds now reach your
+teammates after a push; and a branch switch that Git refuses now tells you
+why.
+
+**v0.9.124 kept everyone's work when
+you pull**: when your beats and a teammate's clash, the new **Keep both**
+choice keeps them all (yours move to a new ID, and your links follow) instead
+of making you pick whose to lose; beats that share an ID in different files
+are separated automatically after a pull; and ASAPS gets you back onto your
+branch when Git says "You are not currently on a branch".
+
+**v0.9.123 made group work through Git
+work**: new beats and copies get unique short IDs, so people adding beats at
+the same time no longer create the same one (and copying a copy no longer
+grows an ID until Git can't push it); ASAPS no longer writes over files you
+pulled outside the app, won't open a project with unresolved merge
+conflicts, and warns when a project was saved by a newer ASAPS; opening an `.asaps` file that sits in a Git
+repository offers to turn it into a project folder Git can merge (one file
+per beat); and Merge Story can combine versions of one story that drifted
+apart — shared beats stay once, new ones come in, and beats changed in both
+are marked for you to decide.
+
+**v0.9.122 answered three questions from
+users**: each speaker's name can now appear in their character's own colour
+(Project Settings → Effects → Speaker Display), the name colour can be set
+for names shown above the text box too, and the little slide of the choice
+buttons can be switched off (it also stops for players whose device asks for
+less motion). Debug and the review after generating a story now point out
+dialog lines that lead nowhere.
+
+**v0.9.121 was a follow-up**: the Debug
+window no longer calls a check on a text variable ("did Jonas stay
+silent?") "always true", opening the project folder that is already open
+reloads it instead of quietly changing where your work is saved, and a
+project folder you copied in Finder becomes its own project with its own
+name the first time you open it.
+
+**v0.9.120 kept the deadlines in
+generated stories**: a story-clock check written by the AI ("did the player
+arrive before 9:18?") lost its time on import and always took the same
+branch. It now keeps it, and the review banner after generation tells you
+when a time check is decided before play starts, or when the AI wrote a
+setting a beat doesn't have. The Debug window no longer reports reachable
+endings as impossible or warns about beats with only one way in, the
+Inspector shows help written for authors, and the User Guide has pictures
+of the recent features.
+
+**v0.9.119 kept your large sound
+files**: in the desktop app, a sound of 5 MB or more (a WAV of about half a
+minute) played while you worked but was gone after reopening the project,
+and never reached your collaborators through git. It is now stored like any
+other file, and if storing a file ever fails, ASAPS tells you. Sounds that
+already disappeared need to be added once more.
+
+**v0.9.118 made the inventory work on
+screen**: items given or taken during play now appear and disappear in the
+inventory panel, with pictures you can choose on Inventory beats and
+effects, and the items listed on a character are theirs from the start. In
+a Dialog Tree each line can change how the speaker looks (an angry or sad
+picture), and with *Message history* turned on players can reread every
+conversation they have had, like chats in a messenger. Pulling with Git no
+longer fails because of the editing-lock file, and your own fonts work on
+Windows and in the Preview Window and exports.
+
+**v0.9.117 let a conversation react to what the player did before**: a
+line where another character speaks next can now have conditions (a
+bystander steps in only if the player stood up for someone earlier) and
+effects (the story remembers what the player witnessed). Use the new
+*Conditions & effects* button on the line's connector in the Dialog Tree
+editor. The Visual Editor and the Preview Window also use the canvas size
+from Project Settings now, so a 16:9 project is laid out on a 16:9 stage,
+and speakers in the editor no longer share colours.
+
+**v0.9.116 let a group scene play out before the player answers**: a Dialog
+Tree has a new setting, *Players can skip ahead* (Inspector → Show Advanced
+Options). Turn it off and the lines other characters say in a row play at
+reading pace, with no Continue button, until it is the player's turn. In
+chat layouts the typing indicator now also shows before each next speaker,
+not only after the player's answer.
+
+**v0.9.115 let players pick their
+character by picture**: a Choose Your Character beat could show its
+options as portrait cards — with names, or pictures only — instead of text
+buttons (Inspector → *Show options as*). Each card used the character's
+portrait, and any option could use a different picture. The Preview Window
+also fit fixed-layout projects into phone and tablet presets instead of
+cropping them.
+
+**v0.9.114 let you show an asterisk**:
+put a backslash before a formatting character (`5 \* 3` shows "5 * 3"
+instead of starting italics), mark words with `==highlight==`, and choice
+buttons showed bold and italic too. Roles reached the remaining places: a
+Condition Check can branch on who plays a role, Dialog Tree lines can be
+spoken by a role, hand-written stories get the role checks in Debug → Story
+Warnings, and renaming a role updates every beat that uses it.
+
+**v0.9.113 let one story be played by
+different people**: set up a role in Project Settings → Roles ("the
+player", "the confidant"), and write each scene once for it — the role as
+speaker or AI partner, `${@confidant.name}` and `${@confidant.they}` in
+text. A new **Choose Your Character** beat lets the player pick who to be,
+with a short description under each name; a choice can also decide who
+fills a role later, or a role can be drawn at random. Each character keeps
+their own counters and feelings. **Preview as** shows a scene as any of
+the candidates while you write, and the template **The Last Ferry** shows
+it all in nine beats. Condition Check beats testing a goal, a variant or a
+location now work (they always took the false branch), and two older
+losses are fixed: choosing a theme (and importing a generated story) no
+longer drops your declared variables, and exported stories now start
+variables at the values you set in Project Settings.
+
+**v0.9.112 let several characters
+talk before the player answers**: in a Dialog Tree, click **Then another
+character speaks** under a line, and the next character's line follows by
+itself after the reading time, with no made-up player reply in between.
+Story state is more trustworthy too: counter effects add numbers again
+(two "+2" choices used to make "22"), variables declared true/false or
+number keep their type and get a true/false picker where they are set or
+checked, and text variables still hold any text exactly. In the flowchart,
+copy, paste and delete now take every selected beat, and an AI
+Conversation always shows its way out in the Inspector.
+
+**v0.9.111 let one choice stand apart**: in a responsive project, any
+choice of a Multi Choice beat can be pinned to a corner of the screen on its own (a "Leave" option top-right
+while the answers stay under the question), and pinned buttons now make
+room for the text instead of covering it on phones. On Windows, the GitHub
+setup's link for the GitHub CLI now leads to its installer, which fixes
+"GitHub CLI not found" for people who had downloaded the zip.
+
+**v0.9.110 made AI failures visible**: when your AI provider rejects the
+API key, the Preview tells you instead of letting every AI beat quietly
+fall back; an Online Content beat whose search fails shows its error
+message instead of stale text; and an AI dialog tree's System Instructions
+can finally be edited. Starting the Preview from a beat now asks for the
+answers the player would have typed, and the Preview no longer hangs on
+its first launch. For AI conversations, the old "NPC Personality" field is
+now **In this scene**: who the NPC is comes from the character you link,
+the beat says how they behave in this scene.
+
+**v0.9.109 fixed Random Target beats**:
+since v0.9.103, **Add Branch** did nothing — new branches now appear and
+keep the target you pick.
+
+**v0.9.108 fixed two Windows problems**:
+when Windows won't open your browser, the Help menu's Documentation and
+Report a Bug… entries now show the link to copy instead of doing nothing,
+and the GitHub setup finds the GitHub CLI wherever its installer put it —
+click Re-check after installing, no restart needed.
+
+**v0.9.107 made location stories say
+what they are doing**: instead of a still screen, players see "Finding your
+location…", "Placing the points on the map…", and — when no position comes
+in — "Waiting for GPS…" with a button to continue without it. A slow GPS
+fix no longer makes a story skip its map scene, and a map without internet
+says so instead of staying grey. **ASAPS Builder now also runs on Linux** (beta: AppImage and
+.deb for 64-bit PCs). Stories exported with the Netlify relay get the same
+protection against over-cautious AI refusals as the builder (redeploy the
+relay from a new export). Work toward native mobile apps continues.
+
+**v0.9.106 brought the Ink & Brass look
+to generated stories**: AI-generated stories now open in ASAPS's own look
+instead of a retro theme, and Ink & Brass is a theme you can pick in Project
+Settings, listed first. AI features got leaner and sturdier: AI beats in a
+running story think briefly on the newest Claude models (much quicker on
+Opus 5.5 and Fable), replies that must
+be data are guaranteed to be valid, repeated requests reuse cached prompts,
+and the stand-alone players use Claude Sonnet 5. Also: the player's Restart
+asks inside its menu instead of freezing the page, the story checks explain
+problems in plain sentences, and a damaged translation file no longer stops
+a project from opening.
+
+**v0.9.105 was a small follow-up to the
+replay release**: the story checks now understand replays (a branch for a
+returning player is no longer reported unreachable) and variables that only
+have a default value; chat-style conversations keep their text clear of
+HUDs in every case; and HUDs in exported fixed-canvas stories hold still
+while an AI beat is loading.
+
+**v0.9.104 was the replay release**: an
+ending's Restart can keep chosen things — a variable, a character's counter,
+the persona the player picked — while everything else resets, and the
+built-in `${playthrough}` counts the runs; a new *Characters* reset option
+lets characters remember the player across a replay, or start over; story variables start at the
+default value you give them in Project Settings; generated choices gated on
+a counter now appear; exported stories place their HUDs clear of the text
+at any window size; the starter templates reset properly when replayed; and
+the toolbar fits a 13-inch laptop screen.
+
+**v0.9.103 was the wiring release**: the
+Co-Designer can change how a story works — choice effects, visibility
+conditions, entry gates, random branches, new choices, a new version of a
+beat side by side; restart and fallback targets are real links, and a
+Restart without a target is flagged; the review, the flowchart and path
+simulation read links the same way and understand character feelings, so
+"Start as if…" presets exist for every beat; a character's HUD appears
+when the character does; quoted speech is spoken in the character's voice;
+dialog-tree buttons in the Visual Editor reorder by drag, with a "Show as"
+state picker; hypertext is readable in every theme. Exported stories
+fit their HUDs to the real window and fold them into the compact strip on
+phones in either orientation.
+
+**v0.9.102 was the UX-evaluation
+release**: renaming a character keeps the story intact; the builder has no
+blocking dialogs left — notices, with Undo on reversible deletes; settings
+split into **Project Settings** and **App Preferences**; API keys in the
+desktop app are encrypted by the operating system instead of sitting in
+plain text; background images get the same Inspector door as sounds; the
+character editor opens on portrait and names; and the Export menu is
+organised as *Publish for players* and *Share for editing*, including
+sharing a GitHub project. Also: Help ▸ Report a Bug….
+
+**v0.9.101 shipped Electron 43** in the
+packaged app: a macOS 27 readiness review found that releases since August
+had packaged an end-of-life Electron 40 because the packaging pin had not
+moved with the dependency. macOS 27 Golden Gate itself needs nothing else
+from the app (universal binary, signed and notarized); a non-blocking CI
+job now smoke-tests each release on GitHub's macOS 27 runner image.
+
+**v0.9.100 moved OpenAI to GPT-6 Astra**
+as the default model and runs OpenAI tool turns (the Ideator's web search)
+through the Responses API — Chat Completions refuses function tools with a
+reasoning effort on GPT-5.6 and has none on Astra — with per-model effort
+mapping so a global setting never 400s. The packaged app's built-in proxy
+gains the Brave search route and Responses-API routing. In the responsive
+Visual Editor, props and characters render on the slot stage again, text,
+inputs and buttons stack in front of them by default, and the elements
+panel's reorder arrows work; long variable values in the Preview Window
+debug panel are readable in full.
+
+**v0.9.99 fixed a Preview Window crash**
+on generated stories whose characters carry a meter with a minimal frame
+definition — the shape the generation guidance asks for. Frames are now
+completed wherever they are read (renderer, import pipeline, Character
+Editor), so a mood-driven meter renders on desktop and folds into the
+compact strip on phones instead of taking the preview down.
+
+**v0.9.98 was the provenance release**: a
+project now carries its own record of AI involvement — an AI edits ledger
+with every proposal from the generator review, Ask AI and the Co-Designer
+and what the author decided, accepted and declined alike (**AI ▸ AI
+changes**) — and the conversations that belong to it, the Ideator session
+that produced it and every Co-Designer session about it, travel with it
+through folders, zips and version control. Also: all Dependabot alerts
+cleared, multi-line question fields, and a generation rule that sibling
+variants of one story moment each introduce their characters.
+
+**v0.9.97 was the review release**: a
+generated story keeps its original with the project and arrives with typed
+findings and one-click, undoable fix proposals in the import banner — a
+typo'd link re-pointed, a counter threshold clamped into reach, an orphaned
+scene linked — and "Ask AI" for the rest, whose answers are checked by code
+on a simulated copy and shown as before → after before anything applies.
+Automatic AI self-repair is gone. Generation escalates once on a capped
+output instead of truncating twice, Opus 5 gets a 64K floor, and a saved
+Max Tokens that silently capped every budget fix is migrated away. One
+import path serves the generator, the Ideator and MCP injection; beats drag
+out of and between clusters with undo; cluster resize is zoom-correct; the
+proxy runtime transport streams; feeling gates on choices; voice input off
+by default on generated conversations.
+
+**v0.9.96 was the phone release**: in-story
+AI answers in seconds instead of minutes (no more double generation, no
+silent thinking-budget burn, streaming everywhere, a per-turn branching cap,
+and a separate model setting for in-story AI); a blind seven-story bake-off
+settled the authoring-model question (Opus 5 won both rounds — the verdict
+is in the User Guide and inline in AI settings) and its AI-length stories
+flushed out a family of layout bugs, all fixed; dialog trees work on phones;
+and screen HUDs fold into a tap-to-expand strip on phone-sized stages
+instead of covering a third of the screen. Also: `effectsOncePerChoice`
+(re-readable but once-scored evidence), conditional choices finally
+documented, Field App P0 chassis, image-anchored background animation,
+Find & Change, and zero open advisories.
+
+**v0.9.95 was the verification release**:
+dialog trees open up on the flowchart with their choice logic visible on the
+edges, clustered beats behave exactly like free beats (one rendering path),
+multi-language exports shrank from 170 MB to ~40 MB with translated
+inventories, and version control speaks plain language — "Track versions"
+sets up local-only history in one click, saves a First version immediately,
+and never shows a git error to an author who chose to keep history on their
+own machine. The flowchart remembers your zoom per project; cluster maps
+render on cold start; menu Undo finally undoes the story.
+
+**v0.9.94** changed where projects live.
+On desktop, new projects are folders of ordinary files in
+`~/Documents/ASAPS Projects/` — one file per beat, readable, git-able,
+backed up by Time Machine like everything else — created silently on the
+first named save, with a one-click "Move library to disk" for existing
+projects and safety rails for synced folders (atomic writes,
+external-change warnings). Project exports are now double-clickable
+`.asaps` files (no more zip-viewer hijacking or Safari auto-extraction),
+every import gap is closed (unzipped folders, bare project.json, recovered
+debug dumps, duplicate-name handling), and the web build finally asks the
+browser to protect its storage — with backup badges for work that exists
+only in one browser.
+
+**v0.9.93** made text formatting a real contract (markdown-lite everywhere
+prose renders, with a formatting bar and translation-safe markers) and gave
+multi-phase Dialog Trees their depth on the flowchart.
+
+**v0.9.91** fixed macOS auto-update and stopped AI-generated and injected
+stories failing silently: broken links are shown in a banner and marked ⚠ in
+the graph, and the same validation runs on every import path.
+
+**v0.9.90** made HUDs and the stage aware of
+each other: screen-docked meter, inventory and mood frames now appear in the
+Visual Editor, so what you arrange is what plays; beat text is laid out clear
+of them instead of underneath; device-size presets scale to fit rather than
+cropping the corners the HUDs sit in; and an exported story keeps its HUDs
+aligned with the stage at any window size and flows them around the page's own
+language panel. On phone-landscape, choices wrap into two columns and content
+steps around a corner HUD rather than being pushed off the screen. Two new
+authoring warnings — a counter shown twice on one beat, and a HUD stack too
+tall for a small screen — flag what the runtime cannot fix for you.
+
+**v0.9.89** before it added counter binding: a counter can be a *display*
+rather than a mechanic. Bind one to a character's sentiment, emotion or mood
+and it becomes a read-only window onto that state, so a simple trust bar can
+front a full affect model instead of competing with it. Bipolar meters grow
+outward from zero, optional word ladders replace raw numbers, and HUD meter
+frames name the character they belong to. Existing counters are untouched.
+
+**v0.9.88** was a security release with no feature changes: the
+desktop runtime moved to **Electron 43**, external links became
+scheme-validated before being handed to the operating system, and the build
+toolchain moved to **vite 8** — open dependency alerts dropping from 39 to 9.
+
+> **macOS users on v0.9.85 or earlier**: your installed (unsigned) build
+> cannot auto-update across the signing boundary — download v0.9.86 once
+> manually; auto-update works from then on. Windows auto-updates normally.
 
 ## Feature Matrix
 
