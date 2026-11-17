@@ -64,6 +64,15 @@ describe('Project Settings tabs', () => {
     expect(screen.getByText(/Show Knowledge Graph view/)).toBeTruthy();
   });
 
+  it('starts another tab at its top', () => {
+    open();
+    fireEvent.click(tab(/^Dialogue$/));
+    const scroller = screen.getByTestId('setting-message-history').closest('.overflow-y-auto') as HTMLElement;
+    scroller.scrollTop = 300;
+    fireEvent.click(tab(/^Screen panels$/));
+    expect(scroller.scrollTop).toBe(0);
+  });
+
   it('shows Location & AR only for a story with location beats', () => {
     open([{ id: 'b1', type: 'gpsLocation', name: 'Harbour' }]);
     expect(tabNames()).toContain('Location & AR');

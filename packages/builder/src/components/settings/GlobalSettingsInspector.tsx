@@ -194,6 +194,11 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     });
   }, [beats, initialSettings]);
   const activeTab: SettingsTab = storedTab === 'xr' && !showLocationTab ? 'project' : storedTab;
+  // Another tab (or Look section) starts at its top, not where the last one was scrolled to.
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  React.useLayoutEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [activeTab, lookSection]);
   const [hasChanges, setHasChanges] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [saveThemeDialogOpen, setSaveThemeDialogOpen] = useState(false);
@@ -925,7 +930,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div ref={contentRef} className="flex-1 overflow-y-auto p-6">
           {activeTab === 'project' && (
             <div className="space-y-4">
               <h3 className="font-medium text-gray-700 mb-3">Story</h3>
