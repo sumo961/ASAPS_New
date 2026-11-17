@@ -19,7 +19,7 @@ describe('digest: story state in use', () => {
       characters: [{ id: 'karin', counters: [{ name: 'trust' }] }],
       variables: [{ name: 'caseName' }],
     });
-    expect(digest).toContain('VARIABLES (declared in Project Settings): caseName');
+    expect(digest).toContain('VARIABLES (declared under Story Data): caseName');
     expect(digest).toContain('VARIABLES used but not declared: route');
     expect(digest).toContain('STORY COUNTERS (story-wide, no declaration needed): Clock, Prep, Tension');
   });

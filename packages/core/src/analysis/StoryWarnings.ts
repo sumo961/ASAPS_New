@@ -8,6 +8,7 @@
  * engine behavior.
  */
 
+import { storyDataUsage } from './storyDataUsage';
 import type { Story } from '../engine/Story';
 import type { Beat } from '../beats/Beat';
 import type { SimulatedPath, SimulatedStep, SimulationState } from './StateSimulationAnalyzer';
@@ -212,14 +213,7 @@ function stateWiring(story: Story) {
     const walk = (o: any): void => {
       if (Array.isArray(o)) { o.forEach(walk); return; }
       if (!o || typeof o !== 'object') return;
-      if (o.type === 'variable' || o.type === 'counter') {
-        const name = o.variableName || o.variable || o.left;
-        if (typeof name === 'string' && name.trim() && !o.character) {
-          const k = key('value', name);
-          if (!reads.has(k)) reads.set(k, { kind: 'value', name: name.trim(), beats: new Set() });
-          reads.get(k)!.beats.add(beat.id);
-        }
-      } else if (o.type === 'inventory' && playerBag(o)) {
+      if (o.type === 'inventory' && playerBag(o)) {
         const name = o.item || o.value || o.right;
         if (typeof name === 'string' && name.trim()) {
           const k = key('item', name);
@@ -227,19 +221,27 @@ function stateWiring(story: Story) {
           reads.get(k)!.beats.add(beat.id);
         }
       }
-      if (o.type === 'setVariable' || o.type === 'setCounter' || o.type === 'incrementCounter') noteSet('value', o.target, beat.id);
       if (o.type === 'addInventory' && playerBag(o)) noteSet('item', o.target, beat.id);
-      noteSet('value', o.counter, beat.id);
-      if (typeof o.variable === 'string' && o.type !== 'variable' && o.type !== 'counter') noteSet('value', o.variable, beat.id);
       for (const v of Object.values(o)) if (v && typeof v === 'object') walk(v);
     };
     walk(params);
     walk((beat as any).requires);
     walk(beat.connections);
-    if (beat.type === 'setVariable') noteSet('value', params.name, beat.id);
-    if (beat.type === 'inputText') noteSet('value', params.variable ?? params.variableName, beat.id);
     if (beat.type === 'addRemoveInventory' && params.action !== 'remove' && playerBag(params)) noteSet('item', params.item, beat.id);
     if (beat.type === 'pickProp') for (const prop of params.props ?? []) noteSet('item', prop?.item ?? prop?.name, beat.id);
+  }
+  // Variables and counters: the shared walk (storyDataUsage). A check here is
+  // on the story's own value, so a counter test naming a character is left
+  // out; anything that sets or shows the name counts as set, whoever owns it.
+  for (const use of storyDataUsage(story.getAllBeats() as any)) {
+    if (!use.character) {
+      for (const beatId of use.tests) {
+        const k = key('value', use.name);
+        if (!reads.has(k)) reads.set(k, { kind: 'value', name: use.name, beats: new Set() });
+        reads.get(k)!.beats.add(beatId);
+      }
+    }
+    for (const beatId of [...use.sets, ...use.displays]) noteSet('value', use.name, beatId);
   }
   // What the story starts with counts as set: nothing is missing there.
   const starts = new Set<string>();

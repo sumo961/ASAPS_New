@@ -346,7 +346,7 @@ export interface GlobalSettings {
   };
 
   /**
-   * Story variables declared in Settings → Variables (and merged in from
+   * Story variables declared under Story Data ▸ Variables (and merged in from
    * AI-generated stories). Was declared only in GlobalSettingsInspector's
    * private copy of this type.
    */

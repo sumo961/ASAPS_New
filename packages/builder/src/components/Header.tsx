@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Github, Compass, GitMerge, FileInput, FileText, Trash2, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus, History } from 'lucide-react';
+import { Github, Compass, GitMerge, FileInput, FileText, Trash2, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus, History, Variable } from 'lucide-react';
 import { AIEditsLogDialog } from './ai/AIEditsLogDialog';
 import type { AIEditLedger } from '../types/aiEdits';
 import { ProjectSelector } from './ProjectSelector';
@@ -75,6 +75,7 @@ interface HeaderProps {
   onSettings?: () => void;
   onAssets?: () => void;
   onCharacters?: () => void;
+  onStoryData?: () => void;
   onSearch?: () => void;
   searchPanelOpen?: boolean;
   onSave?: () => void;
@@ -147,6 +148,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSettings,
   onAssets,
   onCharacters,
+  onStoryData,
   onSearch,
   searchPanelOpen,
   onSave,
@@ -1175,6 +1177,17 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Users className="w-4 h-4" />
               Characters
+            </button>
+          )}
+
+          {onStoryData && (
+            <button
+              className="px-3 py-1.5 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors flex items-center gap-1.5"
+              onClick={() => onStoryData()}
+              title="The story's variables and counters, and the beats that set and test them"
+            >
+              <Variable className="w-4 h-4" />
+              Story Data
             </button>
           )}
 

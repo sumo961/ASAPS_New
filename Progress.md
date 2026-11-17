@@ -3,7 +3,7 @@
 ## Unreleased (since v0.9.157, 2026-11-17)
 
 ### Overview
-First changes from the UX review of 2026-11-16 (the app walked through as a new user, in the browser and in Electron): the New / Browse loop on a fresh starter story, and Project Settings regrouped by what a setting does.
+First changes from the UX review of 2026-11-16 (the app walked through as a new user, in the browser and in Electron): the New / Browse loop on a fresh starter story, Project Settings regrouped by what a setting does, roles moved to the Characters window, and a Story Data window for variables and counters.
 
 ### Fixed: New and Browse all projects on a fresh starter story
 - **No prompt on an untouched starter.** The starter story gained a third link (End → Restart) and the "is this still the untouched starter?" check allowed two, so **New** and **Browse all projects** asked to save a story nobody had written.
@@ -14,7 +14,7 @@ First changes from the UX review of 2026-11-16 (the app walked through as a new 
 - **Files:** `packages/builder/src/App.tsx`, `components/Header.tsx`
 
 ### Changed: Project Settings regrouped
-Thirteen tabs became nine (ten with location beats), none behind the scroll arrow at the default size:
+Thirteen tabs became seven (eight with location beats), none behind the scroll arrow at the default size:
 - **Project:** "Story starts at" (was Debug ▸ "First Beat (for testing)"; it sets where exported stories begin too), then stage size, layout mode, phone behaviour.
 - **Look:** Colours, Fonts, Text box, Text & button motion, Hotspots, as sections of one tab (were Colors, Fonts, Text Box and parts of Effects).
 - **Dialogue:** Speaker Display (names, portraits, speech bubbles, replies, dimming) and Message history (was under HUD).
@@ -22,7 +22,7 @@ Thirteen tabs became nine (ten with location beats), none behind the scroll arro
 - **Languages & culture:** source language, the Knowledge Graph switch (was under Debug) and the cultural setting it shows.
 - **Location & AR:** shown only for a story with location beats, location settings, or a sound placed on the map.
 - **About:** copyright.
-- **Variables** stays as a tab until it moves to the Story Data window.
+- **Variables** moved to the Story Data window (below).
 - **Removed:** the Debug tab, and "Show variable/counter values during preview", which nothing read (the Preview has its own button).
 - Stored settings are unchanged; only where they are edited moved. In-app texts that name a tab were updated.
 - **Files:** `packages/builder/src/components/settings/GlobalSettingsInspector.tsx` (+ `__tests__/GlobalSettingsInspector.tabs.test.tsx`), `components/{Inspector,NewProjectDialog}.tsx`, `components/visual/{BeatLookSection,SpeakFromPicker}.tsx`, `components/knowledgeGraph/KnowledgeGraphView.tsx`, `components/ai/codesigner/systemPrompt.ts`, `editors/{SpatialPositionEditor,XRLocationsEditor}.tsx`
@@ -34,6 +34,17 @@ Thirteen tabs became nine (ten with location beats), none behind the scroll arro
 - Hints, findings and AI guidance that named "Project Settings → Roles" now say "Characters ▸ Roles" (Inspector, effect and condition editors, Co-Designer prompt and wiring vocabulary, role findings, reachability, schema descriptions).
 - Checked in the browser on a Last Ferry copy: three roles listed; renaming @confidant to @friend updated 6 beats in one step and Undo brought it back.
 - **Files:** `packages/builder/src/components/characters/CharacterManager.tsx`, `components/settings/{RolesSettingsPanel,GlobalSettingsInspector,RenpyThemeImporter}.tsx`, `App.tsx`, `editors/{ChoiceEffectsEditor,RoleHolderConditionFields}.tsx`, `utils/{applyChangeProposals,wiringVocabulary}.ts`, `components/ai/codesigner/systemPrompt.ts`, `packages/core/src/analysis/{roleFindings,ReachabilityAnalyzer}.ts`, `engine/StoryContext.ts`, `renpy/RenpyAssetExtractor.ts`, `beat-definitions/core-beats.json`
+
+### New: Story Data window
+A toolbar button beside Characters opens **Story Data**: what the story remembers, and where.
+- **Variables** (moved from Project Settings ▸ Variables): name, type, "Starts as", description, Keep across restarts. Changes apply at once as Undo steps; text fields take effect when left.
+- **Where each is used:** under every variable, the beats that set it, test it and show it (`${name}` in text). A click on a beat goes to it.
+- **Used in the story, not listed above:** variables that beats use without a declaration, each with its uses and **Add to the list**. A misspelt name shows up here.
+- **Counters** tab: **Story counters** (found from the effects that change them; nothing to declare) and **Characters' counters** (name, starting value, uses, **Edit in Characters**). A counter changed through a role (`@confidant`) is listed with every character who can play it; a counter that follows a feeling says so instead of "Set in: nowhere".
+- **One walk for "where is it set and tested":** `storyDataUsage` in core (`analysis/storyDataUsage.ts`) covers Set Variable and Input Text beats, effects wherever they sit (choices, Dialog Tree lines, hotspots, buttons, links), conditions, requirements, counter comparisons and `${name}` text. Story Warnings' "checked but never set" findings are built on it, so the window and the warnings agree. Counter comparisons now count as checks there too.
+- Hints and AI guidance that named "Project Settings → Variables" now say "Story Data ▸ Variables".
+- Checked in the browser: Last Ferry (trust follows feelings), Counters that read affect, and Ordinary Wonders (`wonderName` set in "Name the wonder", shown in "Journal entry"; Add to the list; click goes to the beat).
+- **Files:** `packages/core/src/analysis/{storyDataUsage,StoryWarnings,index}.ts` (+ `tests/analysis/storyDataUsage.test.ts`), `packages/builder/src/components/storyData/{StoryDataWindow,VariablesPanel}.tsx` (+ test), `components/Header.tsx`, `App.tsx`, `components/settings/GlobalSettingsInspector.tsx`, `utils/{applyChangeProposals,storyDigest}.ts`, `components/ai/codesigner/systemPrompt.ts`, `mcp-server-desktop/src/index.ts`
 
 ---
 

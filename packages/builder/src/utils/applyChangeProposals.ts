@@ -375,7 +375,7 @@ export function applyChangeProposals(
           }
           const added = ctx.defineVariable({ name: p.name, defaultValue: p.defaultValue, description: p.description, ...(p.keepOnRestart ? { keepOnRestart: true } : {}) });
           results.push(added
-            ? { index, ok: true, detail: `Declared story variable ${p.name} (starts as ${JSON.stringify(p.defaultValue)}) — see Project Settings → Variables` }
+            ? { index, ok: true, detail: `Declared story variable ${p.name} (starts as ${JSON.stringify(p.defaultValue)}) — see Story Data ▸ Variables` }
             : { index, ok: true, detail: `Story variable ${p.name} already exists — left as it is` });
           return;
         }

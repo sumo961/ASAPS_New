@@ -4353,7 +4353,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                               }}
                               className="w-full px-2 py-1 text-sm border rounded"
                             >
-                              {!role && <option value={roleId}>{roleId} (not in Project Settings)</option>}
+                              {!role && <option value={roleId}>{roleId} (no such role)</option>}
                               {roles.map(r => (
                                 <option key={r.id} value={r.id}>{r.name || r.id} (@{r.id})</option>
                               ))}

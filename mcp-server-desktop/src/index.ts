@@ -824,7 +824,7 @@ const injectStoryTool: Tool = {
       variables: {
         type: 'array',
         description:
-          'Story variables to declare in Project Settings: [{ "name", "initialValue", "description"? }]. ' +
+          'Story variables to declare (Story Data ▸ Variables): [{ "name", "initialValue", "description"? }]. ' +
           'Story counters need no declaration (the first counter effect creates them); counters shown as a ' +
           'character\'s meter belong on that character.',
         items: {

@@ -28,6 +28,7 @@ import type { StoryGenerationRequest } from './types/ai';
 import { GlobalSettingsInspector } from './components/settings/GlobalSettingsInspector';
 import { useStoryBuilder } from './hooks/useStoryBuilder';
 import { CharacterManager } from './components/characters/CharacterManager';
+import { StoryDataWindow } from './components/storyData/StoryDataWindow';
 import {
   CharacterDevelopmentDialog,
   type CharacterDevelopmentSession,
@@ -435,6 +436,7 @@ function App() {
   const [paletteCollapsed, setPaletteCollapsed] = usePersistedState('asaps_ui_palette_collapsed', false);
   const [sidebarCollapsed, setSidebarCollapsed] = usePersistedState('asaps_ui_sidebar_collapsed', false);
   const [showCharacterManager, setShowCharacterManager] = useState(false);
+  const [showStoryData, setShowStoryData] = useState(false);
   const characterSelectionCallbackRef = useRef<((character: Character) => void) | null>(null);
   const [showAssetManager, setShowAssetManager] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -5748,6 +5750,16 @@ function App() {
     notify.success(`${label}: ${commands.length - 1} beat${commands.length === 2 ? '' : 's'} updated`);
   }, [globalSettings, applyGlobalSettingsChange, state.beats]);
 
+  /** Story Data ▸ Variables: the declared variables, one undo step per change. */
+  const handleProjectVariablesChange = useCallback((variables: NonNullable<GlobalSettings['variables']>) => {
+    const oldSettings = globalSettingsRef.current ?? globalSettings;
+    const newSettings = { ...oldSettings, variables } as GlobalSettings;
+    applyGlobalSettingsChange(newSettings);
+    getCommandManager().pushWithoutExecute(new UpdateGlobalSettingsCommand(
+      oldSettings, newSettings, globalSettingsMutationsRef.current, 'Change variables',
+    ));
+  }, [globalSettings, applyGlobalSettingsChange]);
+
   // Cast roles are edited in the Characters window (they are a statement
   // about characters); they stay in the project's settings.
   const handleProjectRolesChange = useCallback((roles: NonNullable<GlobalSettings['roles']>) => {
@@ -7210,6 +7222,7 @@ function App() {
         onPreview={handleTogglePreviewWindow}
         previewWindowOpen={previewWindowOpen}
         onCharacters={handleOpenCharacterManager}
+        onStoryData={() => setShowStoryData(true)}
         onAssets={handleOpenAssetManager}
         onSettings={handleOpenSettings}
         onDebug={handleOpenDebugPanel}
@@ -7589,6 +7602,34 @@ function App() {
                 onItemsChange={handleProjectItemsChange}
                 roles={globalSettings.roles || []}
                 onRolesChange={handleProjectRolesChange}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Story Data: variables and counters, and where each is used */}
+      {showStoryData && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg w-full max-w-4xl h-5/6 m-4 flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div>
+                <h2 className="text-xl font-semibold">Story Data</h2>
+                <p className="text-xs text-gray-500">What the story remembers, and the beats that set and test it.</p>
+              </div>
+              <button onClick={() => setShowStoryData(false)} className="p-2 hover:bg-gray-100 rounded" aria-label="Close">
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <StoryDataWindow
+                variables={globalSettings.variables || []}
+                onVariablesChange={handleProjectVariablesChange}
+                beats={state.beats}
+                characters={characters as any}
+                roles={globalSettings.roles || []}
+                onGoToBeat={(beatId) => { setShowStoryData(false); handleNavigateToBeat(beatId); }}
+                onOpenCharacters={() => { setShowStoryData(false); handleOpenCharacterManager(); }}
               />
             </div>
           </div>

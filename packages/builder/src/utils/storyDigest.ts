@@ -295,7 +295,7 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
   const declared = (input.variables ?? []).map(v => v.name).filter(Boolean) as string[];
   if (declared.length > 0) {
     const kept = new Set((input.variables ?? []).filter(v => v.keepOnRestart).map(v => v.name));
-    lines.push('', `VARIABLES (declared in Project Settings): ${declared.map(n => (kept.has(n) ? `${n} (kept across restarts)` : n)).join(', ')}`);
+    lines.push('', `VARIABLES (declared under Story Data): ${declared.map(n => (kept.has(n) ? `${n} (kept across restarts)` : n)).join(', ')}`);
   }
   const roles = (input.roles ?? []).filter(r => r?.id);
   if (roles.length > 0) {

@@ -59,6 +59,8 @@ export type {
 
 // Level-2 story warnings (soft-locks, ungated puzzles, unfulfillable requires)
 export { detectStoryWarnings, looksLikeSameName } from './StoryWarnings';
+export { storyDataUsage } from './storyDataUsage';
+export type { StoryDataUse, StoryDataKind } from './storyDataUsage';
 export { analyzeRoleFindings, beatCastRoles, type RoleFinding } from './roleFindings';
 export type {
   StoryWarning,

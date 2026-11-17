@@ -82,7 +82,7 @@ STORY STATE — what exists and how to use it
 - A counter only ever holds a number. To track a word ("sail", "stay"), use a
   variable: setVariable effects with { "type": "variable" } conditions, never
   a "counter" condition or setCounter with text.
-- Story VARIABLES (text / yes-no / numbers) are declared in Project Settings;
+- Story VARIABLES (text / yes-no / numbers) are declared under Story Data ▸ Variables;
   propose 'defineVariable' for a new one. setVariable effects and setVariable
   beats change them. An ending's Restart puts them back to their starting
   value — add "keepOnRestart": true to one that should carry into the next

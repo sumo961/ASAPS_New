@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Settings, Palette, Type, Monitor, MessageCircle, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image, Languages, Search, MapPin } from 'lucide-react';
+import { Settings, Palette, Type, Monitor, MessageCircle, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Trash2, FileArchive, Image, Languages, Search, MapPin } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import { useFonts } from '../../hooks/useFonts';
 import { useThemes } from '../../hooks/useThemes';
@@ -119,7 +119,7 @@ interface GlobalSettingsInspectorProps {
   resolvedLayoutMode?: 'fixed' | 'responsive';
 }
 
-type SettingsTab = 'project' | 'look' | 'dialogue' | 'panels' | 'sound' | 'languages' | 'about' | 'xr' | 'variables';
+type SettingsTab = 'project' | 'look' | 'dialogue' | 'panels' | 'sound' | 'languages' | 'about' | 'xr';
 type LookSection = 'colors' | 'fonts' | 'textbox' | 'motion' | 'hotspots';
 
 const SETTINGS_TABS: Array<{ id: SettingsTab; label: string; title: string; Icon: React.ComponentType<{ className?: string }> }> = [
@@ -130,7 +130,6 @@ const SETTINGS_TABS: Array<{ id: SettingsTab; label: string; title: string; Icon
   { id: 'sound', label: 'Sound', title: 'Music and sound', Icon: Music },
   { id: 'languages', label: 'Languages & culture', title: 'Source language, translations, cultural setting, Knowledge Graph view', Icon: Languages },
   { id: 'xr', label: 'Location & AR', title: 'Story origin, test location, proximity radius, what happens without location permission', Icon: MapPin },
-  { id: 'variables', label: 'Variables', title: "The story's variables and their starting values", Icon: Variable },
   { id: 'about', label: 'About', title: 'Copyright and credits', Icon: Copyright },
 ];
 
@@ -3726,166 +3725,6 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   </button>
                 </div>
               </div>
-            </div>
-          )}
-
-          {activeTab === 'variables' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-medium text-gray-700">Global Variables</h3>
-                <button
-                  onClick={() => {
-                    const newVar = {
-                      name: `variable_${(settings.variables?.length || 0) + 1}`,
-                      type: 'string' as const,
-                      defaultValue: '',
-                      description: ''
-                    };
-                    handleChange('variables', undefined, [...(settings.variables || []), newVar]);
-                  }}
-                  className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Variable
-                </button>
-              </div>
-
-              <p className="text-sm text-gray-600 mb-4">
-                Define global variables that can be used throughout your story. These will appear in dropdowns when selecting variables in beats.
-                Each starts at its default value, and goes back to it when an ending's Restart resets variables — unless you tick <em>Keep across restarts</em>.
-                Built in: <code className="font-mono text-xs bg-gray-100 px-1 rounded">playthrough</code> counts the runs (1, 2, …) — use <code className="font-mono text-xs bg-gray-100 px-1 rounded">{'${playthrough}'}</code> in text or test it in a condition.
-              </p>
-
-              {(!settings.variables || settings.variables.length === 0) ? (
-                <div className="text-center py-8 text-gray-500 border-2 border-dashed rounded-lg">
-                  <Variable className="w-12 h-12 mx-auto mb-2 opacity-30" />
-                  <p>No variables defined yet.</p>
-                  <p className="text-sm">Click "Add Variable" to create one.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {settings.variables.map((variable, index) => (
-                    <div key={index} className="p-3 border rounded-lg bg-white">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-1 space-y-2">
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
-                              <input
-                                type="text"
-                                value={variable.name}
-                                onChange={(e) => {
-                                  const updated = [...(settings.variables || [])];
-                                  updated[index] = { ...variable, name: e.target.value };
-                                  handleChange('variables', undefined, updated);
-                                }}
-                                className="w-full px-2 py-1 text-sm border rounded"
-                                placeholder="variableName"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
-                              <select
-                                value={variable.type}
-                                onChange={(e) => {
-                                  const updated = [...(settings.variables || [])];
-                                  const newType = e.target.value as 'string' | 'number' | 'boolean';
-                                  let newDefault: string | number | boolean = '';
-                                  if (newType === 'number') newDefault = 0;
-                                  if (newType === 'boolean') newDefault = false;
-                                  updated[index] = { ...variable, type: newType, defaultValue: newDefault };
-                                  handleChange('variables', undefined, updated);
-                                }}
-                                className="w-full px-2 py-1 text-sm border rounded"
-                              >
-                                <option value="string">String (Text)</option>
-                                <option value="number">Number</option>
-                                <option value="boolean">Boolean (True/False)</option>
-                              </select>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">Default Value</label>
-                              {variable.type === 'boolean' ? (
-                                <select
-                                  value={String(variable.defaultValue ?? false)}
-                                  onChange={(e) => {
-                                    const updated = [...(settings.variables || [])];
-                                    updated[index] = { ...variable, defaultValue: e.target.value === 'true' };
-                                    handleChange('variables', undefined, updated);
-                                  }}
-                                  className="w-full px-2 py-1 text-sm border rounded"
-                                >
-                                  <option value="false">False</option>
-                                  <option value="true">True</option>
-                                </select>
-                              ) : (
-                                <input
-                                  type={variable.type === 'number' ? 'number' : 'text'}
-                                  value={variable.type === 'number'
-                                    ? (typeof variable.defaultValue === 'number' ? variable.defaultValue : 0)
-                                    : (typeof variable.defaultValue === 'string' ? variable.defaultValue : '')}
-                                  onChange={(e) => {
-                                    const updated = [...(settings.variables || [])];
-                                    const value = variable.type === 'number'
-                                      ? (parseFloat(e.target.value) || 0)
-                                      : e.target.value;
-                                    updated[index] = { ...variable, defaultValue: value };
-                                    handleChange('variables', undefined, updated);
-                                  }}
-                                  className="w-full px-2 py-1 text-sm border rounded"
-                                  placeholder={variable.type === 'number' ? '0' : 'default value'}
-                                />
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
-                              <input
-                                type="text"
-                                value={variable.description || ''}
-                                onChange={(e) => {
-                                  const updated = [...(settings.variables || [])];
-                                  updated[index] = { ...variable, description: e.target.value };
-                                  handleChange('variables', undefined, updated);
-                                }}
-                                className="w-full px-2 py-1 text-sm border rounded"
-                                placeholder="What is this variable for?"
-                              />
-                            </div>
-                            <label
-                              className="flex items-start gap-2 text-xs text-gray-600 cursor-pointer"
-                              title="When the player presses Restart on an ending, this variable keeps its value instead of going back to the default — e.g. a character the player chose, or something they unlocked."
-                            >
-                              <input
-                                type="checkbox"
-                                className="mt-0.5"
-                                checked={!!variable.keepOnRestart}
-                                onChange={(e) => {
-                                  const updated = [...(settings.variables || [])];
-                                  updated[index] = { ...variable, keepOnRestart: e.target.checked || undefined };
-                                  handleChange('variables', undefined, updated);
-                                }}
-                              />
-                              <span>Keep across restarts <span className="text-gray-400">— survives an ending's Restart instead of going back to the default</span></span>
-                            </label>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => {
-                            const updated = settings.variables?.filter((_, i) => i !== index) || [];
-                            handleChange('variables', undefined, updated);
-                          }}
-                          className="p-1 text-red-500 hover:bg-red-50 rounded"
-                          title="Delete variable"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           )}
 
