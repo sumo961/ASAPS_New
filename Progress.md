@@ -25,6 +25,12 @@ A check of reading aloud (TTS) and voice input (STT), which had not been exercis
 - **Still open:** OpenAI has announced shutdowns (`tts-1`, `tts-1-hd`, `gpt-4o-mini-tts` on 2027-01-06; `whisper-1` on 2027-02-26; `gpt-transcribe` replaces Whisper), the OpenAI voice list is out of date, Kokoro sends no language and lists English voices only, and which language codes each ElevenLabs model accepts is unverified.
 - **Files:** `packages/core/src/utils/speechLanguage.ts` (+ test), `packages/builder/src/services/tts/{WebSpeechProvider,TTSService,ElevenLabsProvider}.ts` (+ tests), `services/stt/{WebSpeechSTTProvider,LocalSTTProvider,WhisperCppSTTProvider}.ts`, `utils/speakerAliases.ts` (+ test), `App.tsx`, `pages/PreviewWindow.tsx`, `services/PreviewWindowManager.ts`, `docs/USER_GUIDE.md`
 
+### Visual Editor: a Dialog Tree's line in the chosen language
+- With a translation chosen in the header, a Dialog Tree's line stayed in the original language on the fixed canvas (text box or speech bubble), while its replies and the Properties panel were translated. The lookup asked for a `text` entry, but the line's translation is stored under `dialogTree.text`, and the fallback to the original won. The Preview and exports were not affected.
+- The editor now translates the beat's parameters as a whole (`translateBeatParameters`) and reads the line it is stepped into, so later lines of the same dialog follow the language too.
+
+**Files modified:** `packages/builder/src/components/visual/VisualWorkspace.tsx`
+
 ---
 
 ## 2026-11-17: The tidy-up release: regrouped settings, Story Data, plain-language hints (v0.9.158)

@@ -4818,17 +4818,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           buttonText: params.buttonText ? t('buttonText', params.buttonText) : undefined
         };
       case 'dialogTree': {
-        const rawText = params.text || params.dialogTree?.text || '';
-        const rawChoices = params.dialogTree?.choices || [];
-        const translatedChoices = rawChoices.map((c: any, i: number) => ({
-          ...c,
-          text: translations[`dialogTree.choices.${i}.text`] ?? c.text,
-          displayText: translations[`dialogTree.choices.${i}.displayText`] ?? c.displayText,
-        }));
+        // The words are in the tree (dialogTree.text, and nested lines under
+        // choices.N.dialogNode), so translate the parameters as a whole and
+        // read the line the editor is stepped into. Looking up 'text' alone
+        // fell back to the untranslated line.
+        const shown = translateBeatParameters(params, activeResource, beat.id) as any;
+        const stepped = dialogTreeNodePath.length > 0
+          ? dialogNodeAt(shown.dialogTree, dialogTreeNodePath)
+          : null;
         return {
           speaker: params.speaker || params.dialogTree?.speaker || 'Character',
-          text: t('text', rawText) || translations['dialogTree.text'] || rawText,
-          choices: translatedChoices
+          text: stepped ? (stepped.text || '') : (shown.text || shown.dialogTree?.text || ''),
+          choices: (stepped ?? shown.dialogTree)?.choices || []
         };
       }
       case 'movementChoice': {
