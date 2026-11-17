@@ -1,4 +1,4 @@
-import { uiString, isPresetSound, getPresetSound, splitVoicedSegments, isMultiChoiceLike, FREE_LAYOUT_NEXT } from '@asaps/core';
+import { uiString, isPresetSound, getPresetSound, splitVoicedSegments, speechLocale, isMultiChoiceLike, FREE_LAYOUT_NEXT } from '@asaps/core';
 import { pillSafeRadius } from '../utils/pillRadius';
 import { renderMarkdownLite, markdownLiteToPlain } from '../utils/markdownLite';
 import React from 'react';
@@ -1862,7 +1862,17 @@ export class ReactRenderer extends BaseRenderer {
       const rawSttService = options.showMic !== false ? this.getState('sttService') as any : null;
       const sttService = rawSttService?.isEnabled?.() ? rawSttService : null;
       const ttsService = this.getState('ttsService') as any;
-      const sttLanguage = options.language;
+      // The language to listen in. A translation the story is being played
+      // in comes first (a language set on the beat was meant for the
+      // original); then the beat's own; then the story's language. It used
+      // to be the beat's or English, whatever language the story was in.
+      const playLanguage = this.getState('playLanguage') as { code?: string; translated?: boolean } | undefined;
+      const sttLanguage: string | undefined =
+        (playLanguage?.translated ? playLanguage.code : undefined)
+        || options.language
+        || playLanguage?.code
+        || rawSttService?.getLanguage?.()
+        || undefined;
 
       // Wire up TTS service to WhisperCpp provider so it can pause during playback
       if (sttService && ttsService) {
@@ -1877,7 +1887,7 @@ export class ReactRenderer extends BaseRenderer {
 
         // Stop STT immediately — don't let it keep recording after submit
         if (sttService) {
-          sttService.stopListening();
+          sttService.stopListening?.();
         }
 
         // Add player message to chat history
@@ -2008,7 +2018,7 @@ export class ReactRenderer extends BaseRenderer {
             const recognition = new SpeechRecognitionClass();
             recognition.continuous = true;
             recognition.interimResults = true;
-            recognition.lang = sttLanguage || 'en-US';
+            recognition.lang = speechLocale(sttLanguage);
             recognition.maxAlternatives = 1;
             recognitionRef.current = recognition;
 
@@ -2143,7 +2153,7 @@ export class ReactRenderer extends BaseRenderer {
           hasSubmittedRef.current = true;
           if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
           if (isListening && sttService) {
-            sttService.stopListening();
+            sttService.stopListening?.();
             setIsListening(false);
           }
           handleSubmit(text);

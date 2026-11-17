@@ -240,6 +240,17 @@ describe('TTSService', () => {
       );
     });
 
+    it('finds a speaker’s voice under a translated name', async () => {
+      service.setSpeakerVoice('The Captain', { voiceId: 'onyx' });
+      service.setSpeakerAliases({ 'Der Kapitän': 'The Captain' });
+      await service.speak('Willkommen an Bord.', 'Der Kapitän');
+      expect(provider.synthesize).toHaveBeenCalledWith(
+        'Willkommen an Bord.',
+        expect.objectContaining({ voiceId: 'onyx' })
+      );
+      expect(service.getSpeakerVoice('Der Kapitän')?.voiceId).toBe('onyx');
+    });
+
     it('should override language when globally set', async () => {
       service.setLanguage('de');
       await service.speak('Hallo');

@@ -3768,6 +3768,10 @@ TTS automatically adapts to the active language when translations are in use:
 
 This means you do not need to configure TTS language manually -- it follows your translation settings.
 
+**Character voices in a translation.** A character keeps their voice when the story is played in another language, even though their name is translated too. With the browser's built-in voices there is one limit: a voice belongs to a language. If the voice you gave a character can't read the language being played (an English voice and a German translation), the best voice for that language reads the line instead, so the text is pronounced properly. The same happens when the story is opened on a computer that doesn't have that voice installed.
+
+**In exported stories.** With **Read text aloud in the exported player** ticked, a story reads with the browser's own voice unless you set up a cloud provider and embedded its key. A speech server on your own computer can't be reached by your players, so those exports use the browser's voice as well. The **Sound On / Muted** switch in the player's Settings silences the reading along with music and sounds.
+
 ### TTS in Project Settings
 
 Your chosen TTS provider type and model are saved with the project, so collaborators automatically use the same configuration. API keys are **not** saved in the project — they stay in your browser's local storage for security.
@@ -3792,6 +3796,8 @@ ASAPS Modern supports voice input for AI Conversation beats and other text entry
 When an AI Conversation beat has **Enable Voice Input** turned on, a microphone button appears next to the text input. The interactor can click it to speak their response instead of typing. The transcribed text fills the input field, and the interactor can edit it before sending.
 
 This creates a natural voice-driven conversation flow, especially when combined with TTS -- the NPC speaks, the player responds by voice, and the NPC replies.
+
+**Which language it listens for.** The microphone listens in the language the story is being played in: the translation the player switched to, otherwise the language set on the beat (**Language**, if you filled it in), otherwise the story's own language. You only need the beat's Language setting for a conversation held in a different language from the rest of the story.
 
 ## Saving Your Project
 

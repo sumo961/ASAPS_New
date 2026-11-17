@@ -247,6 +247,8 @@ interface PreviewData {
   traitModulations?: import('@asaps/core').TraitEmotionWeight[];
   themeAssets?: any;
   activeLanguage?: string | null;
+  /** Translated speaker name → the name its voice is kept under (utils/speakerAliases). */
+  speakerAliases?: Record<string, string>;
   /** Staged uiStrings translations for the active language (offline path). */
   uiStrings?: Record<string, string> | null;
   /** The editor's "Preview as" casting (role id → character id). */
@@ -1714,6 +1716,19 @@ export const PreviewWindow: React.FC = () => {
       getTTSService().setLanguage(ttsLang);
       // Also set STT language
       getSTTService().setLanguage(ttsLang);
+    }
+
+    // In a translation, speakers go by their translated names; their voices
+    // are kept under the original ones.
+    getTTSService().setSpeakerAliases(previewData.speakerAliases);
+    // The language the story is played in, for the microphone in AI
+    // Conversation (ReactRenderer.renderConversationInput).
+    {
+      const sourceLang = previewData.settings?.translation?.sourceLanguage || 'en';
+      rendererRef.current?.setState('playLanguage', {
+        code: previewData.activeLanguage || sourceLang,
+        translated: !!previewData.activeLanguage && previewData.activeLanguage !== sourceLang,
+      });
     }
 
     // Apply persisted speaker voices from global settings (provider-scoped)

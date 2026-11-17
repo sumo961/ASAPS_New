@@ -62,6 +62,8 @@ export interface PreviewMessage {
     textDirection?: 'ltr' | 'rtl';
     /** Active language code for AI response generation (e.g., 'es', 'de') */
     activeLanguage?: string | null;
+    /** Translated speaker name → the name its voice is kept under (utils/speakerAliases). */
+    speakerAliases?: Record<string, string>;
     /** Staged renderer-chrome translations (uiStrings catalog) for the
      *  active language — applied via setUIStrings, no AI needed. */
     uiStrings?: Record<string, string> | null;

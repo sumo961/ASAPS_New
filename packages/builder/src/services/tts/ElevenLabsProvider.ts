@@ -8,6 +8,7 @@
  * whether to use MediaSource streaming or blob fallback).
  */
 
+import { speechLanguageCode } from '@asaps/core';
 import type { TTSVoiceConfig, TTSVoiceInfo, TTSSynthesisResult } from '../../types/tts';
 import { BaseTTSProvider } from './BaseTTSProvider';
 
@@ -31,8 +32,10 @@ export class ElevenLabsProvider extends BaseTTSProvider {
 
     const requestBody: Record<string, any> = { text, model_id: modelId };
     // Pass language_code for multilingual models (e.g. eleven_multilingual_v2, eleven_v3)
-    if (voiceConfig?.lang) {
-      requestBody.language_code = voiceConfig.lang;
+    // The bare code ('de'), not 'de-AT', 'zh-Hans' or 'es-419'.
+    const languageCode = speechLanguageCode(voiceConfig?.lang);
+    if (languageCode) {
+      requestBody.language_code = languageCode;
     }
 
     this.abortController = new AbortController();

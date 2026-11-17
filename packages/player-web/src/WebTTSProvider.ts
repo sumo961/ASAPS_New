@@ -7,6 +7,8 @@
  */
 
 
+import { speechLocale, speechLanguageCode, voiceSpeaksLanguage } from '@asaps/core';
+
 export interface TTSConfig {
   provider: 'elevenlabs' | 'openai' | 'web-speech' | 'custom' | 'local';
   apiKey?: string;
@@ -38,15 +40,33 @@ export interface TTSConfig {
 }
 
 // Read embedded TTS config from window.ASAPS_CONFIG
+/** A server only the author's own computer can reach. */
+const isLocalAddress = (url?: string) => !url || /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(:|\/|$)/i.test(url);
+
 function getEmbeddedTTSConfig(): TTSConfig | null {
   try {
-    const config = (window as any).ASAPS_CONFIG?.ttsConfig;
-    if (config?.provider && config.provider !== 'web-speech') {
-      if (!config.apiKey) return null;
+    const config = (window as any).ASAPS_CONFIG?.ttsConfig as TTSConfig | undefined;
+    if (!config?.provider) return config || null;
+    // A provider the player can't use falls back to the browser's own
+    // voice, so "Read text aloud" still reads: a cloud provider without its
+    // key, or a local server that only exists on the author's computer.
+    const needsKey = config.provider === 'openai' || config.provider === 'elevenlabs';
+    const unreachable = (config.provider === 'local' || config.provider === 'custom') && isLocalAddress(config.baseUrl);
+    if ((needsKey && !config.apiKey) || unreachable) {
+      return { provider: 'web-speech', enabled: config.enabled, readPrompts: config.readPrompts };
     }
-    return config || null;
+    return config;
   } catch {
     return null;
+  }
+}
+
+/** Translated speaker name → the name its voice is kept under, per language (written by the exporter). */
+function getEmbeddedSpeakerAliases(language: string): Record<string, string> {
+  try {
+    return (window as any).ASAPS_CONFIG?.ttsSpeakerAliases?.[language] || {};
+  } catch {
+    return {};
   }
 }
 
@@ -56,6 +76,8 @@ export class WebTTSService {
   private speaking = false;
   private abortController?: AbortController;
   private language = 'en';
+  private muted = false;
+  private speakerAliases: Record<string, string> = {};
   private utterance?: SpeechSynthesisUtterance;
 
   constructor() {
@@ -78,7 +100,7 @@ export class WebTTSService {
   }
 
   isEnabled(): boolean {
-    return this.enabled && this.isConfigured();
+    return this.enabled && !this.muted && this.isConfigured();
   }
 
   setEnabled(enabled: boolean): void {
@@ -86,8 +108,15 @@ export class WebTTSService {
     if (!enabled) this.stop();
   }
 
+  /** The player's mute switch silences speech too, and stops a line being read. */
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    if (muted) this.stop();
+  }
+
   setLanguage(lang: string): void {
     this.language = lang;
+    this.speakerAliases = getEmbeddedSpeakerAliases(lang);
   }
 
   isSpeaking(): boolean {
@@ -115,9 +144,11 @@ export class WebTTSService {
 
   private getVoiceId(speaker?: string): string | undefined {
     if (!this.config) return undefined;
-    if (speaker && this.config.speakerVoices?.[speaker]) {
-      return this.config.speakerVoices[speaker];
-    }
+    // In a translation the speaker goes by a translated name; the voice is
+    // kept under the original one.
+    const original = speaker ? this.speakerAliases[speaker] : undefined;
+    const voice = (speaker && this.config.speakerVoices?.[speaker]) || (original && this.config.speakerVoices?.[original]);
+    if (voice) return voice;
     return this.config.defaultVoiceId;
   }
 
@@ -180,7 +211,9 @@ export class WebTTSService {
             body: JSON.stringify({
               text,
               model_id: modelId,
-              ...(this.language ? { language_code: this.language } : {}),
+              // ElevenLabs takes the bare language code ('de'), not 'de-AT',
+              // 'zh-Hans' or a typed name; left out when it can't be read.
+              ...(speechLanguageCode(this.language) ? { language_code: speechLanguageCode(this.language) } : {}),
             }),
             signal: this.abortController.signal,
           }
@@ -192,7 +225,7 @@ export class WebTTSService {
           .replace(/\{text\}/g, encodeURIComponent(text))
           .replace(/\{voice\}/g, encodeURIComponent(voiceId || 'default'))
           .replace(/\{speed\}/g, '1.0')
-          .replace(/\{lang\}/g, 'en')
+          .replace(/\{lang\}/g, speechLanguageCode(this.language) || 'en')
           .replace(/\{model\}/g, this.config!.model || 'default');
         const url = baseUrl + interpolate(tmpl.path);
         const headers: Record<string, string> = { ...(tmpl.headers || {}) };
@@ -269,6 +302,17 @@ export class WebTTSService {
 
   private _audioElement?: HTMLAudioElement;
 
+  /**
+   * A voice for the language, when the browser has one. Without this some
+   * browsers read a translation with their default (often English) voice
+   * even though `lang` is set.
+   */
+  private voiceFor(language: string): SpeechSynthesisVoice | undefined {
+    const voices = window.speechSynthesis?.getVoices?.() ?? [];
+    const fitting = voices.filter((v) => voiceSpeaksLanguage(v.lang, language));
+    return fitting.find((v) => v.default) ?? fitting.find((v) => v.localService) ?? fitting[0];
+  }
+
   /** Speak using browser Web Speech API (no API key needed) */
   private speakWebSpeech(text: string, _speaker?: string): Promise<void> {
     return new Promise<void>((resolve) => {
@@ -278,7 +322,10 @@ export class WebTTSService {
       }
       this.speaking = true;
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = this.language;
+      // Voices are tagged by region: 'zh-Hans' → 'zh-CN', 'German' → 'de'.
+      utterance.lang = speechLocale(this.language, this.language);
+      const voice = this.voiceFor(this.language);
+      if (voice) utterance.voice = voice;
       this.utterance = utterance;
       utterance.onend = () => { this.speaking = false; this.utterance = undefined; resolve(); };
       utterance.onerror = () => { this.speaking = false; this.utterance = undefined; resolve(); };

@@ -59,6 +59,19 @@ describe('WebSpeechProvider (TTS)', () => {
       expect(pick([remote, localDefault], 'fr').name).toBe('Neutral Two');
     });
 
+    it('finds a voice for a catalog code that names a script or an area', () => {
+      const mainland = voice('Tingting', 'zh-CN');
+      const taiwan = voice('Meijia', 'zh-TW');
+      expect(pick([taiwan, mainland], 'zh-Hans')).toBe(mainland);
+      expect(pick([taiwan, mainland], 'zh-Hant')).toBe(taiwan);
+      expect(pick([voice('Paulina', 'es-MX')], 'es-419').name).toBe('Paulina');
+    });
+
+    it('takes any voice of the language when none has the right script', () => {
+      const taiwan = voice('Meijia', 'zh-TW');
+      expect(pick([taiwan, voice('Samantha', 'en-US')], 'zh-Hans')).toBe(taiwan);
+    });
+
     it('strips parenthetical locale when matching the preferred list', () => {
       // "Daniel (English (UK))" → base "daniel" is a PREFERRED voice
       const picked = pick([voice('Daniel (English (UK))', 'en-GB'), voice('RandomVoice', 'en-GB')], 'en');

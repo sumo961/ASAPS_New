@@ -18,6 +18,7 @@
  * TTS-aware: pauses recording entirely while TTS is playing.
  */
 
+import { speechLanguageCode } from '@asaps/core';
 import type { STTProviderConfig, STTListeningOptions, STTTranscriptionResult } from '../../types/stt';
 import { BaseSTTProvider } from './BaseSTTProvider';
 
@@ -162,7 +163,9 @@ export class WhisperCppSTTProvider extends BaseSTTProvider {
             this.transcribeAbort = abortCtrl;
             let text: string;
             try {
-              text = await this.transcribeChunk(baseUrl, audioBlob, undefined, abortCtrl.signal);
+              // The language asked for, so the server doesn't fall back to the one
+              // it was started with (English by default).
+              text = await this.transcribeChunk(baseUrl, audioBlob, options.language || this.config?.language, abortCtrl.signal);
             } catch (err) {
               if (abortCtrl.signal.aborted) break;
               throw err;
@@ -429,8 +432,9 @@ export class WhisperCppSTTProvider extends BaseSTTProvider {
   ): Promise<string> {
     const formData = new FormData();
     formData.append('file', audio, 'audio.webm');
-    if (language) {
-      formData.append('language', language.split('-')[0].toLowerCase());
+    const code = speechLanguageCode(language);
+    if (code) {
+      formData.append('language', code);
     }
     formData.append('response_format', 'json');
     formData.append('temperature', '0');

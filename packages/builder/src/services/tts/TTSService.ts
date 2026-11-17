@@ -20,6 +20,7 @@ export class TTSService {
   private _sequence: number = 0;
   private _language: string | null = null;
   private speakerVoices: Map<string, TTSVoiceConfig> = new Map();
+  private speakerAliases: Map<string, string> = new Map();
   private defaultVoiceConfig: TTSVoiceConfig = {};
 
   // ---------------------------------------------------------------------------
@@ -85,8 +86,19 @@ export class TTSService {
     this.speakerVoices.set(speaker, config);
   }
 
+  /**
+   * The speaker's voice. Voices are kept under the speaker's name in the
+   * story's own language; in a translation the name is translated too
+   * ("The Captain" → "Der Kapitän"), so the translated name is looked up
+   * through `setSpeakerAliases`.
+   */
   getSpeakerVoice(speaker: string): TTSVoiceConfig | undefined {
-    return this.speakerVoices.get(speaker);
+    return this.speakerVoices.get(speaker) ?? this.speakerVoices.get(this.speakerAliases.get(speaker) ?? '');
+  }
+
+  /** Translated speaker name → the name its voice is kept under. Replaces the previous set. */
+  setSpeakerAliases(aliases: Record<string, string> | null | undefined): void {
+    this.speakerAliases = new Map(Object.entries(aliases ?? {}));
   }
 
   setDefaultVoiceConfig(config: TTSVoiceConfig): void {
@@ -138,7 +150,7 @@ export class TTSService {
     // Build voice config: speaker-specific → default → empty
     let voiceConfig: TTSVoiceConfig = { ...this.defaultVoiceConfig };
     if (speaker) {
-      const speakerConfig = this.speakerVoices.get(speaker);
+      const speakerConfig = this.getSpeakerVoice(speaker);
       if (speakerConfig) {
         voiceConfig = { ...voiceConfig, ...speakerConfig };
       }

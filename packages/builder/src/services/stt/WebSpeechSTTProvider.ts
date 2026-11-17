@@ -5,6 +5,7 @@
  * speech-to-text with streaming partial results. No API key needed.
  */
 
+import { speechLocale } from '@asaps/core';
 import type { STTListeningOptions, STTTranscriptionResult } from '../../types/stt';
 import { BaseSTTProvider } from './BaseSTTProvider';
 
@@ -94,7 +95,8 @@ export class WebSpeechSTTProvider extends BaseSTTProvider {
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
     this.recognition.maxAlternatives = 1;
-    this.recognition.lang = options.language || this.config?.language || 'en-US';
+    // Recognisers are tagged by region: 'zh-Hans' → 'zh-CN', 'es-419' → 'es-MX'.
+    this.recognition.lang = speechLocale(options.language || this.config?.language);
     this.currentOptions = options;
     this.lastResult = null;
 

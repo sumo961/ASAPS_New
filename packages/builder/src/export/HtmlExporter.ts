@@ -16,6 +16,7 @@ import { getStorageManager } from '../storage/StorageManager';
 import type { TranslationResource } from '@asaps/core';
 import { UI_STRING_DEFAULTS } from '@asaps/core';
 import { applyTranslationResource, applyVideoTranslations } from './StoryTranslator';
+import { speakerAliasesBetween } from '../utils/speakerAliases';
 import { downloadAndInlineFonts } from './fontBundler';
 
 export type AIProvider = 'openai' | 'anthropic' | 'custom' | 'local';
@@ -328,6 +329,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
       mobileScalingMode: '{{MOBILE_SCALING_MODE}}',
       mobileFontScale: {{MOBILE_FONT_SCALE}},
       ttsLanguage: '{{TTS_LANGUAGE}}',
+      ttsSpeakerAliases: {{TTS_SPEAKER_ALIASES}},
       showSessionLog: {{SHOW_SESSION_LOG}},
     };
 
@@ -1522,6 +1524,8 @@ export async function downloadHtmlExport(
     base64: string;
     requiredFonts: string[];
   }> = [];
+  /** Per language: translated speaker name → the name its voice is kept under. */
+  const ttsSpeakerAliases: Record<string, Record<string, string>> = {};
 
   if (hasExistingTranslations) {
     const projectData = await getProjectDataForExport(projectId);
@@ -1549,6 +1553,9 @@ export async function downloadHtmlExport(
         applyTranslationResource(projectData, resource),
         resource.languageCode
       );
+      // Speaker names are translated too; voices are kept under the
+      // original names, so the player needs the way back.
+      ttsSpeakerAliases[resource.languageCode] = speakerAliasesBetween(projectData, translatedData);
 
       // Create translated ZIP
       const translatedZip = await createStoryZipFromData(originalZipBlob, translatedData);
@@ -1614,10 +1621,13 @@ export async function downloadHtmlExport(
         baseUrl: options.ttsBaseUrl || undefined,
         speakerVoices: options.ttsSpeakerVoices || undefined,
         defaultVoiceId: options.ttsDefaultVoiceId || undefined,
+        // The author's "Read text aloud" switch; it was left out here, so a
+        // multi-language export always spoke.
+        enabled: options.ttsEnabled ?? true,
         readPrompts: options.ttsReadPrompts !== false,
       })
     : options.ttsProvider === 'web-speech'
-      ? JSON.stringify({ provider: 'web-speech', readPrompts: options.ttsReadPrompts !== false })
+      ? JSON.stringify({ provider: 'web-speech', enabled: options.ttsEnabled ?? true, readPrompts: options.ttsReadPrompts !== false })
       : 'null';
 
   // Get mobile settings from project
@@ -1634,6 +1644,7 @@ export async function downloadHtmlExport(
     .replace('{{AI_CONFIG}}', aiConfig)
     .replace('{{TTS_CONFIG}}', ttsConfig)
     .replace('{{TTS_LANGUAGE}}', project.globalSettings?.translation?.sourceLanguage || 'en')
+    .replace('{{TTS_SPEAKER_ALIASES}}', JSON.stringify(ttsSpeakerAliases))
     .replace('{{SHOW_SESSION_LOG}}', String(options.showSessionLog ?? false))
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
     .replace('{{MOBILE_FONT_SCALE}}', String(mobileFontScale))

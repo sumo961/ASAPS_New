@@ -79,8 +79,21 @@ export class WebSTTService {
     this.language = lang;
   }
 
+  getLanguage(): string {
+    return this.language;
+  }
+
   isListening(): boolean {
     return this._isListening;
+  }
+
+  /**
+   * The renderer's conversation input calls this on every submit, as it does
+   * on the builder's service. Without it a spoken or typed answer threw
+   * before it was handed on, and the conversation stopped.
+   */
+  stopListening(): void {
+    this.stop();
   }
 
   stop(): void {

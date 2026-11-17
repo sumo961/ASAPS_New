@@ -201,7 +201,9 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         aiProxyUrl: needsAIConfig && relayMode ? (aiProxyUrl.trim() || DEFAULT_RELAY_PATH) : undefined,
         aiBaseUrl: needsAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
         aiModel: needsAIConfig && aiModel ? aiModel : undefined,
-        ttsProvider: savedTTS?.providerType,
+        // No saved speech setup means the browser's own voice, as in the
+        // Preview: without a provider the export had no speech at all.
+        ttsProvider: savedTTS?.providerType || 'web-speech',
         ttsApiKey: savedTTS?.apiKey,
         ttsModel: savedTTS?.model,
         ttsBaseUrl: savedTTS?.baseUrl,
@@ -296,7 +298,9 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         aiProxyUrl: needsAIConfig && relayMode ? (aiProxyUrl.trim() || DEFAULT_RELAY_PATH) : undefined,
         aiBaseUrl: needsAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
         aiModel: needsAIConfig && aiModel ? aiModel : undefined,
-        ttsProvider: savedTTS?.providerType,
+        // No saved speech setup means the browser's own voice, as in the
+        // Preview: without a provider the export had no speech at all.
+        ttsProvider: savedTTS?.providerType || 'web-speech',
         ttsApiKey: savedTTS?.apiKey,
         ttsModel: savedTTS?.model,
         ttsBaseUrl: savedTTS?.baseUrl,

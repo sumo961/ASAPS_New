@@ -5,6 +5,7 @@
  * No API key required — works out of the box.
  */
 
+import { speechLocale, speechLanguageCode, voiceSpeaksLanguage } from '@asaps/core';
 import type { TTSVoiceConfig, TTSVoiceInfo, TTSSynthesisResult } from '../../types/tts';
 import { BaseTTSProvider } from './BaseTTSProvider';
 
@@ -32,12 +33,18 @@ export class WebSpeechProvider extends BaseTTSProvider {
     if (voiceConfig?.pitch != null) utterance.pitch = voiceConfig.pitch;
     if (voiceConfig?.rate != null) utterance.rate = voiceConfig.rate;
     if (voiceConfig?.volume != null) utterance.volume = voiceConfig.volume;
-    if (voiceConfig?.lang) utterance.lang = voiceConfig.lang;
+    // The browser's voices are tagged by region ('zh-CN', 'es-MX'): a
+    // catalog code like 'zh-Hans' or 'es-419' is turned into one.
+    if (voiceConfig?.lang) utterance.lang = speechLocale(voiceConfig.lang, voiceConfig.lang);
 
-    // Set specific voice by ID, or auto-select best voice for language
-    if (voiceConfig?.voiceId) {
-      const match = voices.find(v => v.voiceURI === voiceConfig.voiceId);
-      if (match) utterance.voice = match;
+    // The speaker's own voice, when it can read this language. A voice
+    // chosen for the story's source language (an English "Samantha") would
+    // read a German translation with an English accent, and a voice that
+    // isn't installed on this computer can't be used at all: in both cases
+    // the best voice for the language reads the line.
+    const chosen = voiceConfig?.voiceId ? voices.find(v => v.voiceURI === voiceConfig.voiceId) : undefined;
+    if (chosen && (!voiceConfig?.lang || voiceSpeaksLanguage(chosen.lang, voiceConfig.lang))) {
+      utterance.voice = chosen;
     } else if (voiceConfig?.lang && voices.length > 0) {
       const best = this.pickBestVoice(voices, voiceConfig.lang);
       if (best) utterance.voice = best;
@@ -75,8 +82,7 @@ export class WebSpeechProvider extends BaseTTSProvider {
     }));
 
     if (lang) {
-      const prefix = lang.toLowerCase();
-      return voices.filter(v => v.lang.toLowerCase().startsWith(prefix));
+      return voices.filter(v => voiceSpeaksLanguage(v.lang, lang));
     }
 
     return voices;
@@ -106,8 +112,13 @@ export class WebSpeechProvider extends BaseTTSProvider {
    * Uses known-good/novelty lists + quality keyword heuristics.
    */
   private pickBestVoice(voices: SpeechSynthesisVoice[], lang: string): SpeechSynthesisVoice | null {
-    const prefix = lang.toLowerCase();
-    const candidates = voices.filter(v => v.lang.toLowerCase().startsWith(prefix));
+    let candidates = voices.filter(v => voiceSpeaksLanguage(v.lang, lang));
+    // No voice in the right script (Traditional vs Simplified Chinese): any
+    // voice of the language is better than the browser's default English one.
+    if (candidates.length === 0) {
+      const code = speechLanguageCode(lang);
+      if (code) candidates = voices.filter(v => v.lang.toLowerCase().replace(/_/g, '-').split('-')[0] === code);
+    }
     if (candidates.length === 0) return null;
     if (candidates.length === 1) return candidates[0];
 

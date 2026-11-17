@@ -1,5 +1,32 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.158, 2026-11-17)
+
+### Overview
+A check of reading aloud (TTS) and voice input (STT), which had not been exercised for a while, with the question whether they work in languages other than English. They did only in part: the Preview with the browser's voices or ElevenLabs followed the language; most other paths stayed English or said nothing. This batch fixes the exported player and the language handling. Provider updates (OpenAI's announced shutdowns, Kokoro's languages) are still to do.
+
+### Fixed: reading aloud and voice input in exported stories
+- **"Read text aloud" reads.** An author who never saved a speech setup got an export with no speech at all: the browser voice used in the Preview was never written into the export. The export now defaults to the browser's voice.
+- **A provider the player can't use falls back to the browser's voice** (a cloud provider without its key, or a server on the author's own computer) so the story is still read; before, it was silent.
+- **Voice input no longer stops an AI Conversation.** On every submit the renderer called `stopListening()` on the player's speech-to-text service, which did not have it; the answer was never handed on.
+- **Multi-language exports honour the "Read text aloud" switch** (they always spoke).
+- **Mute silences speech.** The player's mute only reached its `<audio>` elements, not the reading voice.
+- Checked in an exported Last Ferry with the browser's speech stubbed to record what it is asked to say: title and two beats read in `en` with a matching voice; after Mute, the next beat produced no speech.
+- **Files:** `packages/player-web/src/{WebTTSProvider,WebSTTProvider,WebPlayer}.ts(x)`, `packages/builder/src/components/export/HtmlExportDialog.tsx`, `export/HtmlExporter.ts`, `packages/renderer/src/renderers/ReactRenderer.tsx`
+
+### Fixed: speech in languages other than English
+- **Characters keep their voice in a translation.** Voices are kept under the speaker's name in the story's language; a translation translates the name too, so the voice was not found. The Preview and multi-language exports now carry translated name → original name (`utils/speakerAliases.ts`; `ttsSpeakerAliases` in exports).
+- **The language wins over a voice that can't read it.** A browser voice chosen for a character (English "Samantha") read a German translation; and a voice not installed on the computer gave no voice choice at all. In both cases the best voice for the language now reads the line.
+- **Chinese and Latin-American Spanish find a voice.** The catalog's `zh-Hans`, `zh-Hant` and `es-419` matched no browser voice (they are tagged `zh-CN`, `zh-TW`, `es-MX`). A language given by name ("German", as on-the-fly translation does) is read too.
+- **The microphone follows the story.** AI Conversation listened in the beat's language or `en-US`. It now listens in the translation being played, else the beat's language, else the story's.
+- **whisper.cpp is told the language** while streaming (it got none and used the server's default); local Whisper servers and ElevenLabs get the bare code (`de`, not `de-DE` or `zh-Hans`).
+- One helper for all of this in core: `speechLocale`, `speechLanguageCode`, `voiceSpeaksLanguage` (`utils/speechLanguage.ts`).
+- **Not tested by ear:** no audio was played and no cloud or local speech server was reachable; the checks are unit tests and a browser run with speech recorded instead of spoken.
+- **Still open:** OpenAI has announced shutdowns (`tts-1`, `tts-1-hd`, `gpt-4o-mini-tts` on 2027-01-06; `whisper-1` on 2027-02-26; `gpt-transcribe` replaces Whisper), the OpenAI voice list is out of date, Kokoro sends no language and lists English voices only, and which language codes each ElevenLabs model accepts is unverified.
+- **Files:** `packages/core/src/utils/speechLanguage.ts` (+ test), `packages/builder/src/services/tts/{WebSpeechProvider,TTSService,ElevenLabsProvider}.ts` (+ tests), `services/stt/{WebSpeechSTTProvider,LocalSTTProvider,WhisperCppSTTProvider}.ts`, `utils/speakerAliases.ts` (+ test), `App.tsx`, `pages/PreviewWindow.tsx`, `services/PreviewWindowManager.ts`, `docs/USER_GUIDE.md`
+
+---
+
 ## 2026-11-17: The tidy-up release: regrouped settings, Story Data, plain-language hints (v0.9.158)
 
 ### Overview

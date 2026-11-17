@@ -193,11 +193,14 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
     return () => { el.removeAttribute('inert'); };
   }, [explainOverlayActive]);
 
+  const ttsServiceRef = useRef<WebTTSService | null>(null);
   // Handle settings changes from PlayerUI
   const handleSettingsChange = useCallback((settings: PlayerSettings) => {
     if (playerRef.current) {
       // Apply mute state
       playerRef.current.setMuted(settings.muted);
+      // Speech is not one of the player's <audio> elements: mute it too.
+      ttsServiceRef.current?.setMuted(settings.muted);
       // Apply master volume
       playerRef.current.setMasterVolume(settings.masterVolume);
     }
@@ -492,13 +495,22 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           ttsService.setLanguage(ttsLang);
           // Pass TTS service to renderer so ConversationInput can wait for TTS to finish
           renderer.setState('ttsService', ttsService);
+          ttsServiceRef.current = ttsService;
+        }
+
+        // The language the story is being played in, for the microphone in
+        // AI Conversation: a translation the player switched to wins over a
+        // language set on the beat (which was meant for the original).
+        {
+          const sourceLang = (window as any).ASAPS_CONFIG?.ttsLanguage || 'en';
+          renderer.setState('playLanguage', { code: language || sourceLang, translated: !!language && language !== sourceLang });
         }
 
         // Set up STT service if available
         const sttService = new WebSTTService();
         if (sttService.isConfigured()) {
           console.log('[WebPlayer] Setting up STT service...');
-          const sttLang = language || (window as any).ASAPS_CONFIG?.sttLanguage || 'en-US';
+          const sttLang = language || (window as any).ASAPS_CONFIG?.sttLanguage || (window as any).ASAPS_CONFIG?.ttsLanguage || 'en-US';
           sttService.setLanguage(sttLang);
           renderer.setState('sttService', sttService);
         }

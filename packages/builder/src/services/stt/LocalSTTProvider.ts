@@ -6,6 +6,7 @@
  * with MediaRecorder for audio capture.
  */
 
+import { speechLanguageCode } from '@asaps/core';
 import type { STTProviderConfig, STTListeningOptions, STTTranscriptionResult } from '../../types/stt';
 import { BaseSTTProvider } from './BaseSTTProvider';
 
@@ -117,8 +118,10 @@ export class LocalSTTProvider extends BaseSTTProvider {
     if (this.config!.model) {
       formData.append('model', this.config!.model);
     }
-    if (language) {
-      formData.append('language', language);
+    // Whisper-style servers take the bare code ('de'), not 'de-DE'.
+    const code = speechLanguageCode(language);
+    if (code) {
+      formData.append('language', code);
     }
 
     const baseUrl = this.config!.baseUrl!.replace(/\/$/, '');

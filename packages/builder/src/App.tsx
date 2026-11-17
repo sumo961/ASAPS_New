@@ -128,6 +128,7 @@ import { CloneRepoDialog } from './components/vcs/CloneRepoDialog';
 import { NewGitHubProjectDialog } from './components/vcs/NewGitHubProjectDialog';
 import { useTranslationState, useTranslationActions } from './contexts/TranslationContext';
 import { applyTranslationResource, extractCharacterDisplayNameTranslations } from './export/StoryTranslator';
+import { speakerAliasesBetween } from './utils/speakerAliases';
 import { extractSpeakers } from './utils/speakerUtils';
 import { getTTSService } from './services/tts';
 import { getSavedTTSConfig } from './hooks/useTTS';
@@ -5259,6 +5260,7 @@ function App() {
   }, [handleImportZipFile]);
 
   // Serialize story data for preview window
+  const storySpeakerAliasesRef = useRef<Record<string, string>>({});
   const getSerializedStoryData = useCallback(() => {
     // Serialize beats with all their data
     const serializedBeats = state.beats.map(serializeBeatForStory);
@@ -5282,10 +5284,14 @@ function App() {
         // Wrap in project structure for applyTranslationResource, then unwrap
         const wrapped = { project: { story: storyData } };
         const translated = applyTranslationResource(wrapped, resource);
+        // Speaker names are translated too; voices are kept under the
+        // original names (see speakerAliasesBetween).
+        storySpeakerAliasesRef.current = speakerAliasesBetween(storyData, translated.project.story);
         return translated.project.story;
       }
     }
 
+    storySpeakerAliasesRef.current = {};
     return storyData;
   }, [state.beats, state.clusters, state.title, state.author, state.story, translationState.activeLanguage, translationState.translations]);
 
@@ -5321,6 +5327,7 @@ function App() {
         rolePreviewCasting,
         assets: assets,
         characters: translatedChars,
+        speakerAliases: { ...storySpeakerAliasesRef.current, ...speakerAliasesBetween(characters, translatedChars) },
         emotionPalette: emotionPalette,
         traitModulations: traitModulations,
         themeAssets: themeAssets,
@@ -5381,6 +5388,7 @@ function App() {
         projectSettings: { width: projectSettings.width, height: projectSettings.height },
         assets: assets,
         characters: translatedCharacters,
+        speakerAliases: { ...storySpeakerAliasesRef.current, ...speakerAliasesBetween(characters, translatedCharacters) },
         emotionPalette: emotionPalette,
         traitModulations: traitModulations,
         themeAssets: themeAssets,
