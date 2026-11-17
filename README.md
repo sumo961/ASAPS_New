@@ -4,9 +4,9 @@
 [![CI](https://github.com/sumo961/ASAPS_New/actions/workflows/ci.yml/badge.svg)](https://github.com/sumo961/ASAPS_New/actions/workflows/ci.yml)
 [![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20Noncommercial-blue)](LICENSE)
 
-ASAPS is a visual tool for writing interactive stories: stories with choices, conversations, characters who remember, and more than one ending. You build a story as a flowchart of *beats*, arrange each screen in a visual editor, play it in a preview, and publish it as a web page. No programming is needed.
+ASAPS is a visual tool for creating interactive digital narratives (IDNs): stories with choices, conversations, characters who remember, and more than one ending. You build a story as a flowchart of *beats*, arrange each screen in a visual editor, play it in a preview, and publish it as a web page. No programming is needed.
 
-It is made for writers and narrative designers, for teachers and students of interactive storytelling, for museums and others who tell stories on location, and for researchers who study how such stories work.
+It is made for writers and narrative designers, for teachers and students of interactive digital narrative, for museums and others who tell stories on location, and for researchers who study how IDNs work.
 
 This is the modern version of ASAPS by Hartmut Koenitz, rebuilt in TypeScript from his original ActionScript system (2005–2017, begun at Georgia Tech). Stories are kept in ASML 2.0 (Advanced Stories Markup Language, also created by Hartmut Koenitz); stories in the original XML-based ASML 1.0 can be imported.
 
@@ -36,7 +36,7 @@ And this is a story made with it, exported as a web page. **[Play it yourself](h
 - **Debug tools** that play the story for you: a Problems list, beats that can't be reached, dead ends, checks that can never be true, and an optional check by AI.
 
 **AI, if you want it**
-- **For writing:** generate a first story from a prompt, develop ideas in the Ideator, or change an open story with the Co-Designer. Every proposal is shown before it is applied.
+- **For creating:** generate a first story from a prompt, develop ideas in the Ideator, or change an open story with the Co-Designer. Every proposal is shown before it is applied.
 - **In the story:** beats that call a model while the story plays, such as a free conversation with a character, or a summary of what the player did.
 - **Your choice of provider:** OpenAI, Anthropic, any OpenAI-compatible or local model, and Apple's on-device model on macOS 27. An MCP server lets Claude Desktop build stories. All AI features can be switched off.
 
@@ -114,4 +114,4 @@ For questions and support:
 
 ---
 
-Built with ❤️ for interactive storytelling
+Built with ❤️ for interactive digital narratives
