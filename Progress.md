@@ -50,9 +50,9 @@ A toolbar button beside Characters opens **Story Data**: what the story remember
 
 ### Changed: field hints written for authors
 The Properties panel shows a field's `ui.help` and falls back to its `description`, which is written for AI generation (code names, option values, instructions to the model).
-- **95 fields got author help** (`ui.help` in `beat-definitions/core-beats.json`): all 52 whose fallback text was longer than 140 characters (the Set Variable value was 776), and 43 shorter ones that showed code names (`saveToType='variable'`, "the interactor", `LocationSettings.defaultProximityRadiusM`). The descriptions are unchanged, so AI generation and the MCP server read what they read before.
+- **268 fields got author help; first 95:** (`ui.help` in `beat-definitions/core-beats.json`): all 52 whose fallback text was longer than 140 characters (the Set Variable value was 776), and 43 shorter ones that showed code names (`saveToType='variable'`, "the interactor", `LocationSettings.defaultProximityRadiusM`). The descriptions are unchanged, so AI generation and the MCP server read what they read before.
 - **A hint that only repeats the label is left out** ("Author" / "Author name"): `fieldHelp()` in `SchemaFormGenerator.tsx`.
-- 241 of 402 visible fields still fall back to a short description.
+- **A second pass wrote 173 more** ("Target beat when button is clicked" → "Where the button leads."; "Include player inventory in context" → "Tell the AI what the player is carrying."). 68 of 402 visible fields keep their short description ("Timer name", "Start button text").
 - **Files:** `beat-definitions/core-beats.json`, `packages/builder/src/components/SchemaFormGenerator.tsx` (+ `__tests__/fieldHelp.test.ts`)
 
 ### New: links into the User Guide
@@ -73,6 +73,15 @@ The Properties panel shows a field's `ui.help` and falls back to its `descriptio
 - The start is shared through `StoryStartContext`, whose value changes only when the start does, so typing in a beat doesn't redraw the nodes.
 - Checked in the browser: the tab moves from Title to the chosen beat and back on Undo.
 - **Files:** `packages/builder/src/contexts/StoryStartContext.tsx`, `components/graph/{BeatNode,GraphEditor}.tsx`, `App.tsx`
+
+### Changed: a calmer toolbar, a first-run welcome, plainer templates and Preview start
+- **Toolbar:** Find & Change, Characters, Story Data, Assets, Project Settings and Debug are plain buttons with a coloured icon (they were six filled buttons in five colours); Save and Preview keep their colour. The row fits on one line at 1700 px.
+- **"Unsaved" once:** the pill by the title says it; the second "Unsaved changes" label beside Save is gone (Saving… and errors still show there).
+- **Welcome card:** shown once over the untouched starter story: what a beat is, click a beat to edit, drag a beat type and link, Preview; with "Start from a template…" and a User Guide link. "Got it" is remembered on the computer (`asaps_welcome_seen`).
+- **Template gallery:** "What this shows" became "Good for learning", and the six notes say what a template teaches without feature names ("How to let the player choose who they are…"). The suggested name for a copy is "The Last Ferry (my version)" (was "My The Last Ferry — choose your character").
+- **Preview start bar:** "Ready to play from the beginning" (was "Ready to preview: Unknown"); the Cancel button appears only for a mid-story start and says "From the beginning instead"; the redundant "Ready" pill is gone; beat types are named in plain words. The click on the stage to start stays: it is what lets the window play sound.
+- Left as it is: the palette's "Single Choice" heading (the guide's own term for beats with one way on).
+- **Files:** `packages/builder/src/components/{Header,SaveStatus,WelcomeCard,TemplateGallery}.tsx`, `App.tsx`, `pages/PreviewWindow.tsx`, `public/templates/index.json`, `beat-definitions/core-beats.json`
 
 ---
 

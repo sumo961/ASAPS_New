@@ -822,6 +822,7 @@ export const Header: React.FC<HeaderProps> = ({
             hasUnsavedChanges={hasUnsavedChanges}
             showText={true}
             compact={false}
+            hidePendingText
           />
 
           <div className="w-px h-6 bg-gray-300 mx-1" />
@@ -1167,7 +1168,7 @@ export const Header: React.FC<HeaderProps> = ({
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
                 searchPanelOpen
                   ? 'bg-slate-700 text-white ring-2 ring-slate-300'
-                  : 'bg-slate-500 text-white hover:bg-slate-600'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
               }`}
               onClick={onSearch}
               title="Find & replace, and AI bulk changes (Cmd+F)"
@@ -1179,7 +1180,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {onCharacters && (
             <button
-              className="px-3 py-1.5 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
               // Wrap so the click event is NOT passed as onCharacters' argument.
               // onCharacters -> handleOpenCharacterManager(callback): leaking the
               // event made it a truthy non-function "callback", which turned on
@@ -1187,51 +1188,51 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => onCharacters()}
               title="Create and manage characters with appearances, stats, and inventory"
             >
-              <Users className="w-4 h-4" />
+              <Users className="w-4 h-4 text-indigo-500" />
               Characters
             </button>
           )}
 
           {onStoryData && (
             <button
-              className="px-3 py-1.5 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
               onClick={() => onStoryData()}
               title="The story's variables and counters, and the beats that set and test them"
             >
-              <Variable className="w-4 h-4" />
+              <Variable className="w-4 h-4 text-indigo-500" />
               Story Data
             </button>
           )}
 
           {onAssets && (
             <button
-              className="px-3 py-1.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
               onClick={onAssets}
               title="Manage images, sounds, videos, and fonts for your story"
             >
-              <Image className="w-4 h-4" />
+              <Image className="w-4 h-4 text-orange-500" />
               Assets
             </button>
           )}
 
           {onSettings && (
             <button
-              className="px-3 py-1.5 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
               onClick={onSettings}
               title="Project Settings (⌘,) — stage size, typography, colors and everything else that travels with this project"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-4 h-4 text-purple-500" />
               Project Settings
             </button>
           )}
 
           {onDebug && (
             <button
-              className="px-3 py-1.5 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
               onClick={onDebug}
               title="Analyze reachability, find dead ends, and debug story paths"
             >
-              <Bug className="w-4 h-4" />
+              <Bug className="w-4 h-4 text-gray-500" />
               Debug
             </button>
           )}

@@ -513,7 +513,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -531,7 +532,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Target beat when start is clicked"
+          "description": "Target beat when start is clicked",
+          "ui": {
+            "help": "Where the Start button leads."
+          }
         },
         "explainHuds": {
           "type": "boolean",
@@ -628,7 +632,10 @@
           "type": "string",
           "required": false,
           "default": "Continue",
-          "description": "Continue button text (also used as connection label)"
+          "description": "Continue button text (also used as connection label)",
+          "ui": {
+            "help": "The words on the Continue button. They also label the link on the flowchart."
+          }
         },
         "speaker": {
           "type": "string",
@@ -638,7 +645,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -656,7 +664,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Target beat when button is clicked"
+          "description": "Target beat when button is clicked",
+          "ui": {
+            "help": "Where the button leads."
+          }
         },
         "slotAnimations": {
           "type": "object",
@@ -746,7 +757,10 @@
           "type": "string",
           "required": false,
           "default": "Got it",
-          "description": "Continue button text (also used as connection label)"
+          "description": "Continue button text (also used as connection label)",
+          "ui": {
+            "help": "The words on the Continue button. They also label the link on the flowchart."
+          }
         },
         "captionTimer": {
           "type": "string",
@@ -806,7 +820,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Target beat when button is clicked"
+          "description": "Target beat when button is clicked",
+          "ui": {
+            "help": "Where the button leads."
+          }
         },
         "slotAnimations": {
           "type": "object",
@@ -861,7 +878,10 @@
         "dialogTree": {
           "type": "dialogNode",
           "required": true,
-          "description": "Root dialog node with full conversation tree"
+          "description": "Root dialog node with full conversation tree",
+          "ui": {
+            "help": "The conversation: its lines and the replies the player can give."
+          }
         },
         "choiceDelay": {
           "type": "number",
@@ -872,14 +892,18 @@
             "min": 0,
             "max": 30,
             "step": 0.5,
-            "label": "Choice Delay (seconds)"
+            "label": "Choice Delay (seconds)",
+            "help": "Seconds before the choices fade in, so the player reads first."
           }
         },
         "markVisited": {
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Block and dim choices leading to previously visited beats"
+          "description": "Block and dim choices leading to previously visited beats",
+          "ui": {
+            "help": "Dim a choice that leads somewhere the player has already been, and stop it being picked again."
+          }
         },
         "effectsOncePerChoice": {
           "type": "boolean",
@@ -923,7 +947,8 @@
           "default": true,
           "description": "Show character avatars in chat mode",
           "ui": {
-            "scope": "ve-left"
+            "scope": "ve-left",
+            "help": "Show each character's picture beside their lines in a chat layout."
           }
         },
         "chatFrameImage": {
@@ -1006,7 +1031,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show each speaker's name with their line."
           }
         },
         "spatialFit": {
@@ -1123,7 +1149,10 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Block and dim choices that lead to previously visited beats"
+          "description": "Block and dim choices that lead to previously visited beats",
+          "ui": {
+            "help": "Dim a choice that leads somewhere the player has already been, and stop it being picked again."
+          }
         },
         "effectsOncePerChoice": {
           "type": "boolean",
@@ -1168,7 +1197,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who asks the question. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -1319,7 +1349,10 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Block and dim choices that lead to previously visited beats"
+          "description": "Block and dim choices that lead to previously visited beats",
+          "ui": {
+            "help": "Dim a choice that leads somewhere the player has already been, and stop it being picked again."
+          }
         },
         "effectsOncePerChoice": {
           "type": "boolean",
@@ -1364,7 +1397,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who asks the question. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -1482,7 +1516,8 @@
           "ui": {
             "control": "beat-ref",
             "label": "Next (click anywhere), go to",
-            "emptyLabel": "Nowhere yet"
+            "emptyLabel": "Nowhere yet",
+            "help": "Where a click anywhere leads, while the screen has no buttons and doesn't move on by itself."
           }
         },
         "markVisited": {
@@ -1500,7 +1535,8 @@
           "default": false,
           "description": "A button's effects fire only the first time it is picked; the button stays clickable.",
           "ui": {
-            "label": "Effects fire only on first pick"
+            "label": "Effects fire only on first pick",
+            "help": "A button can be clicked again, but what it changes counts only the first time."
           }
         },
         "explainHuds": {
@@ -1543,7 +1579,10 @@
           "type": "array<movementOption>",
           "required": true,
           "minItems": 1,
-          "description": "Array of movement options (each contains a target)"
+          "description": "Array of movement options (each contains a target)",
+          "ui": {
+            "help": "The places the player can go, each with the beat it leads to."
+          }
         },
         "choiceDelay": {
           "type": "number",
@@ -1554,14 +1593,18 @@
             "min": 0,
             "max": 30,
             "step": 0.5,
-            "label": "Choice Delay (seconds)"
+            "label": "Choice Delay (seconds)",
+            "help": "Seconds before the choices fade in, so the player reads first."
           }
         },
         "markVisited": {
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Block and dim choices leading to previously visited beats"
+          "description": "Block and dim choices leading to previously visited beats",
+          "ui": {
+            "help": "Dim a choice that leads somewhere the player has already been, and stop it being picked again."
+          }
         },
         "effectsOncePerChoice": {
           "type": "boolean",
@@ -1576,7 +1619,10 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Only show choice text when hovering over the hotspot"
+          "description": "Only show choice text when hovering over the hotspot",
+          "ui": {
+            "help": "Keep a place's label hidden until the pointer is over it."
+          }
         },
         "spatialFit": {
           "type": "string",
@@ -1594,7 +1640,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -1678,7 +1725,10 @@
           "type": "array<propOption>",
           "required": true,
           "minItems": 1,
-          "description": "Available props to interact with (each contains a target)"
+          "description": "Available props to interact with (each contains a target)",
+          "ui": {
+            "help": "The objects the player can pick, each with the beat it leads to."
+          }
         },
         "choiceDelay": {
           "type": "number",
@@ -1689,14 +1739,18 @@
             "min": 0,
             "max": 30,
             "step": 0.5,
-            "label": "Choice Delay (seconds)"
+            "label": "Choice Delay (seconds)",
+            "help": "Seconds before the choices fade in, so the player reads first."
           }
         },
         "markVisited": {
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Block and dim choices leading to previously visited beats"
+          "description": "Block and dim choices leading to previously visited beats",
+          "ui": {
+            "help": "Dim a choice that leads somewhere the player has already been, and stop it being picked again."
+          }
         },
         "effectsOncePerChoice": {
           "type": "boolean",
@@ -1723,7 +1777,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -1900,7 +1955,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -1918,7 +1974,10 @@
         "connection": {
           "type": "connection",
           "required": false,
-          "description": "Target beat after video ends"
+          "description": "Target beat after video ends",
+          "ui": {
+            "help": "Where the story goes when the video ends."
+          }
         },
         "explainHuds": {
           "type": "boolean",
@@ -2073,7 +2132,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Timers"
+            "label": "Timers",
+            "help": "Stop every running timer."
           }
         },
         "resetFictionalTime": {
@@ -2087,7 +2147,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Fictional Time"
+            "label": "Fictional Time",
+            "help": "Set the story's clock back to its start."
           }
         },
         "resetVisitedTracking": {
@@ -2101,7 +2162,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Visited Tracking"
+            "label": "Visited Tracking",
+            "help": "Forget which places and choices were already visited, so nothing starts dimmed."
           }
         },
         "resetCharacters": {
@@ -2130,7 +2192,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "History"
+            "label": "History",
+            "help": "Forget which beats were played."
           }
         },
         "restartText": {
@@ -2158,7 +2221,8 @@
           "description": "Body text for the credits page (auto-populated from metadata if empty)",
           "ui": {
             "control": "textarea",
-            "rows": 6
+            "rows": 6,
+            "help": "The text of the credits page. Empty: the project's title, author and copyright."
           }
         },
         "creditsCloseText": {
@@ -2175,7 +2239,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -2193,7 +2258,10 @@
         "restartConnection": {
           "type": "connection",
           "required": false,
-          "description": "Target beat for restart (usually beat 0)"
+          "description": "Target beat for restart (usually beat 0)",
+          "ui": {
+            "help": "Where Restart leads, usually the title screen."
+          }
         },
         "connection": {
           "type": "connection",
@@ -2301,7 +2369,8 @@
               }
             ],
             "label": "Projection",
-            "hint": "Equirectangular: use 2:1 images from 360° cameras. Cylindrical: use wide panoramas from phone cameras (4:1 to 8:1 aspect ratio)."
+            "hint": "Equirectangular: use 2:1 images from 360° cameras. Cylindrical: use wide panoramas from phone cameras (4:1 to 8:1 aspect ratio).",
+            "help": "Equirectangular for pictures from a 360° camera (you can look up and down); Cylindrical for a phone's panorama strip."
           }
         },
         "panoramaAssetId": {
@@ -2311,14 +2380,18 @@
           "ui": {
             "control": "asset-picker",
             "accept": "image/*",
-            "label": "Panorama Image"
+            "label": "Panorama Image",
+            "help": "The panorama picture: twice as wide as high from a 360° camera, or a long strip from a phone."
           }
         },
         "hotspots": {
           "type": "array<panoramaHotspot>",
           "required": true,
           "minItems": 1,
-          "description": "Array of interactive hotspots (each contains a target)"
+          "description": "Array of interactive hotspots (each contains a target)",
+          "ui": {
+            "help": "The spots the player can click, each with the beat it leads to."
+          }
         },
         "initialPitch": {
           "type": "number",
@@ -2330,7 +2403,8 @@
             "min": -90,
             "max": 90,
             "step": 1,
-            "label": "Initial Pitch"
+            "label": "Initial Pitch",
+            "help": "Where the player looks at first, up or down: -90 to 90, 0 is the horizon."
           }
         },
         "initialYaw": {
@@ -2343,7 +2417,8 @@
             "min": -180,
             "max": 180,
             "step": 1,
-            "label": "Initial Yaw"
+            "label": "Initial Yaw",
+            "help": "Where the player looks at first, left or right: -180 to 180, 0 is straight ahead."
           }
         },
         "hfov": {
@@ -2356,7 +2431,8 @@
             "min": 50,
             "max": 120,
             "step": 5,
-            "label": "Field of View"
+            "label": "Field of View",
+            "help": "How wide the view is at the start, in degrees. Smaller is zoomed in."
           }
         },
         "minHfov": {
@@ -2369,7 +2445,8 @@
             "min": 10,
             "max": 120,
             "step": 5,
-            "label": "Min FOV (Max Zoom In)"
+            "label": "Min FOV (Max Zoom In)",
+            "help": "How far the player can zoom in (the narrowest view, in degrees)."
           }
         },
         "maxHfov": {
@@ -2382,7 +2459,8 @@
             "min": 30,
             "max": 180,
             "step": 5,
-            "label": "Max FOV (Max Zoom Out)"
+            "label": "Max FOV (Max Zoom Out)",
+            "help": "How far the player can zoom out (the widest view, in degrees)."
           }
         },
         "zoomSpeed": {
@@ -2395,7 +2473,8 @@
             "min": 0.1,
             "max": 3.0,
             "step": 0.1,
-            "label": "Zoom Speed"
+            "label": "Zoom Speed",
+            "help": "How fast the mouse wheel zooms: 0.1 is very slow, 3 very fast."
           }
         },
         "prompt": {
@@ -2421,7 +2500,8 @@
                 "label": "Pinned (scrolls with pano)"
               }
             ],
-            "label": "Prompt Display"
+            "label": "Prompt Display",
+            "help": "Whether the text stays in place on the screen, or is fixed to a spot in the panorama and moves with it."
           }
         },
         "speaker": {
@@ -2432,7 +2512,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -2545,7 +2626,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Next beat after variable/counter is set"
+          "description": "Next beat after variable/counter is set",
+          "ui": {
+            "help": "Where the story goes next."
+          }
         },
         "timeYear": {
           "type": "number",
@@ -2714,7 +2798,8 @@
             "dependsOn": {
               "field": "mode",
               "value": "scatter"
-            }
+            },
+            "help": "How many points to scatter."
           }
         },
         "scatterRadiusMeters": {
@@ -2727,7 +2812,8 @@
             "dependsOn": {
               "field": "mode",
               "value": "scatter"
-            }
+            },
+            "help": "How far from the centre a point can land, in metres."
           }
         },
         "centerSource": {
@@ -2755,7 +2841,8 @@
             "dependsOn": {
               "field": "mode",
               "value": "scatter"
-            }
+            },
+            "help": "Where the centre of the scatter is."
           }
         },
         "centerPointName": {
@@ -2797,7 +2884,8 @@
           "required": false,
           "description": "Fallback latitude used when the sensor is unavailable / permission denied (capture, or scatter-from-current).",
           "ui": {
-            "label": "Fallback latitude"
+            "label": "Fallback latitude",
+            "help": "The latitude to use when the player's position can't be read."
           }
         },
         "fallbackLng": {
@@ -2805,13 +2893,17 @@
           "required": false,
           "description": "Fallback longitude used when the sensor is unavailable / permission denied (capture, or scatter-from-current).",
           "ui": {
-            "label": "Fallback longitude"
+            "label": "Fallback longitude",
+            "help": "The longitude to use when the player's position can't be read."
           }
         },
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Next beat after the points are stored"
+          "description": "Next beat after the points are stored",
+          "ui": {
+            "help": "Where the story goes next."
+          }
         }
       },
       "transitions": false,
@@ -2828,7 +2920,10 @@
         "condition": {
           "type": "condition",
           "required": true,
-          "description": "Condition to evaluate"
+          "description": "Condition to evaluate",
+          "ui": {
+            "help": "What to check."
+          }
         },
         "trueConnection": {
           "type": "connection",
@@ -2836,7 +2931,10 @@
           "description": "Target if condition is true",
           "aliases": [
             "trueTarget"
-          ]
+          ],
+          "ui": {
+            "help": "Where the story goes when the check is true."
+          }
         },
         "falseConnection": {
           "type": "connection",
@@ -2844,7 +2942,10 @@
           "description": "Target if condition is false",
           "aliases": [
             "falseTarget"
-          ]
+          ],
+          "ui": {
+            "help": "Where the story goes when the check is false."
+          }
         },
         "moreConditions": {
           "type": "array<object>",
@@ -2942,7 +3043,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -2960,7 +3062,10 @@
         "connection": {
           "type": "connection",
           "required": false,
-          "description": "Target beat after duration expires"
+          "description": "Target beat after duration expires",
+          "ui": {
+            "help": "Where the story goes when the time is up."
+          }
         },
         "explainHuds": {
           "type": "boolean",
@@ -3072,7 +3177,10 @@
         "value": {
           "type": "number",
           "required": true,
-          "description": "Timer value in seconds (0 to clear)"
+          "description": "Timer value in seconds (0 to clear)",
+          "ui": {
+            "help": "How long the timer runs, in seconds. 0 stops it."
+          }
         },
         "timerTarget": {
           "type": "string",
@@ -3080,13 +3188,17 @@
           "description": "Beat to jump to when timer expires",
           "ui": {
             "control": "beat-ref",
-            "label": "When the timer runs out, go to"
+            "label": "When the timer runs out, go to",
+            "help": "Where the story jumps when the timer runs out."
           }
         },
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Next beat after timer is set"
+          "description": "Next beat after timer is set",
+          "ui": {
+            "help": "Where the story goes next."
+          }
         }
       },
       "transitions": false,
@@ -3104,7 +3216,10 @@
           "type": "string",
           "required": true,
           "default": "add",
-          "description": "Action: add, remove, or transfer"
+          "description": "Action: add, remove, or transfer",
+          "ui": {
+            "help": "Give an item, take one away, or pass one from one character to another."
+          }
         },
         "item": {
           "type": "string",
@@ -3131,7 +3246,8 @@
           "description": "Character name (for add/remove)",
           "ui": {
             "control": "character-ref",
-            "label": "Character"
+            "label": "Character",
+            "help": "Whose inventory changes."
           }
         },
         "fromChar": {
@@ -3140,7 +3256,8 @@
           "description": "Source character (for transfer)",
           "ui": {
             "control": "character-ref",
-            "label": "From character"
+            "label": "From character",
+            "help": "Who gives the item."
           }
         },
         "toChar": {
@@ -3149,7 +3266,8 @@
           "description": "Target character (for transfer)",
           "ui": {
             "control": "character-ref",
-            "label": "To character"
+            "label": "To character",
+            "help": "Who receives the item."
           }
         },
         "itemImage": {
@@ -3166,7 +3284,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Next beat after inventory change"
+          "description": "Next beat after inventory change",
+          "ui": {
+            "help": "Where the story goes next."
+          }
         }
       },
       "transitions": false,
@@ -3187,7 +3308,8 @@
           "description": "Character whose affect changes",
           "ui": {
             "control": "character-ref",
-            "label": "Character"
+            "label": "Character",
+            "help": "The character whose feelings change."
           }
         },
         "moodValenceDelta": {
@@ -3205,7 +3327,8 @@
               "happier →"
             ],
             "affectAxis": "valence",
-            "group": "Mood"
+            "group": "Mood",
+            "help": "Makes the character's mood better (plus) or worse (minus). The total stays between -1 and 1."
           }
         },
         "moodArousalDelta": {
@@ -3223,7 +3346,8 @@
               "more excited →"
             ],
             "affectAxis": "arousal",
-            "group": "Mood"
+            "group": "Mood",
+            "help": "Makes the character calmer (minus) or more excited (plus). The total stays between -1 and 1."
           }
         },
         "sentimentTarget": {
@@ -3243,7 +3367,8 @@
           "description": "Emotion label (e.g. trust, fear, anger, joy, pride, shame). Free-text — no enforced palette.",
           "ui": {
             "label": "Emotion",
-            "group": "Sentiment"
+            "group": "Sentiment",
+            "help": "The feeling, in a word: trust, fear, anger, joy, pride, shame, or one of your own."
           }
         },
         "sentimentDelta": {
@@ -3288,13 +3413,17 @@
               "← weaker",
               "stronger →"
             ],
-            "group": "Emotion"
+            "group": "Emotion",
+            "help": "How much stronger (or, with a minus, weaker) the emotion gets. The total stays between 0 and 1."
           }
         },
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Next beat after the affect update"
+          "description": "Next beat after the affect update",
+          "ui": {
+            "help": "Where the story goes next."
+          }
         },
         "effects": {
           "type": "array<effect>",
@@ -3347,7 +3476,8 @@
           "description": "Target latitude in degrees (WGS84). E.g. 51.5074 for London.",
           "ui": {
             "label": "Target latitude",
-            "step": 1e-06
+            "step": 1e-06,
+            "help": "The place's latitude in decimal degrees, for example 51.5074 for London."
           }
         },
         "targetLng": {
@@ -3356,7 +3486,8 @@
           "description": "Target longitude in degrees (WGS84). E.g. -0.1278 for London.",
           "ui": {
             "label": "Target longitude",
-            "step": 1e-06
+            "step": 1e-06,
+            "help": "The place's longitude in decimal degrees, for example -0.1278 for London."
           }
         },
         "radiusMeters": {
@@ -3384,7 +3515,8 @@
           "default": "Continue",
           "description": "Continue button label (display mode).",
           "ui": {
-            "label": "Continue button text"
+            "label": "Continue button text",
+            "help": "The words on the Continue button, when the beat only shows the map or plan."
           }
         },
         "cancelButtonText": {
@@ -3441,7 +3573,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Next beat after the GPS beat resolves (regardless of how — arrival, timeout, skip)."
+          "description": "Next beat after the GPS beat resolves (regardless of how — arrival, timeout, skip).",
+          "ui": {
+            "help": "Where the story goes next, however this beat ends: arriving, running out of time, or skipping."
+          }
         }
       },
       "transitions": false,
@@ -3485,7 +3620,8 @@
           "required": true,
           "description": "UUID of the target beacon — must match a beacon configured in Project Settings ▸ Location & AR ▸ Indoor venue ▸ Beacons.",
           "ui": {
-            "label": "Target beacon UUID"
+            "label": "Target beacon UUID",
+            "help": "The beacon the player should come near. Beacons are listed in Project Settings ▸ Location & AR ▸ Indoor venue."
           }
         },
         "radiusMeters": {
@@ -3513,7 +3649,8 @@
           "default": "Continue",
           "description": "Continue button label (display mode).",
           "ui": {
-            "label": "Continue button text"
+            "label": "Continue button text",
+            "help": "The words on the Continue button, when the beat only shows the map or plan."
           }
         },
         "cancelButtonText": {
@@ -3537,7 +3674,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Next beat after the indoor-location beat resolves."
+          "description": "Next beat after the indoor-location beat resolves.",
+          "ui": {
+            "help": "Where the story goes next, however this beat ends."
+          }
         }
       },
       "transitions": false,
@@ -3609,13 +3749,19 @@
         "placeholder": {
           "type": "string",
           "required": false,
-          "description": "Optional placeholder text for input field"
+          "description": "Optional placeholder text for input field",
+          "ui": {
+            "help": "Grey example text in the empty field."
+          }
         },
         "validation": {
           "type": "string",
           "required": false,
           "default": "none",
-          "description": "Validation type: none, numeric, email, alphanumeric"
+          "description": "Validation type: none, numeric, email, alphanumeric",
+          "ui": {
+            "help": "What counts as a valid answer: anything, a number, an e-mail address, or letters and digits only."
+          }
         },
         "minLength": {
           "type": "number",
@@ -3631,7 +3777,10 @@
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Whether input is required"
+          "description": "Whether input is required",
+          "ui": {
+            "help": "The player has to answer before going on."
+          }
         },
         "buttonText": {
           "type": "string",
@@ -3647,7 +3796,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -3665,7 +3815,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Target beat after input is submitted"
+          "description": "Target beat after input is submitted",
+          "ui": {
+            "help": "Where the story goes once the player has answered."
+          }
         },
         "explainHuds": {
           "type": "boolean",
@@ -3757,14 +3910,18 @@
           "ui": {
             "control": "textarea",
             "rows": 3,
-            "label": "AI Analysis Prompt"
+            "label": "AI Analysis Prompt",
+            "help": "What the AI should look for in the picture. The player never sees this."
           }
         },
         "saveTo": {
           "type": "string",
           "required": true,
           "default": "imageAnalysis",
-          "description": "Variable name that receives the AI's answer text"
+          "description": "Variable name that receives the AI's answer text",
+          "ui": {
+            "help": "The variable that keeps the AI's answer."
+          }
         },
         "imageSource": {
           "type": "string",
@@ -3809,14 +3966,18 @@
           "description": "Stored in the variable when AI is unavailable, fails, or the player skips",
           "ui": {
             "control": "text",
-            "label": "Fallback Value"
+            "label": "Fallback Value",
+            "help": "What the variable gets when there is no AI answer, or the player skips."
           }
         },
         "timeout": {
           "type": "number",
           "required": false,
           "default": 30000,
-          "description": "Maximum AI response time in ms before falling back"
+          "description": "Maximum AI response time in ms before falling back",
+          "ui": {
+            "help": "How long to wait for the AI, in milliseconds, before using the stand-in answer."
+          }
         },
         "speaker": {
           "type": "string",
@@ -3826,7 +3987,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -3844,7 +4006,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Target beat after the image is analyzed (or the player skips)"
+          "description": "Target beat after the image is analyzed (or the player skips)",
+          "ui": {
+            "help": "Where the story goes once the picture has been looked at, or the player skips."
+          }
         },
         "explainHuds": {
           "type": "boolean",
@@ -3932,7 +4097,8 @@
               "phone",
               "pin"
             ],
-            "label": "Layout"
+            "label": "Layout",
+            "help": "Which keys the keypad has: with ← and ✓, like a phone with * and #, or with C and ✓."
           }
         },
         "maxDigits": {
@@ -3951,7 +4117,10 @@
           "type": "string",
           "required": false,
           "default": "",
-          "description": "Expected code (empty = accept any input)"
+          "description": "Expected code (empty = accept any input)",
+          "ui": {
+            "help": "The code that opens the way. Empty: any code is accepted."
+          }
         },
         "failTarget": {
           "type": "string",
@@ -3960,14 +4129,18 @@
           "description": "Beat to navigate to on wrong code. Shown in the flowchart as a 'Wrong code' link.",
           "ui": {
             "control": "beat-ref",
-            "label": "On wrong code, go to"
+            "label": "On wrong code, go to",
+            "help": "Where the story goes when the code is wrong."
           }
         },
         "maxAttempts": {
           "type": "number",
           "required": false,
           "default": 0,
-          "description": "Maximum attempts (0 = unlimited)"
+          "description": "Maximum attempts (0 = unlimited)",
+          "ui": {
+            "help": "How many tries the player gets. 0: as many as they like."
+          }
         },
         "maskInput": {
           "type": "boolean",
@@ -3979,24 +4152,36 @@
           "type": "string",
           "required": false,
           "default": "variable",
-          "description": "Save input to: variable or counter"
+          "description": "Save input to: variable or counter",
+          "ui": {
+            "help": "Where the code goes: a variable or a counter."
+          }
         },
         "variable": {
           "type": "string",
           "required": false,
           "default": "keypadInput",
-          "description": "Variable name to store the entered code"
+          "description": "Variable name to store the entered code",
+          "ui": {
+            "help": "The variable that keeps the code entered."
+          }
         },
         "counter": {
           "type": "string",
           "required": false,
-          "description": "Counter name to store numeric input"
+          "description": "Counter name to store numeric input",
+          "ui": {
+            "help": "The counter that takes the number entered."
+          }
         },
         "counterOperation": {
           "type": "string",
           "required": false,
           "default": "set",
-          "description": "Counter operation: set or change"
+          "description": "Counter operation: set or change",
+          "ui": {
+            "help": "Set the counter to the number, or add the number to it."
+          }
         },
         "buttonText": {
           "type": "string",
@@ -4019,7 +4204,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Target beat after code is entered"
+          "description": "Target beat after code is entered",
+          "ui": {
+            "help": "Where the story goes when the code is right."
+          }
         },
         "explainHuds": {
           "type": "boolean",
@@ -4138,7 +4326,8 @@
           "description": "Optional regex patterns — only codes that match resolve. Leave empty to accept any code.",
           "ui": {
             "label": "Accept patterns (regex)",
-            "addLabel": "Add Pattern"
+            "addLabel": "Add Pattern",
+            "help": "Optional. Only codes matching one of these patterns (regular expressions) count. Empty: any code."
           }
         },
         "qrJumpTargets": {
@@ -4173,7 +4362,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -4191,7 +4381,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Target beat after a code is scanned (or the player cancels)"
+          "description": "Target beat after a code is scanned (or the player cancels)",
+          "ui": {
+            "help": "Where the story goes once a code is scanned, or the player cancels."
+          }
         },
         "explainHuds": {
           "type": "boolean",
@@ -4426,7 +4619,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this beat's text."
           }
         },
         "showSpeaker": {
@@ -4590,7 +4784,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this beat's text."
           }
         },
         "showSpeaker": {
@@ -4608,7 +4803,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Target beat after the player exits the web view"
+          "description": "Target beat after the player exits the web view",
+          "ui": {
+            "help": "Where the story goes when the player leaves the page."
+          }
         },
         "explainHuds": {
           "type": "boolean",
@@ -4707,7 +4905,10 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Whether user can click multiple links"
+          "description": "Whether user can click multiple links",
+          "ui": {
+            "help": "Let the player follow more than one link before moving on."
+          }
         },
         "highlightColor": {
           "type": "string",
@@ -4729,7 +4930,8 @@
             "control": "speaker",
             "label": "Speaker",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Who says this. It decides the voice when the story is read aloud, and the name shown if speaker names are on."
           }
         },
         "showSpeaker": {
@@ -4836,17 +5038,26 @@
         "apiUrl": {
           "type": "string",
           "required": false,
-          "description": "API URL to fetch (supports ${variable} interpolation)"
+          "description": "API URL to fetch (supports ${variable} interpolation)",
+          "ui": {
+            "help": "The web address to fetch from. You can put ${variable} in it."
+          }
         },
         "apiParams": {
           "type": "object",
           "required": false,
-          "description": "Query parameters for the API"
+          "description": "Query parameters for the API",
+          "ui": {
+            "help": "Extra values added to the address."
+          }
         },
         "jsonPath": {
           "type": "string",
           "required": false,
-          "description": "JSONPath to extract data (e.g., $.current.temp_c)"
+          "description": "JSONPath to extract data (e.g., $.current.temp_c)",
+          "ui": {
+            "help": "Which part of the answer to use, as a JSONPath such as $.current.temp_c."
+          }
         },
         "query": {
           "type": "string",
@@ -4855,13 +5066,17 @@
           "ui": {
             "control": "textarea",
             "rows": 3,
-            "label": "AI Query"
+            "label": "AI Query",
+            "help": "What the AI should look up and summarise. You can put ${variable} in it."
           }
         },
         "title": {
           "type": "string",
           "required": false,
-          "description": "Title displayed above the content (auto-derived from query if not set)"
+          "description": "Title displayed above the content (auto-derived from query if not set)",
+          "ui": {
+            "help": "The heading above the content. Empty: taken from the query."
+          }
         },
         "maxWords": {
           "type": "number",
@@ -4877,7 +5092,8 @@
           "ui": {
             "control": "textarea",
             "rows": 3,
-            "label": "Display Template"
+            "label": "Display Template",
+            "help": "How to show the result. Write {{data}} where it goes."
           }
         },
         "buttonText": {
@@ -4900,7 +5116,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Target beat when button is clicked"
+          "description": "Target beat when button is clicked",
+          "ui": {
+            "help": "Where the button leads."
+          }
         },
         "explainHuds": {
           "type": "boolean",
@@ -4993,7 +5212,8 @@
           "ui": {
             "label": "Categories",
             "addLabel": "Add Category",
-            "itemLabel": "Category"
+            "itemLabel": "Category",
+            "help": "The outcomes the AI picks between, each with the beat it leads to."
           },
           "itemSchema": {
             "name": {
@@ -5029,31 +5249,46 @@
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include player variables in evaluation"
+          "description": "Include player variables in evaluation",
+          "ui": {
+            "help": "Let the AI judge by the story's variables."
+          }
         },
         "evaluateInventory": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include player inventory in evaluation"
+          "description": "Include player inventory in evaluation",
+          "ui": {
+            "help": "Let the AI judge by what the player is carrying."
+          }
         },
         "evaluateHistory": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include beat history in evaluation"
+          "description": "Include beat history in evaluation",
+          "ui": {
+            "help": "Let the AI judge by the beats the player has been through."
+          }
         },
         "evaluateCounters": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include counters in evaluation"
+          "description": "Include counters in evaluation",
+          "ui": {
+            "help": "Let the AI judge by the counters' values."
+          }
         },
         "evaluateChoiceHistory": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include rich choice history in evaluation (what choices were made)"
+          "description": "Include rich choice history in evaluation (what choices were made)",
+          "ui": {
+            "help": "Let the AI judge by the choices the player has made."
+          }
         },
         "fallbackTarget": {
           "type": "string",
@@ -5070,7 +5305,10 @@
           "type": "number",
           "required": false,
           "default": 30000,
-          "description": "Maximum response time in ms"
+          "description": "Maximum response time in ms",
+          "ui": {
+            "help": "How long to wait for the AI, in milliseconds, before taking the fallback."
+          }
         }
       },
       "transitions": false,
@@ -5099,7 +5337,8 @@
           "ui": {
             "control": "textarea",
             "rows": 3,
-            "label": "Scenario"
+            "label": "Scenario",
+            "help": "Where and when this happens, for the AI. The player never sees it."
           }
         },
         "npcName": {
@@ -5109,7 +5348,8 @@
           "description": "NPC name the player is talking to",
           "ui": {
             "control": "npc-character",
-            "label": "NPC Character"
+            "label": "NPC Character",
+            "help": "The name of the character the player talks to."
           }
         },
         "npcPersonality": {
@@ -5128,31 +5368,46 @@
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include player variables in context"
+          "description": "Include player variables in context",
+          "ui": {
+            "help": "Tell the AI the story's variables."
+          }
         },
         "includeInventory": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include player inventory in context"
+          "description": "Include player inventory in context",
+          "ui": {
+            "help": "Tell the AI what the player is carrying."
+          }
         },
         "includeVisitedBeats": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include visited beats in context"
+          "description": "Include visited beats in context",
+          "ui": {
+            "help": "Tell the AI which beats the player has been through."
+          }
         },
         "includeChoiceHistory": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include rich choice history in context (what choices were made)"
+          "description": "Include rich choice history in context (what choices were made)",
+          "ui": {
+            "help": "Tell the AI which choices the player has made."
+          }
         },
         "maxTurns": {
           "type": "number",
           "required": false,
           "default": 3,
-          "description": "Maximum conversation turns"
+          "description": "Maximum conversation turns",
+          "ui": {
+            "help": "How many times the player can speak before the conversation ends."
+          }
         },
         "maxChoicesPerTurn": {
           "type": "number",
@@ -5190,7 +5445,8 @@
           "default": true,
           "description": "Show character avatars beside the lines in the chat layouts (chat-scroll, chat-bubble)",
           "ui": {
-            "scope": "ve-left"
+            "scope": "ve-left",
+            "help": "Show each character's picture beside their lines in a chat layout."
           }
         },
         "exitTargets": {
@@ -5201,7 +5457,8 @@
           "ui": {
             "label": "Exit Targets",
             "addLabel": "Add Exit",
-            "itemLabel": "Exit"
+            "itemLabel": "Exit",
+            "help": "Where the story goes for each way the conversation can end."
           },
           "itemSchema": {
             "id": {
@@ -5249,7 +5506,10 @@
         "choiceDelay": {
           "type": "number",
           "required": false,
-          "description": "Delay before showing choices"
+          "description": "Delay before showing choices",
+          "ui": {
+            "help": "Seconds before the choices appear."
+          }
         },
         "explainHuds": {
           "type": "boolean",
@@ -5338,37 +5598,55 @@
         "prompt": {
           "type": "string",
           "required": false,
-          "description": "Custom instructions for summary style"
+          "description": "Custom instructions for summary style",
+          "ui": {
+            "help": "How the summary should be written, in your own words."
+          }
         },
         "includeVariables": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include player variables in summary"
+          "description": "Include player variables in summary",
+          "ui": {
+            "help": "Tell the AI the story's variables."
+          }
         },
         "includeInventory": {
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Include player inventory in summary"
+          "description": "Include player inventory in summary",
+          "ui": {
+            "help": "Tell the AI what the player is carrying."
+          }
         },
         "includeVisitedBeats": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include visited beats in summary"
+          "description": "Include visited beats in summary",
+          "ui": {
+            "help": "Tell the AI which beats the player has been through."
+          }
         },
         "includeChoiceHistory": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include rich choice history in summary (what choices were made)"
+          "description": "Include rich choice history in summary (what choices were made)",
+          "ui": {
+            "help": "Tell the AI which choices the player has made."
+          }
         },
         "includeCounters": {
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Include final counter values"
+          "description": "Include final counter values",
+          "ui": {
+            "help": "Tell the AI the counters' final values."
+          }
         },
         "summaryStyle": {
           "type": "string",
@@ -5499,7 +5777,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Timers"
+            "label": "Timers",
+            "help": "Stop every running timer."
           }
         },
         "resetFictionalTime": {
@@ -5513,7 +5792,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Fictional Time"
+            "label": "Fictional Time",
+            "help": "Set the story's clock back to its start."
           }
         },
         "resetVisitedTracking": {
@@ -5527,7 +5807,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Visited Tracking"
+            "label": "Visited Tracking",
+            "help": "Forget which places and choices were already visited, so nothing starts dimmed."
           }
         },
         "resetCharacters": {
@@ -5556,7 +5837,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "History"
+            "label": "History",
+            "help": "Forget which beats were played."
           }
         },
         "restartText": {
@@ -5584,7 +5866,8 @@
           "description": "Body text for the credits page (auto-populated from metadata if empty)",
           "ui": {
             "control": "textarea",
-            "rows": 6
+            "rows": 6,
+            "help": "The text of the credits page. Empty: the project's title, author and copyright."
           }
         },
         "creditsCloseText": {
@@ -5705,7 +5988,8 @@
           "ui": {
             "control": "textarea",
             "rows": 3,
-            "label": "AI Prompt"
+            "label": "AI Prompt",
+            "help": "What the AI should write, for example \"A merchant's reply when the player can't afford the item\"."
           }
         },
         "contextVariables": {
@@ -5714,38 +5998,54 @@
           "description": "Specific variables to include in AI context (leave empty for all)",
           "ui": {
             "label": "Context Variables",
-            "addLabel": "Add Variable"
+            "addLabel": "Add Variable",
+            "help": "The variables to tell the AI about. Empty: all of them."
           }
         },
         "includeVariables": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include player variables in context"
+          "description": "Include player variables in context",
+          "ui": {
+            "help": "Tell the AI the story's variables."
+          }
         },
         "includeInventory": {
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Include player inventory in context"
+          "description": "Include player inventory in context",
+          "ui": {
+            "help": "Tell the AI what the player is carrying."
+          }
         },
         "includeHistory": {
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Include visited beats in context"
+          "description": "Include visited beats in context",
+          "ui": {
+            "help": "Tell the AI which beats the player has been through."
+          }
         },
         "includeCounters": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include counters in context"
+          "description": "Include counters in context",
+          "ui": {
+            "help": "Tell the AI the counters' values."
+          }
         },
         "includeChoiceHistory": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include rich choice history in context (what choices were made)"
+          "description": "Include rich choice history in context (what choices were made)",
+          "ui": {
+            "help": "Tell the AI which choices the player has made."
+          }
         },
         "maxSentences": {
           "type": "number",
@@ -5756,7 +6056,8 @@
             "control": "number",
             "min": 1,
             "max": 5,
-            "label": "Max Sentences"
+            "label": "Max Sentences",
+            "help": "The most sentences the AI may write."
           }
         },
         "fallbackText": {
@@ -5767,7 +6068,8 @@
           "ui": {
             "control": "textarea",
             "rows": 2,
-            "label": "Fallback Text"
+            "label": "Fallback Text",
+            "help": "The text shown when the AI can't be reached."
           }
         },
         "buttonText": {
@@ -5779,7 +6081,10 @@
         "connection": {
           "type": "connection",
           "required": true,
-          "description": "Target beat when button is clicked"
+          "description": "Target beat when button is clicked",
+          "ui": {
+            "help": "Where the button leads."
+          }
         },
         "explainHuds": {
           "type": "boolean",
@@ -5858,7 +6163,8 @@
           "ui": {
             "control": "textarea",
             "rows": 3,
-            "label": "AI Prompt"
+            "label": "AI Prompt",
+            "help": "What the AI should write, for example \"Describe the atmosphere as the player enters the dark cave\"."
           }
         },
         "contextVariables": {
@@ -5867,38 +6173,54 @@
           "description": "Specific variables to include in AI context (leave empty for all)",
           "ui": {
             "label": "Context Variables",
-            "addLabel": "Add Variable"
+            "addLabel": "Add Variable",
+            "help": "The variables to tell the AI about. Empty: all of them."
           }
         },
         "includeVariables": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include player variables in context"
+          "description": "Include player variables in context",
+          "ui": {
+            "help": "Tell the AI the story's variables."
+          }
         },
         "includeInventory": {
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Include player inventory in context"
+          "description": "Include player inventory in context",
+          "ui": {
+            "help": "Tell the AI what the player is carrying."
+          }
         },
         "includeHistory": {
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Include visited beats in context"
+          "description": "Include visited beats in context",
+          "ui": {
+            "help": "Tell the AI which beats the player has been through."
+          }
         },
         "includeCounters": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include counters in context"
+          "description": "Include counters in context",
+          "ui": {
+            "help": "Tell the AI the counters' values."
+          }
         },
         "includeChoiceHistory": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include rich choice history in context (what choices were made)"
+          "description": "Include rich choice history in context (what choices were made)",
+          "ui": {
+            "help": "Tell the AI which choices the player has made."
+          }
         },
         "maxSentences": {
           "type": "number",
@@ -5909,7 +6231,8 @@
             "control": "number",
             "min": 1,
             "max": 5,
-            "label": "Max Sentences"
+            "label": "Max Sentences",
+            "help": "The most sentences the AI may write."
           }
         },
         "fallbackText": {
@@ -5920,7 +6243,8 @@
           "ui": {
             "control": "textarea",
             "rows": 2,
-            "label": "Fallback Text"
+            "label": "Fallback Text",
+            "help": "The text shown when the AI can't be reached."
           }
         },
         "wordsPerMinute": {
@@ -5932,7 +6256,8 @@
             "control": "number",
             "min": 100,
             "max": 400,
-            "label": "Reading Speed (WPM)"
+            "label": "Reading Speed (WPM)",
+            "help": "The reading speed the time is worked out from. Most adults read 200 to 250 words a minute."
           }
         },
         "minDuration": {
@@ -5966,7 +6291,10 @@
         "connection": {
           "type": "connection",
           "required": false,
-          "description": "Target beat after duration expires"
+          "description": "Target beat after duration expires",
+          "ui": {
+            "help": "Where the story goes when the time is up."
+          }
         },
         "explainHuds": {
           "type": "boolean",
@@ -6062,7 +6390,8 @@
           "ui": {
             "control": "textarea",
             "rows": 3,
-            "label": "Scenario"
+            "label": "Scenario",
+            "help": "Where and when this happens, for the AI. The player never sees it."
           }
         },
         "npcName": {
@@ -6072,7 +6401,8 @@
           "description": "Name of the NPC the player is talking to",
           "ui": {
             "control": "npc-character",
-            "label": "NPC Character"
+            "label": "NPC Character",
+            "help": "The name of the character the player talks to."
           }
         },
         "npcPersonality": {
@@ -6106,7 +6436,8 @@
           "ui": {
             "label": "Conversation Directions",
             "addLabel": "Add Direction",
-            "itemLabel": "Direction"
+            "itemLabel": "Direction",
+            "help": "Directions for the conversation: when something happens, what the character should do."
           },
           "itemSchema": {
             "id": {
@@ -6383,7 +6714,8 @@
             "control": "number",
             "min": 1,
             "max": 50,
-            "label": "Max Turns"
+            "label": "Max Turns",
+            "help": "How many times the player can speak before the conversation is wrapped up."
           }
         },
         "fallbackExitTarget": {
@@ -6409,25 +6741,37 @@
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include player variables in AI context"
+          "description": "Include player variables in AI context",
+          "ui": {
+            "help": "Tell the AI the story's variables."
+          }
         },
         "includeInventory": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include player inventory in AI context"
+          "description": "Include player inventory in AI context",
+          "ui": {
+            "help": "Tell the AI what the player is carrying."
+          }
         },
         "includeVisitedBeats": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include visited beats in AI context"
+          "description": "Include visited beats in AI context",
+          "ui": {
+            "help": "Tell the AI which beats the player has been through."
+          }
         },
         "includeChoiceHistory": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Include rich choice history in AI context"
+          "description": "Include rich choice history in AI context",
+          "ui": {
+            "help": "Tell the AI which choices the player has made."
+          }
         },
         "enableVoiceInput": {
           "type": "boolean",
@@ -6453,7 +6797,8 @@
           "ui": {
             "control": "textarea",
             "rows": 3,
-            "label": "System Instructions"
+            "label": "System Instructions",
+            "help": "Extra directions for the AI: tone, what to mention, what to avoid. The player never sees them."
           }
         },
         "explainHuds": {

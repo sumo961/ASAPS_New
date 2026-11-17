@@ -29,6 +29,7 @@ import { GlobalSettingsInspector } from './components/settings/GlobalSettingsIns
 import { useStoryBuilder } from './hooks/useStoryBuilder';
 import { CharacterManager } from './components/characters/CharacterManager';
 import { StoryDataWindow } from './components/storyData/StoryDataWindow';
+import { WelcomeCard } from './components/WelcomeCard';
 import {
   CharacterDevelopmentDialog,
   type CharacterDevelopmentSession,
@@ -438,6 +439,8 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = usePersistedState('asaps_ui_sidebar_collapsed', false);
   const [showCharacterManager, setShowCharacterManager] = useState(false);
   const [showStoryData, setShowStoryData] = useState(false);
+  // First-run welcome over the starter story; "Got it" is remembered on this computer.
+  const [welcomeSeen, setWelcomeSeen] = usePersistedState<boolean>('asaps_welcome_seen', false);
   const characterSelectionCallbackRef = useRef<((character: Character) => void) | null>(null);
   const [showAssetManager, setShowAssetManager] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -7357,7 +7360,16 @@ function App() {
           }}
         />
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden relative">
+          {!welcomeSeen && isUntitledProject && isDefaultEmptyProject() && (
+            <WelcomeCard
+              onDismiss={() => setWelcomeSeen(true)}
+              onBrowseStarts={() => {
+                setWelcomeSeen(true);
+                setResumeHeaderAction(prev => ({ action: 'newProject', seq: (prev?.seq ?? 0) + 1 }));
+              }}
+            />
+          )}
           <WorkspaceView
             key={currentProject?.id || 'untitled'}
             projectId={currentProject?.id}

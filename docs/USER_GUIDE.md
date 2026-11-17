@@ -297,13 +297,13 @@ Sometimes the fastest way to learn a technique is to open a project where it's a
 
 You'll find them in two places:
 
-- **The template row in the Project Browser**, right under the create cards. While your project library is small, templates show as full cards — title, description, a *"What this shows"* note, and tags. Once your library grows past a few projects, the row collapses to a slim one-liner (**TEMPLATES** · template names · **browse →**) so it stays out of your way; click **browse →** to expand it again.
+- **The template row in the Project Browser**, right under the create cards. While your project library is small, templates show as full cards — title, description, a *"Good for learning"* note, and tags. Once your library grows past a few projects, the row collapses to a slim one-liner (**TEMPLATES** · template names · **browse →**) so it stays out of your way; click **browse →** to expand it again.
 - **The "Start from a template" card** in the **+ New** picker, which opens the same gallery as a dialog.
 
 Either way, clicking **Use template** creates *your own copy* of the template as a brand-new project in your library. This is the golden rule of templates: **the template itself is never edited.** Experiment freely, gut it, rebuild it — the original stays pristine, and you can instantiate a fresh copy any time.
 
 ![The template gallery opened from the + New picker](images/48-template-gallery.png)
-*The template gallery. Each entry carries a description, a "What this shows" note explaining the techniques it demonstrates, and feature tags; the purple **AI** badge marks templates that need an AI provider to play. **Use template** always creates your own copy.*
+*The template gallery. Each entry carries a description, a "Good for learning" note saying what it teaches, and feature tags; the purple **AI** badge marks templates that need an AI provider to play. **Use template** always creates your own copy.*
 
 **The `.asapst` file format.** Under the hood a template is a normal `.asaps` project zip flagged as a template — think of Word's `.dotx` document templates. Importing or double-clicking a `.asapst` file never opens it directly; it always instantiates a fresh copy as a new project. That makes templates safe to distribute: a lecturer can export a rehearsal scenario as a `.asapst`, share it with a class, and every student who imports it gets their own independent copy to work in.
 

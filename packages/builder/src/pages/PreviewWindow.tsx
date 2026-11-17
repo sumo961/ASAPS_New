@@ -5,6 +5,7 @@
  * and renders the preview. It auto-reloads when the story changes.
  */
 
+import { beatTypeLabel } from '../utils/changeBeatType';
 import { isAppleFmServe } from '../services/providers/appleFoundationModels';
 import { cancelSimulation } from '../services/storySimulation';
 import { simulationProgressShort } from '../components/debug/debugWording';
@@ -3267,20 +3268,22 @@ export const PreviewWindow: React.FC = () => {
                 <Play className="w-4 h-4" />
                 Start Preview
               </button>
-              <button
-                onClick={() => {
-                  setIsWaitingToStart(false);
-                  navigatedBeatIdRef.current = null;
-                  setStartBeatId(null);
-                  setStartMode('beginning');
-                }}
-                className="px-3 py-1.5 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
-              >
-                Cancel
-              </button>
-              <div className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded flex items-center gap-1">
-                Ready
-              </div>
+              {/* Only for a mid-story start: go back to the usual start.
+                  From the beginning there is nothing to cancel. */}
+              {startBeatId && (
+                <button
+                  onClick={() => {
+                    setIsWaitingToStart(false);
+                    navigatedBeatIdRef.current = null;
+                    setStartBeatId(null);
+                    setStartMode('beginning');
+                  }}
+                  className="px-3 py-1.5 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
+                  title="Don't start at this beat; play from the beginning"
+                >
+                  From the beginning instead
+                </button>
+              )}
             </>
           ) : !isRunning && !isPaused ? (
             <button
@@ -3983,11 +3986,13 @@ export const PreviewWindow: React.FC = () => {
           <div className="w-px h-5 bg-gray-400 mx-1" />
           <div className="text-xs text-gray-500">
             {isWaitingToStart ? (
-              <span className="text-amber-600 font-medium">▶ Ready to preview: {story?.getBeat(startBeatId || '')?.name || 'Unknown'}</span>
+              <span className="text-amber-600 font-medium">▶ {startBeatId
+                ? `Ready to play from "${story?.getBeat(startBeatId)?.name || startBeatId}"`
+                : 'Ready to play from the beginning'}</span>
             ) : isPaused ? (
               <span className="text-yellow-600 font-medium">⏸ PAUSED at: {currentBeat?.name || 'Unknown'}</span>
             ) : currentBeat ? (
-              `${currentBeat.name} (${currentBeat.type})`
+              `${currentBeat.name} (${beatTypeLabel(currentBeat.type)})`
             ) : (
               'Ready'
             )}

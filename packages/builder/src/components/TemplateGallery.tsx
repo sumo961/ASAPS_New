@@ -20,6 +20,15 @@
 import React, { useEffect, useState } from 'react';
 import { LayoutTemplate, Loader2, X, Sparkles } from 'lucide-react';
 
+
+/**
+ * A name for the author's copy: "The Last Ferry (my version)". The subtitle
+ * after a dash is dropped, and nothing is put in front ("My The Last Ferry").
+ */
+export function suggestedName(title: string): string {
+  return `${title.split(/\s+[—–-]\s+/)[0].trim()} (my version)`;
+}
+
 export interface TemplateMeta {
   id: string;
   file: string;
@@ -86,13 +95,13 @@ const TemplateCard: React.FC<{ meta: TemplateMeta; compact?: boolean } & Templat
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Naming step: "Use template" first asks for the new project's name
-  // (default suggestion "My <template title>") instead of instantiating a
+  // (default suggestion: the title's short form + "(my version)") instead of instantiating a
   // copy that keeps the template's own name.
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
 
   const use = async () => {
-    const chosen = name.trim() || `My ${meta.title}`;
+    const chosen = name.trim() || suggestedName(meta.title);
     setBusy(true);
     setError(null);
     try {
@@ -121,7 +130,7 @@ const TemplateCard: React.FC<{ meta: TemplateMeta; compact?: boolean } & Templat
       <div className="text-xs text-gray-600 leading-snug">{meta.description}</div>
       {!compact && (
         <div className="text-[11px] text-gray-500 leading-snug bg-amber-50/60 border border-amber-100 rounded px-2 py-1.5">
-          <span className="font-medium text-amber-700">What this shows: </span>
+          <span className="font-medium text-amber-700">Good for learning: </span>
           {meta.whatItShows}
         </div>
       )}
@@ -133,7 +142,7 @@ const TemplateCard: React.FC<{ meta: TemplateMeta; compact?: boolean } & Templat
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void use(); if (e.key === 'Escape') setNaming(false); }}
-            placeholder={`My ${meta.title}`}
+            placeholder={suggestedName(meta.title)}
             aria-label="Name for your new project"
             className="flex-1 min-w-0 px-2 py-1.5 border border-amber-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
           />
@@ -156,7 +165,7 @@ const TemplateCard: React.FC<{ meta: TemplateMeta; compact?: boolean } & Templat
         </div>
         <button
           type="button"
-          onClick={() => { setName(`My ${meta.title}`); setNaming(true); }}
+          onClick={() => { setName(suggestedName(meta.title)); setNaming(true); }}
           disabled={busy}
           className="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
           title="Creates your own copy of this template as a new project — the template itself is never changed"

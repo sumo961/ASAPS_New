@@ -43,6 +43,9 @@ export interface SaveStatusProps {
 
   /** Whether there are unsaved changes */
   hasUnsavedChanges?: boolean;
+
+  /** Leave out "Unsaved changes" where the host already says it (the header's pill by the title). */
+  hidePendingText?: boolean;
 }
 
 /**
@@ -139,6 +142,7 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
   onSaveProject,
   isUntitledProject,
   hasUnsavedChanges,
+  hidePendingText = false,
 }) => {
   const info = getStatusInfo(status, lastSaved, error);
   const Icon = info.icon;
@@ -172,7 +176,7 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       {/* Status indicator - only show when there's something to report */}
-      {(status === 'pending' || status === 'saving' || status === 'error') && showText && (
+      {((status === 'pending' && !hidePendingText) || status === 'saving' || status === 'error') && showText && (
         <div
           className={`flex items-center gap-2 px-3 py-1.5 rounded-md ${info.bgColor} transition-colors`}
           title={error ? error.message : undefined}
