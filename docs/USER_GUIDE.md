@@ -414,12 +414,12 @@ On a narrow window these buttons wrap onto a line of their own below the title, 
 
 | Right Side | What it Does |
 |------------|--------------|
-| **Find & Change** | Find & replace, and AI bulk changes (slate button, Ctrl/Cmd+F) — see [Find & Change](#find-and-change) |
-| **Characters** | Create and manage your cast, the story's list of [items](#project-items) and its [roles](#roles) (blue button) |
-| **Story Data** | The story's variables and counters, and the beats that set and test them (indigo button) — see [Story Data](#story-data) |
-| **Assets** | Manage images, sounds, videos, fonts (orange button) |
-| **Project Settings** | Everything that travels with this project — stage, fonts, colours, HUDs (purple button, ⌘/Ctrl+,). Where this guide says **Project Settings ▸ …**, it means this window — see [Project Settings](#global-settings) |
-| **Debug** | Testing and troubleshooting tools (gray button) |
+| **Find & Change** | Find & replace, and AI bulk changes (Ctrl/Cmd+F) — see [Find & Change](#find-and-change) |
+| **Characters** | Create and manage your cast, the story's list of [items](#project-items) and its [roles](#roles) |
+| **Story Data** | The story's variables and counters, and the beats that set and test them — see [Story Data](#story-data) |
+| **Assets** | Manage images, sounds, videos, fonts |
+| **Project Settings** | Everything that travels with this project — stage, fonts, colours, HUDs (⌘/Ctrl+,). Where this guide says **Project Settings ▸ …**, it means this window — see [Project Settings](#global-settings) |
+| **Debug** | Testing and troubleshooting tools |
 | **Preview** | Test your system (green button) |
 
 <a id="dark-mode"></a>
@@ -1436,7 +1436,7 @@ If evaluation fails (unknown name, division by zero, syntax error), the raw stri
 <a id="story-data"></a>
 #### Story Data: every variable and counter in one place
 
-As a story grows, it gets hard to remember which beat sets `hasKey` and which ones check it. **Story Data** keeps track for you. Click the **Story Data** button in the toolbar (indigo, beside **Characters**). The window has two tabs, **Variables** and **Counters**, each showing how many there are.
+As a story grows, it gets hard to remember which beat sets `hasKey` and which ones check it. **Story Data** keeps track for you. Click the **Story Data** button in the toolbar (beside **Characters**). The window has two tabs, **Variables** and **Counters**, each showing how many there are.
 
 **The Variables tab** is your story's list of variables. Click **Add Variable** and fill in:
 
@@ -1447,6 +1447,8 @@ As a story grows, it gets hard to remember which beat sets `hasKey` and which on
 - **Keep across restarts** — the variable keeps its value when the player restarts from an ending; see [Keeping just some things across a restart](#keep-across-restarts).
 
 A name, starting value or description takes effect when you leave the field or press Enter. Every change applies at once and can be undone with Undo. The bin button on the right removes a variable from the list.
+
+![Story Data ▸ Variables: the variable wonderName, a Text variable with a description, set in "Name the wonder" and shown in "Journal entry"](images/111-story-data-variables.png)
 
 You don't have to list a variable before using it: you can also name a new one in a Set Variable beat or a choice's effect. And one variable is built in: **playthrough** counts the runs (1, 2, …); use `${playthrough}` in text or test it in a condition.
 
@@ -1464,6 +1466,8 @@ Click a beat's name and the window closes and takes you to that beat. *nowhere y
 
 - **Story counters** — numbers that belong to the story and not to a character: a score, the days passed. There is nothing to set up. A story counter starts at 0 and exists as soon as a choice's effect or a Set Variable/Counter beat changes it, so this list fills itself as you write. Each counter has its **Set in** and **Tested in** beats.
 - **Characters' counters** — trust, health, courage: the numbers a character carries, grouped by character, each with its starting value and the beats that use it. You can't edit them here; their names, starting values and meters are set on the character. **Edit in Characters** opens the Characters window (see [Character Counters](#character-counters-stats)). A counter that [follows a character's feelings](#counter-binding) says so in place of **Set in**, because it isn't set directly: choices change the feeling it shows.
+
+![Story Data ▸ Counters: no story counters yet, and the character Ada's counters: gold, which starts at 12, and trust, fear and spirits, which follow her feelings](images/112-story-data-counters.png)
 
 ---
 
@@ -2118,7 +2122,7 @@ Sometimes the person in a scene depends on what happened earlier: the confidant 
 
 **Default (before anyone is chosen)** picks who stands in until the story decides; left at *First of the list*, the first ticked character does. Two checkboxes finish the role: **Can be recast later** allows a second casting to replace the first (otherwise Story Warnings and the review banner flag it), and **Keep across restarts** lets an ending's Restart keep who plays it. Everything you change on this tab applies at once (there is no Save button to click) and can be undone with Undo. The *Referenced as* id takes effect when you leave the field or press Enter. Changing it updates every beat that uses it — speakers, AI partners, `${@…}` text, Cast Role effects, choice conditions, Condition Check beats, beat Requirements and Choose Your Character — as one step you can undo, and a short notice tells you how many beats were updated. If you leave the id empty or type one another role already has, the old id comes back.
 
-![A role named "The player", referenced as @player, playable by Mara and Jonas, chosen in the story. The picture shows the role in its former place in Project Settings.](images/82-project-settings-roles.png)
+![Characters ▸ Roles: a role named "The player", referenced as @player, playable by Mara and Jonas, chosen in the story; below it the start of "The confidant"](images/82-characters-roles.png)
 *A role's fields. They look the same in Characters ▸ Roles, where roles live now; the picture was taken when they were still a tab of Project Settings.*
 
 **Using a role.** Roles appear as *@ The confidant* in the character pickers: a beat's **Speaker** (below *Narrator* and the player), an AI Conversation's or AI Dialog Tree's **NPC** (every role except `player`), and the character an affect effect such as **Add Sentiment** or **Fire Emotion** is aimed at (listed first). Each Dialog Tree line's speaker picker lists them too. In text, write:
@@ -4220,10 +4224,10 @@ Use sprite sheets for frame-by-frame animation:
 <a id="global-settings"></a>
 ### Project Settings
 
-![Settings Panel](images/02-settings-panel.png)
+![Project Settings, on the Project tab: "Story starts at" at the top, then the stage and layout settings](images/02-settings-panel.png)
 *The Settings panel*
 
-Open it with the purple **Project Settings** button (⌘/Ctrl+,). The tabs along the top group the settings by what they do: **Project**, **Look**, **Dialogue**, **Screen panels**, **Sound**, **Languages & culture** and **About**. One more tab, **Location & AR**, shows up only when your story uses location (see below). The window reopens on the tab you used last, and nothing changes in your project until you click **Save Settings**.
+Open it with the **Project Settings** button (⌘/Ctrl+,). The tabs along the top group the settings by what they do: **Project**, **Look**, **Dialogue**, **Screen panels**, **Sound**, **Languages & culture** and **About**. One more tab, **Location & AR**, shows up only when your story uses location (see below). The window reopens on the tab you used last, and nothing changes in your project until you click **Save Settings**.
 
 Two things that used to be tabs here now have a home of their own, because you come back to them while you write: variables are in [Story Data ▸ Variables](#story-data), and roles are in [Characters ▸ Roles](#roles).
 
@@ -4237,6 +4241,8 @@ Two things that used to be tabs here now have a home of their own, because you c
 - In the desktop app, the project's folder is shown at the bottom of the tab.
 
 **Project Settings ▸ Look** has five sections. Pick one with the pills just under the tabs: **Colours**, **Fonts**, **Text box**, **Text & button motion** and **Hotspots**.
+
+![Project Settings ▸ Look, with the five section pills under the tabs and the Colours section open](images/113-project-settings-look.png)
 
 **Project Settings ▸ Look ▸ Colours:**
 - Button colors
@@ -4300,8 +4306,8 @@ Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual 
 
 - <a id="message-history"></a>**Message history** — lets players reopen the conversations they have had so far, like the chats in a messenger app. Every Dialog Tree played becomes one chat, named after the people in it, with the lines as they were shown (with the speaker's look at the time) and the player's replies on the right. A conversation played again continues the same chat after a small *· · ·* divider. It's history only: nothing replays, and closing it (**Close**, a click outside, or Esc) takes the player back to where they were. Players open it from the player's **Menu → Messages**; while you test, the Preview Window's toolbar has a speech-bubbles button for it. The history is kept in saved games and starts empty when the story restarts (or when an End Screen resets *History*). Off by default.
 
-![The former HUD tab of Project Settings: Compact HUD on phones, "Show HUDs on the title screen" unticked, and "Message history" ticked with its explanation.](images/88-project-settings-message-history.png)
-*Message history is one tick. This picture shows it where it used to be, on the HUD tab; you'll now find it at the bottom of Project Settings ▸ Dialogue.*
+![Project Settings ▸ Dialogue, scrolled to the end: "Show lines as", "Show the player's replies as", "Dim characters who aren't speaking", and "Message history" ticked with its explanation.](images/88-project-settings-message-history.png)
+*Message history is one tick, at the bottom of Project Settings ▸ Dialogue.*
 
 ![The Messages panel over the story: on the left one chat, "Wolf", with his latest line; on the right the conversation, the Wolf's two lines with his friendly and then his angry picture, and the player's reply "Sweets for my granny." on the right in gold.](images/91-message-history.png)
 *The message history in the Preview. Each line keeps the picture the speaker had when it was said.*
@@ -4887,7 +4893,7 @@ The ASAPS Desktop app (built with Electron) runs on macOS and Windows, and as a 
 - **Native file dialogs** - Save/open using OS file picker
 - **Git integration** - Full VCS support (see Part 9)
 - **Local file access** - Direct read/write without browser limitations
-- **Two kinds of settings** - **Project Settings** (⌘, or the purple header button) holds everything saved with the project — stage size, fonts, colors, HUDs, whether an exported player reads text aloud — so everyone who opens or exports it gets the same result. **App Preferences** (Tools → App Preferences…, or ⌘⌥, in the app menu) holds what belongs to this computer: light or dark [appearance](#dark-mode), the builder's [reading font](#reading-font), AI, voice and speech-input providers with their keys, the Brave web-search key, automatic updates, the Claude Desktop (MCP) integration, and whether the AI features and beat suggestions are shown at all.
+- **Two kinds of settings** - **Project Settings** (⌘, or the Project Settings button) holds everything saved with the project — stage size, fonts, colors, HUDs, whether an exported player reads text aloud — so everyone who opens or exports it gets the same result. **App Preferences** (Tools → App Preferences…, or ⌘⌥, in the app menu) holds what belongs to this computer: light or dark [appearance](#dark-mode), the builder's [reading font](#reading-font), AI, voice and speech-input providers with their keys, the Brave web-search key, automatic updates, the Claude Desktop (MCP) integration, and whether the AI features and beat suggestions are shown at all.
 - **Updates and quitting** - **Help → Check for Updates…** looks for a newer version; when there is none, it says *You are already running the latest version* and names the version you have. When an update has downloaded, ASAPS offers **Restart Now** or **Later**. Restarting — like quitting — first finishes saving your open project, so nothing in flight is lost. In the rare case something still can't be saved, ASAPS asks before going on: *"Some changes could not be saved."* Choose **Restart and install** (or **Close anyway** when you're just quitting) to go ahead without those changes, or **Cancel** to keep working and save first — a postponed update installs the next time you quit.
 - **Report a bug** - **Help → Report a Bug…** opens a bug report on GitHub in your browser with the app version, build number, operating system and runtime already filled in. You describe what happened and submit it there; nothing is sent until you do, and no project content is included. **Help → Known Issues** lists the open bug reports.
 - **When a link won't open** - Help → Documentation, Report a Bug…, Known Issues, the **Open Releases Page** button (offered when an update can't download), and other web links you click in ASAPS all open in your web browser. If your computer declines to open one (usually because no default browser is set), ASAPS shows **Couldn't open your browser** with the address and a **Copy Link** button, so you can paste it into any browser yourself. If it keeps happening on Windows, set a default browser under **Settings › Apps › Default apps**, and make sure you're not running ASAPS as administrator.
