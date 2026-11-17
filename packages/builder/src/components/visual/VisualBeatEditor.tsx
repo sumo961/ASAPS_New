@@ -199,6 +199,8 @@ interface VisualBeatEditorProps {
   beatType?: string;
   selectedElements: string[];
   onSelectElements: (elementIds: string[]) => void;
+  /** Dialog Tree: the author asked to step into this reply (one of beatContent.choices). */
+  onStepIntoChoice?: (choice: Record<string, unknown>) => void;
   projectSettings?: {
     width: number;
     height: number;
@@ -262,6 +264,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   beatType,
   selectedElements,
   onSelectElements,
+  onStepIntoChoice,
   projectSettings,
   boxVisibility,
   globalSettings,
@@ -432,6 +435,82 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
   const [zoom, setZoomInternal] = useState(initialZoom ?? 1);
   const setZoom = (z: number) => { setZoomInternal(z); onZoomChange?.(z); };
+
+  // Speech bubbles place themselves, away from the text box and buttons they
+  // stand for. These helpers find them on the stage so a click on a bubble
+  // and the selection frame act on what the author sees.
+  type StageRect = { x: number; y: number; width: number; height: number };
+  const stageRectOf = (node: Element): StageRect | null => {
+    const stage = canvasRef.current?.querySelector('[data-stage]');
+    if (!stage) return null;
+    const s = stage.getBoundingClientRect();
+    const r = node.getBoundingClientRect();
+    return { x: (r.left - s.left) / zoom, y: (r.top - s.top) / zoom, width: r.width / zoom, height: r.height / zoom };
+  };
+  /** The spoken line's bubble and the text element it stands for, when the line is shown as a bubble. */
+  const findBubbleLine = (): { id: string; rect: StageRect } | null => {
+    const root = canvasRef.current;
+    const bubble = root?.querySelector('[data-speech-bubble="current"]');
+    const line = root?.querySelector('[data-speech-line]');
+    if (!bubble || !line) return null;
+    const rect = stageRectOf(bubble);
+    const lineRect = stageRectOf(line);
+    if (!rect || !lineRect) return null;
+    let best: { id: string; d: number } | null = null;
+    for (const el of elements) {
+      if (!el.visible || (el.type !== 'text' && el.type !== 'dialog')) continue;
+      const c = computedPositions.get(el.id) ?? el;
+      const d = Math.abs(c.x - lineRect.x) + Math.abs(c.y - lineRect.y);
+      if (!best || d < best.d) best = { id: el.id, d };
+    }
+    return best ? { id: best.id, rect } : null;
+  };
+  const contains = (node: Element, x: number, y: number) => {
+    const r = node.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  };
+  /** The replies a player can pick, in the order the reply bubble lists them. */
+  const pickableReplies = () => ((beatContent?.choices ?? []) as Array<Record<string, unknown>>)
+    .filter((c) => typeof c.text === 'string' && !!(c.text as string).trim());
+  /** The reply a button on the canvas stands for. */
+  const choiceForButton = (el: { id: string; content?: string; text?: string; name?: string }) => {
+    const choices = (beatContent?.choices ?? []) as Array<Record<string, unknown>>;
+    const written = [el.content, el.text, el.name].filter((v): v is string => !!v);
+    const byWords = choices.find((c) => written.includes(String(c.sourceText ?? '')) || written.includes(String(c.text ?? '')));
+    if (byWords) return byWords;
+    const n = /^choice_(\d+)$/.exec(el.id);
+    return n ? choices.filter((c) => !c.continue)[parseInt(n[1], 10)] : undefined;
+  };
+
+  // The selected line's bubble, for the selection frame. Bubbles are placed
+  // after layout, so follow the stage while a text element is selected.
+  const [bubbleFrame, setBubbleFrame] = useState<{ id: string; rect: StageRect } | null>(null);
+  const findBubbleLineRef = useRef(findBubbleLine);
+  findBubbleLineRef.current = findBubbleLine;
+  const watchBubble = selectedElements.some((id) => {
+    const t = elements.find((el) => el.id === id)?.type;
+    return t === 'text' || t === 'dialog';
+  });
+  useEffect(() => {
+    if (!watchBubble) { setBubbleFrame(null); return; }
+    const stage = canvasRef.current?.querySelector('[data-stage]');
+    if (!stage) return;
+    const update = () => {
+      const next = findBubbleLineRef.current();
+      setBubbleFrame((prev) => {
+        if (!next) return prev ? null : prev;
+        const same = prev && prev.id === next.id
+          && Math.abs(prev.rect.x - next.rect.x) < 0.5 && Math.abs(prev.rect.y - next.rect.y) < 0.5
+          && Math.abs(prev.rect.width - next.rect.width) < 0.5 && Math.abs(prev.rect.height - next.rect.height) < 0.5;
+        return same ? prev : next;
+      });
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(stage, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'data-speech-bubble', 'data-speech-line'] });
+    return () => observer.disconnect();
+  }, [watchBubble, zoom, computedPositions]);
+
   const [showGrid, setShowGrid] = useState(true);
   // Phone-crop preview (decision 5, 2026-08-31): draws the region of the
   // authored stage a cover-mode phone actually keeps — one frame per
@@ -1419,6 +1498,32 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
             height: 'max-content',
             outline: 'none',
           }}
+          onMouseDownCapture={(e) => {
+            // A click on a speech bubble acts on the bubble: a reply steps
+            // into its next line, the spoken line selects its text element.
+            // Bubbles lie under the elements' click targets, so look first.
+            if (tool !== 'select' || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+            const target = e.target as HTMLElement;
+            if (!target.closest?.('[data-speech-bubble-layer]') && !target.hasAttribute?.('data-drag-overlay')) return;
+            const root = e.currentTarget;
+            const replyLine = Array.from(root.querySelectorAll('[data-reply-line]')).find((n) => contains(n, e.clientX, e.clientY));
+            if (replyLine) {
+              e.stopPropagation();
+              e.preventDefault();
+              const choice = pickableReplies()[parseInt(replyLine.getAttribute('data-reply-line') || '-1', 10)];
+              if (choice) onStepIntoChoice?.(choice);
+              return;
+            }
+            const bubble = root.querySelector('[data-speech-bubble="current"]');
+            if (bubble && contains(bubble, e.clientX, e.clientY)) {
+              const line = findBubbleLine();
+              if (!line) return;
+              e.stopPropagation();
+              e.preventDefault();
+              canvasRef.current?.focus();
+              onSelectElements([line.id]);
+            }
+          }}
           onMouseDown={(e) => {
             // Focus canvas for keyboard events
             canvasRef.current?.focus();
@@ -2008,6 +2113,13 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   return (
                     <div
                       key={`drag-overlay-${el.id}`}
+                      data-drag-overlay=""
+                      title={el.type === 'button' && onStepIntoChoice && choiceForButton(el) ? 'Double-click to step into this reply' : undefined}
+                      onDoubleClick={() => {
+                        if (el.type !== 'button' || !onStepIntoChoice) return;
+                        const choice = choiceForButton(el);
+                        if (choice) onStepIntoChoice(choice);
+                      }}
                       style={{
                         position: 'absolute',
                         left: `${effectiveX}px`,
@@ -2144,21 +2256,42 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
                   const isOnlySelected = selectedElements.length === 1;
                   const isGrouped = !!el.groupId;
+                  // The line is shown as a speech bubble: frame the bubble, and
+                  // dash the text box (it is used when the bubble doesn't fit).
+                  const inBubble = bubbleFrame?.id === el.id ? bubbleFrame.rect : null;
 
                   return (
+                    <React.Fragment key={`selection-${el.id}`}>
+                    {inBubble && (
+                      <div
+                        data-bubble-selection=""
+                        style={{
+                          position: 'absolute',
+                          left: `${inBubble.x - 3}px`,
+                          top: `${inBubble.y - 3}px`,
+                          width: `${inBubble.width + 6}px`,
+                          height: `${inBubble.height + 6}px`,
+                          border: '2px solid #3b82f6',
+                          borderRadius: '8px',
+                          pointerEvents: 'none',
+                          zIndex: 10000,
+                          boxShadow: '0 0 0 1px rgba(255,255,255,0.5), 0 0 20px rgba(59,130,246,0.3)',
+                        }}
+                      />
+                    )}
                     <div
-                      key={`selection-${el.id}`}
+                      title={inBubble ? 'The text box, used when the bubble does not fit' : undefined}
                       style={{
                         position: 'absolute',
                         left: `${effectiveX}px`,
                         top: `${effectiveY}px`,
                         width: `${effectiveWidth}px`,
                         height: `${effectiveHeight}px`,
-                        border: isGrouped ? '2px solid #8b5cf6' : '2px solid #3b82f6',
+                        border: isGrouped ? '2px solid #8b5cf6' : inBubble ? '2px dashed #3b82f6' : '2px solid #3b82f6',
                         borderRadius: '4px',
                         pointerEvents: 'none',
                         zIndex: 10000,
-                        boxShadow: isGrouped
+                        boxShadow: inBubble ? 'none' : isGrouped
                           ? '0 0 0 1px rgba(255,255,255,0.5), 0 0 20px rgba(139,92,246,0.3)'
                           : '0 0 0 1px rgba(255,255,255,0.5), 0 0 20px rgba(59,130,246,0.3)',
                         transform: transforms.length > 0 ? transforms.join(' ') : undefined,
@@ -2207,6 +2340,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                       </>
                     )}
                   </div>
+                    </React.Fragment>
                   );
                 })}
 

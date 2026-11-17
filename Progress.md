@@ -31,6 +31,10 @@ A check of reading aloud (TTS) and voice input (STT), which had not been exercis
 
 - Reply buttons: with a translation chosen, every reply button on the fixed canvas showed the first reply, so "One bubble at the player's character" could not find them and plain buttons stayed. Buttons are matched to replies by the words as written; the editor now hands each button its translated reply (`sourceText` on the choices, `translatedReplyFor` in the editor). Same for Single Choice.
 
+- Stepping through a dialog on the fixed canvas: stepping into a reply left the first line's elements on the canvas. The stepped-in line was looked up by a path-style id ("root_choice0") while the editor tracks the line's own id, as the player does for `phaseOverrides`; it is now resolved from the dialog path. Long-standing (since the breadcrumb replaced the Dialog Phases panel).
+- A click on a reply in the reply bubble steps into its next line; a double-click on a reply button does the same (a single click still selects it for moving). A reply without a next line says so. Only responsive layouts and hotspots could step in from the canvas before. The Dialog path hint says which gesture applies.
+- A click on the spoken line's bubble selects its text element. The selection frame is drawn around the bubble, and the text box (used when the bubble doesn't fit) keeps a dashed frame with the handles.
+
 **Files modified:** `packages/builder/src/components/visual/VisualWorkspace.tsx`, `packages/builder/src/components/visual/VisualBeatEditor.tsx`
 
 ---

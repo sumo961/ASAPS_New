@@ -74,6 +74,7 @@ import type { ThemeAssetUrls } from '../../hooks/useThemes';
 import { getCommandManager } from '../../commands/CommandManager';
 import { VisualElementsSnapshotCommand } from '../../commands/ElementCommands';
 import { notifyUndoable } from '../../utils/undoNotice';
+import { notify } from '../../utils/notify';
 import { isMultiChoiceLike } from '@asaps/core';
 import { useRolePreview } from '../../contexts/RolesContext';
 import { previewRoles } from '../../utils/rolePreview';
@@ -2276,8 +2277,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Must depend on dialogTreeParams to recalculate when dialog tree is modified (e.g., adding choices)
   const selectedPhase = useMemo(() => {
     if (beat?.type !== 'dialogTree' || !selectedPhaseId || !dialogTreeParams) return null;
+    // The line the editor is stepped into. selectedPhaseId is that line's own
+    // id (as the player keys phaseOverrides), which findPhaseById cannot
+    // resolve unless ids happen to be path-style ("root_choice0"): stepping
+    // in used to leave the root line's elements on the canvas. Wait for the
+    // id to catch up with the path so overrides load under the right key.
+    const node = dialogNodeAt(dialogTreeParams, dialogTreeNodePath);
+    if (node && (node.id || (dialogTreeParams as any)?.id || 'root') === selectedPhaseId) return node as DialogNode;
     return findPhaseById(dialogTreeParams, selectedPhaseId);
-  }, [beat?.type, dialogTreeParams, selectedPhaseId]);
+  }, [beat?.type, dialogTreeParams, selectedPhaseId, dialogTreeNodePath]);
 
   // Track previous phase ID to detect phase changes for auto-save
   const prevPhaseIdRef = useRef<string | null>(null);
@@ -3203,7 +3211,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const phaseOv = (beat.getParameters?.() as any)?.phaseOverrides?.[selectedPhaseId] ?? {};
     const columnSig = Object.keys(phaseOv).filter(k => /^choice_\d+$/.test(k)).sort()
       .map(k => `${phaseOv[k]?.x},${phaseOv[k]?.width},${phaseOv[k]?.stackY}`).join(';');
-    const choicesSig = `${(selectedPhase.choices || []).map((c: any) => c?.id).join('|')}#${choiceStateKey}#${columnSig}`;
+    const choicesSig = `${(selectedPhase.choices || []).map((c: any) => c?.id).join('|')}#${choiceStateKey}#${columnSig}#${dialogTreeNodePath.join('/')}`;
     const choicesChanged = prevChoicesCountRef.current !== currentChoicesCount || prevChoicesSigRef.current !== choicesSig;
 
     // Don't reload if this is the same beat AND same phase AND same choices count AND we already have elements
@@ -6408,7 +6416,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 );
               })}
               {labels.length === 0 && (
-                <span className="text-slate-500 text-sm ml-2 italic min-w-0 truncate" title="click a choice on the canvas to step in, or use the Inspector tree">click a choice on the canvas to step in, or use the Inspector tree</span>
+                <span className="text-slate-500 text-sm ml-2 italic min-w-0 truncate" title={isSlotPreview ? 'click a reply on the canvas to step in, or use the Inspector tree' : 'double-click a reply on the canvas to step in (in a reply bubble, click it), or use the Inspector tree'}>{isSlotPreview ? 'click a reply on the canvas to step in, or use the Inspector tree' : 'double-click a reply to step in (click it in a reply bubble), or use the Inspector tree'}</span>
               )}
               {beat?.type === 'dialogTree' && (
                 <label className="ml-auto max-w-full flex flex-wrap items-center gap-2 text-sm text-slate-600" title="Show the choices a player in this state would see (conditions evaluated)">
@@ -7437,6 +7445,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             onSelectAsset={handleAssetSelection}
             onOpenCharacterManager={onOpenCharacterManager}
             beatContent={content}
+            onStepIntoChoice={beat.type === 'dialogTree' ? (choice) => {
+              // A reply with a next line steps into it, as in a responsive
+              // layout; one without leaves the dialog, so there is nowhere to go.
+              if (choice?.dialogNode && typeof choice.id === 'string') {
+                const id = choice.id;
+                setSelectedElementIds([]);
+                setDialogTreeNodePath(prev => [...prev, id]);
+              } else {
+                notify.info('This reply has no next line: it ends the dialog or leaves this beat.');
+              }
+            } : undefined}
             beatType={beat.type === 'endScreen' && selectedPhaseId === 'credits' ? 'endScreenCredits' : beat.type}
             selectedElements={selectedElementIds}
             onSelectElements={setSelectedElementIds}
