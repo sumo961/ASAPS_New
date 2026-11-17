@@ -23,7 +23,7 @@ Thirteen tabs became seven (eight with location beats), none behind the scroll a
 - **Location & AR:** shown only for a story with location beats, location settings, or a sound placed on the map.
 - **About:** copyright.
 - **Variables** moved to the Story Data window (below).
-- **HTML export follows it:** the export window's Start beat now defaults to "Story starts at" when one is set (before: the selected beat, else the Title Screen, whatever the setting said). Without a set start the default is unchanged.
+- **HTML export follows it:** the export window's Start beat now defaults to "Story starts at" when one is set (before: the selected beat, else the Title Screen, whatever the setting said). Without a set start it defaults to the Title Screen (else the first beat), no longer to the beat selected in the editor, which made it easy to export from the middle by accident (user decision 2026-11-17).
 - **User Guide** updated for the new tabs, Characters ▸ Roles, Story Data (`#story-data`) and New / Browse. Screenshots to retake: 01, 02, 03, 82, 88, 106; new ones wanted for Story Data and Look.
 - **Removed:** the Debug tab, and "Show variable/counter values during preview", which nothing read (the Preview has its own button).
 - Stored settings are unchanged; only where they are edited moved. In-app texts that name a tab were updated.

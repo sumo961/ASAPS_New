@@ -7874,7 +7874,6 @@ function App() {
           projectId={currentProject.id}
           projectName={currentProject.name}
           availableBeats={state.beats.map((b: any) => ({ id: b.id, name: b.name, type: b.type }))}
-          selectedBeatId={selectedBeat?.id}
           storyStartBeatId={globalSettings?.debug?.firstbeat || undefined}
           exportSpeech={resolveExportSpeech(globalSettings)}
           mediaBytes={assets.reduce((sum, a: any) => sum + (typeof a.size === 'number' ? a.size : 0), 0)}

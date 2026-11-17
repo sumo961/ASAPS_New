@@ -22,8 +22,6 @@ interface HtmlExportDialogProps {
   projectName: string;
   /** Beats authors can pick from for the "Start beat" dropdown. */
   availableBeats?: Array<{ id: string; name?: string; type?: string }>;
-  /** Currently-selected beat in the builder, used as the dropdown's default. */
-  selectedBeatId?: string;
   /** The project's start beat when the author set one (Story starts at). */
   storyStartBeatId?: string;
   /** Project setting: the exported player reads text aloud (globalSettings.tts.exportSpeech). */
@@ -40,7 +38,6 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   projectId,
   projectName,
   availableBeats = [],
-  selectedBeatId,
   storyStartBeatId,
   exportSpeech = true,
   onExportSpeechChange,
@@ -87,18 +84,18 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     storyZipBlob: Blob;
   };
   const [sizeWarning, setSizeWarning] = useState<SizeWarning | null>(null);
-  // Start-beat picker (v0.9.49+). Defaults to the currently-selected beat
-  // if any, else the project's first titleScreen, else the first beat in
-  // the list. Author can change before clicking Download.
+  // Start-beat picker. Defaults to the project's start when the author set
+  // one, else the first title screen, else the first beat. Not the selected
+  // beat: that made it easy to export from the middle by accident. The
+  // author can change it before clicking Download.
   const defaultStartBeat = useMemo(() => {
     // The project's own start (Project Settings ▸ Project ▸ Story starts at)
     // comes first: an author who set it means every export to begin there.
     if (storyStartBeatId && availableBeats.some((b) => b.id === storyStartBeatId)) return storyStartBeatId;
-    if (selectedBeatId && availableBeats.some((b) => b.id === selectedBeatId)) return selectedBeatId;
     const titleScreen = availableBeats.find((b) => b.type === 'titleScreen');
     if (titleScreen) return titleScreen.id;
     return availableBeats[0]?.id || '';
-  }, [storyStartBeatId, selectedBeatId, availableBeats]);
+  }, [storyStartBeatId, availableBeats]);
   const [startBeatId, setStartBeatId] = useState<string>(defaultStartBeat);
   // Re-sync the default if the dialog re-opens with a fresh selection.
   useEffect(() => {
@@ -368,8 +365,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         {/* Content */}
         <div className="px-6 py-5 space-y-6 overflow-y-auto flex-1">
           {/* Start beat — author picks where the published story begins.
-              Defaults to whatever is currently selected in the builder
-              (or the project's titleScreen if nothing's selected). */}
+              Defaults to the project's start, else the title screen. */}
           {availableBeats.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -384,7 +380,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
               <p className="text-xs text-gray-500 mt-1">
                 The published story will begin here. {storyStartBeatId
                   ? 'Set to the project’s start (Project Settings ▸ Project ▸ Story starts at)'
-                  : 'Defaults to your current selection in the builder'}; you can change it for this export
+                  : availableBeats.some((b) => b.type === 'titleScreen') ? 'Starts at the title screen' : 'Starts at the first beat'}; you can change it for this export
                 without affecting the project.
               </p>
             </div>
