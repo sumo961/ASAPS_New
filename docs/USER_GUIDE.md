@@ -106,6 +106,8 @@ The quickest way to learn ASAPS is to build something small from start to finish
 
 ### Step 1: Start a new project (2 minutes)
 
+**A hello on your first visit.** The first time ASAPS shows you its starter story, a small **Welcome to ASAPS** card sits at the bottom of the workspace. It says what a beat is and names the three things you'll do most: click a beat to change it, drag a beat type onto the flowchart and link it, and press **Preview**. **Got it** (or the ✕) puts it away for good on this computer, **Templates and other starts…** opens the *Start a new project* picker, and **User Guide** opens this guide. It only shows over the starter story while you haven't changed it.
+
 Click **New** in the toolbar (or, in the project browser, **Empty project**). Name it *The Lighthouse*, leave **Responsive** selected and click **Create Project**.
 
 Your project starts with three beats already linked: **Title Screen → Introduction → The End**. The End's **Play Again** button leads back to the title, so the starter already plays from beginning to end.
@@ -198,7 +200,7 @@ It's probably just off-screen. Click it in the **Story Beats** list on the left 
 The palette shows the ten most-used beats first. Click **All beat types (36)** under them for the rest. AI beat types only appear while **Show AI features** is on in App Preferences.
 
 **Did my work get saved?**
-If the toolbar says **Saved**, yes. ASAPS saves on its own every half minute and when you click **Save**. Still, keep a backup now and then: **Export → Project file (.asaps)**. In the browser version, projects live in the browser's storage, which the browser can clear, so a backup matters even more there.
+If there is no **Unsaved** pill beside the project's title, yes (right after a save the **Save** button also reads **Saved** for a moment). ASAPS saves on its own every half minute and when you click **Save**. Still, keep a backup now and then: **Export → Project file (.asaps)**. In the browser version, projects live in the browser's storage, which the browser can clear, so a backup matters even more there.
 
 **I undid something by mistake.**
 **Redo** (⌘/Ctrl+Shift+Z, or the arrow next to Undo) brings it back. Deleted a beat? **Tools → Recently deleted beats…** keeps them too.
@@ -300,7 +302,7 @@ You'll find them in two places:
 - **The template row in the Project Browser**, right under the create cards. While your project library is small, templates show as full cards — title, description, a *"Good for learning"* note, and tags. Once your library grows past a few projects, the row collapses to a slim one-liner (**TEMPLATES** · template names · **browse →**) so it stays out of your way; click **browse →** to expand it again.
 - **The "Start from a template" card** in the **+ New** picker, which opens the same gallery as a dialog.
 
-Either way, clicking **Use template** creates *your own copy* of the template as a brand-new project in your library. This is the golden rule of templates: **the template itself is never edited.** Experiment freely, gut it, rebuild it — the original stays pristine, and you can instantiate a fresh copy any time.
+Either way, clicking **Use template** creates *your own copy* of the template as a brand-new project in your library. ASAPS first asks what to call it and suggests the template's short title with *(my version)* — *The Last Ferry (my version)*, say. Keep that or type your own, then click **Create**. This is the golden rule of templates: **the template itself is never edited.** Experiment freely, gut it, rebuild it — the original stays pristine, and you can instantiate a fresh copy any time.
 
 ![The template gallery opened from the + New picker](images/48-template-gallery.png)
 *The template gallery. Each entry carries a description, a "Good for learning" note saying what it teaches, and feature tags; the purple **AI** badge marks templates that need an AI provider to play. **Use template** always creates your own copy.*
@@ -386,7 +388,7 @@ The header spans the top of the screen in two rows. (It used to take three; sinc
 **Row 1 -- Title, AI, Voices and Language:**
 The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.64.115), and a large text field where you can type or edit your project's title directly. Next to the title you'll see a small **layout-mode pill** — green *Responsive layout* or amber *Fixed canvas* — that reflects the project's authoring contract. Click it to jump to **Project Settings ▸ Project ▸ Layout Mode**, where you can switch (with a one-shot migrator preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for what the two modes actually mean.
 
-When you've made changes that haven't been saved yet, an amber **● Unsaved** pill appears immediately to the right of the layout pill — a friendly nudge so you don't have to glance down at the Save button to know where you stand.
+When you've made changes that haven't been saved yet, an amber **● Unsaved** pill appears immediately to the right of the layout pill — a friendly nudge so you don't have to glance down at the Save button to know where you stand. This pill is the one place that says so; next to the **Save** button you only see **Saving…** while a save is running, or a message if a save didn't work.
 
 The right side of the same row holds:
 
@@ -407,10 +409,10 @@ On a narrow window these buttons wrap onto a line of their own below the title, 
 | **📁 Projects** | Single button (folder icon). Click to drop down the current project, your most recent projects, and **Browse all projects…** (which opens the full Project Browser). Dropdown is for *switching* — creation lives on the + New button next door. |
 | **+ New** | Direct create-project entry. Opens a compact picker with four cards (Empty project / Build from a prompt / Co-write with AI / Start from a template). Guarded by an unsaved-changes prompt so you don't lose work in flight. |
 | **Undo/Redo** | Fix mistakes (Ctrl/Cmd+Z works too!) |
-| **Save** | Save your project (green button) |
+| **Save** | Save your project. The button turns green and reads **Saved** right after a save |
 | **Open** | Dropdown: open ASAPS project files (`.asaps` / `.asapst` / zip — added to your projects and opened), merge a story into the current project, or *import from other formats* (ASML XML, Twine HTML — genuine conversions) |
 | **Export** | Dropdown, organised by what the recipient does: **Publish for players** (a playable standalone HTML story), **Share for editing** (the complete project as one `.asaps` file — ASML 2.0, JSON, native — or a template `.asapst`), and a **Legacy** group for ASML 1.0 XML (frozen serialization; newer features are not included) |
-| **Tools** | Dropdown: App Preferences… (settings for this computer, light or dark and the reading font among them), Change with AI, Merge DialogTrees, Recently deleted beats… |
+| **Tools** | Dropdown: App Preferences… (settings for this computer, light or dark and the reading font among them), User Guide (opens this guide in your browser), Change with AI, Merge DialogTrees, Recently deleted beats… |
 
 | Right Side | What it Does |
 |------------|--------------|
@@ -420,7 +422,9 @@ On a narrow window these buttons wrap onto a line of their own below the title, 
 | **Assets** | Manage images, sounds, videos, fonts |
 | **Project Settings** | Everything that travels with this project — stage, fonts, colours, HUDs (⌘/Ctrl+,). Where this guide says **Project Settings ▸ …**, it means this window — see [Project Settings](#global-settings) |
 | **Debug** | Testing and troubleshooting tools |
-| **Preview** | Test your system (green button) |
+| **Preview** | Test your system (green button; it reads **Preview Open** while the Preview Window is open) |
+
+Only **Save** and **Preview** are filled with colour. The other buttons on the right are plain white with a small coloured icon, so look for their names.
 
 <a id="dark-mode"></a>
 **Light or dark.** Prefer a dark screen, or working late? Open **Tools → App Preferences…** and pick **Appearance: Light**, **Dark** or **As the system** (which follows your computer's own setting, also when it changes during the day). Every open ASAPS window switches at once, the Preview included. Your story keeps its own colours: the stage in the Visual Editor and in the Preview looks the same in both modes, so what you see is what your players get. Appearance is a setting of this computer, not of the project.
@@ -446,7 +450,7 @@ This is your system's table of contents. Every beat you create appears here.
 **Key Features:**
 - **Search Box** - Filter beats by name (useful when you have dozens!)
 - **Add Cluster** - Organize related beats into folders
-- **Beat List** - All your beats, draggable for reordering
+- **Beat List** - All your beats, draggable for reordering. Under each beat's name is its type in plain words (*Info Text*, *Dialog Tree*); search results add the beat's id (*Info Text · beat_1*)
 - **Fold it away** - The **‹** button next to *Story Beats* folds the panel into a narrow strip of beat icons, so the flowchart gets the room. Click an icon to select that beat, or **›** to unfold the panel again
 
 **Pro Tip:** Drag beats into clusters to keep things organized. A mystery might have clusters for "Act 1," "Investigation Scenes," "Suspect Interrogations," and "Endings."
@@ -479,6 +483,9 @@ See your entire system structure as a graph. Beats appear as boxes, connections 
 **Where does this beat lead?** In a busy flowchart, rest the pointer on a beat: its outgoing links are drawn thicker, on top, with bold labels, and every other link fades. Move the pointer away and everything goes back. Only the drawing changes, nothing in your story. (To see the links coming *in* to a beat, look at **Reached from** in the [Properties panel](#reached-from).)
 
 **Who plays a role.** A beat that decides who plays a [role](#roles) — a Choose Your Character beat, or a choice with a **Cast Role** effect — carries a small **🎭 @role** badge (for example *🎭 @confidant*), so you can see at a glance where the story casts its people.
+
+<a id="flowchart-start-mark"></a>
+**Where the story starts.** Each box shows the beat's name and, under it, its type in plain words (*Title Screen*, *Multi Choice*). The beat your story starts at carries a green **▶ Start** tab on its top-left corner. To start somewhere else, right-click a beat and choose **Start the story here**; on the start beat itself the menu says *The story starts here*. It is the same setting as **Story starts at** in [Project Settings ▸ Project](#global-settings), it applies to the Preview and to exported stories, and it is one Undo step.
 
 The small count strip above the canvas (**Beats · Clusters · Connections**) counts exactly these arrows: one per pair of beats that are linked, restart links included.
 
@@ -591,6 +598,8 @@ When you select a beat, the Inspector shows everything about it:
 
 The Inspector changes based on what you've selected. Select a Dialog Tree and you'll see choice options. Select a Video Beat and you'll see playback settings.
 
+Right under the **Properties** heading is the beat's type in plain words and its id, for example *Info Text · beat_1*. The id is what links, QR codes and the Debug tools call the beat; you rarely need to type it.
+
 <a id="reached-from"></a>
 **Reached from: the way in.** Under the beat's type and ID, **Reached from:** lists every beat that links here, one button each, with the link's words next to it (a choice's text, or *auto-advance* for a timer). Click a button to jump to that beat and edit the link there. A beat reached from many places shows six and a **+N more** button for the rest; a beat nothing links to yet says *no links yet*. Unless it's your story's first beat, that is a quick way to spot a scene players can't reach.
 
@@ -614,7 +623,7 @@ The Inspector changes based on what you've selected. Select a Dialog Tree and yo
 
 The change is **one Undo step**. The notice that confirms it (*"Hallway 3" is now Multi Choice · Undo*) also names anything the new type couldn't keep: the other choices when a choice beat becomes a text beat, the deeper part of a conversation, the Visual Editor layout when the kind of beat changes, or settings the new type doesn't have (only ones you had actually set). If you don't like what you see, Undo brings it all back.
 
-Many fields carry a short grey note underneath that says what the setting does, and some empty text fields show an example of what to type. When a setting is new to you, that note is a good first stop.
+Many fields carry a short grey note underneath that says what the setting does, and some empty text fields show an example of what to type. When a setting is new to you, that note is a good first stop. (Since v0.9.158 most of these notes are written in plain words for authors, so some read differently than before.)
 
 **Preview as.** When the selected beat refers to a [role](#roles) — a speaker such as *@ The confidant*, or text like `${@confidant.name}` — a small **Preview as** bar appears at the top of the Inspector with one picker per role. It only changes what the Visual Editor shows while you write (and who the Preview starts with); the story itself is untouched.
 
@@ -955,7 +964,7 @@ Changed your mind about a clickable picture? Untick **Clickable** and it's an or
 
 **Where the buttons lead (Properties panel).** Under **Buttons**, the Properties panel lists every button on the stage, named by its words (a clickable picture by its name). Each one has the same editors as a Multi Choice choice: where it **leads to** (the [searchable beat picker](#beat-picker)), **Show only if…** conditions (a button whose conditions don't match isn't shown — see [Earned options](#conditional-choices)) and **Effects**. (Its sound is the **Click Sound** you set in the Visual Editor.) You can also [draw the links in the flowchart](#drawing-links). Add or delete a button in the Visual Editor and the list follows at once. A button that isn't linked yet behaves like any [choice that isn't linked yet](#unlinked-choices): clicking it does nothing, and the screen stays up.
 
-**Timers and "click anywhere".** A Free Layout has no timer of its own; it uses the same **Auto-Advance Settings** as other beats (under **Show Advanced Options**): a **Default Target Beat**, the **Auto-Advance Delay**, **Show countdown timer to player**, and the countdown meter. If the screen has no buttons and no timer, a click anywhere moves on to the beat chosen in **Next (click anywhere), go to** — handy for a full-screen picture or a chapter card.
+**Timers and "click anywhere".** A Free Layout has no timer of its own; it uses the same **Auto-Advance Settings** as other beats (under **Show Advanced Options**): a **Default Target Beat**, the **Auto-Advance Delay**, **Show countdown timer to player**, and, when the project's Countdown Meter is on, **Hide / Show countdown meter**. If the screen has no buttons and no timer, a click anywhere moves on to the beat chosen in **Next (click anywhere), go to** — handy for a full-screen picture or a chapter card.
 
 **Second visits.** **Block and dim visited choices** dims buttons the player already picked, and **Effects fire only on first pick** lets a button's effects count only the first time — the same pair as on Multi Choice (see [What happens on a second visit?](#revisit-policy)). **Explain HUDs on entry** works as on other beats.
 
@@ -3358,6 +3367,8 @@ The Preview Window is your primary tool for testing your interactive narrative. 
 2. The Preview Window opens as a separate window
 3. Choose where to start — **From the beginning**, or **From "‹beat›"** (the beat currently selected in the editor; the arrow next to it lets you pick any beat) — then click the stage to begin
 
+Until you start, the status at the bottom right of the window reads *Ready to play from the beginning* or *Ready to play from "‹beat›"*, and the amber **Start Preview** button waits in the toolbar. When you're starting mid-story, a grey **From the beginning instead** button sits beside it: one click and the Preview goes back to the usual start. Once the story runs, the same status names the beat on screen and its type in plain words, for example *The greeting (Dialog Tree)*.
+
 **Pro Tip:** Starting mid-story is a first-class mode, not a guess: while **From "‹beat›"** is active, selecting a different beat in the flowchart re-arms the preview live, and a **Start as if…** picker appears so you can begin with the state a player would really have at that point (see [Path-Based State Presets](#path-based-state-presets)).
 
 ![Preview Running](images/09-preview-running.png)
@@ -3438,7 +3449,7 @@ When previewing from a beat other than the start, ASAPS Modern intelligently ana
 
 **InputText Beats in Paths:**
 
-When a path includes **inputText** beats (where the interactor types input), ASAPS Modern prompts you to enter values:
+When a path includes **Input Text** beats (where the interactor types input), ASAPS Modern prompts you to enter values:
 
 ![InputText Values Modal](images/11-inputtext-modal.png)
 *Modal for entering values that would have been typed by the interactor*
@@ -4227,9 +4238,11 @@ Use sprite sheets for frame-by-frame animation:
 ![Project Settings, on the Project tab: "Story starts at" at the top, then the stage and layout settings](images/02-settings-panel.png)
 *The Settings panel*
 
-Open it with the **Project Settings** button (⌘/Ctrl+,). The tabs along the top group the settings by what they do: **Project**, **Look**, **Dialogue**, **Screen panels**, **Sound**, **Languages & culture** and **About**. One more tab, **Location & AR**, shows up only when your story uses location (see below). The window reopens on the tab you used last, and nothing changes in your project until you click **Save Settings**.
+Open it with the **Project Settings** button (⌘/Ctrl+,). The tabs along the top group the settings by what they do: **Project**, **Look**, **Dialogue**, **Screen panels**, **Sound**, **Languages & culture** and **About**. One more tab, **Location & AR**, shows up only when your story uses location (see below). The window reopens on the tab you used last, each tab (and each section of **Look**) starts at its top when you switch to it, and nothing changes in your project until you click **Save Settings**.
 
 Two things that used to be tabs here now have a home of their own, because you come back to them while you write: variables are in [Story Data ▸ Variables](#story-data), and roles are in [Characters ▸ Roles](#roles).
+
+**Learn more.** A few places carry a small **Learn more** link that opens this guide in your browser at the section you need: Speaker Display, speech bubbles and Message history on the **Dialogue** tab, the **Story Data** window, and **Characters ▸ Roles**. The guide is online, so the link needs an internet connection.
 
 **Project Settings ▸ Project:**
 - **Story starts at** — the beat your story opens on, in the Preview and in exported stories. Left at *The first beat (automatic)*, ASAPS picks the start itself (a Title Screen if you have one). The HTML export's **Start beat** picker starts from this beat when you've set one, and from the Title Screen otherwise; you can still begin a single export somewhere else. On the flowchart the start carries a green **▶ Start** tab; right-click another beat and choose **Start the story here** to move it.
@@ -4472,6 +4485,8 @@ Fictional time tracks an in-story date and time that's independent of real-world
 
 <a id="per-beat-time-display"></a>
 **Changing the clock on one beat.** A beat can show something else in the Timer HUD, or nothing at all: open **Show Advanced Options** in the Inspector and pick its **Time Display** — *Fictional Time (default)*, *Manual text* (for example *Meanwhile…* or *2h later*), or *None (hide on this beat)*. On the beat types that can auto-advance (Title Screen, Info Text, Dialog Tree, Movement Choice, Pick Prop, Hyper Text, Input Text, Video) it sits in the **Auto-Advance Settings** section; **End Screens** and **Multiple Choice** beats have it on its own. Hiding the clock is handy for a flashback, a dream, an ending set the next morning, or a line of text that names a different time than the clock would show.
+
+**Not seeing Time Display?** A beat's **Time Display** is offered only while the project's Timer is on (**Project Settings ▸ Screen panels ▸ Timer / Time Display**). In the same way, **Hide countdown meter** (or **Show countdown meter**, when the meter is hidden by default) appears under **Show Advanced Options** only while the **Countdown Meter** is on. A beat that already has one of these set keeps showing it, so nothing you set goes out of reach.
 
 **Fictional-time HUD in the Visual Editor (v0.9.59).** When all three switches line up — **Project Settings ▸ Screen panels ▸ Timer / Time Display** *Enabled*, **Project Settings ▸ Screen panels ▸ Fictional Time** *Enabled*, and that section's **Show in Timer HUD** option turned on — the Visual Editor's slot/spatial preview now renders the chip too, in the configured corner and at the configured `displayFormat` (e.g., a green *"1 January 2024, 9:00 AM"* chip at top-right). So you can see WHERE the chip will sit and HOW the initial time renders without leaving the editor. The chip stays hidden in the VE when any of those switches is off.
 
@@ -4879,6 +4894,7 @@ Create localized versions of your story with AI-assisted translation:
 Bulk operations accessible from the **Tools** dropdown in the header:
 
 - **App Preferences…** - Settings for this computer: [light or dark](#dark-mode), a [reading font](#reading-font) for the builder, AI and voice providers, keys, updates, Claude Desktop, and the [Show AI features / Beat suggestions](#working-without-ai) switches
+- **User Guide** - Opens this guide in your browser
 - **Change with AI** - Opens the Change tab of [Find & Change](#find-and-change) (also Ctrl/Cmd+Shift+F; hidden when Show AI features is off)
 - **Merge DialogTrees** - Combine multiple DialogTree beats into a nested conversation
 - **Recently deleted beats…** - Bring back beats deleted in the last 30 days (see [Recently deleted beats](#recently-deleted-beats))

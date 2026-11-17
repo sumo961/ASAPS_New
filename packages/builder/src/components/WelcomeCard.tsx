@@ -46,7 +46,7 @@ export const WelcomeCard: React.FC<Props> = ({ onDismiss, onBrowseStarts }) => (
         Got it
       </button>
       <button onClick={onBrowseStarts} className="px-3 py-1.5 border border-gray-300 text-sm text-gray-700 rounded-lg hover:bg-gray-50">
-        Start from a template…
+        Templates and other starts…
       </button>
       <GuideLink>User Guide</GuideLink>
     </div>

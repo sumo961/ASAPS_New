@@ -1,9 +1,9 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.157, 2026-11-17)
+## 2026-11-17: The tidy-up release: regrouped settings, Story Data, plain-language hints (v0.9.158)
 
 ### Overview
-First changes from the UX review of 2026-11-16 (the app walked through as a new user, in the browser and in Electron): the New / Browse loop on a fresh starter story, Project Settings regrouped by what a setting does, roles moved to the Characters window, and a Story Data window for variables and counters.
+The changes from the UX review of 2026-11-16 (the app walked through as a new user, in the browser and in Electron). Field hints for authors, links into the User Guide, plain beat-type names, a start marker on the flowchart, a first-run welcome and a calmer toolbar followed in the same release. In order of work: the New / Browse loop on a fresh starter story, Project Settings regrouped by what a setting does, roles moved to the Characters window, and a Story Data window for variables and counters.
 
 ### Fixed: New and Browse all projects on a fresh starter story
 - **No prompt on an untouched starter.** The starter story gained a third link (End → Restart) and the "is this still the untouched starter?" check allowed two, so **New** and **Browse all projects** asked to save a story nobody had written.
@@ -78,9 +78,12 @@ The Properties panel shows a field's `ui.help` and falls back to its `descriptio
 ### Changed: a calmer toolbar, a first-run welcome, plainer templates and Preview start
 - **Toolbar:** Find & Change, Characters, Story Data, Assets, Project Settings and Debug are plain buttons with a coloured icon (they were six filled buttons in five colours); Save and Preview keep their colour. The row fits on one line at 1700 px.
 - **"Unsaved" once:** the pill by the title says it; the second "Unsaved changes" label beside Save is gone (Saving… and errors still show there).
-- **Welcome card:** shown once over the untouched starter story: what a beat is, click a beat to edit, drag a beat type and link, Preview; with "Start from a template…" and a User Guide link. "Got it" is remembered on the computer (`asaps_welcome_seen`).
+- **Welcome card:** shown once over the untouched starter story: what a beat is, click a beat to edit, drag a beat type and link, Preview; with "Templates and other starts…" (opens the New project picker) and a User Guide link. "Got it" is remembered on the computer (`asaps_welcome_seen`).
 - **Template gallery:** "What this shows" became "Good for learning", and the six notes say what a template teaches without feature names ("How to let the player choose who they are…"). The suggested name for a copy is "The Last Ferry (my version)" (was "My The Last Ferry — choose your character").
 - **Preview start bar:** "Ready to play from the beginning" (was "Ready to preview: Unknown"); the Cancel button appears only for a mid-story start and says "From the beginning instead"; the redundant "Ready" pill is gone; beat types are named in plain words. The click on the stage to start stays: it is what lets the window play sound.
+- **Beat picker and Preview debug line** name beat types in plain words too ("Title (Title Screen)"); searching the picker still finds a beat by its code name.
+- **Release checks (v0.9.158):** The Last Ferry played from title to an ending in a Preview (7 beats); exported as one HTML file with AI off while a middle beat was selected, it started at the title and played to an ending at 1100×640 with no button outside the window. No renderer or player source changed in this release, so there was no device-preset sweep; the web player bundle was rebuilt with the current core.
+- **User Guide release audit:** 19 edits for the welcome card, toolbar, Tools ▸ User Guide, plain type names, the Preview start bar, the ▶ Start tab (`#flowchart-start-mark`) and when Time Display is offered. Screenshots still showing the old look, for a later pass: 05, 07, 08, 09, 10, 44, 48, 73, 97, 98, 104, 107.
 - Left as it is: the palette's "Single Choice" heading (the guide's own term for beats with one way on).
 - **Files:** `packages/builder/src/components/{Header,SaveStatus,WelcomeCard,TemplateGallery}.tsx`, `App.tsx`, `pages/PreviewWindow.tsx`, `public/templates/index.json`, `beat-definitions/core-beats.json`
 

@@ -21,7 +21,7 @@ describe('beatMatches', () => {
 describe('BeatPicker', () => {
   it('shows the picked beat with its type, so two beats with one name can be told apart', () => {
     render(<BeatPicker value="b2" onChange={() => {}} beats={beats} emptyLabel="Select target beat..." />);
-    expect(screen.getByRole('combobox').textContent).toBe('Hallway 3 (multiChoice)');
+    expect(screen.getByRole('combobox').textContent).toBe('Hallway 3 (Multi Choice)');
   });
 
   it('narrows the list as you type and picks with Enter', () => {
@@ -30,7 +30,7 @@ describe('BeatPicker', () => {
     fireEvent.click(screen.getByRole('combobox'));
     const search = screen.getByLabelText('Search beats');
     fireEvent.change(search, { target: { value: 'cafe' } });
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Cafeteria' + 'dialogTree']);
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Cafeteria' + 'Dialog Tree']);
     fireEvent.keyDown(search, { key: 'Enter' });
     expect(onChange).toHaveBeenCalledWith('b3');
     expect(screen.queryByLabelText('Search beats')).toBeNull();

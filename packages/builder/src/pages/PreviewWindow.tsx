@@ -3527,7 +3527,7 @@ export const PreviewWindow: React.FC = () => {
                 <div className="bg-white p-3 rounded-lg">
                   <div className="text-sm font-medium text-gray-600">Current Beat</div>
                   <div className="font-semibold">{currentBeat.name}</div>
-                  <div className="text-xs text-gray-500">{currentBeat.type} • {currentBeat.id}</div>
+                  <div className="text-xs text-gray-500">{beatTypeLabel(currentBeat.type)} · {currentBeat.id}</div>
                 </div>
 
                 {/* Character Affect (Step 4 Phase 2) — current mood + top

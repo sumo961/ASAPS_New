@@ -22,8 +22,21 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.157** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.157 is the speech-bubble release**:
+Current release: **v0.9.158** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.158 is the tidy-up release**, made
+after walking through the app as a new user. Project Settings has seven tabs
+grouped by what a setting does (Project, Look, Dialogue, Screen panels, Sound,
+Languages & culture, About). Roles are set up in the Characters window. A new
+**Story Data** window lists the story's variables and counters with the beats
+that set, test and show each one. 268 field hints are rewritten in plain
+words, beat types are named as in the palette ("Info Text", not `infoText`),
+and "Learn more" links open the User Guide at the right section. The
+flowchart marks where the story starts, a welcome card greets first-time
+users, the toolbar is calmer, and New and Browse no longer loop on a fresh
+starter story. The HTML export starts at the title screen unless you set
+another start.
+
+**v0.9.157 was the speech-bubble release**:
 characters who aren't speaking can be dimmed, as in visual novels, and a
 character's lines can appear as comic speech bubbles pointing at them, with
 the line before kept up beside it and inner voices thinking in clouds. A

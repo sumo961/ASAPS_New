@@ -11,6 +11,7 @@
  * The list is drawn in a portal so the Inspector's scrolling panel can't
  * clip it.
  */
+import { beatTypeLabel } from '../../utils/changeBeatType';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -55,7 +56,7 @@ function remember(id: string) {
 export function beatMatches(beat: BeatPickerBeat, query: string): boolean {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return true;
-  const hay = `${beat.name ?? ''} ${beat.id} ${beat.type ?? ''}`.toLowerCase();
+  const hay = `${beat.name ?? ''} ${beat.id} ${beat.type ?? ''} ${beat.type ? beatTypeLabel(beat.type) : ''}`.toLowerCase();
   return words.every((w) => hay.includes(w));
 }
 
@@ -240,7 +241,7 @@ export const BeatPicker: React.FC<Props> = ({
                 {r.kind === 'beat' ? (
                   <>
                     <span className="truncate text-gray-900">{r.beat.name || r.beat.id}</span>
-                    <span className="ml-auto flex-shrink-0 text-xs text-gray-400">{detail === 'id' ? r.beat.id : r.beat.type}</span>
+                    <span className="ml-auto flex-shrink-0 text-xs text-gray-400">{detail === 'id' ? r.beat.id : (r.beat.type ? beatTypeLabel(r.beat.type) : '')}</span>
                   </>
                 ) : (
                   <span className="truncate text-gray-600 italic">{r.label}</span>
@@ -257,6 +258,6 @@ export const BeatPicker: React.FC<Props> = ({
 };
 
 function beatLabel(b: BeatPickerBeat, detail: 'type' | 'id') {
-  const d = detail === 'id' ? b.id : b.type;
+  const d = detail === 'id' ? b.id : (b.type ? beatTypeLabel(b.type) : b.type);
   return b.name ? (d ? `${b.name} (${d})` : b.name) : b.id;
 }
