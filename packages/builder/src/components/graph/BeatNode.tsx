@@ -7,6 +7,8 @@ import { dialogTreePhaseCount } from '../../utils/dialogTreePhases';
 import { beatTypeIcons, DEFAULT_BEAT_ICON } from './graphStyle';
 import { beatCastRoles } from '../../utils/roleFindings';
 import { useIsDark } from '../../utils/appearance';
+import { useStoryStart } from '../../contexts/StoryStartContext';
+import { beatTypeLabel } from '../../utils/changeBeatType';
 
 interface BeatNodeData {
   beat: Beat;
@@ -48,6 +50,7 @@ const truncateTitle = (title: string, maxLength: number = MAX_TITLE_LENGTH): str
 };
 
 export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
+  const isStoryStart = useStoryStart().startBeatId === data.beat.id;
   // B1b — the ▸ trigger on collapsed dialogTree nodes. The expanded form is
   // a separate dialogContainer node with real child nodes (cluster-style);
   // this component never renders the internals itself.
@@ -170,6 +173,15 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
           ⏏
         </button>
       )}
+      {isStoryStart && (
+        <div
+          className="absolute -top-5 left-0 px-1.5 rounded-t bg-green-600 text-white text-[10px] leading-4 font-medium"
+          title="The story starts here (right-click another beat to start there)"
+          data-testid="story-start-mark"
+        >
+          ▶ Start
+        </div>
+      )}
       {/* Broken-link mark. Sits above the node's own corner rather than inside
           the label, so it survives the title being truncated. */}
       {data.brokenTarget && (
@@ -208,13 +220,13 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
             ▸
           </button>
         )}
-        <span className="text-lg" title={data.type}>{icon}</span>
+        <span className="text-lg" title={beatTypeLabel(data.type)}>{icon}</span>
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-sm text-gray-800 truncate">
             {displayLabel}
           </div>
           <div className="text-xs text-gray-500">
-            {data.type || 'unknown'}
+            {data.type ? beatTypeLabel(data.type) : 'unknown'}
           </div>
         </div>
       </div>

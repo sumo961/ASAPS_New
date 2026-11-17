@@ -55,6 +55,7 @@ import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { getAIValidator } from './services/AIValidator';
 import { useSave, useProject, usePersistence } from './contexts/PersistenceContext';
 import { RolesProvider } from './contexts/RolesContext';
+import { StoryStartContext, resolveStoryStart } from './contexts/StoryStartContext';
 import { ProjectAssetsProvider } from './contexts/ProjectAssetsContext';
 import { Character } from './types/character';
 import type { Asset } from './components/assets/AssetManager';
@@ -5760,6 +5761,25 @@ function App() {
     ));
   }, [globalSettings, applyGlobalSettingsChange]);
 
+  // Where the story starts, for the flowchart's marker and its
+  // "Start the story here" menu item.
+  const storyStartBeatId = useMemo(
+    () => resolveStoryStart(state.beats, globalSettings?.debug?.firstbeat),
+    [state.beats, globalSettings?.debug?.firstbeat],
+  );
+  // The value changes only when the start does: every beat on the
+  // flowchart reads it, and typing in a beat must not redraw them all.
+  const applyEditedSettingsRef = useRef(applyEditedSettings);
+  applyEditedSettingsRef.current = applyEditedSettings;
+  const storyStart = useMemo(() => ({
+    startBeatId: storyStartBeatId,
+    setStartBeat: (beatId: string) => {
+      const old = globalSettingsRef.current;
+      if (!old) return;
+      applyEditedSettingsRef.current({ ...old, debug: { ...old.debug, firstbeat: beatId } } as GlobalSettings, 'Set where the story starts');
+    },
+  }), [storyStartBeatId]);
+
   // Cast roles are edited in the Characters window (they are a statement
   // about characters); they stay in the project's settings.
   const handleProjectRolesChange = useCallback((roles: NonNullable<GlobalSettings['roles']>) => {
@@ -7202,6 +7222,7 @@ function App() {
   }, [markChanged]);
 
   return (
+    <StoryStartContext.Provider value={storyStart}>
     <RolesProvider roles={(globalSettings as any)?.roles} previewCasting={rolePreviewCasting} onPreviewCastingChange={setRolePreviewCasting}>
     <ProjectAssetsProvider assets={assets} onAssetAdd={handleAssetAdd}>
     <div className="flex flex-col h-screen bg-gray-50">
@@ -7986,6 +8007,7 @@ function App() {
     </div>
     </ProjectAssetsProvider>
     </RolesProvider>
+    </StoryStartContext.Provider>
   );
 }
 

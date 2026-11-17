@@ -34,6 +34,7 @@ import { notify } from '../../utils/notify';
 import { LinkOutputMenu } from './LinkOutputMenu';
 import { usePersistedState } from '../../utils/persistedState';
 import { useIsDark } from '../../utils/appearance';
+import { useStoryStart } from '../../contexts/StoryStartContext';
 
 // Asset type for looking up URLs
 interface Asset {
@@ -186,6 +187,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   const vcsActive = vcs && vcs.initialized && vcs.type !== 'none';
 
   // Context menu state
+  const { startBeatId, setStartBeat } = useStoryStart();
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -1237,6 +1239,23 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
                 <span className="text-gray-500">⌘C</span>
                 <span>Copy</span>
               </button>
+              {setStartBeat && (
+                contextMenu.beatId === startBeatId ? (
+                  <div className="px-4 py-2 text-sm text-gray-400 flex items-center gap-2">
+                    <span className="text-green-600">▶</span>
+                    <span>The story starts here</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setStartBeat(contextMenu.beatId!); closeContextMenu(); }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                    title="The Preview and exported stories begin at this beat"
+                  >
+                    <span className="text-green-600">▶</span>
+                    <span>Start the story here</span>
+                  </button>
+                )
+              )}
               {/* VCS actions */}
               {vcsActive && contextMenu.beatId && (
                 <>

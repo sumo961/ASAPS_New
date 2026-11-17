@@ -67,6 +67,13 @@ The Properties panel shows a field's `ui.help` and falls back to its `descriptio
 - **Advanced Options** offers a beat's Time Display only when the project's Timer is on, and "Hide / Show countdown meter" only when the Countdown Meter is on (Project Settings ▸ Screen panels). A beat that already carries one of these still shows it.
 - **Files:** `packages/builder/src/components/{Inspector,Sidebar}.tsx`
 
+### New: the start is marked on the flowchart
+- The beat the story starts at carries a green **▶ Start** tab. Right-click a beat ▸ **Start the story here** sets it (the same value as Project Settings ▸ Project ▸ "Story starts at"), as one Undo step.
+- Flowchart nodes name their type in plain words too ("Title Screen", not `titleScreen`).
+- The start is shared through `StoryStartContext`, whose value changes only when the start does, so typing in a beat doesn't redraw the nodes.
+- Checked in the browser: the tab moves from Title to the chosen beat and back on Undo.
+- **Files:** `packages/builder/src/contexts/StoryStartContext.tsx`, `components/graph/{BeatNode,GraphEditor}.tsx`, `App.tsx`
+
 ---
 
 ## 2026-11-16: Speech bubbles and dimmed characters (v0.9.157)
