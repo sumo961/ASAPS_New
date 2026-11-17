@@ -273,7 +273,7 @@ The blue **+ New** button sits between **📁 Projects** and **Undo/Redo** in th
 
 The picker deliberately does *not* include an Import card — importing a zip isn't a "new project" flow conceptually; it lives on the Browser and in the toolbar's **Open** dropdown.
 
-If the current project has unsaved changes when you click **+ New**, nothing is lost: a named project is simply saved before the picker opens, and an untitled one asks whether to **Save**, **Discard** or **Cancel** first.
+If the current project has unsaved changes when you click **+ New**, nothing is lost: a named project is simply saved before the picker opens, and an untitled one you've worked in opens the **Unsaved Changes** dialog, which asks whether to **Save to Project**, **Discard** or **Cancel** first. After **Discard**, the picker opens, just as you asked. A starter story you haven't touched has nothing to keep, so the picker opens straight away. **Browse all projects…** in the 📁 Projects dropdown works the same way: straight to your projects from an untouched starter, and on to them after **Discard**.
 
 ### Starting a new project — five ways in
 
@@ -364,7 +364,7 @@ The interactor never sees logic beats directly, but they're what make your syste
 
 Your system has memory, called **state**. This includes:
 
-- **Variables** - Named values — true/false flags (hasKey, metWizard), numbers or text — each starting at the default value you give it
+- **Variables** - Named values — true/false flags (hasKey, metWizard), numbers or text — each starting at the value you give it in [Story Data](#story-data)
 - **Counters** - Numbers (gold, health, reputation)
 - **Inventory** - Items characters carry
 - **History** - Which beats have been visited
@@ -384,7 +384,7 @@ Let's take a tour of your system-building workspace. Don't worry about memorizin
 The header spans the top of the screen in two rows. (It used to take three; since v0.9.146 the AI, version-control, voice, speech-input and language buttons share the title row, which leaves more of the screen for your story.)
 
 **Row 1 -- Title, AI, Voices and Language:**
-The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.64.115), and a large text field where you can type or edit your project's title directly. Next to the title you'll see a small **layout-mode pill** — green *Responsive layout* or amber *Fixed canvas* — that reflects the project's authoring contract. Click it to jump to **Settings → Project → Layout Mode**, where you can switch (with a one-shot migrator preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for what the two modes actually mean.
+The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.64.115), and a large text field where you can type or edit your project's title directly. Next to the title you'll see a small **layout-mode pill** — green *Responsive layout* or amber *Fixed canvas* — that reflects the project's authoring contract. Click it to jump to **Project Settings ▸ Project ▸ Layout Mode**, where you can switch (with a one-shot migrator preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for what the two modes actually mean.
 
 When you've made changes that haven't been saved yet, an amber **● Unsaved** pill appears immediately to the right of the layout pill — a friendly nudge so you don't have to glance down at the Save button to know where you stand.
 
@@ -415,9 +415,10 @@ On a narrow window these buttons wrap onto a line of their own below the title, 
 | Right Side | What it Does |
 |------------|--------------|
 | **Find & Change** | Find & replace, and AI bulk changes (slate button, Ctrl/Cmd+F) — see [Find & Change](#find-and-change) |
-| **Characters** | Create and manage your cast, and the story's list of [items](#project-items) (blue button) |
+| **Characters** | Create and manage your cast, the story's list of [items](#project-items) and its [roles](#roles) (blue button) |
+| **Story Data** | The story's variables and counters, and the beats that set and test them (indigo button) — see [Story Data](#story-data) |
 | **Assets** | Manage images, sounds, videos, fonts (orange button) |
-| **Project Settings** | Everything that travels with this project — stage, fonts, colours, HUDs (purple button, ⌘/Ctrl+,). Where this guide says **Settings → …**, it means this panel |
+| **Project Settings** | Everything that travels with this project — stage, fonts, colours, HUDs (purple button, ⌘/Ctrl+,). Where this guide says **Project Settings ▸ …**, it means this window — see [Project Settings](#global-settings) |
 | **Debug** | Testing and troubleshooting tools (gray button) |
 | **Preview** | Test your system (green button) |
 
@@ -436,7 +437,7 @@ On a narrow window these buttons wrap onto a line of their own below the title, 
 | **Atkinson Hyperlegible** | Letters hard to confuse: I, l, 1, O, 0. |
 | **OpenDyslexic** | Weighted bottoms keep b, d, p, q apart. |
 
-Research hasn't found one font that's best for every reader with dyslexia — people differ — so try them and keep the one that feels easiest, or go back to **Standard**. Like Appearance, it's a setting of this computer, and every open ASAPS window follows it at once. It doesn't change your story: the stage in the Visual Editor and in the Preview keeps the story's fonts. To give your *players* one of these fonts, choose it in [Settings → Fonts](#story-fonts).
+Research hasn't found one font that's best for every reader with dyslexia — people differ — so try them and keep the one that feels easiest, or go back to **Standard**. Like Appearance, it's a setting of this computer, and every open ASAPS window follows it at once. It doesn't change your story: the stage in the Visual Editor and in the Preview keeps the story's fonts. To give your *players* one of these fonts, choose it in [Project Settings ▸ Look ▸ Fonts](#story-fonts).
 
 ## The Left Sidebar: Beat List
 
@@ -618,7 +619,7 @@ Many fields carry a short grey note underneath that says what the setting does, 
 **Preview as.** When the selected beat refers to a [role](#roles) — a speaker such as *@ The confidant*, or text like `${@confidant.name}` — a small **Preview as** bar appears at the top of the Inspector with one picker per role. It only changes what the Visual Editor shows while you write (and who the Preview starts with); the story itself is untouched.
 
 <a id="beat-picker"></a>
-**Links are always picked, never typed — and you can search.** Every setting that names another beat — a link's or choice's target, an AI Summary's *Restart at*, a Set Timer's expiry target, a Keypad's *Fail Target Beat*, an AR Scene's *Fallback beat*, an AI Condition's *Fallback Target*, a Dialog Tree line's next line, Hyper Text links, conditions and requirements, **Project Settings → First Beat**, the export's start beat — uses the same searchable beat picker. (Or skip the picker entirely and [draw the link in the flowchart](#drawing-links).)
+**Links are always picked, never typed — and you can search.** Every setting that names another beat — a link's or choice's target, an AI Summary's *Restart at*, a Set Timer's expiry target, a Keypad's *Fail Target Beat*, an AR Scene's *Fallback beat*, an AI Condition's *Fallback Target*, a Dialog Tree line's next line, Hyper Text links, conditions and requirements, **Project Settings ▸ Project ▸ Story starts at**, the export's start beat — uses the same searchable beat picker. (Or skip the picker entirely and [draw the link in the flowchart](#drawing-links).)
 
 - Click the picker (or just start typing on it) and a search field opens. Type a few words: every word has to appear in the beat's name, ID or type, so *hall multi* finds the Multi Choice called *Hallway 3*. Beats with the same name are easy to tell apart, because each row shows the beat's type.
 - **Arrow keys** move through the list, **Enter** picks, **Escape** closes without changing anything.
@@ -921,7 +922,7 @@ A Multi Choice whose buttons are people. Each choice names a character, and pick
 *Each button carries a description line. Everything after this beat follows the pick.*
 
 **Key Settings:**
-- **Role** - Which role the pick fills (from Project Settings → Roles; a new beat starts on the `player` role). Picking a role while the beat has no choices yet fills them in for you. **Add a choice for each character of this role** does the same on demand: one choice per character, labelled with their name and the first sentence of their description; choices you have already edited are kept.
+- **Role** - Which role the pick fills (from [Characters ▸ Roles](#roles); a new beat starts on the `player` role). Picking a role while the beat has no choices yet fills them in for you. **Add a choice for each character of this role** does the same on demand: one choice per character, labelled with their name and the first sentence of their description; choices you have already edited are kept.
 - **Question** - The prompt above the buttons ("Who will you be?")
 - **Choices** - Each with a **character**, a label (leave it empty to show the character's name), a **description**, and a target. Usually every choice goes to the same beat: the story stays one story, and later beats refer to the role. A choice without a target simply goes where the other choices go (only if no choice has a target yet does nothing happen — see [A choice that isn't linked yet](#unlinked-choices)). The Inspector flags a choice that has no character yet. *Show only if…* conditions work as in Multi Choice — a character can unlock on a second playthrough.
 - **Show options as** (in the Visual Editor's left panel, under **Display**) - *Buttons* (the default), *Pictures with names* or *Pictures only*. With pictures, each choice is a card showing the character's portrait (the portrait of their current variant, if it has one), with the name and description under it, or the picture alone. *Pictures only* still gives the name to screen readers and shows it with the description when the pointer rests on a card. Once a picture style is chosen, each choice in the Inspector gets a small picture row showing what the card will use. **Other picture…** there uses any image instead of the portrait, for example a full-figure drawing (the button then reads **Change**); ✕ goes back to the portrait. A character without any picture gets a card with their initial and name.
@@ -1052,7 +1053,7 @@ Embed videos in your story—cutscenes, tutorials, animations, or any video cont
 
 ![Video Beat in the Visual Editor — the Captions checkbox with cue rows (start → end → text) and + Add caption](images/52-video-captions-editor.png)
 
-<!-- TODO screenshot: the "Language versions" rows additionally appear here in projects with target languages configured (Settings → Translation) -->
+<!-- TODO screenshot: the "Language versions" rows additionally appear here in projects with target languages configured (Project Settings ▸ Languages & culture) -->
 
 **When to Use:** Cutscenes, intro sequences, tutorial segments.
 
@@ -1328,7 +1329,7 @@ When the **Reset** toggle is turned on, a set of sub-options appears letting you
 
 | Option | What It Clears |
 |--------|---------------|
-| **Variables** | All story variables — each goes back to its [Project Settings](#global-settings) default |
+| **Variables** | All story variables — each goes back to the starting value it has in [Story Data ▸ Variables](#story-data) |
 | **Counters** | All numeric counters (gold, health, etc.) — the story's and every character's, back to their starting values |
 | **Inventory** | All items held by all characters; the items listed on the characters' Inventory tabs are then handed out again |
 | **Timers** | All active timers |
@@ -1342,9 +1343,9 @@ This is especially useful for "New Game+" experiences where you want interactors
 <a id="keep-across-restarts"></a>
 **Keeping just some things across a restart.** Usually you want a clean reset *except* for one or two things: the character the player chose, an extra they unlocked, a "you've been here before" flag. Turn **Reset** on (an AI Summary's reset is on by default; an End Screen's starts off, so tick it) and mark only those:
 
-- **A story variable** — **Project Settings → Variables**, tick **Keep across restarts** on it. Every other variable goes back to its default value.
+- **A story variable** — [Story Data ▸ Variables](#story-data), tick **Keep across restarts** on it. Every other variable goes back to its starting value.
 - **A character's counter** — Character Editor → **Counters** tab, tick **Keep across restarts** on that counter (next to *Show Level Meter* — it works whether or not the counter is shown).
-- **Who plays a role** — **Project Settings → Roles**, tick **Keep across restarts** on the role. The person the player chose to be stays chosen on replay.
+- **Who plays a role** — [Characters ▸ Roles](#roles), tick **Keep across restarts** on the role. The person the player chose to be stays chosen on replay.
 - **A character's chosen variant** — Character Editor → **Affect** tab → Variants, tick **Keep the chosen variant across restarts** (it appears as soon as the character has a variant). A persona the player picked stays theirs on replay, with that persona's starting feelings.
 
 ![The Variants section of a character with four variants: the "At story start" dropdown set to Pick randomly each playthrough, and below it the "Keep the chosen variant across restarts" checkbox](images/79-keep-variant-across-restarts.png)
@@ -1411,7 +1412,7 @@ Set a variable to true/false or modify a counter value. This is how your story r
 - Set `reputation` to 50 at story start
 
 <a id="typed-variables"></a>
-**True/false and numbers stay what they are.** Give a variable its **Type** in [Project Settings → Variables](#global-settings) and ASAPS keeps to it. A variable declared *true/false* gets a **true / false** picker instead of a text field, here and everywhere else you write or test it: choice conditions, the **Set Variable** choice effect, the [Condition Beat](#condition-beat), and beat [Requirements](#per-beat-requirements). A *number* variable gets a number field in choice conditions. Even a value typed as text — say `5` for a number variable, or `false` for a true/false one — is stored as the declared type, so `hasKey = false` matches a variable that starts out false. *Text* variables hold whatever you type, exactly as written. Counters always count: a **Change Counter** effect of +2 adds two, even in older stories where the amount was saved as text.
+**True/false and numbers stay what they are.** Give a variable its **Type** in [Story Data ▸ Variables](#story-data) and ASAPS keeps to it. A variable declared *true/false* gets a **true / false** picker instead of a text field, here and everywhere else you write or test it: choice conditions, the **Set Variable** choice effect, the [Condition Beat](#condition-beat), and beat [Requirements](#per-beat-requirements). A *number* variable gets a number field in choice conditions. Even a value typed as text — say `5` for a number variable, or `false` for a true/false one — is stored as the declared type, so `hasKey = false` matches a variable that starts out false. *Text* variables hold whatever you type, exactly as written. Counters always count: a **Change Counter** effect of +2 adds two, even in older stories where the amount was saved as text.
 
 **Calculations (v0.9.71+).** Start the value with `=` (spreadsheet convention) and it's evaluated as an arithmetic expression at runtime:
 
@@ -1431,6 +1432,38 @@ If evaluation fails (unknown name, division by zero, syntax error), the raw stri
 **Counters bound to affect state can't be assigned (v0.9.89).** If a counter has been wired to read a character's feelings (see [Counters that read affect](#counter-binding)), it still appears in the counter picker — labelled *"(mirrors affect state)"* — but greyed out, with the reason and the right substitute on hover: *"trust mirrors affect state — change it with an Add Sentiment effect."* Writing to one would simply be overwritten the next time the character reacts to something. Reading it in a Condition Check is untouched and works exactly as before.
 
 **Flow:** Executes instantly, then moves to the target beat.
+
+<a id="story-data"></a>
+#### Story Data: every variable and counter in one place
+
+As a story grows, it gets hard to remember which beat sets `hasKey` and which ones check it. **Story Data** keeps track for you. Click the **Story Data** button in the toolbar (indigo, beside **Characters**). The window has two tabs, **Variables** and **Counters**, each showing how many there are.
+
+**The Variables tab** is your story's list of variables. Click **Add Variable** and fill in:
+
+- **Name** — what you call it in beats, conditions and `${name}` text.
+- **Type** — *Text*, *Number* or *True / false*. The type decides which kind of field you get wherever you set or test the variable; see [True/false and numbers stay what they are](#typed-variables).
+- **Starts as** — the value the variable has when the story begins. It also goes back to this value when an ending's Restart resets variables. (Before v0.9.104 this value was ignored in play and variables started empty; stories that relied on that should check their starting values.)
+- **Description** — a note to yourself about what the variable is for.
+- **Keep across restarts** — the variable keeps its value when the player restarts from an ending; see [Keeping just some things across a restart](#keep-across-restarts).
+
+A name, starting value or description takes effect when you leave the field or press Enter. Every change applies at once and can be undone with Undo. The bin button on the right removes a variable from the list.
+
+You don't have to list a variable before using it: you can also name a new one in a Set Variable beat or a choice's effect. And one variable is built in: **playthrough** counts the runs (1, 2, …); use `${playthrough}` in text or test it in a condition.
+
+**Where each variable is used.** Under every variable you'll find the beats that use it:
+
+- **Set in** — beats that give it a value.
+- **Tested in** — beats that check it in a condition.
+- **Shown in** — beats that show it to the player, for example as `${name}` in text. This line only appears when there is such a beat.
+
+Click a beat's name and the window closes and takes you to that beat. *nowhere yet* after **Set in** or **Tested in** is worth a second look: a variable that is tested but never set, or set but never tested, may be a leftover.
+
+**Used in the story, not listed above.** Below the list, Story Data shows any variable your beats use that isn't in the list. These work as they are and start empty. Click **Add to the list** to give one a type, a starting value or *Keep across restarts*. If you see a name here that you didn't mean to use, it is often a misspelling of one of your listed variables, and its **Set in** and **Tested in** beats show you where to fix it.
+
+**The Counters tab** shows counters in two groups:
+
+- **Story counters** — numbers that belong to the story and not to a character: a score, the days passed. There is nothing to set up. A story counter starts at 0 and exists as soon as a choice's effect or a Set Variable/Counter beat changes it, so this list fills itself as you write. Each counter has its **Set in** and **Tested in** beats.
+- **Characters' counters** — trust, health, courage: the numbers a character carries, grouped by character, each with its starting value and the beats that use it. You can't edit them here; their names, starting values and meters are set on the character. **Edit in Characters** opens the Characters window (see [Character Counters](#character-counters-stats)). A counter that [follows a character's feelings](#counter-binding) says so in place of **Set in**, because it isn't set directly: choices change the feeling it shows.
 
 ---
 
@@ -1850,7 +1883,7 @@ strip**:
 
 The strip only reserves its own height, so on a phone the text starts a few
 lines lower instead of a few paragraphs lower. It is on by default for phones
-only: **General Settings → HUDs → Compact HUD on phones** is set to *Auto —
+only: **Project Settings ▸ Screen panels ▸ Compact HUD on phones** is set to *Auto —
 collapse on phone-sized stages*, and also offers *Always — collapse on every
 stage* (useful to check the strip on a desktop preview) and *Never — always
 show full cards*. A fixed-layout story authored at 1024 px and shrunk onto a
@@ -2007,7 +2040,7 @@ Give your characters a face that appears alongside their dialog. Speaker portrai
 3. Scroll down to **Speaker Portrait**
 4. Upload a portrait image (square or near-square works best)
 
-To enable portraits globally, go to **Settings → Effects → Speaker Display** and check **Show speaker portraits**. You can also choose where portraits appear and how large they are — see [Speaker Display Settings](#speaker-display) for details.
+To enable portraits globally, go to **Project Settings ▸ Dialogue ▸ Speaker Display** and check **Show speaker portraits**. You can also choose where portraits appear and how large they are — see [Speaker Display Settings](#speaker-display) for details.
 
 **Tip:** Portraits are different from character states. States are the full-body images placed on the visual stage; portraits are small face images shown in the text box during dialog.
 
@@ -2078,14 +2111,15 @@ Sometimes the person in a scene depends on what happened earlier: the confidant 
 
 **Variants or roles?** [Variants](#character-affect) are different moods of *one* person: same name, same history. A role is filled by *different* people, each with their own name, portrait, voice, counters and feelings. Trust that Mara builds stays Mara's, even if Jonas plays the confidant later.
 
-**Setting up a role.** Open **Project Settings → Roles** and click **Add Role** (or **Player role** for the protagonist). Give it a **Name** ("The confidant") and, next to it, the short id you'll write in the story under **Referenced as** (type `confidant` to use it as `@confidant`; a new role starts as `role_1`, the Player role as `player`). Add an optional **Description**, tick the characters under **Can be played by**, and choose **Who plays it**:
+**Setting up a role.** Click **Characters** in the toolbar and switch to the **Roles** tab (beside **Characters** and **Items**). Click **Add Role** (or **Player role** for the protagonist). Give it a **Name** ("The confidant") and, next to it, the short id you'll write in the story under **Referenced as** (type `confidant` to use it as `@confidant`; a new role starts as `role_1`, the Player role as `player`). Add an optional **Description**, tick the characters under **Can be played by**, and choose **Who plays it**:
 - **Chosen in the story** — a [Choose Your Character](#choose-your-character) beat or a **Cast Role** effect on a choice decides. Until then the **default** plays it.
 - **Drawn at random at the start** — each playthrough draws one of the characters (rehearsal stories with different people).
 - **Always the default** — handy while the other characters are still unwritten.
 
-**Default (before anyone is chosen)** picks who stands in until the story decides; left at *First of the list*, the first ticked character does. Two checkboxes finish the role: **Can be recast later** allows a second casting to replace the first (otherwise Story Warnings and the review banner flag it), and **Keep across restarts** lets an ending's Restart keep who plays it. Changing the *Referenced as* id updates every beat that uses it when you click **Save Settings** — speakers, AI partners, `${@…}` text, Cast Role effects, choice conditions, Condition Check beats, beat Requirements and Choose Your Character — as one step you can undo.
+**Default (before anyone is chosen)** picks who stands in until the story decides; left at *First of the list*, the first ticked character does. Two checkboxes finish the role: **Can be recast later** allows a second casting to replace the first (otherwise Story Warnings and the review banner flag it), and **Keep across restarts** lets an ending's Restart keep who plays it. Everything you change on this tab applies at once (there is no Save button to click) and can be undone with Undo. The *Referenced as* id takes effect when you leave the field or press Enter. Changing it updates every beat that uses it — speakers, AI partners, `${@…}` text, Cast Role effects, choice conditions, Condition Check beats, beat Requirements and Choose Your Character — as one step you can undo, and a short notice tells you how many beats were updated. If you leave the id empty or type one another role already has, the old id comes back.
 
-![Project Settings → Roles: a role named "The player", referenced as @player, playable by Mara and Jonas, chosen in the story](images/82-project-settings-roles.png)
+![A role named "The player", referenced as @player, playable by Mara and Jonas, chosen in the story. The picture shows the role in its former place in Project Settings.](images/82-project-settings-roles.png)
+*A role's fields. They look the same in Characters ▸ Roles, where roles live now; the picture was taken when they were still a tab of Project Settings.*
 
 **Using a role.** Roles appear as *@ The confidant* in the character pickers: a beat's **Speaker** (below *Narrator* and the player), an AI Conversation's or AI Dialog Tree's **NPC** (every role except `player`), and the character an affect effect such as **Add Sentiment** or **Fire Emotion** is aimed at (listed first). Each Dialog Tree line's speaker picker lists them too. In text, write:
 
@@ -2525,7 +2559,7 @@ Your story shouldn't just read well—it should look amazing. The Visual Editor 
 1. Select a beat in the Flowchart
 2. Click the **Visual Editor** tab
 
-You'll see a stage representing what interactors see—your project's canvas, 1024×768 pixels unless you pick another size under **Settings → Project**. The Preview Window and the exported player use the same canvas.
+You'll see a stage representing what interactors see—your project's canvas, 1024×768 pixels unless you pick another size under **Project Settings ▸ Project**. The Preview Window and the exported player use the same canvas.
 
 <a id="responsive-vs-fixed-layout"></a>
 ## Responsive vs Fixed Layout (v0.9.59)
@@ -2549,14 +2583,14 @@ The **New Project** dialog (**+ New** → *Empty project*, or the **Empty projec
   - **📱 Responsive** — *"Text, buttons, and images flow and adapt to any screen — phone, tablet, or desktop. You guide the layout; the player's device decides the exact placement."* Best for stories played on many devices. The default.
   - **🎯 Static (fixed canvas)** — *"You place every element at exact pixel positions on a fixed stage. What you see in the editor is exactly what the player sees, scaled to fit their screen."* Best for precise, hand-crafted compositions.
 
-  The active card shows a small **✓ selected** marker, and a footnote reminds you that you can switch later in **Settings → Project** — a migrator converts existing beats between the two modes, so this isn't a decision you're locked into.
+  The active card shows a small **✓ selected** marker, and a footnote reminds you that you can switch later in **Project Settings ▸ Project** — a migrator converts existing beats between the two modes, so this isn't a decision you're locked into.
 - **Orientation** — appears only when Layout Mode is *Responsive*. Three options: *Flexible* (adapts to device rotation, default), *Landscape* (locks to landscape — player shows a "rotate your device" overlay otherwise), *Portrait* (locks to portrait the same way). When Layout Mode is *Static (fixed canvas)* the Orientation row collapses, because fixed-canvas projects always render at their authored aspect ratio.
 
-You can change either setting later from **Settings → Project**.
+You can change either setting later from **Project Settings ▸ Project**.
 
 ### Switching mode on an existing project
 
-Click the **layout-mode pill** in the header (green *Responsive layout* or amber *Fixed canvas*) — or open **Settings → Project → Layout Mode** — and pick the other mode. ASAPS runs a one-shot **migrator** with a preview:
+Click the **layout-mode pill** in the header (green *Responsive layout* or amber *Fixed canvas*) — or open **Project Settings ▸ Project ▸ Layout Mode** — and pick the other mode. ASAPS runs a one-shot **migrator** with a preview:
 
 - **Fixed → Responsive** clears baked pixel positions and infers slot intent from them, so beats fall back to schema-driven slot/spatial layout. Best for projects that have only ever used the default layouts.
 - **Responsive → Fixed** bakes the current schema-default positions into explicit pixel `locations[]` entries on each beat, so you can hand-tune them as pixel coordinates.
@@ -2632,7 +2666,7 @@ The layout of choices and dialogs has its own section above (**Layout** or **Dia
 <a id="this-beats-look"></a>
 ### This beat's look
 
-Your project's colours, text box and fonts live in [Project Settings](#global-settings) and apply to every beat. Sometimes one beat should look different: a dream sequence on a dark stage, a letter in a handwriting font, a quiet moment with no box behind the text. Open that beat in the Visual Editor and expand **This beat's look** in the left panel (just above *Transition*). It lets you change, for this beat only:
+Your project's colours, text box and fonts live in [Project Settings](#global-settings), on the **Look** tab, and apply to every beat. Sometimes one beat should look different: a dream sequence on a dark stage, a letter in a handwriting font, a quiet moment with no box behind the text. Open that beat in the Visual Editor and expand **This beat's look** in the left panel (just above *Transition*). It lets you change, for this beat only:
 
 - **Stage colour** and **Text colour**
 - **Spoken lines:** *Speech bubbles on this beat* or *Text box on this beat*, over the project's [Show lines as](#speech-bubbles) choice
@@ -3343,14 +3377,14 @@ The top toolbar provides essential controls:
 | **Mute** | Silence all audio |
 | **Text-to-Speech / Speech-to-Text** | Toggle voice output and voice input for this run (see [TTS](#text-to-speech-tts) and [STT](#speech-to-text-stt)) |
 | **Inventory** | Show/hide inventory panel (Ctrl/Cmd+I) |
-| **Messages** (speech-bubbles icon) | Open the [message history](#message-history) — only there when Project Settings → HUD → Message history is on |
+| **Messages** (speech-bubbles icon) | Open the [message history](#message-history) — only there when Project Settings ▸ Dialogue ▸ Message history is on |
 | **Debug** | Toggle the debug panel (state, variables, visited beats) |
 
 ### Viewport Switcher (v0.9.59)
 
 The **Viewport** dropdown next to the Fit button lets you preview your story at a fixed device preset without resizing the actual browser window. Six options ship out of the box:
 
-- **Fit window** — no override; your project's canvas (Settings → Project) scales to whatever window size you've given the preview pop-out (the default).
+- **Fit window** — no override; your project's canvas (Project Settings ▸ Project) scales to whatever window size you've given the preview pop-out (the default).
 - **Desktop · 1280×800** — landscape desktop reference.
 - **Tablet landscape · 1024×768** and **Tablet portrait · 768×1024**.
 - **Phone landscape · 740×360** and **Phone portrait · 390×740**.
@@ -3364,7 +3398,7 @@ This is particularly useful for **responsive-mode projects**, where the same sto
 
 Location-driven beats — GPS Location, Indoor Location, and the Set GPS Location logic beat — need sensor input that a desktop simply doesn't have. The **Mock Sensors** panel is how you test them without leaving your chair.
 
-When your project has any location settings configured (**Settings → Location & XR** — a story origin, a mock location, or an indoor venue with beacons), the Preview window shows a purple **📍 Mock Sensors** button in its bottom-right corner. Click it to open the **Mock Sensors (XR)** panel:
+When your project has any location settings configured (**Project Settings ▸ Location & AR** — a story origin, a mock location, or an indoor venue with beacons; the tab appears once your story has a location beat), the Preview window shows a purple **📍 Mock Sensors** button in its bottom-right corner. Click it to open the **Mock Sensors (XR)** panel:
 
 - **Position** — latitude/longitude inputs plus N/S/E/W "walk" nudge buttons, so you can type a coordinate or stroll the simulated player around in small steps. GPS Location geofences react immediately, exactly as they would to a real fix. A **Snap to story origin** button jumps back to the project's configured origin.
 - **Orientation** — three sliders (alpha/beta/gamma) for beats that care which way the device is facing.
@@ -3565,7 +3599,7 @@ Reachability is the long version of the unreachable entries in Problems: every b
 
 A beat is reachable when some way of playing gets there. Linked isn't enough: a beat that is linked but never on offer counts as unreachable, and says which beat links to it. Each unreachable beat says why in a sentence (nothing links to it, every way in has a condition that can never be met, every beat that links to it is unreachable itself, a beat links here but no way of playing takes that link, or a Condition beat never takes the branch to it), followed by suggested fixes where the analysis has one. When a check always answers the same way, it says so with the values, for example *"BrokeDeathCheck" checks Money <= 0, and Money is always 0 there, so the answer always sends players the other way*.
 
-A variable counts as set when anything in the story can set it: an effect on a choice or a Free Layout button, a dialog line, a link or a random branch, a Set Variable beat, or an input the player types. A variable with a default value in Project Settings counts as set too, and so does the built-in **playthrough**. Text never matches a counter, so a counter checked against text can't open a way in.
+A variable counts as set when anything in the story can set it: an effect on a choice or a Free Layout button, a dialog line, a link or a random branch, a Set Variable beat, or an input the player types. A variable with a starting value in [Story Data ▸ Variables](#story-data) counts as set too, and so does the built-in **playthrough**. Text never matches a counter, so a counter checked against text can't open a way in.
 
 When the story is too large to try every way through, the [search-limit note](#search-limit) and its **may be reachable** / **only after replays** marks appear here too.
 
@@ -4183,27 +4217,36 @@ Use sprite sheets for frame-by-frame animation:
 
 ## Theming & Styling
 
-### Global Settings
+<a id="global-settings"></a>
+### Project Settings
 
 ![Settings Panel](images/02-settings-panel.png)
 *The Settings panel*
 
-**Settings → Project:**
-- Stage dimensions and aspect ratio (4:3, 16:9, etc.). This is your design canvas: the Visual Editor stage, the Preview Window's *Fit window* view and the exported player all use it. *(Before v0.9.117 only the export did; the editor and preview stayed at 1024×768.)* If you change it after laying out a fixed-canvas project, check your beats in the Visual Editor — positions stay where you put them, so a 4:3 layout on a 16:9 canvas leaves room on the right.
+Open it with the purple **Project Settings** button (⌘/Ctrl+,). The tabs along the top group the settings by what they do: **Project**, **Look**, **Dialogue**, **Screen panels**, **Sound**, **Languages & culture** and **About**. One more tab, **Location & AR**, shows up only when your story uses location (see below). The window reopens on the tab you used last, and nothing changes in your project until you click **Save Settings**.
+
+Two things that used to be tabs here now have a home of their own, because you come back to them while you write: variables are in [Story Data ▸ Variables](#story-data), and roles are in [Characters ▸ Roles](#roles).
+
+**Project Settings ▸ Project:**
+- **Story starts at** — the beat your story opens on, in the Preview and in exported stories. Left at *The first beat (automatic)*, ASAPS picks the start itself (a Title Screen if you have one). The HTML export's **Start beat** picker starts from this beat when you've set one, and you can still begin a single export somewhere else.
+- **Stage & Layout** — Stage dimensions and aspect ratio (4:3, 16:9, etc.). This is your design canvas: the Visual Editor stage, the Preview Window's *Fit window* view and the exported player all use it. *(Before v0.9.117 only the export did; the editor and preview stayed at 1024×768.)* If you change it after laying out a fixed-canvas project, check your beats in the Visual Editor — positions stay where you put them, so a 4:3 layout on a 16:9 canvas leaves room on the right.
 - Scaling mode
-- Mobile display settings (font scaling, safe zone preview)
+- **Mobile Display** — **Mobile Scaling** (how the story fits a phone, with or without font scaling) and **Show Mobile Safe Zone in Editor**
 - **Layout Mode** — *Responsive layout* (green) or *Fixed canvas* (amber). Switching runs the one-shot migrator with a preview; see [Responsive vs Fixed Layout](#responsive-vs-fixed-layout).
 - **Orientation** — *Flexible*, *Portrait only*, or *Landscape only*. Affects how the player handles device rotation (a locked project shows a "rotate your device" prompt when held the wrong way).
+- In the desktop app, the project's folder is shown at the bottom of the tab.
 
-**Settings → Colors:**
+**Project Settings ▸ Look** has five sections. Pick one with the pills just under the tabs: **Colours**, **Fonts**, **Text box**, **Text & button motion** and **Hotspots**.
+
+**Project Settings ▸ Look ▸ Colours:**
 - Button colors
 - Text box colors
 - Background color
 
-These colours, and the Text Box and Fonts settings below, apply to every beat. To give a single beat its own, use [This beat's look](#this-beats-look) in the Visual Editor.
+These colours, and the Fonts and Text box settings below, apply to every beat. To give a single beat its own, use [This beat's look](#this-beats-look) in the Visual Editor.
 
 <a id="story-fonts"></a>
-**Settings → Fonts:**
+**Project Settings ▸ Look ▸ Fonts:**
 - Default fonts for titles, body, buttons
 - Font sizes
 - Line height
@@ -4212,26 +4255,30 @@ Your own fonts (TrueType `.ttf`, OpenType `.otf`, `.woff` or `.woff2`) go into t
 
 **Fonts that are easier to read.** The Title, Text and Button font menus also have a group **Easier to read (added to the project)** with Lexend, Atkinson Hyperlegible and OpenDyslexic — the same free fonts as the builder's [Reading font](#reading-font). Choosing one copies the font into the project's Assets (as *OpenDyslexic.woff2*, for example); from then on it's listed under **Custom Fonts** like any font you added, and it travels with the story: the Preview, `.asaps` files, HTML exports and the player all show it. Click **Save Settings** to keep your choice, as with any other font. These fonts cover Western European letters (Latin-1); for other scripts, add a font that has them through **Assets → Fonts**. No font is best for every reader, so if you're writing for readers with dyslexia, you might ask them which one they like.
 
-**Settings → Text Box:**
+**Project Settings ▸ Look ▸ Text box:**
 - Text box appearance: corners, padding, borders, position
 - **Background Opacity** — slider (0–100%) controlling how transparent the text-box background is
 - **Box Visibility** — *Show All Boxes*, *Hide Text/Dialog Boxes* (text renders directly on the stage, no box behind it), or *Hide All Boxes* (buttons also render as bare labels). Great for stories where the artwork should carry the frame and text floats over it.
 
 <a id="text-box-pictures"></a>
-- **Pictures** — use pictures instead of the colours: a **Text box frame**, a **Button** picture and a **Button under the pointer** picture. For each, click **Choose picture…** to pick one of the project's pictures or upload a new one; **Change** swaps it and the small **×** removes it. If you leave *Button under the pointer* empty, the button keeps its normal picture on hover. This works for any project, not only for Ren'Py themes. A [Ren'Py theme](#renpy-theme-import) fills these in for you, and anything you choose here stays your choice even if you apply the theme again. The preview at the bottom of the tab shows your frame.
+- **Pictures** — use pictures instead of the colours: a **Text box frame**, a **Button** picture and a **Button under the pointer** picture. For each, click **Choose picture…** to pick one of the project's pictures or upload a new one; **Change** swaps it and the small **×** removes it. If you leave *Button under the pointer* empty, the button keeps its normal picture on hover. This works for any project, not only for Ren'Py themes. A [Ren'Py theme](#renpy-theme-import) fills these in for you, and anything you choose here stays your choice even if you apply the theme again. The preview at the bottom of the section shows your frame.
 
   Button pictures appear on choice, Continue, Start and ending buttons in both fixed and responsive layouts. They don't appear on picture cards (Choose Your Character), hotspots or chat-style replies, or when Box Visibility is *Hide All Boxes*. A button picture is stretched to the size of each button, so a very wide picture looks squeezed on narrow buttons.
 
 Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual Editor, the Preview Window, exported stories, and responsive (slot-mode) layouts all honor them consistently. What you set here is what your interactors get.
 
 <a id="per-beat-text-box-border"></a>
-**One beat with or without a border.** These settings apply to the whole story. To change the border on a single beat — no frame around the text for a quiet moment over a picture, or a frame on one beat in a story that otherwise has none — open the beat in the Visual Editor and set **Border** under [This beat's look](#this-beats-look): *Project setting* (the default), *Show on this beat* or *Hide on this beat*. *Show* uses the border width and colour from Settings → Text Box, or a thin border in the text colour if the project has none. The next beat goes back to the project setting. The Visual Editor, the Preview Window and exported stories all show it. The same section can change the rest of the project's look for one beat, too: colours, the text box, buttons and fonts.
+**One beat with or without a border.** These settings apply to the whole story. To change the border on a single beat — no frame around the text for a quiet moment over a picture, or a frame on one beat in a story that otherwise has none — open the beat in the Visual Editor and set **Border** under [This beat's look](#this-beats-look): *Project setting* (the default), *Show on this beat* or *Hide on this beat*. *Show* uses the border width and colour from Project Settings ▸ Look ▸ Text box, or a thin border in the text colour if the project has none. The next beat goes back to the project setting. The Visual Editor, the Preview Window and exported stories all show it. The same section can change the rest of the project's look for one beat, too: colours, the text box, buttons and fonts.
 
-**Settings → Effects:**
-- Text animations (typewriter, fade)
+**Project Settings ▸ Look ▸ Text & button motion:**
+- **Text Animation** — *None*, *Typewriter* (with its speed, revealing by letter, word or line) or *Fade In* (with its duration)
 - **Choice Buttons** — in responsive layouts, choice and Continue buttons slide up into place when a beat starts (in chat layouts, the reply buttons rise in a little). Choose *Appear in place* to switch that off. Players whose device is set to reduce motion never see the slide either way.
-- Hotspot visibility (Hotspot Area Visibility, Label Display)
-- <a id="speaker-display"></a>**Speaker Display** (sub-section) — controls how speaker names and portrait graphics appear during playback:
+
+**Project Settings ▸ Look ▸ Hotspots:**
+- Hotspot Opacity, Hotspot Area Visibility (always visible, on hover, or invisible) and Label Display (none, on hover, or always)
+
+**Project Settings ▸ Dialogue:**
+- <a id="speaker-display"></a>**Speaker Display** — controls how speaker names and portrait graphics appear during playback:
   - **Show speaker names** — Master toggle for displaying character names during dialog
   - **Show speaker portraits** — Master toggle for character portrait images in text boxes
   - **Name style** — How the speaker name appears:
@@ -4251,17 +4298,10 @@ Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual 
 
   Individual beats can override these global settings. This lets you hide the speaker name for narration beats while showing it for dialog, for example.
 
-**Settings → HUD:**
-- **Compact HUD on phones** — *Auto* (default: fold screen HUDs into a slim tap-to-expand strip on phone-sized stages), *Always*, or *Never*. See [On phones — the compact HUD strip](#counter-binding).
-- **Show HUDs on the title screen** — off by default for a distraction-free start; turn on if a HUD (say, a countdown that is already running) should be visible from the first frame.
 - <a id="message-history"></a>**Message history** — lets players reopen the conversations they have had so far, like the chats in a messenger app. Every Dialog Tree played becomes one chat, named after the people in it, with the lines as they were shown (with the speaker's look at the time) and the player's replies on the right. A conversation played again continues the same chat after a small *· · ·* divider. It's history only: nothing replays, and closing it (**Close**, a click outside, or Esc) takes the player back to where they were. Players open it from the player's **Menu → Messages**; while you test, the Preview Window's toolbar has a speech-bubbles button for it. The history is kept in saved games and starts empty when the story restarts (or when an End Screen resets *History*). Off by default.
-- Timer / Time Display overlay (timer name, default text, position)
-- Fictional Time overlay
-- Countdown Meter overlay
-Each overlay has its own *Enabled* toggle and renders on the running stage when on.
 
-![Project Settings, HUD tab: Compact HUD on phones, "Show HUDs on the title screen" unticked, and "Message history" ticked with its explanation.](images/88-project-settings-message-history.png)
-*Message history is one tick in Project Settings → HUD.*
+![The former HUD tab of Project Settings: Compact HUD on phones, "Show HUDs on the title screen" unticked, and "Message history" ticked with its explanation.](images/88-project-settings-message-history.png)
+*Message history is one tick. This picture shows it where it used to be, on the HUD tab; you'll now find it at the bottom of Project Settings ▸ Dialogue.*
 
 ![The Messages panel over the story: on the left one chat, "Wolf", with his latest line; on the right the conversation, the Wolf's two lines with his friendly and then his angry picture, and the player's reply "Sweets for my granny." on the right in gold.](images/91-message-history.png)
 *The message history in the Preview. Each line keeps the picture the speaker had when it was said.*
@@ -4269,28 +4309,32 @@ Each overlay has its own *Enabled* toggle and renders on the running stage when 
 ![The same panel on a phone: the chat fills the screen, with a Back link to the list of chats above it.](images/92-message-history-phone.png)
 *On a phone the list and the chat take turns; Back returns to the list.*
 
-**Settings → Sound:**
+**Project Settings ▸ Screen panels:**
+
+Screen panels are the HUDs: the small displays that stay on the stage while the story plays.
+
+- **Compact HUD on phones** — *Auto* (default: fold screen HUDs into a slim tap-to-expand strip on phone-sized stages), *Always*, or *Never*. See [On phones — the compact HUD strip](#counter-binding).
+- **Show HUDs on the title screen** — off by default for a distraction-free start; turn on if a HUD (say, a countdown that is already running) should be visible from the first frame.
+- Timer / Time Display overlay (timer name, default text, position)
+- Fictional Time overlay
+- Countdown Meter overlay
+Each overlay has its own *Enabled* toggle and renders on the running stage when on.
+
+**Project Settings ▸ Sound:**
 - Background music and volume settings
 - Background music respects browser autoplay policies -- if the browser blocks automatic playback (common on first page load), playback starts automatically on the interactor's first click, keypress, or tap
+- **Read questions and prompts aloud** — when text-to-speech is on, choice questions and input prompts are spoken too, not only the story text. This applies to the Preview Window and to exported players.
 
-**Settings → Copyright:**
-- Author name, copyright year, and license text embedded in exports and the credits page.
+**Project Settings ▸ Languages & culture:**
+- **Source Language** — the language you write the story in. Translations themselves are added and managed with the language selector in the toolbar; see [Multi-Language Translation](#multi-language-translation).
+- **Show Knowledge Graph view (experimental)** — adds a Knowledge Graph tab to the editor. Ticking it also shows the **Cultural setting** just below: the culture your project is set in, which is separate from its language.
 
-**Settings → Variables:**
-- Define global variables for tracking story state: **Add Variable**, then give each a **Name**, a **Type** (text, number or true/false), a **Default Value** and an optional **Description**.
-- The **Type** matters: a true/false variable gets a **true / false** picker wherever you set or test it, and true/false and number variables keep their type when the story writes to them — see [True/false and numbers stay what they are](#typed-variables).
-- Every variable **starts at its Default Value** when the story begins, and goes back to it when an ending's Restart resets variables. (Before v0.9.104 the default was ignored in play and variables started empty; stories that relied on that should check their defaults.)
-- **Keep across restarts** on a variable lets it survive an ending's Restart instead — see [Keeping just some things across a restart](#keep-across-restarts).
-- Built in, no need to declare it: **playthrough** counts the runs (1, 2, …); use `${playthrough}` in text or test it in a condition.
+**Project Settings ▸ Location & AR:**
+- This tab is only there when your story needs it: when it has a GPS Location, Indoor Location, Set GPS Location or AR Scene beat, when it already has location settings, or when a sound is placed at a map position.
+- It holds the story origin (latitude and longitude), the default proximity radius, a mock location for testing at your desk (see [Mock Sensors](#mock-sensors)), what happens when a player doesn't give location permission, and an optional indoor venue with its Bluetooth beacons.
 
-**Settings → Roles:**
-- Parts in the story that one of several characters can play — *the player*, *the confidant*: **Add Role** or **Player role**, then the characters who can play it, **Who plays it** (chosen in the story, drawn at random, or always the default), a default, **Can be recast later** and **Keep across restarts**. See [Roles — One Story, Several Possible People](#roles).
-
-**Settings → Translation:**
-- Source language and translation management
-
-**Settings → Debug:**
-- Testing options: start beat override, variable display
+**Project Settings ▸ About:**
+- **Copyright Notice**, **Copyright Year** and **Copyright Owner**, shown in your story's copyright information. **Generate Default Notice** writes a notice for you.
 
 ### Text Effects
 
@@ -4298,7 +4342,7 @@ Each overlay has its own *Enabled* toggle and renders on the running stage when 
 - **Fade** - Text fades in
 - **None** - Instant display
 
-Adjust speed in Settings.
+Choose the animation and its speed in **Project Settings ▸ Look ▸ Text & button motion**.
 
 ### Theme Presets
 
@@ -4338,17 +4382,17 @@ What you can import:
 
 The import window lists what it found (colours, fonts and UI graphics) and shows any **Warnings** before you import. Some things don't come across:
 
-- **A full-screen text box.** Some themes draw the text box as one picture the size of the whole screen, which Ren'Py lays over everything. That picture isn't a frame, so ASAPS doesn't use it as one; the import window says so. Pick a frame of your own under [Settings → Text Box → Pictures](#text-box-pictures) if you like.
+- **A full-screen text box.** Some themes draw the text box as one picture the size of the whole screen, which Ren'Py lays over everything. That picture isn't a frame, so ASAPS doesn't use it as one; the import window says so. Pick a frame of your own under [Project Settings ▸ Look ▸ Text box ▸ Pictures](#text-box-pictures) if you like.
 - **Text outlines** (and Ren'Py's character name colours) aren't carried over.
 - **A pack with nothing usable.** If a ZIP has pictures but no text-box frame ASAPS can use, no choice-button pictures, no fonts and no `.rpy` settings, the importer explains why instead of making an empty theme. You can still upload single pictures from it and use them under Text Box → Pictures.
 
-Prefer plain text boxes? Open **Advanced Options** in the import window and untick *Use the theme's text-box picture as the frame*: the theme keeps its colours, fonts and button pictures, and the text boxes stay plain. You can still choose a frame later under [Settings → Text Box → Pictures](#text-box-pictures). To keep the frame but give a single beat a plain box, use **Frame picture** in that beat's [This beat's look](#this-beats-look).
+Prefer plain text boxes? Open **Advanced Options** in the import window and untick *Use the theme's text-box picture as the frame*: the theme keeps its colours, fonts and button pictures, and the text boxes stay plain. You can still choose a frame later under [Project Settings ▸ Look ▸ Text box ▸ Pictures](#text-box-pictures). To keep the frame but give a single beat a plain box, use **Frame picture** in that beat's [This beat's look](#this-beats-look).
 
 **The theme's pictures and fonts travel with your project.** When a Ren'Py theme is applied, its text-box frame picture, its button pictures (the normal one and the one under the pointer) and its fonts are copied into the project as ordinary assets, and a notice lists them. You'll find them in **Assets** like any other picture or font. From then on the look is the same everywhere: both Visual Editor layouts, the Preview Window, HTML exports, `.asaps` copies, and project folders shared through Git, so a teammate on another computer sees the frame and fonts without installing the theme. A project made with an earlier version gets the same treatment the first time you open it on a computer where its theme is installed.
 
-Switching to a theme without pictures stops using them; the files stay in Assets, so you can switch back or pick them again under [Settings → Text Box → Pictures](#text-box-pictures).
+Switching to a theme without pictures stops using them; the files stay in Assets, so you can switch back or pick them again under [Project Settings ▸ Look ▸ Text box ▸ Pictures](#text-box-pictures).
 
-**Drawn the way Ren'Py draws them.** A frame picture's decorated top and bottom edges keep their proportions, and your text sits between them. A long text makes only the plain middle of the frame taller — the decoration never stretches across the words — and the story scrolls as usual, with the bottom edge arriving at the end of the text. (Decoration on the *sides* of a frame, such as an emblem at the left, does stretch with long text, so frames with plain sides work best.) The **Padding** under Settings → Text Box counts from the frame's outer edge: above and below the text, the decorated edge is part of that space (there is always at least a small gap), so the text sits snugly between the edges rather than far inside them. In responsive layouts the edges and padding grow and shrink with the stage, so a phone-sized stage gets slimmer edges.
+**Drawn the way Ren'Py draws them.** A frame picture's decorated top and bottom edges keep their proportions, and your text sits between them. A long text makes only the plain middle of the frame taller — the decoration never stretches across the words — and the story scrolls as usual, with the bottom edge arriving at the end of the text. (Decoration on the *sides* of a frame, such as an emblem at the left, does stretch with long text, so frames with plain sides work best.) The **Padding** under Project Settings ▸ Look ▸ Text box counts from the frame's outer edge: above and below the text, the decorated edge is part of that space (there is always at least a small gap), so the text sits snugly between the edges rather than far inside them. In responsive layouts the edges and padding grow and shrink with the stage, so a phone-sized stage gets slimmer edges.
 
 <a id="delete-theme"></a>
 **Deleting a theme.** Tried a few kits and want to tidy up? Open the **Theme:** menu and click the trash button next to a theme under *Custom Themes* (the ones you imported or saved). Built-in themes have no trash button and can't be deleted. ASAPS asks first and tells you what goes with the theme:
@@ -4385,7 +4429,7 @@ ASAPS Modern has two distinct time systems: **real-time timers** that count down
 
 ### Timer HUD
 
-The Timer HUD is a persistent overlay that appears in a corner of the stage. Configure it in **Settings → HUD → Timer / Time Display**. Toggle **Enabled** and the configuration unfolds:
+The Timer HUD is a persistent overlay that appears in a corner of the stage. Configure it in **Project Settings ▸ Screen panels ▸ Timer / Time Display**. Toggle **Enabled** and the configuration unfolds:
 
 - **Timer Name** — Which named timer to track (leave empty to follow the first active timer)
 - **Show "00:00" when no timer active** — Whether to display a placeholder zero-time when nothing is counting down
@@ -4395,7 +4439,7 @@ The Timer HUD is a persistent overlay that appears in a corner of the stage. Con
 - **Font size**, **text color**, **background color**, **background opacity**, **border radius**, **padding**
 - **Show label** + **Label text** — Optional label rendered above the time display
 
-The HUD's display logic is layered: an active timer countdown takes priority, then per-beat time text, then the default text. Two sibling overlays — **Fictional Time** and **Countdown Meter** — sit alongside it on the same Settings page and can be enabled independently.
+The HUD's display logic is layered: an active timer countdown takes priority, then per-beat time text, then the default text. Two sibling overlays — **Fictional Time** and **Countdown Meter** — sit alongside it on the same **Screen panels** tab and can be enabled independently.
 
 ### Fictional Time System
 
@@ -4423,7 +4467,7 @@ Fictional time tracks an in-story date and time that's independent of real-world
 <a id="per-beat-time-display"></a>
 **Changing the clock on one beat.** A beat can show something else in the Timer HUD, or nothing at all: open **Show Advanced Options** in the Inspector and pick its **Time Display** — *Fictional Time (default)*, *Manual text* (for example *Meanwhile…* or *2h later*), or *None (hide on this beat)*. On the beat types that can auto-advance (Title Screen, Info Text, Dialog Tree, Movement Choice, Pick Prop, Hyper Text, Input Text, Video) it sits in the **Auto-Advance Settings** section; **End Screens** and **Multiple Choice** beats have it on its own. Hiding the clock is handy for a flashback, a dream, an ending set the next morning, or a line of text that names a different time than the clock would show.
 
-**Fictional-time HUD in the Visual Editor (v0.9.59).** When all three switches line up — **Settings → HUD → Timer / Time Display** *Enabled*, **Settings → HUD → Fictional Time** *Enabled*, and that section's **Show in Timer HUD** option turned on — the Visual Editor's slot/spatial preview now renders the chip too, in the configured corner and at the configured `displayFormat` (e.g., a green *"1 January 2024, 9:00 AM"* chip at top-right). So you can see WHERE the chip will sit and HOW the initial time renders without leaving the editor. The chip stays hidden in the VE when any of those switches is off.
+**Fictional-time HUD in the Visual Editor (v0.9.59).** When all three switches line up — **Project Settings ▸ Screen panels ▸ Timer / Time Display** *Enabled*, **Project Settings ▸ Screen panels ▸ Fictional Time** *Enabled*, and that section's **Show in Timer HUD** option turned on — the Visual Editor's slot/spatial preview now renders the chip too, in the configured corner and at the configured `displayFormat` (e.g., a green *"1 January 2024, 9:00 AM"* chip at top-right). So you can see WHERE the chip will sit and HOW the initial time renders without leaving the editor. The chip stays hidden in the VE when any of those switches is off.
 
 **Example: Day/Night Cycle**
 ```
@@ -4878,7 +4922,7 @@ Quick reference for all beat types.
 | Hyper Text | Clickable text | text, links (select a word → Create Link → target beat; optional per-link colour/underline), allow multiple clicks; links default to a theme colour that reads against the background |
 | 360 Panorama | Panoramic view | panorama image, hotspots (pitch/yaw), starting orientation, field of view |
 | GPS Location | Map + geofenced locations | mode (display / trigger-on-arrival / trigger-on-departure), location entries (name, lat/lng, radius, target, effects), radius (m), instructional text, button/skip text, timeout, map style, show player marker; entries also support a project-file-level `pointName` binding to a Set GPS Location point set |
-| Indoor Location | Floor plan + beacon zones | mode (display / trigger-on-arrival / trigger-on-departure), target beacon UUID (from Settings → Location & XR → Indoor venue), radius (m), instructional text, button/skip text, timeout |
+| Indoor Location | Floor plan + beacon zones | mode (display / trigger-on-arrival / trigger-on-departure), target beacon UUID (from Project Settings ▸ Location & AR ▸ Indoor venue), radius (m), instructional text, button/skip text, timeout |
 | End Screen | Story ending | message, show restart, **Restart leads to** (required while Restart is shown; drawn as a dashed teal ↺ Restart link), show credits, reset (with granular sub-options: variables, counters, inventory, timers, fictional time, visited tracking, history; anything marked *Keep across restarts* survives), restart text, credits text, credits page title, credits page body, credits close text |
 | Online Content | Live web data | mode (API/AI), query, template |
 
@@ -4988,7 +5032,9 @@ Quick reference for all beat types.
 
 **System Builder** - See "Narrative System Builder."
 
-**Variable** - A named value (true/false, number or text) that tracks conditions (hasKey, metWizard). Starts at the default value set in Project Settings → Variables.
+**Variable** - A named value (true/false, number or text) that tracks conditions (hasKey, metWizard). Starts at the value set under **Starts as** in [Story Data ▸ Variables](#story-data).
+
+**Story Data** - The window (toolbar button beside Characters) that lists the story's variables and counters, each with the beats that set it, test it and show it. Variables are added and edited there. See [Story Data](#story-data).
 
 **Visible Beat** - A beat that displays content to the interactor.
 
@@ -5016,7 +5062,7 @@ Quick reference for all beat types.
 
 **Effects fire only on first pick** - Per-beat checkbox (`effectsOncePerChoice`) on Dialog Tree, Multi Choice, Movement Choice, Pick Prop, and Free Layout: choices stay selectable on revisits, but their effects apply only the first time. The re-readable-but-once-scored middle ground between a plain repeatable choice and *Block and dim visited choices*. See [What happens on a second visit?](#revisit-policy).
 
-**Compact HUD strip** - On phone-sized stages, the slim tap-to-expand bar each corner's screen-docked HUDs fold into (initials + micro-bar per metered character, item counts, mood tokens). Controlled by **General Settings → HUDs → Compact HUD on phones** (Auto / Always / Never). See [On phones — the compact HUD strip](#counter-binding).
+**Compact HUD strip** - On phone-sized stages, the slim tap-to-expand bar each corner's screen-docked HUDs fold into (initials + micro-bar per metered character, item counts, mood tokens). Controlled by **Project Settings ▸ Screen panels ▸ Compact HUD on phones** (Auto / Always / Never). See [On phones — the compact HUD strip](#counter-binding).
 
 **Model for in-story AI** - Optional second model in AI settings, used only while a story plays (AI Dialog Tree, AI Conversation, AI Condition) in the Preview Window and exported players; authoring tools keep the main model. See [Which Model for Which Job?](#which-model-for-which-job).
 
@@ -5038,7 +5084,7 @@ Quick reference for all beat types.
 
 **Variant Selection Policy** - The per-character "At story start" setting (shown when a character has 2+ variants): *Use default variant* starts with the persona marked default (the base character or one of its variants); *Pick randomly each playthrough* draws a fresh variant on every story start and preview restart. An authored `setCharacterVariant` effect always overrides the policy.
 
-**Role (cast role)** - A part in the story — *the player*, *the confidant* — that one of several characters plays, decided in the story (Choose Your Character beat or a Cast Role effect), drawn at random, or fixed. Defined in Project Settings → Roles; referenced as `@confidant` in character pickers and `${@confidant.name}` / `${@confidant.they}` in text. Counters and feelings stay with each character, not with the role.
+**Role (cast role)** - A part in the story — *the player*, *the confidant* — that one of several characters plays, decided in the story (Choose Your Character beat or a Cast Role effect), drawn at random, or fixed. Defined in [Characters ▸ Roles](#roles); referenced as `@confidant` in character pickers and `${@confidant.name}` / `${@confidant.they}` in text. Counters and feelings stay with each character, not with the role.
 
 **Interpersonal Stance / Stance Pad** - A character's or variant's way of meeting other people, plotted on a 2D "Leary's Rose" pad: warmth (cold ↔ warm) × dominance (submissive ↔ dominant), with corner labels *hostile*, *leading*, *withdrawn*, *cooperative*. The pad is a lens on Big Five extraversion and agreeableness — dragging the dot updates both. Appears on the base Personality card, on each variant card, and on the AI character helper's preview cards.
 
@@ -5058,7 +5104,7 @@ Quick reference for all beat types.
 
 **Markdown-Lite** - Lightweight text formatting supported in text boxes and choice buttons: `**bold**`, `*italic*`, `~~strikethrough~~`, `==highlight==`, line breaks, and backslash escapes (`\*` shows an asterisk).
 
-**Layout Mode** - Project-level setting (v0.9.59+) that decides whether the project uses *Responsive layout* (slot/spatial flow, reflows to any viewport, default for new projects) or *Fixed canvas* (pixel positions on your project's canvas, 1024×768 by default — the historical ASAPS behaviour). Set in the New Project wizard or **Settings → Project → Layout Mode**; the colored pill in the header reflects the active mode. Switching modes on an existing project runs a one-shot migrator with a preview.
+**Layout Mode** - Project-level setting (v0.9.59+) that decides whether the project uses *Responsive layout* (slot/spatial flow, reflows to any viewport, default for new projects) or *Fixed canvas* (pixel positions on your project's canvas, 1024×768 by default — the historical ASAPS behaviour). Set in the New Project wizard or **Project Settings ▸ Project ▸ Layout Mode**; the colored pill in the header reflects the active mode. Switching modes on an existing project runs a one-shot migrator with a preview.
 
 **Orientation Policy** - Project-level setting (v0.9.59+) that constrains responsive projects to *Flexible*, *Landscape only*, or *Portrait only*. Locking shows a "rotate your device" overlay when the player holds the device the wrong way; layout stays width-responsive either way. Only meaningful for Responsive-layout projects; collapses to a non-choice when Layout Mode is Fixed canvas.
 
@@ -5129,7 +5175,7 @@ Most likely that choice isn't linked to a beat yet. The Preview shows an amber n
 Yes. Switch off **Show AI features** in **Tools → App Preferences…** and every AI button, menu and AI beat type is hidden; your stories don't change. See [Working without AI](#working-without-ai).
 
 ### Is there a dyslexia-friendly font?
-Yes, three of them: Lexend, Atkinson Hyperlegible and OpenDyslexic. For the builder itself, pick one under **Tools → App Preferences… → Reading font** ([Reading font](#reading-font)); for your players, choose one in **Settings → Fonts** ([Fonts that are easier to read](#story-fonts)). Readers differ in which helps most, so it's worth trying more than one.
+Yes, three of them: Lexend, Atkinson Hyperlegible and OpenDyslexic. For the builder itself, pick one under **Tools → App Preferences… → Reading font** ([Reading font](#reading-font)); for your players, choose one in **Project Settings ▸ Look ▸ Fonts** ([Fonts that are easier to read](#story-fonts)). Readers differ in which helps most, so it's worth trying more than one.
 
 ### Can I write my story's text in another editor?
 Yes. In the [Script view](#script-view), **Save as Markdown** gives you a file for Obsidian, Google Docs or any text editor, and **Update from Markdown…** brings your edits back after showing you every change. See [Writing elsewhere](#script-markdown).
@@ -5168,7 +5214,7 @@ Almost always one of three things. **One:** no effect is moving the underlying f
 It doesn't — it sits at *zero*, and zero is where you put it. On a `Min: 0` range zero is the left edge, so an empty bar is correct. On a `Min: -100` range zero is the centre, so a neutral character shows a bar of no width at the midpoint. If you wanted neutral to look "half full", that's the one reading ASAPS deliberately doesn't offer, because a half-filled bar reads as a partial score rather than as *nothing yet*. See [The one rule: the bar starts at zero](#counter-projection).
 
 ### Should I pick Responsive or Static (fixed canvas) for my new project?
-**Responsive** is the default and the right pick for most new projects — especially anything you might run on phones or tablets. Text, buttons, and images flow and adapt to any screen: you guide the layout, and the player's device decides exact placement. The Preview Window's viewport switcher (Fit / Desktop / Tablet / Phone) lets you sanity-check device sizes without leaving the editor. **Static (fixed canvas)** gives you full pixel control on your project's canvas (1024×768 by default) — what you see in the editor is exactly what the player sees. Pick it for precise, hand-crafted compositions like visual-novel-style layouts, or if you're porting a pre-v0.9.58 project and don't want to migrate. Both modes are fully supported — this is a choice of authoring style, not old-vs-new. And it's not final: switch later via the header pill or **Settings → Project → Layout Mode** (a one-shot migrator converts your beats, with a preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for the full breakdown.
+**Responsive** is the default and the right pick for most new projects — especially anything you might run on phones or tablets. Text, buttons, and images flow and adapt to any screen: you guide the layout, and the player's device decides exact placement. The Preview Window's viewport switcher (Fit / Desktop / Tablet / Phone) lets you sanity-check device sizes without leaving the editor. **Static (fixed canvas)** gives you full pixel control on your project's canvas (1024×768 by default) — what you see in the editor is exactly what the player sees. Pick it for precise, hand-crafted compositions like visual-novel-style layouts, or if you're porting a pre-v0.9.58 project and don't want to migrate. Both modes are fully supported — this is a choice of authoring style, not old-vs-new. And it's not final: switch later via the header pill or **Project Settings ▸ Project ▸ Layout Mode** (a one-shot migrator converts your beats, with a preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for the full breakdown.
 
 ---
 

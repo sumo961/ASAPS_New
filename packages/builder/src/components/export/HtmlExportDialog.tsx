@@ -24,6 +24,8 @@ interface HtmlExportDialogProps {
   availableBeats?: Array<{ id: string; name?: string; type?: string }>;
   /** Currently-selected beat in the builder, used as the dropdown's default. */
   selectedBeatId?: string;
+  /** The project's start beat when the author set one (Story starts at). */
+  storyStartBeatId?: string;
   /** Project setting: the exported player reads text aloud (globalSettings.tts.exportSpeech). */
   exportSpeech?: boolean;
   /** Persist a changed exportSpeech into the project. */
@@ -39,6 +41,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   projectName,
   availableBeats = [],
   selectedBeatId,
+  storyStartBeatId,
   exportSpeech = true,
   onExportSpeechChange,
   mediaBytes,
@@ -88,11 +91,14 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   // if any, else the project's first titleScreen, else the first beat in
   // the list. Author can change before clicking Download.
   const defaultStartBeat = useMemo(() => {
+    // The project's own start (Project Settings ▸ Project ▸ Story starts at)
+    // comes first: an author who set it means every export to begin there.
+    if (storyStartBeatId && availableBeats.some((b) => b.id === storyStartBeatId)) return storyStartBeatId;
     if (selectedBeatId && availableBeats.some((b) => b.id === selectedBeatId)) return selectedBeatId;
     const titleScreen = availableBeats.find((b) => b.type === 'titleScreen');
     if (titleScreen) return titleScreen.id;
     return availableBeats[0]?.id || '';
-  }, [selectedBeatId, availableBeats]);
+  }, [storyStartBeatId, selectedBeatId, availableBeats]);
   const [startBeatId, setStartBeatId] = useState<string>(defaultStartBeat);
   // Re-sync the default if the dialog re-opens with a fresh selection.
   useEffect(() => {
@@ -376,8 +382,9 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               />
               <p className="text-xs text-gray-500 mt-1">
-                The published story will begin here. Defaults to your current
-                selection in the builder; you can change it for this export
+                The published story will begin here. {storyStartBeatId
+                  ? 'Set to the project’s start (Project Settings ▸ Project ▸ Story starts at)'
+                  : 'Defaults to your current selection in the builder'}; you can change it for this export
                 without affecting the project.
               </p>
             </div>

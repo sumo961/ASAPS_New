@@ -23,6 +23,8 @@ Thirteen tabs became seven (eight with location beats), none behind the scroll a
 - **Location & AR:** shown only for a story with location beats, location settings, or a sound placed on the map.
 - **About:** copyright.
 - **Variables** moved to the Story Data window (below).
+- **HTML export follows it:** the export window's Start beat now defaults to "Story starts at" when one is set (before: the selected beat, else the Title Screen, whatever the setting said). Without a set start the default is unchanged.
+- **User Guide** updated for the new tabs, Characters ▸ Roles, Story Data (`#story-data`) and New / Browse. Screenshots to retake: 01, 02, 03, 82, 88, 106; new ones wanted for Story Data and Look.
 - **Removed:** the Debug tab, and "Show variable/counter values during preview", which nothing read (the Preview has its own button).
 - Stored settings are unchanged; only where they are edited moved. In-app texts that name a tab were updated.
 - **Files:** `packages/builder/src/components/settings/GlobalSettingsInspector.tsx` (+ `__tests__/GlobalSettingsInspector.tabs.test.tsx`), `components/{Inspector,NewProjectDialog}.tsx`, `components/visual/{BeatLookSection,SpeakFromPicker}.tsx`, `components/knowledgeGraph/KnowledgeGraphView.tsx`, `components/ai/codesigner/systemPrompt.ts`, `editors/{SpatialPositionEditor,XRLocationsEditor}.tsx`

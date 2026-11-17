@@ -940,7 +940,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   className="w-full px-3 py-2 border rounded"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  The beat the story opens on, in the Preview and in exported stories.
+                  The beat the story opens on, in the Preview and in exported stories. The export
+                  window starts from it and lets you pick another for one export.
                 </p>
               </div>
 
