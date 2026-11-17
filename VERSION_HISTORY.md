@@ -7,8 +7,9 @@ visit the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
 
 Current release: **v0.9.158**. This is a **beta**: core functionality works,
 and new releases arrive often. The release summaries below cover v0.9.88
-onward, newest first; the feature matrix after them covers the releases up to
-v0.9.89. Detailed notes for every release are in [`Progress.md`](Progress.md).
+onward, newest first. Below them are an archived feature table and deep-dives
+for the releases up to v0.9.89. Detailed notes for every release are in
+[`Progress.md`](Progress.md).
 
 ## Release Summaries
 
@@ -615,7 +616,11 @@ toolchain moved to **vite 8** — open dependency alerts dropping from 39 to 9.
 > cannot auto-update across the signing boundary — download v0.9.86 once
 > manually; auto-update works from then on. Windows auto-updates normally.
 
-## Feature Matrix
+## Feature Matrix (archive, up to v0.9.89)
+
+This table was kept until v0.9.89 and is no longer updated. The release
+summaries above cover everything since, one paragraph per release; the table
+stays for the detail it holds on the earlier versions.
 
 | Feature | Status |
 |---------|--------|
