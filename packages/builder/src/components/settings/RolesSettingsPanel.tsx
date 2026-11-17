@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Users } from 'lucide-react';
 import type { CastRole, RoleSelection } from '@asaps/core';
+import { GuideLink } from '../GuideLink';
 
 interface Props {
   roles: CastRole[] | undefined;
@@ -105,7 +106,8 @@ export const RolesSettingsPanel: React.FC<Props> = ({ roles = [], characters, on
         <code className="font-mono text-xs bg-gray-100 px-1 rounded">{'${@confidant.name}'}</code> or{' '}
         <code className="font-mono text-xs bg-gray-100 px-1 rounded">{'${@confidant.they}'}</code> in text.
         Counters and feelings stay with each character. A role called <code className="font-mono text-xs bg-gray-100 px-1 rounded">player</code>{' '}
-        makes the player's own counters and feelings follow the character they chose; the inventory stays the player's.
+        makes the player's own counters and feelings follow the character they chose; the inventory stays the player's.{' '}
+        <GuideLink anchor="roles" />
       </p>
 
       {roles.length === 0 ? (

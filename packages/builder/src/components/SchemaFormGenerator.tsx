@@ -1,5 +1,22 @@
 import { isTextForCounter } from '@asaps/core';
 import React, { useState } from 'react';
+
+const HELP_FILLER = new Set('the a an of to for text this is in on beat that used value name'.split(' '));
+const helpWords = (t: string) => new Set(
+  t.replace(/([A-Z])/g, ' $1').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(' ').filter(Boolean),
+);
+/**
+ * The hint under a field: the schema's author help, else its description.
+ * A hint that says no more than the label ("Author" / "Author name") is
+ * left out; it only adds a line to read.
+ */
+export function fieldHelp(paramDef: any, label: string, paramName: string): string | undefined {
+  const text: string | undefined = paramDef?.ui?.help || paramDef?.description;
+  if (!text) return undefined;
+  const known = new Set([...helpWords(label), ...helpWords(paramName)]);
+  const adds = [...helpWords(text)].some((w) => !HELP_FILLER.has(w) && !known.has(w));
+  return adds ? text : undefined;
+}
 import { Variable, Box, Timer, User, ChevronDown, ChevronRight, Plus, Trash2, Shuffle, Package } from 'lucide-react';
 import { SmartNameDropdown } from '../editors/SmartNameDropdown';
 import { closeItemName } from '../utils/storyItems';
@@ -348,6 +365,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
     // already read ui.label; the generic path silently didn't.
     const label = paramDef.ui?.label
       || (paramName.charAt(0).toUpperCase() + paramName.slice(1).replace(/([A-Z])/g, ' $1'));
+    const helpText = fieldHelp(paramDef, label, paramName);
 
     // Speaker visibility - tri-state select (default / show / hide)
     // Checked before the type switch since showSpeaker is type "boolean" but needs custom rendering
@@ -369,8 +387,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
             <option value="show">Always show</option>
             <option value="hide">Always hide</option>
           </select>
-          {(paramDef.ui?.help || paramDef.description) && (
-            <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
+          {helpText && (
+            <p className="text-xs text-gray-500 mt-1">{helpText}</p>
           )}
         </div>
       );
@@ -406,8 +424,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 emptyLabel="-- Select target (optional) --"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               />
-              {(paramDef.ui?.help || paramDef.description) && (
-                <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
+              {helpText && (
+                <p className="text-xs text-gray-500 mt-1">{helpText}</p>
               )}
             </div>
           );
@@ -455,8 +473,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 </p>
               )}
               {/* ui.help speaks to the author; the description also teaches the AI generators. */}
-              {!showSourceHint && (paramDef.ui?.help || paramDef.description) && (
-                <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
+              {!showSourceHint && helpText && (
+                <p className="text-xs text-gray-500 mt-1">{helpText}</p>
               )}
             </div>
           );
@@ -483,8 +501,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               {paramDef.ui.hint && (
                 <p className="text-xs text-blue-600 mt-1">{paramDef.ui.hint}</p>
               )}
-              {!paramDef.ui.hint && (paramDef.ui?.help || paramDef.description) && (
-                <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
+              {!paramDef.ui.hint && helpText && (
+                <p className="text-xs text-gray-500 mt-1">{helpText}</p>
               )}
             </div>
           );
@@ -545,8 +563,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 ]}
                 placeholder="Type or pick a speaker…"
               />
-              {(paramDef.ui?.help || paramDef.description) && (
-                <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
+              {helpText && (
+                <p className="text-xs text-gray-500 mt-1">{helpText}</p>
               )}
             </div>
           );
@@ -633,8 +651,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               {!current && paramDef.ui.requiredWhen && parameters[paramDef.ui.requiredWhen] !== false && (
                 <p className="text-xs text-red-600 mt-1">{paramDef.ui.missingHint || 'Pick a beat.'}</p>
               )}
-              {(paramDef.ui?.help || paramDef.description) && (
-                <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
+              {helpText && (
+                <p className="text-xs text-gray-500 mt-1">{helpText}</p>
               )}
             </div>
           );
@@ -682,8 +700,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 pinnedOptions={[{ value: 'player', label: 'Player' }]}
                 placeholder="Player, a defined character, or type a name…"
               />
-              {(paramDef.ui?.help || paramDef.description) && (
-                <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
+              {helpText && (
+                <p className="text-xs text-gray-500 mt-1">{helpText}</p>
               )}
             </div>
           );
@@ -734,8 +752,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                   Direction: <span className="font-medium">{previewWord}</span>
                 </p>
               )}
-              {(paramDef.ui?.help || paramDef.description) && (
-                <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
+              {helpText && (
+                <p className="text-xs text-gray-500 mt-1">{helpText}</p>
               )}
             </div>
           );
@@ -830,8 +848,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                   ✨ Develop character with AI…
                 </button>
               )}
-              {(paramDef.ui?.help || paramDef.description) && (
-                <p className="mt-1 text-xs text-gray-500">{paramDef.ui?.help || paramDef.description}</p>
+              {helpText && (
+                <p className="mt-1 text-xs text-gray-500">{helpText}</p>
               )}
             </div>
           );
@@ -1179,8 +1197,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                   ))}
                 </datalist>
               )}
-              {(paramDef.ui?.help || paramDef.description) && (
-                <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
+              {helpText && (
+                <p className="text-xs text-gray-500 mt-1">{helpText}</p>
               )}
             </div>
           );
@@ -1209,8 +1227,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                   Source: {sourceHintDefault}
                 </p>
               )}
-              {!showSourceHintDefault && (paramDef.ui?.help || paramDef.description) && (
-                <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
+              {!showSourceHintDefault && helpText && (
+                <p className="text-xs text-gray-500 mt-1">{helpText}</p>
               )}
             </div>
           );
@@ -1235,8 +1253,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               step={numStep}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
             />
-            {(paramDef.ui?.help || paramDef.description) && (
-              <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
+            {helpText && (
+              <p className="text-xs text-gray-500 mt-1">{helpText}</p>
             )}
           </div>
         );
@@ -1254,8 +1272,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               />
               <span className="text-sm text-gray-700">{label}</span>
             </label>
-            {(paramDef.ui?.help || paramDef.description) && (
-              <p className="text-xs text-gray-500 mt-1 ml-6">{paramDef.ui?.help || paramDef.description}</p>
+            {helpText && (
+              <p className="text-xs text-gray-500 mt-1 ml-6">{helpText}</p>
             )}
           </div>
         );
@@ -1275,8 +1293,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               emptyLabel="None (optional)"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
             />
-            {(paramDef.ui?.help || paramDef.description) && (
-              <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
+            {helpText && (
+              <p className="text-xs text-gray-500 mt-1">{helpText}</p>
             )}
           </div>
         );
@@ -1515,8 +1533,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                   </button>
                 </div>
 
-                {(paramDef.ui?.help || paramDef.description) && (
-                  <p className="text-xs text-gray-500">{paramDef.ui?.help || paramDef.description}</p>
+                {helpText && (
+                  <p className="text-xs text-gray-500">{helpText}</p>
                 )}
 
                 {items.length === 0 && (

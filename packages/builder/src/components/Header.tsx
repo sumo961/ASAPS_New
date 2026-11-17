@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Github, Compass, GitMerge, FileInput, FileText, Trash2, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus, History, Variable } from 'lucide-react';
+import { guideUrl } from './GuideLink';
+import { Github, Compass, GitMerge, FileInput, FileText, Trash2, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus, History, Variable, BookOpen } from 'lucide-react';
 import { AIEditsLogDialog } from './ai/AIEditsLogDialog';
 import type { AIEditLedger } from '../types/aiEdits';
 import { ProjectSelector } from './ProjectSelector';
@@ -1098,6 +1099,17 @@ export const Header: React.FC<HeaderProps> = ({
                       <Settings className="w-4 h-4" />
                       App Preferences…
                     </button>
+                    <a
+                      href={guideUrl()}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => setShowToolsMenu(false)}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                      title="Opens the User Guide in your browser"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      User Guide
+                    </a>
                     {((aiOn && onHelperCommands) || onMergeDialogTrees) && <div className="my-1 border-t border-gray-100" />}
                     {aiOn && onHelperCommands && (
                       <button

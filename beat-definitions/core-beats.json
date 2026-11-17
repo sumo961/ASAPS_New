@@ -524,7 +524,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "connection": {
@@ -607,7 +608,10 @@
           "type": "string",
           "required": true,
           "default": "",
-          "description": "Text content to display. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~, ==highlight== — use sparingly, for emphasis a reader should feel. A backslash shows a marker character itself: \\* for a literal *, \\_ for _."
+          "description": "Text content to display. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~, ==highlight== — use sparingly, for emphasis a reader should feel. A backslash shows a marker character itself: \\* for a literal *, \\_ for _.",
+          "ui": {
+            "help": "The text shown on this screen. Use the buttons above for bold, italic, strikethrough and highlight; write \\* for a real asterisk."
+          }
         },
         "textVariations": {
           "type": "array<string>",
@@ -645,7 +649,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "connection": {
@@ -732,7 +737,10 @@
           "type": "string",
           "required": false,
           "default": "Here's what you'll see on screen.",
-          "description": "Intro text shown in the beat's own text box. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~, ==highlight== — use sparingly, for emphasis a reader should feel. A backslash shows a marker character itself: \\* for a literal *, \\_ for _."
+          "description": "Intro text shown in the beat's own text box. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~, ==highlight== — use sparingly, for emphasis a reader should feel. A backslash shows a marker character itself: \\* for a literal *, \\_ for _.",
+          "ui": {
+            "help": "The introduction shown in the beat's text box. Use the buttons above for bold, italic, strikethrough and highlight; write \\* for a real asterisk."
+          }
         },
         "buttonText": {
           "type": "string",
@@ -877,7 +885,10 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored."
+          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored.",
+          "ui": {
+            "help": "A choice can be picked again, but what it changes counts only the first time. Use it for clues the player may re-read without scoring twice."
+          }
         },
         "layoutTemplate": {
           "type": "string",
@@ -894,7 +905,8 @@
               "custom"
             ],
             "label": "Layout",
-            "scope": "ve-left"
+            "scope": "ve-left",
+            "help": "How the conversation is laid out in a responsive story: text beside the replies, text above them, a scrolling chat, or one chat bubble at a time. Custom lets you place each part yourself."
           }
         },
         "presentationMode": {
@@ -951,7 +963,8 @@
             "max": 10,
             "step": 0.5,
             "label": "NPC Response Delay (seconds)",
-            "scope": "ve-left"
+            "scope": "ve-left",
+            "help": "How long a character \"types\" before their line appears in a chat layout. Empty: 1.5 seconds."
           }
         },
         "lineAdvance": {
@@ -970,7 +983,8 @@
                 "value": "auto",
                 "label": "by themselves after reading time"
               }
-            ]
+            ],
+            "help": "What happens after a line the player doesn't answer (another character speaks next, or a goodbye). Wait for a click suits quiet scenes; moving on by itself suits chats and group scenes. Empty: by itself in chat layouts, a click elsewhere."
           }
         },
         "allowSkipAhead": {
@@ -980,7 +994,8 @@
           "description": "Only when lines move on by themselves (lineAdvance 'auto', the default in chat layouts): whether the player can skip ahead while other characters speak. On (default): those lines show a Continue button and also move on after reading time. Off: no Continue button; those lines play at reading pace (in chat layouts with the typing indicator before each next speaker) and the player waits until it is their turn to answer. Turn it off for group scenes that should unfold at their own pace.",
           "ui": {
             "control": "checkbox",
-            "label": "Players can skip ahead"
+            "label": "Players can skip ahead",
+            "help": "When lines move on by themselves: on, the player gets a Continue button to hurry them; off, the player waits until it is their turn. Turn it off for group scenes that should unfold at their own pace."
           }
         },
         "showSpeaker": {
@@ -1077,7 +1092,8 @@
           "required": true,
           "ui": {
             "control": "textarea",
-            "rows": 3
+            "rows": 3,
+            "help": "The question shown above the choices. Use the buttons above for bold, italic, strikethrough and highlight; write \\* for a real asterisk."
           },
           "default": "What do you say?",
           "description": "Prompt text shown above the choice buttons. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~, ==highlight== — use sparingly, for emphasis a reader should feel. A backslash shows a marker character itself: \\* for a literal *, \\_ for _."
@@ -1086,7 +1102,10 @@
           "type": "array<multiChoiceOption>",
           "required": true,
           "minItems": 1,
-          "description": "Array of choice buttons. Each has its own target + per-choice effect/condition bundle (same surface as DialogTree's choices)."
+          "description": "Array of choice buttons. Each has its own target + per-choice effect/condition bundle (same surface as DialogTree's choices).",
+          "ui": {
+            "help": "The choice buttons. Each has its own destination, effects and conditions."
+          }
         },
         "choiceDelay": {
           "type": "number",
@@ -1110,7 +1129,10 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored."
+          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored.",
+          "ui": {
+            "help": "A choice can be picked again, but what it changes counts only the first time. Use it for clues the player may re-read without scoring twice."
+          }
         },
         "slotIntent": {
           "type": "object",
@@ -1134,7 +1156,8 @@
               "custom"
             ],
             "label": "Layout",
-            "scope": "ve-left"
+            "scope": "ve-left",
+            "help": "How the question and choices are laid out in a responsive story: question above the buttons, side by side, or as one chat bubble. Custom lets you place each part yourself. For a scrolling chat, use a Dialog Tree."
           }
         },
         "speaker": {
@@ -1156,7 +1179,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "explainHuds": {
@@ -1248,7 +1272,10 @@
           "type": "array<characterOption>",
           "required": true,
           "minItems": 1,
-          "description": "One option per character the player can pick. Each names its character; the label defaults to the character's name, and description adds a second line. Filled from the role's candidates when the role is chosen."
+          "description": "One option per character the player can pick. Each names its character; the label defaults to the character's name, and description adds a second line. Filled from the role's candidates when the role is chosen.",
+          "ui": {
+            "help": "One option for each character the player can pick. The label is the character's name unless you write another; the description adds a second line."
+          }
         },
         "optionStyle": {
           "type": "string",
@@ -1298,7 +1325,10 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored."
+          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored.",
+          "ui": {
+            "help": "A choice can be picked again, but what it changes counts only the first time. Use it for clues the player may re-read without scoring twice."
+          }
         },
         "slotIntent": {
           "type": "object",
@@ -1322,7 +1352,8 @@
               "custom"
             ],
             "label": "Layout",
-            "scope": "ve-left"
+            "scope": "ve-left",
+            "help": "How the question and options are laid out in a responsive story: question above the options, side by side, or as one chat bubble. Custom lets you place each part yourself."
           }
         },
         "speaker": {
@@ -1344,7 +1375,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "explainHuds": {
@@ -1431,7 +1463,8 @@
           "required": false,
           "description": "The buttons (text buttons and clickable pictures), each keyed to its stage element by locationName, with its own target, effects and conditions.",
           "ui": {
-            "label": "Buttons"
+            "label": "Buttons",
+            "help": "The buttons and clickable pictures on this screen. Each has its own destination, effects and conditions."
           }
         },
         "parkedButtons": {
@@ -1534,7 +1567,10 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored."
+          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored.",
+          "ui": {
+            "help": "A choice can be picked again, but what it changes counts only the first time. Use it for clues the player may re-read without scoring twice."
+          }
         },
         "showTextOnHover": {
           "type": "boolean",
@@ -1569,7 +1605,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "explainHuds": {
@@ -1665,7 +1702,10 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored."
+          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored.",
+          "ui": {
+            "help": "An object can be picked again, but it is added to the inventory and its effects count only the first time."
+          }
         },
         "spatialFit": {
           "type": "string",
@@ -1694,7 +1734,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "explainHuds": {
@@ -1870,7 +1911,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "connection": {
@@ -1952,7 +1994,10 @@
           "type": "string",
           "required": false,
           "default": "The End",
-          "description": "Ending message. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~, ==highlight== — use sparingly, for emphasis a reader should feel. A backslash shows a marker character itself: \\* for a literal *, \\_ for _."
+          "description": "Ending message. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~, ==highlight== — use sparingly, for emphasis a reader should feel. A backslash shows a marker character itself: \\* for a literal *, \\_ for _.",
+          "ui": {
+            "help": "The closing words of this ending. Use the buttons above for bold, italic, strikethrough and highlight; write \\* for a real asterisk."
+          }
         },
         "showRestart": {
           "type": "boolean",
@@ -1970,7 +2015,10 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Reset all values on restart. Items marked keepOnRestart (variables, character counters) or keepVariantOnRestart (characters) survive; the built-in ${playthrough} counts the runs"
+          "description": "Reset all values on restart. Items marked keepOnRestart (variables, character counters) or keepVariantOnRestart (characters) survive; the built-in ${playthrough} counts the runs",
+          "ui": {
+            "help": "Start the next run fresh. Anything marked Keep across restarts stays."
+          }
         },
         "resetVariables": {
           "type": "boolean",
@@ -2067,7 +2115,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Characters (feelings, variants)"
+            "label": "Characters (feelings, variants)",
+            "help": "Also reset the characters: their feelings, which variant they are, and when their HUD appears. Untick to let characters remember the last run."
           }
         },
         "resetHistory": {
@@ -2137,7 +2186,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "restartConnection": {
@@ -2393,7 +2443,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "explainHuds": {
@@ -2443,7 +2494,10 @@
           "type": "string",
           "required": true,
           "default": "variable",
-          "description": "Discriminator: 'variable' | 'counter' | 'fictionalTime'. Drives which fields below are read at runtime."
+          "description": "Discriminator: 'variable' | 'counter' | 'fictionalTime'. Drives which fields below are read at runtime.",
+          "ui": {
+            "help": "What to change: a variable, a counter, or the story's clock."
+          }
         },
         "name": {
           "type": "string",
@@ -2453,7 +2507,8 @@
             "dependsOn": {
               "field": "type",
               "value": "variable"
-            }
+            },
+            "help": "The variable or counter to change. Not needed for the story's clock."
           }
         },
         "character": {
@@ -2466,19 +2521,26 @@
             "dependsOn": {
               "field": "type",
               "value": "counter"
-            }
+            },
+            "help": "Whose counter this is. Leave empty for a counter of the story itself (a score, days passed); pick a character for one they carry (health, trust)."
           }
         },
         "value": {
           "type": "any",
           "required": true,
-          "description": "New value (string for variables, number for counters). Prefix with '=' (spreadsheet convention) to compute an arithmetic expression at runtime, e.g. \"= (var1 + var2) / 100\" — supports + - * / parentheses, unary minus, numeric literals, and variable/counter references (plain identifiers like score, plus ${name}, $name$, {name}; names resolve against variables first, then counters; character-scoped counters via owner.counter, e.g. alice.trust). If evaluation fails (unknown reference, division by zero, syntax error) the raw string is stored unchanged. Without the leading '=' nothing is evaluated — '5+3' stays the literal string '5+3'. For type='fictionalTime' with operation='advance'/'subtract', this is the magnitude (paired with timeUnit). Empty/zero is a valid value."
+          "description": "New value (string for variables, number for counters). Prefix with '=' (spreadsheet convention) to compute an arithmetic expression at runtime, e.g. \"= (var1 + var2) / 100\" — supports + - * / parentheses, unary minus, numeric literals, and variable/counter references (plain identifiers like score, plus ${name}, $name$, {name}; names resolve against variables first, then counters; character-scoped counters via owner.counter, e.g. alice.trust). If evaluation fails (unknown reference, division by zero, syntax error) the raw string is stored unchanged. Without the leading '=' nothing is evaluated — '5+3' stays the literal string '5+3'. For type='fictionalTime' with operation='advance'/'subtract', this is the magnitude (paired with timeUnit). Empty/zero is a valid value.",
+          "ui": {
+            "help": "The new value. Start with = to calculate it from other values, for example = score + 10 or = (gold + silver) / 2."
+          }
         },
         "operation": {
           "type": "string",
           "required": false,
           "default": "set",
-          "description": "Variable: 'set'. Counter: 'set' | 'change' | 'add' | 'subtract' | 'multiply'. fictionalTime: 'set' | 'advance' | 'subtract'."
+          "description": "Variable: 'set'. Counter: 'set' | 'change' | 'add' | 'subtract' | 'multiply'. fictionalTime: 'set' | 'advance' | 'subtract'.",
+          "ui": {
+            "help": "A variable is set. A counter can be set, raised, lowered or multiplied. The clock can be set, moved forward or moved back."
+          }
         },
         "connection": {
           "type": "connection",
@@ -2570,7 +2632,8 @@
                 "value": "preset",
                 "label": "Place points on a map (authoring)"
               }
-            ]
+            ],
+            "help": "Where the points come from: the player's position right now, coordinates you type in, points scattered at random around a centre, or points you place on a map beforehand."
           }
         },
         "presetPoints": {
@@ -2584,7 +2647,8 @@
             "dependsOn": {
               "field": "mode",
               "value": "preset"
-            }
+            },
+            "help": "The points you placed on the map. They are used exactly as placed, with no connection needed while playing."
           },
           "itemSchema": {
             "lat": {
@@ -2609,7 +2673,8 @@
           "required": true,
           "description": "Name of the GPS point set to write. Reference this name from a GpsLocation entry (its 'pointName') to geofence these points.",
           "ui": {
-            "label": "Point set name"
+            "label": "Point set name",
+            "help": "A name for these points. A GPS Location beat uses the name to wait at them."
           }
         },
         "lat": {
@@ -2617,7 +2682,8 @@
           "required": false,
           "description": "Latitude (WGS84). Used by 'explicit' mode, and by 'scatter' when the center source is explicit coordinates.",
           "ui": {
-            "label": "Latitude"
+            "label": "Latitude",
+            "help": "Latitude in decimal degrees, for example 59.3293."
           }
         },
         "lng": {
@@ -2625,7 +2691,8 @@
           "required": false,
           "description": "Longitude (WGS84). Used by 'explicit' mode, and by 'scatter' when the center source is explicit coordinates.",
           "ui": {
-            "label": "Longitude"
+            "label": "Longitude",
+            "help": "Longitude in decimal degrees, for example 18.0686."
           }
         },
         "pointRadiusMeters": {
@@ -2633,7 +2700,8 @@
           "required": false,
           "description": "Optional geofence radius (metres) stamped on each stored point; falls back to the GpsLocation beat's radius when omitted.",
           "ui": {
-            "label": "Point radius (m)"
+            "label": "Point radius (m)",
+            "help": "Optional. How near the player has to come to each point, in metres. Empty: the GPS Location beat's own radius."
           }
         },
         "count": {
@@ -2695,7 +2763,8 @@
           "required": false,
           "description": "scatter mode with center source 'point': the name of the point set to center on (uses its first point).",
           "ui": {
-            "label": "Center point set"
+            "label": "Center point set",
+            "help": "The named points to scatter around; the first of them is the centre."
           }
         },
         "placement": {
@@ -2719,7 +2788,8 @@
             "dependsOn": {
               "field": "mode",
               "value": "scatter"
-            }
+            },
+            "help": "Uniform works offline but can land in a building or in water. Walkable looks up real streets and parks, so it needs a connection while playing."
           }
         },
         "fallbackLat": {
@@ -2779,13 +2849,19 @@
         "moreConditions": {
           "type": "array<object>",
           "required": false,
-          "description": "Further conditions checked together with `condition`, each in the same shape (e.g. {\"type\":\"variable\",\"variableName\":\"attachedOldChat\",\"operator\":\"==\",\"value\":true}). With conditionsMatch 'any' the beat takes trueConnection when AT LEAST ONE condition holds (OR); with 'all' (default) only when EVERY condition holds (AND). Use this instead of chaining several Condition Check beats for one decision."
+          "description": "Further conditions checked together with `condition`, each in the same shape (e.g. {\"type\":\"variable\",\"variableName\":\"attachedOldChat\",\"operator\":\"==\",\"value\":true}). With conditionsMatch 'any' the beat takes trueConnection when AT LEAST ONE condition holds (OR); with 'all' (default) only when EVERY condition holds (AND). Use this instead of chaining several Condition Check beats for one decision.",
+          "ui": {
+            "help": "More checks for the same decision, so you don't need a chain of Condition Check beats."
+          }
         },
         "conditionsMatch": {
           "type": "string",
           "required": false,
           "default": "all",
-          "description": "How `condition` and `moreConditions` combine: 'all' = every one must hold (AND), 'any' = at least one (OR). Only matters when moreConditions has entries."
+          "description": "How `condition` and `moreConditions` combine: 'all' = every one must hold (AND), 'any' = at least one (OR). Only matters when moreConditions has entries.",
+          "ui": {
+            "help": "Whether every check has to be true, or one is enough."
+          }
         }
       },
       "nested": {
@@ -2829,7 +2905,10 @@
           "type": "string",
           "required": true,
           "default": "",
-          "description": "Text to display. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~, ==highlight== — use sparingly, for emphasis a reader should feel. A backslash shows a marker character itself: \\* for a literal *, \\_ for _."
+          "description": "Text to display. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~, ==highlight== — use sparingly, for emphasis a reader should feel. A backslash shows a marker character itself: \\* for a literal *, \\_ for _.",
+          "ui": {
+            "help": "The text shown while the screen is up. Use the buttons above for bold, italic, strikethrough and highlight; write \\* for a real asterisk."
+          }
         },
         "textVariations": {
           "type": "array<string>",
@@ -2851,7 +2930,8 @@
             "control": "number",
             "min": 0.5,
             "step": 0.5,
-            "label": "Duration (seconds)"
+            "label": "Duration (seconds)",
+            "help": "How long the screen stays up, in seconds. Allow about a second for every two words, and at least three seconds."
           }
         },
         "speaker": {
@@ -2873,7 +2953,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "connection": {
@@ -2966,6 +3047,9 @@
               "required": false,
               "description": "Name for the branch shown on the graph edge"
             }
+          },
+          "ui": {
+            "help": "The branches one is drawn from. A higher weight makes a branch more likely; 0 means never. A branch can also have effects that happen when it is drawn."
           }
         }
       },
@@ -3149,7 +3233,8 @@
           "ui": {
             "control": "character-ref",
             "label": "Sentiment target",
-            "group": "Sentiment"
+            "group": "Sentiment",
+            "help": "Who or what the feeling is about: a character, an item, a place, or any word you choose."
           }
         },
         "sentimentEmotion": {
@@ -3175,7 +3260,8 @@
               "← weaker / opposite",
               "stronger →"
             ],
-            "group": "Sentiment"
+            "group": "Sentiment",
+            "help": "How much stronger (or, with a minus, weaker) the feeling gets. The total stays between -1 and 1."
           }
         },
         "emotion": {
@@ -3184,7 +3270,8 @@
           "description": "Emotion name to fire (e.g. joy, anger, fear). When the emotion is in the project's emotion palette, mood is auto-nudged by its weights — no need to also set mood deltas above. Unknown names still update the level but skip the mood side-effect so typos are surfaced.",
           "ui": {
             "label": "Emotion",
-            "group": "Emotion"
+            "group": "Emotion",
+            "help": "The emotion the character feels now, such as joy, anger or fear. An emotion from the project's list also shifts their mood."
           }
         },
         "emotionDelta": {
@@ -3250,7 +3337,8 @@
                 "value": "trigger-on-departure",
                 "label": "Trigger on departure"
               }
-            ]
+            ],
+            "help": "Show the map and a Continue button, or wait until the player arrives at the place, or until they leave it."
           }
         },
         "targetLat": {
@@ -3277,7 +3365,8 @@
           "description": "Proximity radius in metres. Falls back to the project's LocationSettings.defaultProximityRadiusM when unset, then 25m.",
           "ui": {
             "label": "Radius (metres)",
-            "min": 1
+            "min": 1,
+            "help": "How near the player has to be, in metres. Empty: the project's radius, or 25 m."
           }
         },
         "text": {
@@ -3312,7 +3401,8 @@
           "description": "Optional timeout in milliseconds. The beat resolves with 'timeout' if no arrival / departure / skip happens within this window.",
           "ui": {
             "label": "Timeout (ms)",
-            "min": 0
+            "min": 0,
+            "help": "Optional. Give up waiting after this long, in milliseconds (60000 = one minute)."
           }
         },
         "mapStyle": {
@@ -3386,7 +3476,8 @@
                 "value": "trigger-on-departure",
                 "label": "Trigger on departure"
               }
-            ]
+            ],
+            "help": "Show the floor plan and a Continue button, or wait until the player comes near the beacon, or until they walk away from it."
           }
         },
         "targetBeaconUuid": {
@@ -3403,7 +3494,8 @@
           "description": "Proximity radius in metres. Falls back to LocationSettings.defaultProximityRadiusM when unset, then 5m (room-scale default — indoor is tighter than outdoor).",
           "ui": {
             "label": "Radius (metres)",
-            "min": 0.5
+            "min": 0.5,
+            "help": "How near the player has to be, in metres. Empty: the project's radius, or 5 m."
           }
         },
         "text": {
@@ -3438,7 +3530,8 @@
           "description": "Optional timeout in milliseconds. Beat resolves with 'timeout' if no arrival / departure / skip within this window.",
           "ui": {
             "label": "Timeout (ms)",
-            "min": 0
+            "min": 0,
+            "help": "Optional. Give up waiting after this long, in milliseconds (60000 = one minute)."
           }
         },
         "connection": {
@@ -3462,13 +3555,19 @@
           "type": "string",
           "required": true,
           "default": "Please enter your response:",
-          "description": "Question or prompt text to display. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~, ==highlight== — use sparingly, for emphasis a reader should feel. A backslash shows a marker character itself: \\* for a literal *, \\_ for _."
+          "description": "Question or prompt text to display. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~, ==highlight== — use sparingly, for emphasis a reader should feel. A backslash shows a marker character itself: \\* for a literal *, \\_ for _.",
+          "ui": {
+            "help": "The question the player answers. Use the buttons above for bold, italic, strikethrough and highlight; write \\* for a real asterisk."
+          }
         },
         "saveToType": {
           "type": "string",
           "required": true,
           "default": "variable",
-          "description": "Save input to: 'variable', 'characterName', or 'counter'"
+          "description": "Save input to: 'variable', 'characterName', or 'counter'",
+          "ui": {
+            "help": "Where the answer goes: a variable, a character's name, or a counter."
+          }
         },
         "variable": {
           "type": "string",
@@ -3477,23 +3576,35 @@
           ],
           "required": false,
           "default": "userInput",
-          "description": "Variable name to store the input (when saveToType='variable'). AI sometimes emits 'variableName' — pipeline aliases it to 'variable'."
+          "description": "Variable name to store the input (when saveToType='variable'). AI sometimes emits 'variableName' — pipeline aliases it to 'variable'.",
+          "ui": {
+            "help": "The variable that keeps the answer."
+          }
         },
         "characterId": {
           "type": "string",
           "required": false,
-          "description": "Character ID to update display name (when saveToType='characterName')"
+          "description": "Character ID to update display name (when saveToType='characterName')",
+          "ui": {
+            "help": "The character who takes the answer as their name."
+          }
         },
         "counter": {
           "type": "string",
           "required": false,
-          "description": "Counter name to store numeric input (when saveToType='counter')"
+          "description": "Counter name to store numeric input (when saveToType='counter')",
+          "ui": {
+            "help": "The counter that takes the number the player types."
+          }
         },
         "counterOperation": {
           "type": "string",
           "required": false,
           "default": "set",
-          "description": "Counter operation: 'set' or 'change' (when saveToType='counter')"
+          "description": "Counter operation: 'set' or 'change' (when saveToType='counter')",
+          "ui": {
+            "help": "Set the counter to the number, or add the number to it."
+          }
         },
         "placeholder": {
           "type": "string",
@@ -3547,7 +3658,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "connection": {
@@ -3725,7 +3837,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "connection": {
@@ -3983,7 +4096,10 @@
           "type": "string",
           "required": true,
           "default": "scannedCode",
-          "description": "Variable name to receive the decoded value (used when the QR is not an asaps:// URI, or interpretAsapsUri is off)"
+          "description": "Variable name to receive the decoded value (used when the QR is not an asaps:// URI, or interpretAsapsUri is off)",
+          "ui": {
+            "help": "The variable that keeps what the code says."
+          }
         },
         "interpretAsapsUri": {
           "type": "boolean",
@@ -3992,7 +4108,8 @@
           "description": "When true and the scanned code is a valid asaps:// URI (e.g. asaps://beat/<id>, asaps://variable/<name>/<value>, asaps://inventory/add/<item>), apply it directly instead of just saving to a variable. Non-asaps codes still save to the variable.",
           "ui": {
             "control": "checkbox",
-            "label": "Interpret asaps:// URIs"
+            "label": "Interpret asaps:// URIs",
+            "help": "A code made for this story (starting with asaps://) acts directly: it jumps to a beat, sets a variable or adds an item. Other codes are saved to the variable."
           }
         },
         "facing": {
@@ -4067,7 +4184,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "connection": {
@@ -4189,7 +4307,8 @@
                 "label": "Face tracking (Phase 2)"
               }
             ],
-            "label": "Tracking Mode"
+            "label": "Tracking Mode",
+            "help": "How the scene finds where to put things. Only picture markers are available so far."
           }
         },
         "markerAssetId": {
@@ -4198,7 +4317,8 @@
           "description": "Asset ID of a pre-compiled .mind file produced by the MindAR compiler (https://hiukim.github.io/mind-ar-js-doc/tools/compile/). Used as the image target the camera tracks.",
           "ui": {
             "control": "asset-picker",
-            "label": "Marker (.mind file)"
+            "label": "Marker (.mind file)",
+            "help": "The picture the camera looks for, as a .mind file made with the MindAR compiler."
           }
         },
         "anchors": {
@@ -4209,7 +4329,8 @@
           "ui": {
             "label": "Anchors",
             "addLabel": "Add Anchor",
-            "itemLabel": "Anchor"
+            "itemLabel": "Anchor",
+            "help": "What appears on the marker. Each has a label, an optional picture, and a beat it leads to when tapped."
           },
           "itemSchema": {
             "id": {
@@ -4293,7 +4414,8 @@
           "description": "Target beat when the player skips, when permission is denied, or when no anchor is tapped. Shown in the flowchart as a 'Skip / no anchor' link.",
           "ui": {
             "control": "beat-ref",
-            "label": "Fallback beat"
+            "label": "Fallback beat",
+            "help": "Where the story goes when the player skips, refuses the camera, or taps nothing."
           }
         },
         "speaker": {
@@ -4315,7 +4437,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "explainHuds": {
@@ -4412,7 +4535,8 @@
           "description": "URL to embed. NOTE: many public sites block iframe embedding (X-Frame-Options / CSP frame-ancestors). Electron desktop bypasses this; the web/PW preview cannot.",
           "ui": {
             "control": "text",
-            "label": "URL"
+            "label": "URL",
+            "help": "The web page to show. Many sites refuse to be shown inside another page; the desktop app can show them, a story in a browser cannot."
           }
         },
         "prompt": {
@@ -4430,7 +4554,8 @@
           "required": false,
           "description": "Optional regex — when the embedded page navigates to a URL matching this pattern, the beat advances automatically. Iframe origin restrictions may prevent detecting cross-origin navigation; Electron <webview> can observe it.",
           "ui": {
-            "label": "Auto-exit URL pattern (regex)"
+            "label": "Auto-exit URL pattern (regex)",
+            "help": "Optional. When the page moves to an address matching this pattern, the story moves on. In a browser this often cannot be seen for other sites."
           }
         },
         "passContext": {
@@ -4439,13 +4564,17 @@
           "description": "Story variable names to inject into the URL as a hash fragment (e.g. #userName=Alice). Lets the embedded page read story state without an API call.",
           "ui": {
             "label": "Pass variables",
-            "addLabel": "Add Variable"
+            "addLabel": "Add Variable",
+            "help": "Variables to hand to the page, added to its address (for example #userName=Alice)."
           }
         },
         "saveTo": {
           "type": "string",
           "required": false,
-          "description": "Variable to receive a value posted from the page via postMessage({asaps:'result', value: ...}). Empty = ignore postMessage."
+          "description": "Variable to receive a value posted from the page via postMessage({asaps:'result', value: ...}). Empty = ignore postMessage.",
+          "ui": {
+            "help": "A variable for a value the page sends back. Empty: nothing is kept."
+          }
         },
         "doneButtonText": {
           "type": "string",
@@ -4472,7 +4601,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "connection": {
@@ -4568,7 +4698,10 @@
           "type": "array<object>",
           "required": true,
           "minItems": 1,
-          "description": "Array of { word: string, targetBeatId: string, style?: object }"
+          "description": "Array of { word: string, targetBeatId: string, style?: object }",
+          "ui": {
+            "help": "The words in the text that can be clicked, each with the beat it leads to."
+          }
         },
         "allowMultipleClicks": {
           "type": "boolean",
@@ -4607,7 +4740,8 @@
             "control": "speaker-visibility",
             "label": "Show Speaker Name",
             "group": "Speaker",
-            "scope": "beat"
+            "scope": "beat",
+            "help": "Show the speaker's name to the player."
           }
         },
         "explainHuds": {
@@ -4695,7 +4829,8 @@
               "api",
               "ai-query"
             ],
-            "label": "Source Type"
+            "label": "Source Type",
+            "help": "Fetch from a web address directly, or let the AI search for it."
           }
         },
         "apiUrl": {
@@ -4846,7 +4981,8 @@
           "ui": {
             "control": "textarea",
             "rows": 3,
-            "label": "Evaluation Prompt"
+            "label": "Evaluation Prompt",
+            "help": "What the AI should judge, in your own words."
           }
         },
         "categories": {
@@ -4926,7 +5062,8 @@
           "description": "Fallback target if AI can't decide (used when no category matches). Shown in the flowchart as a 'Fallback' link.",
           "ui": {
             "label": "Fallback Target",
-            "control": "beat-ref"
+            "control": "beat-ref",
+            "help": "Where the story goes if the AI can't decide."
           }
         },
         "timeout": {
@@ -5043,7 +5180,8 @@
               "custom"
             ],
             "label": "Layout",
-            "scope": "ve-left"
+            "scope": "ve-left",
+            "help": "How the conversation is laid out: text above the replies, text beside them, a scrolling chat, or one chat bubble at a time. Custom lets you place each part yourself."
           }
         },
         "showAvatars": {
@@ -5104,7 +5242,8 @@
           "ui": {
             "control": "textarea",
             "rows": 3,
-            "label": "System Instructions"
+            "label": "System Instructions",
+            "help": "Directions for the AI that writes this dialog: what to mention, what to avoid, the tone. The player never sees them."
           }
         },
         "choiceDelay": {
@@ -5286,7 +5425,8 @@
             "label": "Restart at",
             "emptyLabel": "— choose where Restart leads —",
             "requiredWhen": "showRestart",
-            "missingHint": "The Restart button leads nowhere yet — pick where replays begin: the title screen, the project's start beat, or another beat."
+            "missingHint": "The Restart button leads nowhere yet — pick where replays begin: the title screen, the project's start beat, or another beat.",
+            "help": "Where the Restart button leads, usually the title screen. Needed while the Restart button is shown."
           }
         },
         "connection": {
@@ -5301,7 +5441,10 @@
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Reset state on restart. Items marked keepOnRestart (variables, character counters) or keepVariantOnRestart (characters) survive; the built-in ${playthrough} counts the runs"
+          "description": "Reset state on restart. Items marked keepOnRestart (variables, character counters) or keepVariantOnRestart (characters) survive; the built-in ${playthrough} counts the runs",
+          "ui": {
+            "help": "Start the next run fresh. Anything marked Keep across restarts stays."
+          }
         },
         "resetVariables": {
           "type": "boolean",
@@ -5398,7 +5541,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Characters (feelings, variants)"
+            "label": "Characters (feelings, variants)",
+            "help": "Also reset the characters: their feelings, which variant they are, and when their HUD appears. Untick to let characters remember the last run."
           }
         },
         "resetHistory": {
@@ -5801,7 +5945,8 @@
             "min": 1,
             "max": 30,
             "step": 0.5,
-            "label": "Min Duration (seconds)"
+            "label": "Min Duration (seconds)",
+            "help": "The shortest the screen stays up, in seconds."
           }
         },
         "maxDuration": {
@@ -5814,7 +5959,8 @@
             "min": 5,
             "max": 120,
             "step": 1,
-            "label": "Max Duration (seconds)"
+            "label": "Max Duration (seconds)",
+            "help": "The longest the screen stays up, in seconds. A full paragraph needs about 25."
           }
         },
         "connection": {
@@ -5905,7 +6051,8 @@
                 "value": "dialog",
                 "label": "Dialog (back-and-forth, positionable)"
               }
-            ]
+            ],
+            "help": "Chat is a scrolling message panel, best on phones. Dialog shows one exchange at a time in a dialog box with a text field below, like a Dialog Tree."
           }
         },
         "scenario": {
@@ -5947,7 +6094,8 @@
           "ui": {
             "control": "textarea",
             "rows": 2,
-            "label": "Opening Line"
+            "label": "Opening Line",
+            "help": "The character's first line. Empty: the AI writes one. If the player hasn't met this character, introduce them here; the scenario and personality notes are never shown."
           }
         },
         "directions": {
@@ -6253,7 +6401,8 @@
           "ui": {
             "control": "textarea",
             "rows": 2,
-            "label": "Closing line when turns run out"
+            "label": "Closing line when turns run out",
+            "help": "What the character should say when the turns run out, for example \"apologise that time is up and suggest meeting next week\". Empty: no closing line."
           }
         },
         "includeVariables": {
@@ -6284,12 +6433,18 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Show a microphone button for voice input. OFF by default and NOT something to turn on when generating a story: it only works after the author has set up a speech-to-text server (header STT menu). Leave it unset."
+          "description": "Show a microphone button for voice input. OFF by default and NOT something to turn on when generating a story: it only works after the author has set up a speech-to-text server (header STT menu). Leave it unset.",
+          "ui": {
+            "help": "Adds a microphone button. Works only after a speech-to-text server is set up (STT in the toolbar)."
+          }
         },
         "language": {
           "type": "string",
           "required": false,
-          "description": "Language for speech recognition (BCP 47, e.g., 'en-US')"
+          "description": "Language for speech recognition (BCP 47, e.g., 'en-US')",
+          "ui": {
+            "help": "The language the player speaks, as a code such as en-US or sv-SE."
+          }
         },
         "systemInstructions": {
           "type": "string",

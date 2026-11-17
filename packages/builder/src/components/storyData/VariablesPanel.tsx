@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Variable } from 'lucide-react';
 import type { GlobalSettings } from '../../storage/types';
+import { GuideLink } from '../GuideLink';
 
 export type StoryVariable = NonNullable<GlobalSettings['variables']>[number];
 
@@ -73,7 +74,8 @@ export const VariablesPanel: React.FC<Props> = ({ variables, onChange, renderUsa
         Variables remember what happened: a door unlocked, a name the player typed, a score. Each starts at its
         starting value and goes back to it when an ending's Restart resets variables, unless you tick{' '}
         <em>Keep across restarts</em>. Built in:{' '}
-        <code className="font-mono text-xs bg-gray-100 px-1 rounded">playthrough</code> counts the runs (1, 2, …).
+        <code className="font-mono text-xs bg-gray-100 px-1 rounded">playthrough</code> counts the runs (1, 2, …).{' '}
+        <GuideLink anchor="story-data" />
       </p>
 
       {variables.length === 0 ? (

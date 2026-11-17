@@ -15,6 +15,7 @@ import { normalizeSpeakerDisplay, normalizeGlobalSettings } from '../../utils/th
 import { findThemeCopies, assetsInUseBySettings, settingsWithoutAssets } from '../../utils/themeGraphics';
 import { COMMON_LANGUAGES } from '../../utils/languageCatalog';
 import { usePersistedState } from '../../utils/persistedState';
+import { GuideLink } from '../GuideLink';
 import { notify, confirmAction } from '../../utils/notify';
 import { useAIFeatures } from '../../utils/aiFeatures';
 import { useProjectAssets } from '../../contexts/ProjectAssetsContext';
@@ -2133,7 +2134,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
                 <div className="border rounded-lg p-4 space-y-3">
                   <h4 className="font-medium text-gray-700">Speaker Display</h4>
-                  <p className="text-xs text-gray-500">Controls how speaker names and portrait graphics appear during playback. Individual beats can override these settings.</p>
+                  <p className="text-xs text-gray-500">How speakers' names, portraits and lines are shown. A beat can do it differently (This beat's look, in the Visual Editor). <GuideLink anchor="speaker-display" /></p>
 
                   {/* Global toggles */}
                   <div className="flex gap-6">
@@ -2312,7 +2313,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       <option value="bubble">Speech bubbles</option>
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
-                      Speech bubbles: when a character placed on the stage speaks, the line appears in a bubble next to them, pointing at them. Narration, and characters who aren't on the stage, keep the text box, as does any line whose bubble doesn't fit, as on a small phone. Choose where the bubble points by selecting the character in the Visual Editor.
+                      Speech bubbles: a character on the stage says their line in a bubble pointing at them. Narration, characters who aren't on the stage, and lines too long for a bubble keep the text box. <GuideLink anchor="speech-bubbles" />
                     </p>
                   </div>
 
@@ -2415,7 +2416,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     Players can reopen the conversations they have had so far, like chats in a
                     messenger: every Dialog Tree played, with the lines as they were shown and the
                     player's replies. It's history only; nothing replays. Opens from the player's
-                    menu (Messages) and from the Preview Window's toolbar.
+                    menu (Messages) and from the Preview Window's toolbar. <GuideLink anchor="message-history" />
                   </span>
                 </span>
               </label>

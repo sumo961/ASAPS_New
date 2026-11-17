@@ -48,6 +48,20 @@ A toolbar button beside Characters opens **Story Data**: what the story remember
 - Checked in the browser: Last Ferry (trust follows feelings), Counters that read affect, and Ordinary Wonders (`wonderName` set in "Name the wonder", shown in "Journal entry"; Add to the list; click goes to the beat).
 - **Files:** `packages/core/src/analysis/{storyDataUsage,StoryWarnings,index}.ts` (+ `tests/analysis/storyDataUsage.test.ts`), `packages/builder/src/components/storyData/{StoryDataWindow,VariablesPanel}.tsx` (+ test), `components/Header.tsx`, `App.tsx`, `components/settings/GlobalSettingsInspector.tsx`, `utils/{applyChangeProposals,storyDigest}.ts`, `components/ai/codesigner/systemPrompt.ts`, `mcp-server-desktop/src/index.ts`
 
+### Changed: field hints written for authors
+The Properties panel shows a field's `ui.help` and falls back to its `description`, which is written for AI generation (code names, option values, instructions to the model).
+- **95 fields got author help** (`ui.help` in `beat-definitions/core-beats.json`): all 52 whose fallback text was longer than 140 characters (the Set Variable value was 776), and 43 shorter ones that showed code names (`saveToType='variable'`, "the interactor", `LocationSettings.defaultProximityRadiusM`). The descriptions are unchanged, so AI generation and the MCP server read what they read before.
+- **A hint that only repeats the label is left out** ("Author" / "Author name"): `fieldHelp()` in `SchemaFormGenerator.tsx`.
+- 241 of 402 visible fields still fall back to a short description.
+- **Files:** `beat-definitions/core-beats.json`, `packages/builder/src/components/SchemaFormGenerator.tsx` (+ `__tests__/fieldHelp.test.ts`)
+
+### New: links into the User Guide
+- **Tools ▸ User Guide** opens the guide; the browser build had no way to it (the desktop app has Help ▸ Documentation).
+- **Learn more** links open the guide at the right section: Speaker Display, speech bubbles and Message history (Project Settings ▸ Dialogue), Story Data, Characters ▸ Roles. `GuideLink` / `guideUrl(anchor)` in `components/GuideLink.tsx`.
+- The speech-bubble hint under "Show lines as" is half as long, with the detail behind the link.
+- The links point at the guide on GitHub's main branch, so the new anchors (`#story-data`) work once this is pushed.
+- **Files:** `packages/builder/src/components/{GuideLink,Header}.tsx`, `components/settings/{GlobalSettingsInspector,RolesSettingsPanel}.tsx`, `components/storyData/VariablesPanel.tsx`
+
 ---
 
 ## 2026-11-16: Speech bubbles and dimmed characters (v0.9.157)
