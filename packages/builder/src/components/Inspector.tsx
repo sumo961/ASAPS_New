@@ -1343,6 +1343,13 @@ export const Inspector: React.FC<InspectorProps> = ({
   }
 
   const beatDef = getBeatDefinition(beat.type);
+  // Per-beat overrides of a screen panel are offered when the project has
+  // that panel turned on (Project Settings ▸ Screen panels), or when this
+  // beat already carries one, so nothing an author set goes out of reach.
+  const showsTimeDisplay = !!(globalSettings as any)?.hudOverlays?.timerHud?.enabled
+    || !!localBeat?.timeDisplayMode || !!localBeat?.timeDisplayText;
+  const showsCountdownOverride = !!(globalSettings as any)?.hudOverlays?.countdownMeter?.enabled
+    || !!localBeat?.overrideCountdownMeter;
   const connectionType = beatDef?.connectionType || 'single';
 
   const validateBeat = (): string[] => {
@@ -1878,7 +1885,7 @@ export const Inspector: React.FC<InspectorProps> = ({
             </div>
           </div>
           <div className="text-sm text-gray-500 flex items-center gap-2 flex-wrap">
-            <span>{beat.type} • ID: {beat.id}</span>
+            <span>{beatTypeLabel(getCanonicalBeatType(beat.type))} · <span title="This beat's id: what links, QR codes and the Debug tools call it">{beat.id}</span></span>
             {onChangeType && changeableTypes(beat).length > 0 && (
               <select
                 value=""
@@ -5560,7 +5567,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                 {/* End Screens and Multiple Choice beats have no auto-advance
                     settings to sit with, but often jump in time (an ending the
                     next morning): the clock setting on its own. */}
-                {showAdvanced && offersTimeDisplayOnItsOwn(getCanonicalBeatType(beat.type)) && !localBeat.defaultTarget && (
+                {showAdvanced && offersTimeDisplayOnItsOwn(getCanonicalBeatType(beat.type)) && !localBeat.defaultTarget && showsTimeDisplay && (
                   <TimeDisplaySetting
                     mode={localBeat.timeDisplayMode}
                     text={localBeat.timeDisplayText}
@@ -5644,13 +5651,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                     )}
 
                     {/* Time Display Override (for Timer HUD) */}
+                    {showsTimeDisplay && (
                     <TimeDisplaySetting
                       mode={localBeat.timeDisplayMode}
                       text={localBeat.timeDisplayText}
                       onChange={(field, value) => handleChange(field, value)}
                     />
+                    )}
 
                     {/* Override Countdown Meter Visibility */}
+                    {showsCountdownOverride && (
                     <div className="border-t pt-3 mt-3">
                       <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                         <input
@@ -5669,6 +5679,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                           : 'Show the countdown meter HUD on this beat (overrides the global "hide by default" setting).'}
                       </p>
                     </div>
+                    )}
                   </div>
                 )}
 

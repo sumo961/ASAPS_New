@@ -62,6 +62,11 @@ The Properties panel shows a field's `ui.help` and falls back to its `descriptio
 - The links point at the guide on GitHub's main branch, so the new anchors (`#story-data`) work once this is pushed.
 - **Files:** `packages/builder/src/components/{GuideLink,Header}.tsx`, `components/settings/{GlobalSettingsInspector,RolesSettingsPanel}.tsx`, `components/storyData/VariablesPanel.tsx`
 
+### Changed: beat types in plain words; panel overrides only when the panel is on
+- **Beat list and Properties header** say "Info Text", "Dialog Tree" in place of `infoText`, `dialogTree`. The header reads "Info Text · beat_1" (was "infoText • ID: beat_1"); the id keeps a tooltip saying what it is for.
+- **Advanced Options** offers a beat's Time Display only when the project's Timer is on, and "Hide / Show countdown meter" only when the Countdown Meter is on (Project Settings ▸ Screen panels). A beat that already carries one of these still shows it.
+- **Files:** `packages/builder/src/components/{Inspector,Sidebar}.tsx`
+
 ---
 
 ## 2026-11-16: Speech bubbles and dimmed characters (v0.9.157)

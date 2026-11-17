@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Beat, Cluster } from '@asaps/core';
 import { Plus, Search, ChevronRight, ChevronDown, ChevronLeft, List, Folder, FolderPlus } from 'lucide-react';
+import { beatTypeLabel } from '../utils/changeBeatType';
 
 interface SidebarProps {
   beats: Beat[];
@@ -357,7 +358,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         {beat.name}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {beat.type} • {beat.id}
+                        {beatTypeLabel(beat.type)} · {beat.id}
                       </div>
                     </div>
                   </div>
@@ -523,7 +524,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <span className="text-lg">{beatTypeIcons[beat.type] || '📄'}</span>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm text-gray-800 truncate">{beat.name}</div>
-                          <div className="text-xs text-gray-500">{beat.type}</div>
+                          <div className="text-xs text-gray-500">{beatTypeLabel(beat.type)}</div>
                         </div>
                       </div>
                     </button>
