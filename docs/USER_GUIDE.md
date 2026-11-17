@@ -493,11 +493,11 @@ The small count strip above the canvas (**Beats · Clusters · Connections**) co
 **Drawing a link.** You can wire beats right in the flowchart. Every beat has a small dot on its right edge: press on it, drag, and let go anywhere on the beat that should come next (or on a line inside an expanded Dialog Tree).
 
 - **A beat with one way on** — an Info Text, a Title Screen, a Duration Screen and the other single-link beats — is linked at once. If it already led somewhere, the new link replaces the old one; any effects you put on that link stay.
-- **A beat with several ways on** asks which one. A small menu opens where you dropped the link — *"Link from Choose Your Path to Rushed Visit — which one?"* — listing the beat's outputs: its choices (numbered, with their text), a Condition Check's *If true* / *If false*, a timer's *Continue* / *When time runs out*, a keypad's *Right code* / *Too many tries*, a Dialog Tree's lines without a reply. Outputs that aren't linked yet come first, marked *not linked yet*; linked ones show where they lead now, and picking one moves it to the new beat. Use the mouse, or the arrow keys and **Enter**; **Escape** (or a click elsewhere) closes the menu without changing anything.
+- **A beat with several ways on** asks which one. A small menu opens where you dropped the link — *"Link from Three ways of seeing to Leaving — which one?"* — listing the beat's outputs: its choices (numbered, with their text), a Condition Check's *If true* / *If false*, a timer's *Continue* / *When time runs out*, a keypad's *Right code* / *Too many tries*, a Dialog Tree's lines without a reply. Outputs that aren't linked yet come first, marked *not linked yet*; linked ones show where they lead now, and picking one moves it to the new beat. Use the mouse, or the arrow keys and **Enter**; **Escape** (or a click elsewhere) closes the menu without changing anything.
 - **Every drawn link is one Undo step**, and the Properties panel shows it straight away, exactly as if you had picked the target there.
 - A few beat types keep their links in the Properties panel only: AI Condition categories, AR Scene anchors and AI Dialog Tree exits. Drag from one of those and ASAPS tells you so. A beat with nothing to link yet (a Multi Choice without choices, say) asks you to add a choice first.
 
-![Dragging a link from the Movement Choice "Choose Your Path" onto "Rushed Visit": a menu asks which of the three choices the link is for, each showing where it leads now](images/97-draw-link-menu.png)
+![Dragging a link from the Multi Choice "Three ways of seeing" onto "Leaving": a menu asks which of the four choices the link is for, each showing where it leads now](images/97-draw-link-menu.png)
 *Drop a link from a beat with several choices and ASAPS asks which choice it is for. Each row shows where that choice leads now.*
 
 **More room for the graph.** The zoom buttons in the flowchart's bottom-left corner end with a button that hides the **overview map** (the small map of the whole graph in the bottom-right corner) and brings it back. Together with folding away [Story Beats](#the-left-sidebar-beat-list) and the Beat Types palette, a big story can have most of the screen. ASAPS remembers these choices on this computer.
@@ -603,8 +603,8 @@ Right under the **Properties** heading is the beat's type in plain words and its
 <a id="reached-from"></a>
 **Reached from: the way in.** Under the beat's type and ID, **Reached from:** lists every beat that links here, one button each, with the link's words next to it (a choice's text, or *auto-advance* for a timer). Click a button to jump to that beat and edit the link there. A beat reached from many places shows six and a **+N more** button for the rest; a beat nothing links to yet says *no links yet*. Unless it's your story's first beat, that is a quick way to spot a scene players can't reach.
 
-![The top of the Properties panel for the beat "Reflection": Reached from lists FreeLayout 26 (auto-advance), FreeLayout 26 (Wait here), Better Late Than Never (Continue), Small Talk (Continue) and Heart to Heart](images/104-properties-reached-from.png)
-*"Reflection" is reached from four beats; one of them leads here twice, by a button and by its timer.*
+![The top of the Properties panel for the Multi Choice "On the stairs" (beat_confide): Reached from lists Halfway three times, once for each of its choices](images/104-properties-reached-from.png)
+*"On the stairs" is reached from one beat, "Halfway", by each of its three choices.*
 
 **Need more room to write?** The small expand button next to the **Properties** heading makes the panel wide (60 % of the window); click it again to make it narrow. Dragging the panel's edge also works, and leaves the wide setting from the width you dragged it to. ASAPS remembers wide or narrow on this computer.
 
@@ -642,7 +642,7 @@ Many fields carry a short grey note underneath that says what the setting does, 
 
 **Default target and Auto-Advance.** Under **Show Advanced Options**, the beat types that can auto-advance (Title Screen, Info Text, Dialog Tree, Movement Choice, Pick Prop, Hyper Text, Input Text, Video, Free Layout) offer **Auto-Advance Settings**: pick a **Default Target Beat** and an **Auto-Advance Delay (seconds)**, and the beat moves on by itself after that time if the player hasn't. On beat types that never auto-advance the section only appears when a default target is already stored, and says what it does there: it is used only when the beat has no other link.
 
-![Inspector Panel](images/05-inspector-panel.png)
+![The Properties panel on the right, for the Dialog Tree "The argument" selected in the beat list](images/05-inspector-panel.png)
 *The Inspector panel shows properties of the selected beat. The Speaker section uses a unified [Character combobox](#character-combobox) — pick a defined Character, type a free-text name, or leave blank for the narrator. The Dialog Tree Editor opens inline on dialog beats; click it to author choices, per-node speakers, and choice effects.*
 
 ## The Beat Palette (Right Side)
@@ -3358,7 +3358,7 @@ You've built something. Time to make sure it works and share it with the world.
 
 The Preview Window is your primary tool for testing your interactive narrative. It provides a comprehensive testing environment with powerful debugging features.
 
-![Preview Panel](images/08-preview-panel.png)
+![The Preview Window with the Debug panel open: the story's stage with a character's meters on the left, the current beat and the characters' feelings on the right](images/08-preview-panel.png)
 *The Preview panel*
 
 ### Starting a Preview
@@ -3371,7 +3371,7 @@ Until you start, the status at the bottom right of the window reads *Ready to pl
 
 **Pro Tip:** Starting mid-story is a first-class mode, not a guess: while **From "‹beat›"** is active, selecting a different beat in the flowchart re-arms the preview live, and a **Start as if…** picker appears so you can begin with the state a player would really have at that point (see [Path-Based State Presets](#path-based-state-presets)).
 
-![Preview Running](images/09-preview-running.png)
+![The Preview running a Dialog Tree, with Pause, Stop, Restart and Save Log at the top and the Debug panel on the right](images/09-preview-running.png)
 *Preview mode showing the experience in action*
 
 ### Preview Controls
@@ -3427,7 +3427,7 @@ Since v0.9.85 the panel also appears for **indoor-only projects** — a venue wi
 
 When previewing from a beat other than the start, ASAPS Modern intelligently analyzes all paths to that beat and generates **state presets** representing different ways the interactor could have arrived there.
 
-![Path Presets Menu](images/10-path-presets.png)
+![The Preview set to start from "On the stairs", with the "Start as if…" menu open, listing the ways a player can have arrived there](images/10-path-presets.png)
 *Start as if… for "On the stairs" in The Last Ferry: the states that change what happens there, grouped by which of the beat's own conditions they meet ("With Tomas as the confidant" opens the notebook reply), three per group with Show more.*
 
 **Using Path Presets:**
