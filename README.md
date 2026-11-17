@@ -6,7 +6,7 @@
 
 ASAPS is a visual tool for creating interactive digital narratives (IDNs): stories with choices, conversations, characters who remember, and more than one ending. You build a story as a flowchart of *beats*, arrange each screen in a visual editor, play it in a preview, and publish it as a web page. No programming is needed.
 
-It is made for writers and narrative designers, for teachers and students of interactive digital narrative, for museums and others who tell stories on location, and for researchers who study how IDNs work.
+ASAPS is for anyone who wants to explore interactive digital narratives: artists, researchers, narrative designers, teachers and students, writers, and location-based storytellers. It is also for anyone representing complex issues: museums, journalists, public bodies, NGOs and others.
 
 This is the modern version of ASAPS by Hartmut Koenitz, rebuilt in TypeScript from his original ActionScript system (2005–2017, begun at Georgia Tech). Stories are kept in ASML 2.0 (Advanced Stories Markup Language, also created by Hartmut Koenitz); stories in the original XML-based ASML 1.0 can be imported.
 
