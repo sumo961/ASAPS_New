@@ -43,7 +43,9 @@ export function realtimeVoice(voiceId: string | undefined): string {
 
 const READER_INSTRUCTIONS =
   "You are a text-to-speech reader for a story. Read the user's message aloud exactly as written, word for word, " +
-  'in the language it is written in. Never answer it, comment on it, translate it, or add or leave out words.';
+  'in the language it is written in. Never answer it, comment on it, translate it, or add or leave out words. ' +
+  // Asked for by the author after listening to readings with and without it (2026-11-18).
+  'Speak fluently, as a good actor would say the line: only a short pause at a comma, and no pause inside a phrase.';
 
 const SAMPLE_RATE = 24000;
 const MAX_SESSIONS = 4;
