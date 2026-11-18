@@ -5,6 +5,7 @@ export * from './xml';
 export * from './types';
 export * from './types/animation';
 export * from './audio/presetSounds';
+export * from './audio/openaiRealtimeSpeech';
 export * from './generated/beat-types';
 export * from './analysis';
 export * from './migration/effectsMigration';

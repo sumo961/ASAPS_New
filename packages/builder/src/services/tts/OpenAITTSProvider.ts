@@ -6,7 +6,7 @@
  *  - /v1/audio/speech with tts-1, tts-1-hd or gpt-4o-mini-tts. OpenAI
  *    switches all three off on 2027-01-06.
  *  - The Realtime API with gpt-realtime-2.1-mini, their named replacement
- *    (see openaiRealtimeSpeech.ts). Used when that model is chosen, and by
+ *    (see openaiRealtimeSpeech.ts in core). Used when that model is chosen, and by
  *    itself once OpenAI refuses one of the older models.
  * (developers.openai.com/api/docs/deprecations, checked 2026-11-18)
  *
@@ -18,10 +18,12 @@
  */
 
 import type { TTSVoiceConfig, TTSVoiceInfo, TTSSynthesisResult } from '../../types/tts';
-import { speechLanguageCode } from '@asaps/core';
+import {
+  OpenAIRealtimeSpeech, OPENAI_REALTIME_SPEECH_MODEL, OPENAI_REALTIME_VOICES,
+  isRealtimeSpeechModel as isRealtimeModel, readerLanguageName as languageName, speechModelRetired,
+} from '@asaps/core';
 import type { TTSProviderConfig } from '../../types/tts';
 import { BaseTTSProvider } from './BaseTTSProvider';
-import { OpenAIRealtimeSpeech, OPENAI_REALTIME_SPEECH_MODEL, OPENAI_REALTIME_VOICES } from './openaiRealtimeSpeech';
 
 /** Whether we're running inside Electron (can call APIs directly, no CORS) */
 function isElectron(): boolean {
@@ -52,24 +54,12 @@ const OPENAI_VOICES: Array<TTSVoiceInfo & { newer?: boolean }> = [
 ];
 
 const isOlderModel = (model: string) => /^tts-1/.test(model);
-const isRealtimeModel = (model: string) => /^gpt-realtime/.test(model);
 
 /** The voices `model` can use. */
 function voicesFor(model: string): TTSVoiceInfo[] {
   return OPENAI_VOICES
     .filter((v) => (isRealtimeModel(model) ? OPENAI_REALTIME_VOICES.includes(v.id) : !(v.newer && isOlderModel(model))))
     .map(({ newer: _newer, ...voice }) => voice);
-}
-
-/** 'de-AT' → 'German', for the reader's instructions; undefined when unknown. */
-function languageName(lang: string | undefined): string | undefined {
-  const code = speechLanguageCode(lang);
-  if (!code) return undefined;
-  try {
-    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) || undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 export class OpenAITTSProvider extends BaseTTSProvider {
@@ -149,7 +139,7 @@ export class OpenAITTSProvider extends BaseTTSProvider {
       const errorText = await response.text();
       // The model has been switched off (see the note at the top): from now
       // on this setup reads through the Realtime API.
-      if (response.status === 404 || response.status === 410 || /model_not_found|deprecat|does not exist/i.test(errorText)) {
+      if (speechModelRetired(response.status, errorText)) {
         console.warn(`[${this.name}] "${model}" is no longer offered; reading with ${OPENAI_REALTIME_SPEECH_MODEL}`);
         this.speechApiGone = true;
         return this.readRealtime(text, voiceConfig);

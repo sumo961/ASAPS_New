@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { OpenAIRealtimeSpeech, pcmToWav, realtimeVoice } from '../openaiRealtimeSpeech';
+import { OpenAIRealtimeSpeech, pcmToWav, realtimeVoice } from '@asaps/core';
 import { OpenAITTSProvider } from '../OpenAITTSProvider';
 
 /** A socket that answers like the Realtime API. Tests drive the responses. */

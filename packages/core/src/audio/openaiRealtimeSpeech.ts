@@ -23,8 +23,11 @@
  *  - Audio arrives as base64 chunks of 24 kHz 16-bit PCM, faster than it
  *    plays; they are collected into one WAV.
  *
- * Nothing here depends on the builder, so the exported player can use it too.
+ * Used by the builder (OpenAITTSProvider) and the exported player
+ * (WebTTSProvider).
  */
+
+import { speechLanguageCode } from '../utils/speechLanguage';
 
 export const OPENAI_REALTIME_SPEECH_MODEL = 'gpt-realtime-2.1-mini';
 
@@ -39,6 +42,27 @@ export function realtimeVoice(voiceId: string | undefined): string {
   const id = (voiceId || 'alloy').toLowerCase();
   if (OPENAI_REALTIME_VOICES.includes(id)) return id;
   return VOICE_STAND_INS[id] ?? 'alloy';
+}
+
+/** Whether `model` is read through the Realtime API. */
+export const isRealtimeSpeechModel = (model: string | undefined): boolean => /^gpt-realtime/.test(model ?? '');
+
+/**
+ * Whether a refused /v1/audio/speech request means the model was switched
+ * off (OpenAI ends tts-1, tts-1-hd and gpt-4o-mini-tts on 2027-01-06).
+ */
+export const speechModelRetired = (status: number, errorText: string): boolean =>
+  status === 404 || status === 410 || /model_not_found|deprecat|does not exist/i.test(errorText);
+
+/** 'de-AT' → 'German', for the reader's instructions; undefined when unknown. */
+export function readerLanguageName(language: string | null | undefined): string | undefined {
+  const code = speechLanguageCode(language);
+  if (!code) return undefined;
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 const READER_INSTRUCTIONS =

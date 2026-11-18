@@ -3,11 +3,18 @@
  *
  * Supports: ElevenLabs, OpenAI, and browser Web Speech.
  * Calls APIs directly (no proxy needed — runs in browser).
- * Uses streaming audio via AudioManager for low-latency playback.
+ *
+ * OpenAI is read through /v1/audio/speech, or through the Realtime API when
+ * the story was exported with a gpt-realtime model, and by itself once
+ * OpenAI refuses the exported model (tts-1, tts-1-hd and gpt-4o-mini-tts end
+ * on 2027-01-06), so stories exported before then keep their voices.
  */
 
 
-import { speechLocale, speechLanguageCode, voiceSpeaksLanguage } from '@asaps/core';
+import {
+  speechLocale, speechLanguageCode, voiceSpeaksLanguage,
+  OpenAIRealtimeSpeech, isRealtimeSpeechModel, readerLanguageName, speechModelRetired,
+} from '@asaps/core';
 
 export interface TTSConfig {
   provider: 'elevenlabs' | 'openai' | 'web-speech' | 'custom' | 'local';
@@ -79,6 +86,9 @@ export class WebTTSService {
   private muted = false;
   private speakerAliases: Record<string, string> = {};
   private utterance?: SpeechSynthesisUtterance;
+  private realtime: OpenAIRealtimeSpeech | null = null;
+  /** OpenAI has refused the exported Speech API model: lines go through the Realtime API. */
+  private speechApiGone = false;
 
   constructor() {
     this.config = getEmbeddedTTSConfig();
@@ -132,6 +142,7 @@ export class WebTTSService {
     this.speaking = false;
     this.abortController?.abort();
     this.abortController = undefined;
+    this.realtime?.stop();
     if (this._audioElement) {
       this._audioElement.pause();
       this._audioElement = undefined;
@@ -188,6 +199,10 @@ export class WebTTSService {
     if (!voiceId) {
       // No voice assigned — use Web Speech as fallback
       return this.speakWebSpeech(text, speaker);
+    }
+
+    if (provider === 'openai' && (isRealtimeSpeechModel(this.config!.model) || this.speechApiGone)) {
+      return this.speakRealtime(text, voiceId, speaker);
     }
 
     try {
@@ -269,9 +284,16 @@ export class WebTTSService {
       }
 
       if (!response.ok) {
-        // The provider refused (a key that ran out, or a model that was
-        // switched off: OpenAI ends tts-1 and gpt-4o-mini-tts on
-        // 2027-01-06). The story is still read, with the browser's voice.
+        // OpenAI has switched the exported model off: from now on this
+        // story is read through the Realtime API, in the same voices.
+        if (provider === 'openai' && speechModelRetired(response.status, await response.text().catch(() => ''))) {
+          console.warn(`[WebTTS] "${this.config!.model || 'tts-1'}" is no longer offered; reading through the Realtime API`);
+          this.speechApiGone = true;
+          this.speaking = false;
+          return this.speakRealtime(text, voiceId, speaker);
+        }
+        // The provider refused for another reason (a key that ran out…).
+        // The story is still read, with the browser's voice.
         console.warn(`[WebTTS] ${provider} error: ${response.status}; reading with the browser's voice`);
         this.speaking = false;
         return this.speakWebSpeech(text, speaker);
@@ -288,6 +310,32 @@ export class WebTTSService {
       }
       this.speaking = false;
     }
+  }
+
+  /** Read a line through OpenAI's Realtime API; the browser's voice when that fails. */
+  private async speakRealtime(text: string, voiceId: string, speaker?: string): Promise<void> {
+    const model = this.config!.model;
+    this.realtime ??= new OpenAIRealtimeSpeech({
+      apiKey: this.config!.apiKey!,
+      baseUrl: this.config!.baseUrl,
+      model: isRealtimeSpeechModel(model) ? model : undefined,
+    });
+    this.speaking = true;
+    let line: Blob;
+    try {
+      line = await this.realtime.read(text, voiceId, readerLanguageName(this.language));
+    } catch (err: any) {
+      this.speaking = false;
+      if (err?.name === 'AbortError') return; // stopped, or the next line came
+      console.warn("[WebTTS] OpenAI could not read the line; reading with the browser's voice:", err?.message || err);
+      return this.speakWebSpeech(text, speaker);
+    }
+    try {
+      await this.playAudioBlob(line);
+    } catch (err) {
+      console.warn('[WebTTS] Speech failed:', err);
+    }
+    this.speaking = false;
   }
 
   /** Play audio from a Blob using a temporary Audio element */
