@@ -9,8 +9,8 @@
  * from the project as written, so they stayed in the original language.
  *
  * Only for what is DRAWN on the panels. Lookups by name keep using the
- * project's own characters: a translation writes display fields only, but
- * the editor has no reason to depend on that.
+ * project's own characters: a translation rewrites a character's `name`
+ * as well as its display name.
  */
 
 import { useMemo } from 'react';

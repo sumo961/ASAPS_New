@@ -1836,11 +1836,11 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                       buttonLayout: themeAssets?.buttonLayout,
                     };
                   })() : undefined}
-                  timerHudConfig={showHud ? globalSettings?.hudOverlays?.timerHud : undefined}
+                  timerHudConfig={showHud ? hudGlobalSettings?.hudOverlays?.timerHud : undefined}
                   timerHudState={showHud && globalSettings?.hudOverlays?.timerHud?.enabled ? {
                     remainingTime: 45, totalTime: 60
                   } : undefined}
-                  countdownMeterConfig={showHud ? globalSettings?.hudOverlays?.countdownMeter : undefined}
+                  countdownMeterConfig={showHud ? hudGlobalSettings?.hudOverlays?.countdownMeter : undefined}
                   overrideCountdownMeter={overrideCountdownMeter}
                   countdownMeterValue={showHud && globalSettings?.hudOverlays?.countdownMeter?.enabled ? {
                     value: Math.round(((globalSettings.hudOverlays!.countdownMeter!.counterMax ?? 100) - (globalSettings.hudOverlays!.countdownMeter!.counterMin ?? 0)) * 0.65 + (globalSettings.hudOverlays!.countdownMeter!.counterMin ?? 0)),

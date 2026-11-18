@@ -7201,7 +7201,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     has fictional-time enabled + opted-in to the HUD;
                     otherwise the stage stays clean. */}
                 {(() => {
-                  const overlays = (globalSettings as any)?.hudOverlays ?? {};
+                  // The translated settings: the chip's label follows the header language.
+                  const overlays = (hudGlobalSettings as any)?.hudOverlays ?? {};
                   const ft = overlays.fictionalTime as
                     | {
                         enabled?: boolean;
