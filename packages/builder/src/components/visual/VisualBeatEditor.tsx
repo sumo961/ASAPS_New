@@ -52,6 +52,7 @@ import { hudStackWarnings, describeHudStackWarning } from '../../utils/hudStackW
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 import { resolvePortraitUrl, shouldShowSpeaker, resolveTranslatedSpeakerName } from '../../utils/speakerUtils';
 import { useTranslationState } from '../../contexts/TranslationContext';
+import { useTranslatedHudData } from '../../hooks/useTranslatedHudData';
 import { yawPitchToStage, stageToYawPitch, viewportSizeOnStage } from '../../utils/panoramaCoordinates';
 import {
   alignLeft, alignRight, alignTop, alignBottom,
@@ -314,10 +315,13 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   panoramaViewportRef.current = panoramaViewport;
   onPanoramaViewportChangeRef.current = onPanoramaViewportChange;
 
+  // The HUD panels show the language chosen in the header.
+  const { hudCharacters, hudGlobalSettings } = useTranslatedHudData(characters, globalSettings);
+
   // Mock resolvers for character HUD overlays in editor mode
   const characterMeterFrameResolver = useCallback((characterId: string) => {
     if (!showHud) return null;
-    const character = characters.find(c => c.id === characterId);
+    const character = hudCharacters.find(c => c.id === characterId);
     const resolvedFrame = resolveMeterFrame(character as any);
     if (!character || !resolvedFrame) return null;
     // Screen-docked frames are drawn by ScreenHudLayer above the stage, which
@@ -337,11 +341,11 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       characterName: character.displayName || character.name,
       characterColor: character.color,
     };
-  }, [showHud, characters, elements]);
+  }, [showHud, hudCharacters, elements]);
 
   const characterInventoryResolver = useCallback((characterId: string) => {
     if (!showHud) return null;
-    const character = characters.find(c => c.id === characterId);
+    const character = hudCharacters.find(c => c.id === characterId);
     if (!character?.inventoryFrame) return null;
     if ((character.inventoryFrame as any).dockMode === 'screen') return null;
     // Show configured inventory items, or placeholder items for preview
@@ -362,7 +366,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       ];
     }
     return { items, config: character.inventoryFrame };
-  }, [showHud, characters]);
+  }, [showHud, hudCharacters]);
 
   // Multi-drag offset tracking: stores offsets for all selected elements during drag
   const dragOffsetsRef = useRef<Map<string, { dx: number; dy: number }>>(new Map());
@@ -393,7 +397,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       showOnTitleScreen: (globalSettings?.hudOverlays as any)?.showOnTitleScreen,
     })) return null;
 
-    const hudChars: ScreenHudCharacter[] = (characters || []).map(c => {
+    const hudChars: ScreenHudCharacter[] = hudCharacters.map(c => {
       const frame = resolveMeterFrame(c as any);
       const visibleCounters = (c.counters || []).filter(k => k.visible);
       const items = (c.inventory || []).map(item => ({
@@ -417,10 +421,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
     return buildScreenHudLayout({
       characters: hudChars,
-      hudOverlays: globalSettings?.hudOverlays,
+      hudOverlays: hudGlobalSettings?.hudOverlays,
       stage: { width: stageWidth, height: stageHeight },
     });
-  }, [showHud, characters, elements, globalSettings, beatType, stageWidth, stageHeight]);
+  }, [showHud, hudCharacters, elements, globalSettings, hudGlobalSettings, beatType, stageWidth, stageHeight]);
 
   /**
    * HUD stacks too tall for the smallest screen this story could run on.

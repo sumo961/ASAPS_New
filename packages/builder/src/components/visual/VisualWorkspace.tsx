@@ -65,6 +65,7 @@ const SLOT_PREVIEW_SAMPLE_BODY = [
   "Replace the prompt or add a fallback on the beat to preview your own wording instead of this placeholder.",
 ].join('\n\n');
 import { useTranslationState } from '../../contexts/TranslationContext';
+import { useTranslatedHudData } from '../../hooks/useTranslatedHudData';
 import { getTranslationsForBeat, translateBeatParameters } from '../../export/StoryTranslator';
 import { resolveTranslatedSpeakerName } from '../../utils/speakerUtils';
 
@@ -971,8 +972,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
    * No engine in the editor, so derived counters read their authored range at
    * rest rather than a live affect value.
    */
+  // The HUD panels show the language chosen in the header.
+  const { hudCharacters, hudGlobalSettings } = useTranslatedHudData(characters, globalSettings);
   const slotScreenHud = useMemo(() => {
-    const chars = characters || [];
+    const chars = hudCharacters;
     if (chars.length === 0) return null;
     const hudChars: ScreenHudCharacter[] = chars.map((c: any) => ({
       id: c.id,
@@ -993,13 +996,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     }));
     return buildScreenHudLayout({
       characters: hudChars,
-      hudOverlays: globalSettings?.hudOverlays,
+      hudOverlays: hudGlobalSettings?.hudOverlays,
       stage: {
         width: globalSettings?.project?.width || 1024,
         height: globalSettings?.project?.height || 768,
       },
     });
-  }, [characters, globalSettings]);
+  }, [hudCharacters, hudGlobalSettings, globalSettings]);
 
   const slotHudWarnings = useMemo(
     () => hudStackWarnings(slotScreenHud?.rects),
