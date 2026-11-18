@@ -260,14 +260,63 @@ describe('TTSService', () => {
       );
     });
 
-    it('should play audio blob through AudioManager for cloud providers', async () => {
-      mockPlaySoundFromBlob.mockClear();
-      const mockBlob = new Blob(['audio'], { type: 'audio/mpeg' });
-      (provider.synthesize as any).mockResolvedValue({ audio: mockBlob });
+    describe('a line that arrives as one sound file', () => {
+      class FakeAudio {
+        static all: FakeAudio[] = [];
+        volume = 1; paused = false; listeners: Record<string, () => void> = {};
+        constructor(public src: string) { FakeAudio.all.push(this); }
+        addEventListener(type: string, fn: () => void) { this.listeners[type] = fn; }
+        play() { return Promise.resolve(); }
+        pause() { this.paused = true; }
+      }
+      const originalAudio = (globalThis as any).Audio;
+      const originalCreate = URL.createObjectURL;
+      const originalRevoke = URL.revokeObjectURL;
+      const wav = new Blob(['audio'], { type: 'audio/wav' });
 
-      await service.speak('Hello');
+      beforeEach(() => {
+        FakeAudio.all = [];
+        (globalThis as any).Audio = FakeAudio;
+        URL.createObjectURL = vi.fn(() => 'blob:line');
+        URL.revokeObjectURL = vi.fn();
+        (provider.synthesize as any).mockResolvedValue({ audio: wav });
+      });
+      afterEach(() => {
+        (globalThis as any).Audio = originalAudio;
+        URL.createObjectURL = originalCreate;
+        URL.revokeObjectURL = originalRevoke;
+      });
+      const started = async (n: number) => { await vi.waitFor(() => expect(FakeAudio.all).toHaveLength(n)); return FakeAudio.all[n - 1]; };
 
-      expect(mockPlaySoundFromBlob).toHaveBeenCalledWith(mockBlob, 1.0);
+      it('plays it and speaks until it ends', async () => {
+        const speaking = service.speak('Hello');
+        const audio = await started(1);
+        expect(service.isSpeaking()).toBe(true);
+        audio.listeners.ended();
+        await speaking;
+        expect(service.isSpeaking()).toBe(false);
+        expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:line');
+      });
+
+      it('is cut off by the next line instead of talking over it', async () => {
+        const first = service.speak('One');
+        const one = await started(1);
+        const second = service.speak('Two');
+        await first;
+        expect(one.paused).toBe(true);
+        const two = await started(2);
+        expect(two.paused).toBe(false);
+        two.listeners.ended();
+        await second;
+      });
+
+      it('is cut off by stop()', async () => {
+        const speaking = service.speak('Hello');
+        const audio = await started(1);
+        service.stop();
+        await speaking;
+        expect(audio.paused).toBe(true);
+      });
     });
 
     it('should track isSpeaking state', async () => {

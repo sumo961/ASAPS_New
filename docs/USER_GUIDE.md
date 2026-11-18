@@ -3706,7 +3706,7 @@ ASAPS Modern can read your story aloud using text-to-speech. This is useful for 
 4. Choose a **TTS provider**:
    - **Web Speech** — Free, built into your browser. Quality varies by OS and browser.
    - **ElevenLabs** — High-quality cloud voices. Requires an API key from [elevenlabs.io](https://elevenlabs.io).
-   - **OpenAI** — Cloud TTS via OpenAI. Requires an API key. OpenAI ends its speech models on 6 January 2027; after that day lines are read with your computer's built-in voice until you choose another provider.
+   - **OpenAI** — Cloud TTS via OpenAI. Requires an API key. Choose **GPT Realtime mini**: OpenAI ends its older speech models (TTS-1, TTS-1 HD, GPT-4o mini TTS) on 6 January 2027, and a setup still on one of them moves to GPT Realtime mini by itself that day. It has ten voices; Fable, Nova and Onyx don't exist there and are read by Alloy, Marin and Cedar. In exported stories OpenAI speech falls back to the browser's voice after that date.
    - **Local TTS** — Run open-source TTS models on your own machine. Supports Kokoro (via mlx-audio), Coqui, Piper, and Chatterbox with built-in presets. No API key needed.
    - **Custom Server** — Connect to any OpenAI-compatible TTS endpoint.
 5. Enter your API key if using a cloud provider

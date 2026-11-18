@@ -25,6 +25,8 @@ export class TTSService {
   private defaultVoiceConfig: TTSVoiceConfig = {};
   /** The browser's voice, for a line the active provider can't read at all. */
   private browserVoice: ITTSProvider | null = null;
+  /** A line playing from a whole sound file (OpenAI's Realtime reader). */
+  private speechPlayback: { element: HTMLAudioElement; finish: () => void } | null = null;
 
   // ---------------------------------------------------------------------------
   // Provider registry
@@ -179,7 +181,7 @@ export class TTSService {
         await audioManager.playStreamingAudio(result.response, voiceConfig.volume ?? 1.0);
       } else if (result.audio) {
         // Blob path — must wait for playback to finish so isSpeaking() stays true
-        await audioManager.playSoundFromBlobAndWait(result.audio, voiceConfig.volume ?? 1.0);
+        await this.playSpeechBlob(result.audio, voiceConfig.volume ?? 1.0);
       } else {
         // WebSpeech or similar — no audio object returned, provider plays directly.
         // We don't know when it finishes, but the provider should handle its own state.
@@ -207,6 +209,42 @@ export class TTSService {
         console.log(`[TTSService] Skipping isSpeaking reset — stale gen ${gen}, current ${this._speakGeneration}`);
       }
     }
+  }
+
+  /**
+   * Play a line that arrived as one sound file and wait for its end. Unlike
+   * AudioManager's blob player this can be stopped: the next line, or
+   * stop(), cuts it off instead of talking over it.
+   */
+  private playSpeechBlob(blob: Blob, volume: number): Promise<void> {
+    const audioManager = getAudioManager();
+    if (audioManager.isMuted?.()) return Promise.resolve();
+    this.stopSpeechPlayback();
+    return new Promise<void>((resolve) => {
+      const url = URL.createObjectURL(blob);
+      const element = new Audio(url);
+      element.volume = Math.max(0, Math.min(1, volume)) * (audioManager.getMasterVolume?.() ?? 1);
+      const finish = () => {
+        if (this.speechPlayback?.element === element) this.speechPlayback = null;
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      this.speechPlayback = { element, finish };
+      element.addEventListener('ended', finish, { once: true });
+      element.addEventListener('error', finish, { once: true });
+      Promise.resolve(element.play()).catch(() => {
+        console.warn('[TTSService] The browser did not let the line play');
+        finish();
+      });
+    });
+  }
+
+  private stopSpeechPlayback(): void {
+    const playback = this.speechPlayback;
+    if (!playback) return;
+    this.speechPlayback = null;
+    playback.element.pause();
+    playback.finish();
   }
 
   private async speakWithBrowserVoice(text: string, voiceConfig: TTSVoiceConfig): Promise<void> {
@@ -241,6 +279,7 @@ export class TTSService {
   private halt(): void {
     this._speakGeneration++; // Invalidate any running speak() finally block
     try {
+      this.stopSpeechPlayback();
       this.activeProvider?.stop();
       this.browserVoice?.stop();
     } catch {

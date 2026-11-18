@@ -59,6 +59,16 @@ describe('OpenAITTSProvider', () => {
       expect(voices.map(v => v.id)).not.toContain('marin');
     });
 
+    it('lists the ten the Realtime API has for gpt-realtime-2.1-mini', async () => {
+      provider.configure({ provider: 'openai', apiKey: 'sk-test', model: 'gpt-realtime-2.1-mini' });
+      const ids = (await provider.getVoices()).map(v => v.id);
+      expect(ids).toHaveLength(10);
+      expect(ids).toEqual(expect.arrayContaining(['marin', 'cedar']));
+      expect(ids).not.toEqual(expect.arrayContaining(['fable']));
+      expect(ids).not.toContain('nova');
+      expect(ids).not.toContain('onyx');
+    });
+
     it('lists all thirteen for gpt-4o-mini-tts', async () => {
       provider.configure({ provider: 'openai', apiKey: 'sk-test', model: 'gpt-4o-mini-tts' });
       const ids = (await provider.getVoices()).map(v => v.id);
@@ -269,16 +279,6 @@ describe('OpenAITTSProvider', () => {
       provider.configure({ provider: 'openai', apiKey: 'sk-test', model: 'tts-1' });
       await provider.synthesize('Hello', { voiceId: 'voice_1234' });
       expect(JSON.parse((global.fetch as any).mock.calls[1][1].body).voice).toBe('voice_1234');
-    });
-
-    it('says the provider is unavailable once the model is switched off', async () => {
-      provider.configure({ provider: 'openai', apiKey: 'sk-test' });
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: false,
-        status: 404,
-        text: () => Promise.resolve('{"error":{"code":"model_not_found"}}'),
-      });
-      await expect(provider.synthesize('Hello')).rejects.toMatchObject({ name: 'TTSUnavailableError' });
     });
 
     it('keeps other errors as they were', async () => {

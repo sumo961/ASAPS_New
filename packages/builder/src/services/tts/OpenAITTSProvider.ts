@@ -1,24 +1,27 @@
 /**
  * OpenAI TTS Provider
  *
- * Cloud TTS using OpenAI's /v1/audio/speech.
+ * Two ways to OpenAI's voices:
  *
- * OpenAI switches off every model of this endpoint (tts-1, tts-1-hd,
- * gpt-4o-mini-tts) on 2027-01-06. The replacement, gpt-realtime-2.1-mini,
- * runs on the Realtime API, a different workflow this provider does not
- * speak. Once the models are gone the provider throws TTSUnavailableError
- * and TTSService reads with the browser's voice.
+ *  - /v1/audio/speech with tts-1, tts-1-hd or gpt-4o-mini-tts. OpenAI
+ *    switches all three off on 2027-01-06.
+ *  - The Realtime API with gpt-realtime-2.1-mini, their named replacement
+ *    (see openaiRealtimeSpeech.ts). Used when that model is chosen, and by
+ *    itself once OpenAI refuses one of the older models.
  * (developers.openai.com/api/docs/deprecations, checked 2026-11-18)
  *
  * There is no language parameter: the voice follows the language of the text.
  *
- * Returns raw Response for streaming playback (AudioManager decides
- * whether to use MediaSource streaming or blob fallback).
+ * The Speech API path returns the raw Response for streaming playback
+ * (AudioManager decides whether to use MediaSource streaming or blob
+ * fallback); the Realtime path returns the line as one WAV.
  */
 
 import type { TTSVoiceConfig, TTSVoiceInfo, TTSSynthesisResult } from '../../types/tts';
-import { TTSUnavailableError } from '../../types/tts';
+import { speechLanguageCode } from '@asaps/core';
+import type { TTSProviderConfig } from '../../types/tts';
 import { BaseTTSProvider } from './BaseTTSProvider';
+import { OpenAIRealtimeSpeech, OPENAI_REALTIME_SPEECH_MODEL, OPENAI_REALTIME_VOICES } from './openaiRealtimeSpeech';
 
 /** Whether we're running inside Electron (can call APIs directly, no CORS) */
 function isElectron(): boolean {
@@ -49,10 +52,24 @@ const OPENAI_VOICES: Array<TTSVoiceInfo & { newer?: boolean }> = [
 ];
 
 const isOlderModel = (model: string) => /^tts-1/.test(model);
+const isRealtimeModel = (model: string) => /^gpt-realtime/.test(model);
 
 /** The voices `model` can use. */
 function voicesFor(model: string): TTSVoiceInfo[] {
-  return OPENAI_VOICES.filter((v) => !(v.newer && isOlderModel(model))).map(({ newer: _newer, ...voice }) => voice);
+  return OPENAI_VOICES
+    .filter((v) => (isRealtimeModel(model) ? OPENAI_REALTIME_VOICES.includes(v.id) : !(v.newer && isOlderModel(model))))
+    .map(({ newer: _newer, ...voice }) => voice);
+}
+
+/** 'de-AT' → 'German', for the reader's instructions; undefined when unknown. */
+function languageName(lang: string | undefined): string | undefined {
+  const code = speechLanguageCode(lang);
+  if (!code) return undefined;
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export class OpenAITTSProvider extends BaseTTSProvider {
@@ -60,11 +77,33 @@ export class OpenAITTSProvider extends BaseTTSProvider {
   readonly requiresApiKey = true;
 
   private abortController?: AbortController;
+  private realtime: OpenAIRealtimeSpeech | null = null;
+  /** OpenAI has refused the chosen Speech API model: lines go through the Realtime API. */
+  private speechApiGone = false;
+
+  configure(config: TTSProviderConfig): void {
+    this.realtime?.dispose();
+    this.realtime = null;
+    this.speechApiGone = false;
+    super.configure(config);
+  }
+
+  private async readRealtime(text: string, voiceConfig?: TTSVoiceConfig): Promise<TTSSynthesisResult> {
+    const model = this.config!.model || '';
+    this.realtime ??= new OpenAIRealtimeSpeech({
+      apiKey: this.config!.apiKey!,
+      baseUrl: this.config!.baseUrl,
+      model: isRealtimeModel(model) ? model : OPENAI_REALTIME_SPEECH_MODEL,
+    });
+    return { audio: await this.realtime.read(text, voiceConfig?.voiceId, languageName(voiceConfig?.lang)) };
+  }
 
   async synthesize(text: string, voiceConfig?: TTSVoiceConfig): Promise<TTSSynthesisResult> {
     this.ensureReady();
 
     const model = this.config!.model || 'tts-1';
+    if (isRealtimeModel(model) || this.speechApiGone) return this.readRealtime(text, voiceConfig);
+
     // A voice the model doesn't have (Marin on tts-1) is refused by the API.
     const wanted = voiceConfig?.voiceId || 'alloy';
     const known = OPENAI_VOICES.some((v) => v.id === wanted);
@@ -108,9 +147,12 @@ export class OpenAITTSProvider extends BaseTTSProvider {
 
     if (!response.ok) {
       const errorText = await response.text();
-      // The model has been switched off (see the note at the top).
+      // The model has been switched off (see the note at the top): from now
+      // on this setup reads through the Realtime API.
       if (response.status === 404 || response.status === 410 || /model_not_found|deprecat|does not exist/i.test(errorText)) {
-        throw new TTSUnavailableError(`OpenAI no longer offers the speech model "${model}": ${errorText}`);
+        console.warn(`[${this.name}] "${model}" is no longer offered; reading with ${OPENAI_REALTIME_SPEECH_MODEL}`);
+        this.speechApiGone = true;
+        return this.readRealtime(text, voiceConfig);
       }
       throw new Error(`OpenAI TTS error ${response.status}: ${errorText}`);
     }
@@ -122,6 +164,7 @@ export class OpenAITTSProvider extends BaseTTSProvider {
   stop(): void {
     this.abortController?.abort();
     this.abortController = undefined;
+    this.realtime?.stop();
   }
 
   async getVoices(_lang?: string): Promise<TTSVoiceInfo[]> {

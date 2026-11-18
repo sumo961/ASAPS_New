@@ -44,11 +44,12 @@ const PROVIDER_PRESETS: Record<TTSProviderTab, ProviderPreset> = {
     apiKeyPlaceholder: 'Enter your OpenAI API key',
     apiKeyHelp: 'Uses your OpenAI API key from platform.openai.com',
     models: [
-      { id: 'tts-1', name: 'TTS-1 (fast)' },
-      { id: 'tts-1-hd', name: 'TTS-1 HD (quality)' },
-      { id: 'gpt-4o-mini-tts', name: 'GPT-4o mini TTS (more voices)' },
+      { id: 'gpt-realtime-2.1-mini', name: 'GPT Realtime mini' },
+      { id: 'tts-1', name: 'TTS-1 (ends 6 Jan 2027)' },
+      { id: 'tts-1-hd', name: 'TTS-1 HD (ends 6 Jan 2027)' },
+      { id: 'gpt-4o-mini-tts', name: 'GPT-4o mini TTS (ends 6 Jan 2027)' },
     ],
-    defaultModel: 'tts-1',
+    defaultModel: 'gpt-realtime-2.1-mini',
   },
   elevenlabs: {
     name: 'ElevenLabs',
@@ -441,9 +442,10 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
                 ))}
               </select>
               {provider === 'openai' && (
-                <p className="mt-1 text-xs text-amber-700">
-                  OpenAI ends these speech models on 6 January 2027. After that day, lines are read with your
-                  computer's built-in voice until you choose another provider here.
+                <p className="mt-1 text-xs text-gray-500">
+                  OpenAI ends TTS-1, TTS-1 HD and GPT-4o mini TTS on 6 January 2027. GPT Realtime mini replaces
+                  them; a setup still on an older model moves to it by itself that day. It has no Fable, Nova or
+                  Onyx: Alloy, Marin and Cedar read in their place.
                 </p>
               )}
             </div>
