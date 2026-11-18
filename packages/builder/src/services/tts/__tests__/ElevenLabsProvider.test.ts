@@ -164,6 +164,27 @@ describe('ElevenLabsProvider', () => {
     });
   });
 
+  describe('language_code', () => {
+    const sentBody = () => JSON.parse((global.fetch as any).mock.calls[0][1].body);
+
+    beforeEach(() => {
+      (window as any).electronAPI = { isElectron: true };
+      global.fetch = vi.fn().mockResolvedValue({ ok: true });
+    });
+
+    it('is sent as the bare code to v3', async () => {
+      provider.configure({ provider: 'elevenlabs', apiKey: 'xi-test123' });
+      await provider.synthesize('Hallo', { voiceId: 'v', lang: 'de-AT' });
+      expect(sentBody().language_code).toBe('de');
+    });
+
+    it('is left out for Multilingual v2, which does not take it', async () => {
+      provider.configure({ provider: 'elevenlabs', apiKey: 'xi-test123', model: 'eleven_multilingual_v2' });
+      await provider.synthesize('Hallo', { voiceId: 'v', lang: 'de' });
+      expect(sentBody()).not.toHaveProperty('language_code');
+    });
+  });
+
   // -------------------------------------------------------------------------
   // getVoices (browser proxy)
   // -------------------------------------------------------------------------

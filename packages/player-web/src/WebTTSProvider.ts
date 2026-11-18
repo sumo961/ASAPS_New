@@ -213,7 +213,8 @@ export class WebTTSService {
               model_id: modelId,
               // ElevenLabs takes the bare language code ('de'), not 'de-AT',
               // 'zh-Hans' or a typed name; left out when it can't be read.
-              ...(speechLanguageCode(this.language) ? { language_code: speechLanguageCode(this.language) } : {}),
+              // Multilingual v2 doesn't take it and reads the language of the text.
+              ...(speechLanguageCode(this.language) && !/multilingual/i.test(modelId) ? { language_code: speechLanguageCode(this.language) } : {}),
             }),
             signal: this.abortController.signal,
           }
@@ -268,9 +269,12 @@ export class WebTTSService {
       }
 
       if (!response.ok) {
-        console.warn(`[WebTTS] ${provider} error: ${response.status}`);
+        // The provider refused (a key that ran out, or a model that was
+        // switched off: OpenAI ends tts-1 and gpt-4o-mini-tts on
+        // 2027-01-06). The story is still read, with the browser's voice.
+        console.warn(`[WebTTS] ${provider} error: ${response.status}; reading with the browser's voice`);
         this.speaking = false;
-        return;
+        return this.speakWebSpeech(text, speaker);
       }
 
       // Play audio — use blob approach for compatibility with file:// origins

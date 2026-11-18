@@ -41,11 +41,12 @@ const PROVIDER_PRESETS: Record<STTProviderTab, ProviderPreset> = {
     description: 'OpenAI API',
     apiKeyRequired: true,
     apiKeyPlaceholder: 'Enter your OpenAI API key',
-    apiKeyHelp: 'Uses your OpenAI API key for Whisper transcription',
+    apiKeyHelp: 'Uses your OpenAI API key for transcription',
     models: [
-      { id: 'whisper-1', name: 'Whisper v1' },
+      { id: 'gpt-transcribe', name: 'GPT Transcribe' },
+      { id: 'whisper-1', name: 'Whisper v1 (ends 26 Feb 2027)' },
     ],
-    defaultModel: 'whisper-1',
+    defaultModel: 'gpt-transcribe',
   },
   local: {
     name: 'Local Server',
@@ -140,7 +141,7 @@ export const STTConfigDialog: React.FC<STTConfigDialogProps> = ({
         sttProvider: 'whisper' as STTProviderTab,
         apiKey: ttsConfig.apiKey,
         baseUrl: undefined as string | undefined,
-        model: 'whisper-1',
+        model: 'gpt-transcribe',
       };
     }
     if (ttsConfig.providerType === 'custom' && ttsConfig.baseUrl) {

@@ -16,42 +16,10 @@ import type {
   LocalTTSRequestTemplate,
   LocalTTSPreset,
 } from '../../types/tts';
+import { speechLanguageCode } from '@asaps/core';
+import { TTSUnavailableError } from '../../types/tts';
 import { BaseTTSProvider } from './BaseTTSProvider';
-
-/** Built-in Kokoro voice list (used when server doesn't provide /voices endpoint) */
-const KOKORO_VOICES: TTSVoiceInfo[] = [
-  // American Female
-  { id: 'af_heart', name: 'Heart (American F)', lang: 'en', gender: 'female' },
-  { id: 'af_alloy', name: 'Alloy (American F)', lang: 'en', gender: 'female' },
-  { id: 'af_aoede', name: 'Aoede (American F)', lang: 'en', gender: 'female' },
-  { id: 'af_bella', name: 'Bella (American F)', lang: 'en', gender: 'female' },
-  { id: 'af_jessica', name: 'Jessica (American F)', lang: 'en', gender: 'female' },
-  { id: 'af_kore', name: 'Kore (American F)', lang: 'en', gender: 'female' },
-  { id: 'af_nicole', name: 'Nicole (American F)', lang: 'en', gender: 'female' },
-  { id: 'af_nova', name: 'Nova (American F)', lang: 'en', gender: 'female' },
-  { id: 'af_river', name: 'River (American F)', lang: 'en', gender: 'female' },
-  { id: 'af_sarah', name: 'Sarah (American F)', lang: 'en', gender: 'female' },
-  { id: 'af_sky', name: 'Sky (American F)', lang: 'en', gender: 'female' },
-  // American Male
-  { id: 'am_adam', name: 'Adam (American M)', lang: 'en', gender: 'male' },
-  { id: 'am_echo', name: 'Echo (American M)', lang: 'en', gender: 'male' },
-  { id: 'am_eric', name: 'Eric (American M)', lang: 'en', gender: 'male' },
-  { id: 'am_fenrir', name: 'Fenrir (American M)', lang: 'en', gender: 'male' },
-  { id: 'am_liam', name: 'Liam (American M)', lang: 'en', gender: 'male' },
-  { id: 'am_michael', name: 'Michael (American M)', lang: 'en', gender: 'male' },
-  { id: 'am_onyx', name: 'Onyx (American M)', lang: 'en', gender: 'male' },
-  { id: 'am_puck', name: 'Puck (American M)', lang: 'en', gender: 'male' },
-  // British Female
-  { id: 'bf_emma', name: 'Emma (British F)', lang: 'en', gender: 'female' },
-  { id: 'bf_alice', name: 'Alice (British F)', lang: 'en', gender: 'female' },
-  { id: 'bf_isabella', name: 'Isabella (British F)', lang: 'en', gender: 'female' },
-  { id: 'bf_lily', name: 'Lily (British F)', lang: 'en', gender: 'female' },
-  // British Male
-  { id: 'bm_george', name: 'George (British M)', lang: 'en', gender: 'male' },
-  { id: 'bm_daniel', name: 'Daniel (British M)', lang: 'en', gender: 'male' },
-  { id: 'bm_fable', name: 'Fable (British M)', lang: 'en', gender: 'male' },
-  { id: 'bm_lewis', name: 'Lewis (British M)', lang: 'en', gender: 'male' },
-];
+import { KOKORO_VOICES, describeKokoroVoice, isKokoro, kokoroVoiceFor } from './kokoro';
 
 /** Built-in presets for common local TTS servers */
 export const LOCAL_TTS_PRESETS: LocalTTSPreset[] = [
@@ -119,7 +87,8 @@ export const LOCAL_TTS_PRESETS: LocalTTSPreset[] = [
       path: '/audio/speech',
       contentType: 'json',
       body: { model: '{model}', input: '{text}', voice: '{voice}', speed: '{speed}', response_format: 'mp3' },
-      voiceListEndpoint: '/voices',
+      // Kokoro-FastAPI lists its voices here; mlx-audio doesn't, and gets the built-in list.
+      voiceListEndpoint: '/audio/voices',
     },
   },
 ];
@@ -189,11 +158,23 @@ export class LocalTTSProvider extends BaseTTSProvider {
     }
 
     const baseUrl = this.config!.baseUrl!.replace(/\/$/, '');
+    let voice = voiceConfig?.voiceId || this.config!.defaultVoiceId || 'default';
+
+    // Kokoro: a voice reads one language, and the server must be told which.
+    let kokoroLangCode: string | undefined;
+    if (isKokoro(this.config)) {
+      const match = kokoroVoiceFor(voice, voiceConfig?.lang);
+      if (!match) throw new TTSUnavailableError(`Kokoro has no voice for "${voiceConfig?.lang}"`);
+      voice = match.voice || voice;
+      kokoroLangCode = match.langCode;
+    }
+
     const vars: Record<string, string> = {
       text,
-      voice: voiceConfig?.voiceId || this.config!.defaultVoiceId || 'default',
+      voice,
       speed: String(voiceConfig?.rate ?? 1.0),
-      lang: voiceConfig?.lang || 'en',
+      // The bare code ('de'), not 'de-AT', 'zh-Hans' or a typed name.
+      lang: speechLanguageCode(voiceConfig?.lang) || 'en',
       model: (this.config!.model || 'default').trim(),
     };
 
@@ -238,6 +219,7 @@ export class LocalTTSProvider extends BaseTTSProvider {
       const body = this.template.body
         ? this.interpolateObject(this.template.body, vars)
         : { text, voice: vars.voice };
+      if (kokoroLangCode) body.lang_code = kokoroLangCode;
 
       response = await fetch(url, {
         method: 'POST',
@@ -303,7 +285,7 @@ export class LocalTTSProvider extends BaseTTSProvider {
           }
 
           if (voiceList.length > 0) {
-            return voiceList.map((v: any) => ({
+            return voiceList.map((v: any) => (typeof v === 'string' && describeKokoroVoice(v)) || ({
               id: typeof v === 'string' ? v : v.id || v.voice_id || v.name,
               name: typeof v === 'string' ? v : v.name || v.id || v.voice_id,
               lang: typeof v === 'string' ? 'mul' : v.lang || v.language || 'mul',
@@ -317,8 +299,7 @@ export class LocalTTSProvider extends BaseTTSProvider {
     }
 
     // Fall back to built-in voice list for known models
-    const model = (this.config?.model || '').toLowerCase();
-    if (model.includes('kokoro')) {
+    if (isKokoro(this.config)) {
       return KOKORO_VOICES;
     }
 

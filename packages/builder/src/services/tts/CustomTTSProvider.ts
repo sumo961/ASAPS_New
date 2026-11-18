@@ -10,7 +10,9 @@
  */
 
 import type { TTSVoiceConfig, TTSVoiceInfo, TTSSynthesisResult } from '../../types/tts';
+import { TTSUnavailableError } from '../../types/tts';
 import { BaseTTSProvider } from './BaseTTSProvider';
+import { KOKORO_VOICES, isKokoro, kokoroVoiceFor } from './kokoro';
 
 export class CustomTTSProvider extends BaseTTSProvider {
   readonly name = 'Custom TTS';
@@ -29,12 +31,22 @@ export class CustomTTSProvider extends BaseTTSProvider {
   async synthesize(text: string, voiceConfig?: TTSVoiceConfig): Promise<TTSSynthesisResult> {
     this.ensureReady();
 
-    const voice = voiceConfig?.voiceId || 'default';
+    let voice = voiceConfig?.voiceId || 'default';
     const model = this.config!.model || 'tts-1';
     const speed = voiceConfig?.rate ?? 1.0;
     const baseUrl = this.config!.baseUrl!.replace(/\/$/, '');
 
-    const requestBody = { model, input: text, voice, speed, response_format: 'mp3' };
+    const requestBody: Record<string, unknown> = { model, input: text, voice, speed, response_format: 'mp3' };
+
+    // Kokoro behind an OpenAI-compatible server: a voice reads one language,
+    // and the server must be told which.
+    if (isKokoro(this.config)) {
+      const match = kokoroVoiceFor(voice, voiceConfig?.lang);
+      if (!match) throw new TTSUnavailableError(`Kokoro has no voice for "${voiceConfig?.lang}"`);
+      voice = match.voice || voice;
+      requestBody.voice = voice;
+      if (match.langCode) requestBody.lang_code = match.langCode;
+    }
 
     // Custom providers are typically local — call directly (no proxy needed)
     const endpoint = `${baseUrl}/audio/speech`;
@@ -79,7 +91,7 @@ export class CustomTTSProvider extends BaseTTSProvider {
       }
 
       const response = await fetch(`${baseUrl}/voices`, { headers });
-      if (!response.ok) return [];
+      if (!response.ok) return isKokoro(this.config) ? KOKORO_VOICES : [];
 
       const data = await response.json();
       // Support both OpenAI-style { voices: [...] } and array responses

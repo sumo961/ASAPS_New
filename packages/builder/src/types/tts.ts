@@ -22,7 +22,7 @@ export interface TTSProviderConfig {
   /** Custom base URL for API-compatible providers */
   baseUrl?: string;
 
-  /** Model identifier (e.g., 'tts-1', 'tts-1-hd') */
+  /** Model identifier (e.g., 'tts-1', 'gpt-4o-mini-tts') */
   model?: string;
 
   /** Default voice ID to use when no speaker-specific voice is set */
@@ -90,6 +90,18 @@ export interface TTSSynthesisResult {
 
   /** Estimated duration in milliseconds */
   durationMs?: number;
+}
+
+/**
+ * Thrown by a provider that can't read this line at all: the language is one
+ * it doesn't have, or its speech models have been switched off. TTSService
+ * hands such a line to the browser's voice instead of staying silent.
+ */
+export class TTSUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TTSUnavailableError';
+  }
 }
 
 /**

@@ -296,6 +296,56 @@ describe('TTSService', () => {
   // -------------------------------------------------------------------------
   // speakPrompt
   // -------------------------------------------------------------------------
+  describe('a line the provider cannot read', () => {
+    let spoken: SpeechSynthesisUtterance[];
+    const original = (window as any).speechSynthesis;
+    const originalUtterance = (window as any).SpeechSynthesisUtterance;
+
+    beforeEach(() => {
+      spoken = [];
+      (window as any).SpeechSynthesisUtterance = class { lang = ''; voice = null; constructor(public text: string) {} };
+      (window as any).speechSynthesis = {
+        cancel: vi.fn(),
+        getVoices: () => [{ voiceURI: 'Anna', name: 'Anna', lang: 'de-DE', localService: true, default: false }],
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        speak: (u: any) => { spoken.push(u); u.onend?.(); },
+      };
+    });
+
+    afterEach(() => {
+      (window as any).speechSynthesis = original;
+      (window as any).SpeechSynthesisUtterance = originalUtterance;
+    });
+
+    const unavailable = () => Object.assign(new Error('no German'), { name: 'TTSUnavailableError' });
+
+    it('is read with the browser voice, in the line language', async () => {
+      const provider = createMockProvider({ synthesize: vi.fn(async () => { throw unavailable(); }) });
+      service.registerProvider(provider);
+      service.setProvider(provider.name);
+      service.setLanguage('de');
+      service.setDefaultVoiceConfig({ voiceId: 'am_adam' });
+
+      await service.speak('Guten Tag');
+
+      expect(spoken).toHaveLength(1);
+      expect(spoken[0].text).toBe('Guten Tag');
+      expect(spoken[0].lang).toBe('de');
+      expect((spoken[0].voice as any)?.name).toBe('Anna');
+    });
+
+    it('stays silent for any other error', async () => {
+      const provider = createMockProvider({ synthesize: vi.fn(async () => { throw new Error('401'); }) });
+      service.registerProvider(provider);
+      service.setProvider(provider.name);
+
+      await service.speak('Hello');
+
+      expect(spoken).toHaveLength(0);
+    });
+  });
+
   describe('speakPrompt()', () => {
     let provider: ITTSProvider;
 

@@ -9,6 +9,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Key, CheckCircle, AlertCircle, Server, Trash2, Play, Volume2, Cpu } from 'lucide-react';
 import { getSavedTTSConfig, clearSavedTTSConfig } from '../../hooks/useTTS';
 import { getTTSService, WebSpeechProvider, LOCAL_TTS_PRESETS } from '../../services/tts';
+import { isKokoro } from '../../services/tts/kokoro';
 import type { TTSProviderType, TTSVoiceInfo } from '../../types/tts';
 import { keyStorageNote } from '../../utils/keyStorageNote';
 
@@ -45,6 +46,7 @@ const PROVIDER_PRESETS: Record<TTSProviderTab, ProviderPreset> = {
     models: [
       { id: 'tts-1', name: 'TTS-1 (fast)' },
       { id: 'tts-1-hd', name: 'TTS-1 HD (quality)' },
+      { id: 'gpt-4o-mini-tts', name: 'GPT-4o mini TTS (more voices)' },
     ],
     defaultModel: 'tts-1',
   },
@@ -438,6 +440,12 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
               </select>
+              {provider === 'openai' && (
+                <p className="mt-1 text-xs text-amber-700">
+                  OpenAI ends these speech models on 6 January 2027. After that day, lines are read with your
+                  computer's built-in voice until you choose another provider here.
+                </p>
+              )}
             </div>
           ) : (provider === 'local' || provider === 'custom') && (
             <div>
@@ -455,6 +463,12 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
               <p className="mt-1 text-xs text-gray-500">
                 Model name sent to the server (leave empty if server uses a default)
               </p>
+              {isKokoro({ model, localPreset: provider === 'local' ? localPreset : undefined }) && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Kokoro reads English, Spanish, French, Italian, Brazilian Portuguese, Hindi, Japanese and Mandarin.
+                  A story played in another language is read with your computer's built-in voice.
+                </p>
+              )}
             </div>
           )}
 

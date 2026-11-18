@@ -89,20 +89,57 @@ describe('WhisperSTTProvider', () => {
       await provider.transcribe(new Blob(['audio']));
 
       const body = (global.fetch as any).mock.calls[0][1].body as FormData;
-      expect(body.get('model')).toBe('whisper-1');
+      expect(body.get('model')).toBe('gpt-transcribe');
       expect(body.get('file')).toBeTruthy();
     });
 
-    it('should include language when specified', async () => {
+    it('gives gpt-transcribe the language as a list', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ text: 'test' }),
       });
 
-      await provider.transcribe(new Blob(['audio']), 'de');
+      await provider.transcribe(new Blob(['audio']), 'de-DE');
 
       const body = (global.fetch as any).mock.calls[0][1].body as FormData;
-      expect(body.get('language')).toBe('de');
+      expect(body.getAll('languages[]')).toEqual(['de']);
+      expect(body.has('language')).toBe(false);
+    });
+
+    it('gives whisper-1 and other servers the single language field', async () => {
+      provider.configure({ provider: 'whisper', apiKey: 'sk-test', model: 'whisper-1' });
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ text: 'test' }),
+      });
+
+      await provider.transcribe(new Blob(['audio']), 'zh-Hans');
+
+      const body = (global.fetch as any).mock.calls[0][1].body as FormData;
+      expect(body.get('language')).toBe('zh');
+      expect(body.has('languages[]')).toBe(false);
+    });
+
+    it('asks gpt-transcribe once whisper-1 has been switched off', async () => {
+      provider.configure({ provider: 'whisper', apiKey: 'sk-test', model: 'whisper-1' });
+      global.fetch = vi.fn()
+        .mockResolvedValueOnce({ ok: false, status: 404, text: () => Promise.resolve('model_not_found') })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ text: 'Hallo', languages: [{ code: 'de' }] }) });
+
+      const result = await provider.transcribe(new Blob(['audio']), 'de');
+
+      const second = (global.fetch as any).mock.calls[1][1].body as FormData;
+      expect(second.get('model')).toBe('gpt-transcribe');
+      expect(second.getAll('languages[]')).toEqual(['de']);
+      expect(result).toMatchObject({ text: 'Hallo', detectedLanguage: 'de' });
+    });
+
+    it('does not swap the model on another server', async () => {
+      provider.configure({ provider: 'whisper', apiKey: 'k', model: 'whisper-1', baseUrl: 'http://localhost:9000/v1' });
+      global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404, text: () => Promise.resolve('nope') });
+
+      await expect(provider.transcribe(new Blob(['audio']))).rejects.toThrow('Whisper API error 404');
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
     it('should use custom baseUrl when configured', async () => {

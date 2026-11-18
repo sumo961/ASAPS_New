@@ -53,9 +53,17 @@ describe('OpenAITTSProvider', () => {
   // Voices
   // -------------------------------------------------------------------------
   describe('getVoices()', () => {
-    it('should return 10 static voices', async () => {
+    it('lists the nine voices tts-1 has', async () => {
       const voices = await provider.getVoices();
-      expect(voices).toHaveLength(10);
+      expect(voices).toHaveLength(9);
+      expect(voices.map(v => v.id)).not.toContain('marin');
+    });
+
+    it('lists all thirteen for gpt-4o-mini-tts', async () => {
+      provider.configure({ provider: 'openai', apiKey: 'sk-test', model: 'gpt-4o-mini-tts' });
+      const ids = (await provider.getVoices()).map(v => v.id);
+      expect(ids).toHaveLength(13);
+      expect(ids).toEqual(expect.arrayContaining(['ballad', 'verse', 'marin', 'cedar']));
     });
 
     it('should include expected voice IDs', async () => {
@@ -71,7 +79,7 @@ describe('OpenAITTSProvider', () => {
 
     it('should return all multilingual voices regardless of lang filter', async () => {
       const voices = await provider.getVoices('de');
-      expect(voices).toHaveLength(10);
+      expect(voices).toHaveLength(9);
     });
 
     it('should include gender info on voices', async () => {
@@ -237,6 +245,46 @@ describe('OpenAITTSProvider', () => {
   describe('stop()', () => {
     it('should be a no-op (AudioManager manages playback)', () => {
       expect(() => provider.stop()).not.toThrow();
+    });
+  });
+
+  describe('models and voices that end', () => {
+    beforeEach(() => {
+      (window as any).electronAPI = { isElectron: true };
+    });
+
+    it('asks tts-1 for Alloy when the chosen voice only exists on the newer model', async () => {
+      provider.configure({ provider: 'openai', apiKey: 'sk-test', model: 'tts-1' });
+      global.fetch = vi.fn().mockResolvedValue({ ok: true });
+      await provider.synthesize('Hello', { voiceId: 'marin' });
+      expect(JSON.parse((global.fetch as any).mock.calls[0][1].body).voice).toBe('alloy');
+    });
+
+    it('keeps the voice on gpt-4o-mini-tts, and a custom voice id anywhere', async () => {
+      provider.configure({ provider: 'openai', apiKey: 'sk-test', model: 'gpt-4o-mini-tts' });
+      global.fetch = vi.fn().mockResolvedValue({ ok: true });
+      await provider.synthesize('Hello', { voiceId: 'marin' });
+      expect(JSON.parse((global.fetch as any).mock.calls[0][1].body).voice).toBe('marin');
+
+      provider.configure({ provider: 'openai', apiKey: 'sk-test', model: 'tts-1' });
+      await provider.synthesize('Hello', { voiceId: 'voice_1234' });
+      expect(JSON.parse((global.fetch as any).mock.calls[1][1].body).voice).toBe('voice_1234');
+    });
+
+    it('says the provider is unavailable once the model is switched off', async () => {
+      provider.configure({ provider: 'openai', apiKey: 'sk-test' });
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        text: () => Promise.resolve('{"error":{"code":"model_not_found"}}'),
+      });
+      await expect(provider.synthesize('Hello')).rejects.toMatchObject({ name: 'TTSUnavailableError' });
+    });
+
+    it('keeps other errors as they were', async () => {
+      provider.configure({ provider: 'openai', apiKey: 'sk-test' });
+      global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 401, text: () => Promise.resolve('Unauthorized') });
+      await expect(provider.synthesize('Hello')).rejects.toThrow('OpenAI TTS error 401: Unauthorized');
     });
   });
 });

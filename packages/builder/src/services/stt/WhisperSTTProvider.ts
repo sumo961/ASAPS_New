@@ -1,12 +1,30 @@
 /**
- * Whisper STT Provider
+ * OpenAI STT Provider (named after Whisper, its first model)
  *
- * Uses OpenAI's Whisper API for batch audio transcription.
- * Does not support streaming — records audio, then transcribes.
+ * Batch transcription through /v1/audio/transcriptions: records audio, then
+ * transcribes. No streaming.
+ *
+ * OpenAI switches off whisper-1 (and gpt-4o-transcribe, gpt-4o-mini-transcribe)
+ * on 2027-02-26; gpt-transcribe replaces them on the same endpoint. It takes
+ * the language as `languages[]` (a list) where the older models take
+ * `language`, and answers with `languages: [{ code }]`.
+ * (developers.openai.com/api/docs/guides/speech-to-text, checked 2026-11-18)
+ *
+ * A custom base URL (Groq, a local server) keeps its own model names.
  */
 
 import type { STTProviderConfig, STTListeningOptions, STTTranscriptionResult } from '../../types/stt';
+import { speechLanguageCode } from '@asaps/core';
 import { BaseSTTProvider } from './BaseSTTProvider';
+
+/** The model for a setup that names none. */
+export const OPENAI_STT_MODEL = 'gpt-transcribe';
+
+/** The day OpenAI switches off whisper-1. */
+export const OPENAI_WHISPER_SHUTDOWN = '2027-02-26';
+
+const OPENAI_BASE = 'https://api.openai.com/v1';
+const isRetired = (model: string) => /^(whisper-1|gpt-4o(-mini)?-transcribe)/.test(model);
 
 export class WhisperSTTProvider extends BaseSTTProvider {
   readonly name = 'Whisper STT';
@@ -113,26 +131,20 @@ export class WhisperSTTProvider extends BaseSTTProvider {
   async transcribe(audio: Blob, language?: string): Promise<STTTranscriptionResult> {
     this.ensureReady();
 
-    const formData = new FormData();
-    formData.append('file', audio, 'audio.webm');
-    formData.append('model', this.config!.model || 'whisper-1');
-    if (language) {
-      // Whisper API requires ISO 639-1 (e.g., 'en'), not BCP 47 (e.g., 'en-US')
-      const iso639 = language.split('-')[0].toLowerCase();
-      formData.append('language', iso639);
+    const baseUrl = (this.config!.baseUrl || OPENAI_BASE).replace(/\/$/, '');
+    const model = this.config!.model || OPENAI_STT_MODEL;
+
+    let response = await this.request(baseUrl, model, audio, language);
+    let errorText = response.ok ? '' : await response.text();
+    // After its shutdown OpenAI refuses the older model; ask the current one.
+    const gone = response.status === 404 || response.status === 410 || /model_not_found|deprecat|does not exist/i.test(errorText);
+    if (!response.ok && gone && baseUrl === OPENAI_BASE && isRetired(model)) {
+      console.warn(`[${this.name}] "${model}" is no longer offered; using ${OPENAI_STT_MODEL}`);
+      response = await this.request(baseUrl, OPENAI_STT_MODEL, audio, language);
+      errorText = response.ok ? '' : await response.text();
     }
 
-    const baseUrl = (this.config!.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
-    const response = await fetch(`${baseUrl}/audio/transcriptions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.config!.apiKey}`,
-      },
-      body: formData,
-    });
-
     if (!response.ok) {
-      const errorText = await response.text();
       throw new Error(`Whisper API error ${response.status}: ${errorText}`);
     }
 
@@ -140,7 +152,27 @@ export class WhisperSTTProvider extends BaseSTTProvider {
     return {
       text: data.text,
       isFinal: true,
-      detectedLanguage: data.language,
+      detectedLanguage: data.language ?? data.languages?.[0]?.code,
     };
+  }
+
+  private request(baseUrl: string, model: string, audio: Blob, language?: string): Promise<Response> {
+    const formData = new FormData();
+    formData.append('file', audio, 'audio.webm');
+    formData.append('model', model);
+    // The bare code ('de'), not 'de-DE', 'zh-Hans' or a typed name.
+    const code = speechLanguageCode(language);
+    if (code) {
+      // gpt-transcribe takes a list and refuses the single field.
+      formData.append(/^gpt-transcribe/.test(model) ? 'languages[]' : 'language', code);
+    }
+
+    return fetch(`${baseUrl}/audio/transcriptions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.config!.apiKey}`,
+      },
+      body: formData,
+    });
   }
 }

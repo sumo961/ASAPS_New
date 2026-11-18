@@ -3706,7 +3706,7 @@ ASAPS Modern can read your story aloud using text-to-speech. This is useful for 
 4. Choose a **TTS provider**:
    - **Web Speech** — Free, built into your browser. Quality varies by OS and browser.
    - **ElevenLabs** — High-quality cloud voices. Requires an API key from [elevenlabs.io](https://elevenlabs.io).
-   - **OpenAI** — Cloud TTS via OpenAI. Requires an API key.
+   - **OpenAI** — Cloud TTS via OpenAI. Requires an API key. OpenAI ends its speech models on 6 January 2027; after that day lines are read with your computer's built-in voice until you choose another provider.
    - **Local TTS** — Run open-source TTS models on your own machine. Supports Kokoro (via mlx-audio), Coqui, Piper, and Chatterbox with built-in presets. No API key needed.
    - **Custom Server** — Connect to any OpenAI-compatible TTS endpoint.
 5. Enter your API key if using a cloud provider
@@ -3716,7 +3716,7 @@ ASAPS Modern can read your story aloud using text-to-speech. This is useful for 
 | Model | Description |
 |-------|-------------|
 | **Eleven v3** | Most expressive, highest quality (default) |
-| **Multilingual v2** | Good quality, supports many languages |
+| **Multilingual v2** | Good quality, supports many languages; works out the language from the text |
 | **Flash v2.5** | Fastest response time, lowest cost |
 | **Turbo v2.5** | Fast with good quality |
 
@@ -3730,7 +3730,9 @@ The Local TTS provider comes with built-in presets for popular open-source TTS s
 2. Choose the **Kokoro** preset from the server presets dropdown
 3. The base URL auto-fills to `http://localhost:8880/v1`
 4. Start your local Kokoro server (see the mlx-audio documentation)
-5. A curated list of Kokoro voices appears automatically -- male and female voices in American, British, and other accents
+5. A list of Kokoro voices appears automatically: American and British English, Spanish, French, Italian, Brazilian Portuguese, Hindi, Japanese and Mandarin
+
+A Kokoro voice reads one language. When the story is played in another of Kokoro's languages, a voice of that language reads the line (a man's voice for a man's, where there is one). Kokoro has no German, Dutch or Swedish, among others: those lines are read with your computer's built-in voice. Japanese and Mandarin need extra packages on the server (`misaki[ja]`, `misaki[zh]`).
 
 Other presets include Coqui TTS, Piper, and Chatterbox. You can also enter a custom base URL for any OpenAI-compatible TTS server.
 
@@ -3785,7 +3787,7 @@ ASAPS Modern supports voice input for AI Conversation beats and other text entry
 1. Click the **Mic** button in the header toolbar (next to the TTS button)
 2. Configure a **STT provider**:
    - **Web Speech** — Free, built into your browser. Real-time streaming, but quality varies.
-   - **Whisper (OpenAI)** — Cloud-based, high accuracy. Requires an OpenAI API key.
+   - **Whisper (OpenAI)** — Cloud-based, high accuracy. Requires an OpenAI API key. Uses OpenAI's **GPT Transcribe**; Whisper v1 can still be chosen until OpenAI ends it on 26 February 2027.
    - **Local Server** — Self-hosted Whisper server (any OpenAI-compatible endpoint).
    - **Vosk** — Offline streaming recognition via WebSocket.
    - **Whisper.cpp** — Local whisper.cpp server for accurate offline recognition (default port: 8178).

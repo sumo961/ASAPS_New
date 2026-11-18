@@ -31,10 +31,13 @@ export class ElevenLabsProvider extends BaseTTSProvider {
     const modelId = this.config!.model || 'eleven_v3';
 
     const requestBody: Record<string, any> = { text, model_id: modelId };
-    // Pass language_code for multilingual models (e.g. eleven_multilingual_v2, eleven_v3)
-    // The bare code ('de'), not 'de-AT', 'zh-Hans' or 'es-419'.
+    // language_code holds the model to one language. The bare code ('de'),
+    // not 'de-AT', 'zh-Hans' or 'es-419'. Multilingual v2 doesn't take it
+    // ("not supported for multilingual_v2 models", API reference, checked
+    // 2026-11-18) and reads the language of the text; a code a model doesn't
+    // know is ignored.
     const languageCode = speechLanguageCode(voiceConfig?.lang);
-    if (languageCode) {
+    if (languageCode && !/multilingual/i.test(modelId)) {
       requestBody.language_code = languageCode;
     }
 

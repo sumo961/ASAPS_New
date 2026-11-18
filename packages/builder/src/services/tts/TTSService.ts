@@ -7,6 +7,7 @@
 
 import type { ITTSProvider, TTSVoiceConfig } from '../../types/tts';
 import { getAudioManager } from '@asaps/renderer';
+import { WebSpeechProvider } from './WebSpeechProvider';
 
 export class TTSService {
   private providers: Map<string, ITTSProvider> = new Map();
@@ -22,6 +23,8 @@ export class TTSService {
   private speakerVoices: Map<string, TTSVoiceConfig> = new Map();
   private speakerAliases: Map<string, string> = new Map();
   private defaultVoiceConfig: TTSVoiceConfig = {};
+  /** The browser's voice, for a line the active provider can't read at all. */
+  private browserVoice: ITTSProvider | null = null;
 
   // ---------------------------------------------------------------------------
   // Provider registry
@@ -186,6 +189,12 @@ export class TTSService {
       // AbortError is expected when a new speak() cancels the previous one via stop()
       if (error instanceof DOMException && error.name === 'AbortError') {
         // Silently ignore — this is normal during speech transitions
+      } else if (error instanceof Error && error.name === 'TTSUnavailableError' && this._speakGeneration === gen) {
+        // The provider can't read this line (a language it doesn't have, a
+        // model that was switched off): the browser's voice reads it, in
+        // the line's language and without the provider's voice id.
+        console.warn(`[TTSService] ${error.message}; reading with the browser's voice`);
+        await this.speakWithBrowserVoice(text, voiceConfig);
       } else {
         console.error('[TTSService] Speech failed:', error);
       }
@@ -197,6 +206,19 @@ export class TTSService {
       } else {
         console.log(`[TTSService] Skipping isSpeaking reset — stale gen ${gen}, current ${this._speakGeneration}`);
       }
+    }
+  }
+
+  private async speakWithBrowserVoice(text: string, voiceConfig: TTSVoiceConfig): Promise<void> {
+    try {
+      if (!this.browserVoice) {
+        this.browserVoice = new WebSpeechProvider();
+        this.browserVoice.configure({ provider: 'web-speech' });
+      }
+      if (!this.browserVoice.isReady()) return;
+      await this.browserVoice.synthesize(text, { ...voiceConfig, voiceId: undefined });
+    } catch (error) {
+      console.error('[TTSService] Speech failed:', error);
     }
   }
 
@@ -220,6 +242,7 @@ export class TTSService {
     this._speakGeneration++; // Invalidate any running speak() finally block
     try {
       this.activeProvider?.stop();
+      this.browserVoice?.stop();
     } catch {
       // AbortError is expected when cancelling in-progress synthesis
     }

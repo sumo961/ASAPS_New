@@ -3,7 +3,7 @@
 ## Unreleased (since v0.9.158, 2026-11-17)
 
 ### Overview
-A check of reading aloud (TTS) and voice input (STT), which had not been exercised for a while, with the question whether they work in languages other than English. They did only in part: the Preview with the browser's voices or ElevenLabs followed the language; most other paths stayed English or said nothing. This batch fixes the exported player and the language handling. Provider updates (OpenAI's announced shutdowns, Kokoro's languages) are still to do.
+A check of reading aloud (TTS) and voice input (STT), which had not been exercised for a while, with the question whether they work in languages other than English. They did only in part: the Preview with the browser's voices or ElevenLabs followed the language; most other paths stayed English or said nothing. This batch fixes the exported player and the language handling. A second batch brings the providers up to date (OpenAI's announced shutdowns, Kokoro's languages).
 
 ### Fixed: reading aloud and voice input in exported stories
 - **"Read text aloud" reads.** An author who never saved a speech setup got an export with no speech at all: the browser voice used in the Preview was never written into the export. The export now defaults to the browser's voice.
@@ -22,8 +22,22 @@ A check of reading aloud (TTS) and voice input (STT), which had not been exercis
 - **whisper.cpp is told the language** while streaming (it got none and used the server's default); local Whisper servers and ElevenLabs get the bare code (`de`, not `de-DE` or `zh-Hans`).
 - One helper for all of this in core: `speechLocale`, `speechLanguageCode`, `voiceSpeaksLanguage` (`utils/speechLanguage.ts`).
 - **Not tested by ear:** no audio was played and no cloud or local speech server was reachable; the checks are unit tests and a browser run with speech recorded instead of spoken.
-- **Still open:** OpenAI has announced shutdowns (`tts-1`, `tts-1-hd`, `gpt-4o-mini-tts` on 2027-01-06; `whisper-1` on 2027-02-26; `gpt-transcribe` replaces Whisper), the OpenAI voice list is out of date, Kokoro sends no language and lists English voices only, and which language codes each ElevenLabs model accepts is unverified.
+- **Still open:** see "Speech providers brought up to date" below for what is left.
 - **Files:** `packages/core/src/utils/speechLanguage.ts` (+ test), `packages/builder/src/services/tts/{WebSpeechProvider,TTSService,ElevenLabsProvider}.ts` (+ tests), `services/stt/{WebSpeechSTTProvider,LocalSTTProvider,WhisperCppSTTProvider}.ts`, `utils/speakerAliases.ts` (+ test), `App.tsx`, `pages/PreviewWindow.tsx`, `services/PreviewWindowManager.ts`, `docs/USER_GUIDE.md`
+
+
+### Speech providers brought up to date
+Checked against the providers' documentation on 2026-11-18.
+- **Kokoro reads its other languages.** The voice list had English only; it now has all 54 voices in Kokoro's nine language codes (American and British English, Spanish, French, Italian, Brazilian Portuguese, Hindi, Japanese, Mandarin). The server is told the voice's language (`lang_code`): mlx-audio assumes American English without it, so even a British voice was read as American. A voice reads one language, so a line in another of Kokoro's languages goes to a voice of that language, same gender where there is one.
+- **A language Kokoro lacks is read by the browser's voice** (German, Dutch, Swedish…), instead of being spelled out with English sounds. `TTSService` does this for any provider that throws the new `TTSUnavailableError`.
+- Kokoro is recognised by its preset or by a model named after it, also on the Custom Server tab. The preset's voice list is asked for at `/audio/voices` (Kokoro-FastAPI). Local servers get the bare language code in `{lang}`.
+- **OpenAI speech ends on 2027-01-06.** OpenAI switches off every model of `/v1/audio/speech` (`tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`); the replacement runs on the Realtime API, a different workflow we do not speak yet. The setup dialog says so. After that day the Preview and exported stories read with the browser's voice instead of going silent (exports now do this for any refused request).
+- **OpenAI voices:** GPT-4o mini TTS can be chosen, with its four extra voices (Ballad, Cedar, Marin, Verse); the list follows the model, and a voice the model lacks is asked for as Alloy instead of failing.
+- **Voice input uses `gpt-transcribe`** for new setups (`whisper-1` ends 2027-02-26). It takes the language as `languages[]`, the older models as `language`. A saved `whisper-1` setup keeps working and moves to `gpt-transcribe` by itself once OpenAI refuses it. Other servers keep their own model names.
+- **ElevenLabs:** Multilingual v2 no longer gets `language_code`, which it does not take; the other models do.
+- **Not tested against the services:** no OpenAI or ElevenLabs key and no local Kokoro server on this computer. Unit tests cover the requests sent; the dialog's notices were read in the dev app. Nothing was played.
+- **Still open:** reading aloud through OpenAI's Realtime API (needed to keep OpenAI as a speech provider after 2027-01-06); a listening test of Kokoro in a second language and of `gpt-transcribe`.
+- **Files:** `packages/builder/src/services/tts/{kokoro.ts (new),LocalTTSProvider,CustomTTSProvider,OpenAITTSProvider,ElevenLabsProvider,TTSService}.ts` (+ tests), `services/stt/WhisperSTTProvider.ts` (+ test), `types/tts.ts`, `components/tts/TTSConfigDialog.tsx`, `components/stt/STTConfigDialog.tsx`, `packages/player-web/src/WebTTSProvider.ts`, `packages/builder/public/player-web.js`, `docs/USER_GUIDE.md`
 
 ### Visual Editor: a Dialog Tree's line in the chosen language
 - With a translation chosen in the header, a Dialog Tree's line stayed in the original language on the fixed canvas (text box or speech bubble), while its replies and the Properties panel were translated. The lookup asked for a `text` entry, but the line's translation is stored under `dialogTree.text`, and the fallback to the original won. The Preview and exports were not affected.
