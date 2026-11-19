@@ -972,15 +972,22 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
    * rest rather than a live affect value.
    */
   /** Where a Dialog Tree reply without a next line leads, for its badge on the canvas. */
-  const replyExit = (choice: Record<string, unknown>): { label: string; title: string } => {
+  const replyExit = (choice: Record<string, unknown>): { label: string; title: string; warn?: boolean } => {
     const targetId = typeof choice.target === 'string' ? choice.target : '';
+    if (targetId === '__self__') return { label: '↺ Starts the dialog again', title: 'This reply goes back to the first line of this dialog.' };
     const target = targetId ? beats.find((b) => b.id === targetId) : undefined;
     if (target) {
       const name = (target as any).name || target.id;
       return { label: `→ ${name}`, title: `This reply leaves this beat and goes to “${name}”.` };
     }
-    if (targetId) return { label: '→ missing beat', title: 'This reply goes to a beat that no longer exists.' };
-    return { label: 'Ends the dialog', title: 'This reply has no next line and no beat of its own to go to: the dialog ends here.' };
+    if (targetId) return { label: '⚠ Missing beat', title: 'This reply goes to a beat that no longer exists. Give it another exit.', warn: true };
+    // No next line and no exit: what Story Warnings reports as well.
+    const onward = ((beat as any)?.connections?.length ?? 0) > 0 || !!(beat as any)?.defaultTarget;
+    return {
+      label: '⚠ No exit',
+      title: `This reply has no next line and no exit, so picking it ends the scene${onward ? " and the story goes on by the beat's own link" : ' and the story stops there'}. Give it an exit or a next line.`,
+      warn: true,
+    };
   };
 
   // The HUD panels show the language chosen in the header.

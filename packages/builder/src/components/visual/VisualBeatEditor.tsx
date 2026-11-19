@@ -179,7 +179,7 @@ interface VisualBeatEditorProps {
   /** This beat's own look (Beat.look) over the project's. */
   look?: BeatLook;
   /** Dialog Tree: where a reply without a next line leads ("→ The forest"), for its badge. */
-  describeReplyExit?: (choice: Record<string, unknown>) => { label: string; title: string } | null;
+  describeReplyExit?: (choice: Record<string, unknown>) => { label: string; title: string; warn?: boolean } | null;
   /** The author changed the look on the canvas (a speech bubble resized). */
   onLookChange?: (look: BeatLook) => void;
   backgroundAssetId?: string;

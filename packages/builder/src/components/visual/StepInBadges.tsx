@@ -3,9 +3,10 @@
  *
  * Every reply says where it leads, in a badge at its top right corner. One
  * that has a next line reads "Step in →", and a click on the badge shows that
- * line on the canvas. One that leaves the beat names the beat it goes to, and
- * one that ends the dialog says so; those two only tell, there is nothing to
- * step into. A click on the reply itself never steps in: on the fixed canvas it selects the reply's button, and a
+ * line on the canvas. One that leaves the beat names the beat it goes to. One
+ * with neither a next line nor an exit is a missing connection (Story
+ * Warnings' "reply-nowhere") and is flagged in amber. Those two only tell,
+ * there is nothing to step into. A click on the reply itself never steps in: on the fixed canvas it selects the reply's button, and a
  * reply can't be both selected and followed by the same click. One rule for
  * buttons and for replies listed in a bubble, on both canvases; hotspots
  * have had the same badge all along (HotspotEditOverlay).
@@ -28,6 +29,8 @@ export interface StepInTarget {
   label?: string;
   /** The same in a sentence, for the tooltip. */
   title?: string;
+  /** Something is missing here (no exit, or a beat that no longer exists). */
+  warn?: boolean;
 }
 
 interface Props {
@@ -36,7 +39,7 @@ interface Props {
   zIndex?: number;
 }
 
-interface Badge { key: string; x: number; y: number; label?: string; title?: string; steps: boolean }
+interface Badge { key: string; x: number; y: number; label?: string; title?: string; steps: boolean; warn?: boolean }
 
 const hidden = (node: Element): boolean => {
   for (let n: Element | null = node; n; n = n.parentElement) {
@@ -71,7 +74,7 @@ export const StepInBadges: React.FC<Props> = ({ findTargets, zIndex = 10001 }) =
         const r = target.node.getBoundingClientRect();
         if (r.width <= 0 || r.height <= 0 || hidden(target.node)) continue;
         if (target.onStep) steps.set(target.key, target.onStep);
-        next.push({ key: target.key, x: (r.right - box.left) / s, y: (r.top - box.top) / s, label: target.label, title: target.title, steps: !!target.onStep });
+        next.push({ key: target.key, x: (r.right - box.left) / s, y: (r.top - box.top) / s, label: target.label, title: target.title, steps: !!target.onStep, warn: target.warn });
       }
       stepsRef.current = steps;
       setScale((prev) => (Math.abs(prev - s) < 0.001 ? prev : s));
@@ -138,8 +141,8 @@ export const StepInBadges: React.FC<Props> = ({ findTargets, zIndex = 10001 }) =
             maxWidth: 220,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            // Blue steps in; grey only tells where the reply goes.
-            background: badge.steps ? 'rgba(59, 130, 246, 0.95)' : 'rgba(55, 65, 81, 0.92)',
+            // Blue steps in; grey only tells where the reply goes; amber: nowhere.
+            background: badge.steps ? 'rgba(59, 130, 246, 0.95)' : badge.warn ? 'rgba(217, 119, 6, 0.97)' : 'rgba(55, 65, 81, 0.92)',
             color: '#fff',
             padding: '1px 6px',
             borderRadius: 3,
