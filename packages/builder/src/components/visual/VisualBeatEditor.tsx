@@ -2260,8 +2260,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
 
                   const isOnlySelected = selectedElements.length === 1;
                   const isGrouped = !!el.groupId;
-                  // The line is shown as a speech bubble: frame the bubble, and
-                  // dash the text box (it is used when the bubble doesn't fit).
+                  // The line is shown as a speech bubble: frame the bubble only.
+                  // The text box it stands for is not on the canvas, so a frame
+                  // and handles where it would be read as a leftover.
                   const inBubble = bubbleFrame?.id === el.id ? bubbleFrame.rect : null;
 
                   return (
@@ -2283,19 +2284,19 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         }}
                       />
                     )}
+                    {!inBubble && (
                     <div
-                      title={inBubble ? 'The text box, used when the bubble does not fit' : undefined}
                       style={{
                         position: 'absolute',
                         left: `${effectiveX}px`,
                         top: `${effectiveY}px`,
                         width: `${effectiveWidth}px`,
                         height: `${effectiveHeight}px`,
-                        border: isGrouped ? '2px solid #8b5cf6' : inBubble ? '2px dashed #3b82f6' : '2px solid #3b82f6',
+                        border: isGrouped ? '2px solid #8b5cf6' : '2px solid #3b82f6',
                         borderRadius: '4px',
                         pointerEvents: 'none',
                         zIndex: 10000,
-                        boxShadow: inBubble ? 'none' : isGrouped
+                        boxShadow: isGrouped
                           ? '0 0 0 1px rgba(255,255,255,0.5), 0 0 20px rgba(139,92,246,0.3)'
                           : '0 0 0 1px rgba(255,255,255,0.5), 0 0 20px rgba(59,130,246,0.3)',
                         transform: transforms.length > 0 ? transforms.join(' ') : undefined,
@@ -2344,6 +2345,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                       </>
                     )}
                   </div>
+                    )}
                     </React.Fragment>
                   );
                 })}
