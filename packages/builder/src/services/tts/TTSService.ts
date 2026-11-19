@@ -182,6 +182,8 @@ export class TTSService {
       } else if (result.audio) {
         // Blob path — must wait for playback to finish so isSpeaking() stays true
         await this.playSpeechBlob(result.audio, voiceConfig.volume ?? 1.0);
+      } else if (result.played) {
+        // The provider played the line while it arrived, to its end.
       } else {
         // WebSpeech or similar — no audio object returned, provider plays directly.
         // We don't know when it finishes, but the provider should handle its own state.

@@ -2639,16 +2639,17 @@ interface PositionedElementProps {
  * The text box of a line shown as a speech bubble: 'shown' while the bubble
  * is being placed (or doesn't fit), 'hidden' while it shows — kept in place
  * so the buttons stay put and its lettering can be copied — and 'ghost' in
- * the Visual Editor, where the box stays findable.
+ * the Visual Editor: there too nothing of it is drawn, but it stays laid out
+ * and measurable (the editor reads where it is).
  */
 export type SpeechLineMode = 'shown' | 'hidden' | 'ghost';
 
 /** How the text box of a line in a speech bubble looks (see SpeechLineMode). */
 export function speechLineStyle(mode: SpeechLineMode | undefined): React.CSSProperties {
-  // The ghost is an empty dashed outline: a faded copy of the line showed
-  // through and beside the bubble, reading as the same line twice.
+  // The ghost draws nothing. A faded copy of the line read as the same line
+  // twice, and a dashed outline where the box would be as a leftover.
   if (mode === 'hidden') return { visibility: 'hidden' };
-  if (mode === 'ghost') return { opacity: 1, color: 'transparent', textShadow: 'none', backgroundColor: 'transparent', backgroundImage: 'none', boxShadow: 'none', border: '1px dashed rgba(128,128,128,0.6)' };
+  if (mode === 'ghost') return { opacity: 1, color: 'transparent', textShadow: 'none', backgroundColor: 'transparent', backgroundImage: 'none', boxShadow: 'none', border: '1px solid transparent' };
   return {};
 }
 

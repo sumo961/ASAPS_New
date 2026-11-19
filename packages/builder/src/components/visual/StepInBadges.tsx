@@ -25,7 +25,7 @@ export interface StepInTarget {
   node: Element;
   /** The reply has a next line: show it. Left out for a reply that leaves or ends the dialog. */
   onStep?: () => void;
-  /** What the badge says when there is nothing to step into ("→ The forest"). */
+  /** What the badge says: where the reply goes when there is nothing to step into ("→ The forest"), or other words for stepping in ("Next: Ingrid →"). "Step in →" when left out. */
   label?: string;
   /** The same in a sentence, for the tooltip. */
   title?: string;
@@ -127,7 +127,7 @@ export const StepInBadges: React.FC<Props> = ({ findTargets, zIndex = 10001 }) =
             e.stopPropagation();
             stepsRef.current.get(badge.key)?.();
           }}
-          title={badge.steps ? 'Show the line that follows this reply' : badge.title}
+          title={badge.title ?? 'Show the line that follows this reply'}
           style={{
             position: 'absolute',
             left: badge.x,
@@ -153,7 +153,7 @@ export const StepInBadges: React.FC<Props> = ({ findTargets, zIndex = 10001 }) =
             userSelect: 'none',
           }}
         >
-          {badge.steps ? 'Step in →' : badge.label}
+          {badge.label ?? 'Step in →'}
         </button>
       ))}
     </div>

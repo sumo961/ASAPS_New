@@ -37,7 +37,7 @@ const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').tr
  * so they would stay visible for the length of the easing first.
  */
 const HIDDEN: Record<string, string> = { transition: 'none', visibility: 'hidden' };
-/** In the Visual Editor: an empty outline, still there to select. */
+/** In the Visual Editor: nothing drawn, but still laid out where the editor can find it. */
 const GHOST: Record<string, string> = {
   transition: 'none',
   color: 'transparent',
@@ -45,9 +45,8 @@ const GHOST: Record<string, string> = {
   'background-image': 'none',
   'box-shadow': 'none',
   'text-shadow': 'none',
-  'border-style': 'dashed',
-  'border-width': '1px',
-  'border-color': 'rgba(128,128,128,0.6)',
+  'border-color': 'transparent',
+  'outline-color': 'transparent',
 };
 
 /** The reply buttons on the stage, in reply order; undefined when any can't be found. */

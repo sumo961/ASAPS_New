@@ -75,6 +75,26 @@ describe('applyChangeProposals', () => {
     expect(r[3].detail).toMatch(/textBoxBorder/);
   });
 
+  it("sets a beat's speech bubbles and their widths, and refuses a width out of range", () => {
+    const c = ctx([{ id: 'b1', name: 'Speech', type: 'dialogTree', look: { speechBubbleWidth: 0.3 } }]);
+    const ok = applyChangeProposals([{ kind: 'updateParams', beatId: 'b1', params: {
+      look: { speechBubbles: 'on', replyBubble: 'off', speechBubbleWidth: 0.45, replyBubbleWidth: 0.5 },
+    } }], c);
+    expect(ok[0]).toMatchObject({ ok: true });
+    expect(c.updateBeat).toHaveBeenCalledWith('b1', {
+      look: { speechBubbles: 'on', replyBubble: 'off', speechBubbleWidth: 0.45, replyBubbleWidth: 0.5 },
+    });
+
+    const c2 = ctx([{ id: 'b1', name: 'Speech', type: 'dialogTree' }]);
+    const bad = applyChangeProposals([
+      { kind: 'updateParams', beatId: 'b1', params: { look: { speechBubbleWidth: 45 } } },
+      { kind: 'updateParams', beatId: 'b1', params: { look: { speechBubbles: 'yes' } } },
+    ], c2);
+    expect(c2.updateBeat).not.toHaveBeenCalled();
+    expect(bad[0].detail).toMatch(/0\.1 to 0\.6/);
+    expect(bad[1].detail).toMatch(/"on" or "off"/);
+  });
+
   it('reports missing beats without applying', () => {
     const c = ctx([]);
     const results = applyChangeProposals(

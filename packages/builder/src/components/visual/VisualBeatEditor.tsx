@@ -515,6 +515,20 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       const exit = describeReplyExit?.(choice);
       if (exit) targets.push({ key, node, ...exit });
     };
+    // "Then another character speaks": no reply stands for it on this canvas
+    // (the story shows a Continue button), so the line itself carries it.
+    const next = ((beatContent?.choices ?? []) as Array<Record<string, unknown>>).find((c) => c.continue && c.dialogNode);
+    // The line as drawn: its bubble, or else its text box (by its click target).
+    const lineElement = elements.find((el) => el.visible && (el.type === 'dialog' || el.type === 'text'));
+    const lineNode = host.querySelector('[data-speech-bubble="current"]')
+      ?? (lineElement ? Array.from(host.querySelectorAll('[data-drag-overlay]')).find((n) => n.getAttribute('data-element-id') === lineElement.id) : undefined);
+    if (next && lineNode) {
+      const speaker = String((next.dialogNode as Record<string, unknown>).speaker ?? '').trim();
+      targets.push({
+        key: `next:${String(next.id ?? '')}`, node: lineNode, onStep: () => onStepIntoChoice(next),
+        label: speaker ? `Next: ${speaker} →` : 'Next line →', title: 'Show the line that follows this one',
+      });
+    }
     const lines = Array.from(host.querySelectorAll('[data-reply-line]'));
     if (lines.length > 0) {
       const replies = pickableReplies();
@@ -589,6 +603,24 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const [bubbleFrame, setBubbleFrame] = useState<{ id: string; rect: StageRect } | null>(null);
   /** A mousedown has just selected the bubble: its click is not a click on the stage. */
   const bubbleClickRef = useRef(false);
+
+  // Which bubbles are on the stage. The text box and the reply buttons they
+  // stand for are not drawn then, so their click targets are switched off:
+  // a click on what looks like empty stage must not select or drag them.
+  const [bubblesShown, setBubblesShown] = useState<{ lineId: string | null; replies: boolean }>({ lineId: null, replies: false });
+  useEffect(() => {
+    const stage = canvasRef.current?.querySelector('[data-stage]');
+    if (!stage) return;
+    const update = () => {
+      const lineId = findBubbleLineRef.current()?.id ?? null;
+      const replies = !!canvasRef.current?.querySelector('[data-speech-bubble="replies"]');
+      setBubblesShown((prev) => (prev.lineId === lineId && prev.replies === replies ? prev : { lineId, replies }));
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(stage, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-speech-bubble', 'data-speech-line'] });
+    return () => observer.disconnect();
+  }, [zoom, computedPositions, elements]);
 
   // The reply bubble (the player's replies listed in one bubble) stands for
   // several buttons, so it is selected as itself, not as an element.
@@ -2292,6 +2324,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                     transforms.push(`rotate(${el.rotation}deg)`);
                   }
 
+                  const inBubbleNow = el.id === bubblesShown.lineId
+                    || (bubblesShown.replies && el.type === 'button' && !!choiceForButton(el));
+
                   return (
                     <div
                       key={`drag-overlay-${el.id}`}
@@ -2305,7 +2340,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         height: `${effectiveHeight}px`,
                         zIndex: (el.z || 0) + 1000,
                         cursor: el.locked ? 'not-allowed' : 'move',
-                        pointerEvents: 'auto',
+                        // In a bubble: not on the stage, so nothing to click here
+                        // (the bubble is selected by a click on the bubble).
+                        pointerEvents: inBubbleNow ? 'none' : 'auto',
                         transform: transforms.length > 0 ? transforms.join(' ') : undefined,
                         transformOrigin: 'center center',
                       }}

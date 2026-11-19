@@ -7,7 +7,7 @@
  */
 import type { BeatLook } from '@asaps/core';
 
-type FieldKind = 'string' | 'percent' | 'px' | 'fontSize' | { oneOf: readonly string[] };
+type FieldKind = 'string' | 'percent' | 'px' | 'fontSize' | { oneOf: readonly string[] } | { share: readonly [number, number] };
 
 const GROUPS: Record<'textBox' | 'button' | 'fonts', Record<string, FieldKind>> = {
   textBox: {
@@ -35,10 +35,22 @@ const GROUPS: Record<'textBox' | 'button' | 'fonts', Record<string, FieldKind>> 
     buttonFontSize: 'fontSize',
   },
 };
-const TOP: Record<string, FieldKind> = { stageColor: 'string', textColor: 'string' };
+const TOP: Record<string, FieldKind> = {
+  stageColor: 'string',
+  textColor: 'string',
+  speechBubbles: { oneOf: ['on', 'off'] },
+  replyBubble: { oneOf: ['on', 'off'] },
+  // How far a bubble's text runs before it wraps, as a share of the stage's width.
+  speechBubbleWidth: { share: [0.1, 0.6] },
+  replyBubbleWidth: { share: [0.12, 0.7] },
+};
 
 function fieldProblem(path: string, kind: FieldKind, v: unknown): string | null {
   if (v === null) return null; // removes the field
+  if (typeof kind === 'object' && 'share' in kind) {
+    const [min, max] = kind.share;
+    return typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? null : `${path} must be a number from ${min} to ${max} (a share of the stage's width)`;
+  }
   if (typeof kind === 'object') {
     return kind.oneOf.includes(v as string) ? null : `${path} must be ${kind.oneOf.map((o) => `"${o}"`).join(' or ')}`;
   }
@@ -62,7 +74,7 @@ export function beatLookPatchProblem(patch: unknown): string | null {
     }
     const group = GROUPS[key as keyof typeof GROUPS];
     if (!group) {
-      return `look.${key} is not a look field (use stageColor, textColor, textBox, button, fonts)`;
+      return `look.${key} is not a look field (use ${Object.keys(TOP).join(', ')}, textBox, button, fonts)`;
     }
     if (value === null) continue;
     if (typeof value !== 'object' || Array.isArray(value)) return `look.${key} must be an object`;

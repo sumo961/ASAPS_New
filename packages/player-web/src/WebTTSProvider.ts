@@ -323,7 +323,11 @@ export class WebTTSService {
     this.speaking = true;
     let line: Blob;
     try {
-      line = await this.realtime.read(text, voiceId, readerLanguageName(this.language));
+      // Played while it arrives; `heard` is false where the page may not
+      // play sound yet, and the whole line is played below instead.
+      const spoken = await this.realtime.speak(text, voiceId, readerLanguageName(this.language));
+      if (spoken.heard) { this.speaking = false; return; }
+      line = spoken.audio;
     } catch (err: any) {
       this.speaking = false;
       if (err?.name === 'AbortError') return; // stopped, or the next line came

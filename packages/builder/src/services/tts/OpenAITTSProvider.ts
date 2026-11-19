@@ -14,7 +14,8 @@
  *
  * The Speech API path returns the raw Response for streaming playback
  * (AudioManager decides whether to use MediaSource streaming or blob
- * fallback); the Realtime path returns the line as one WAV.
+ * fallback); the Realtime path plays the line itself while it arrives, or
+ * returns it as one WAV where the page can't play sound yet.
  */
 
 import type { TTSVoiceConfig, TTSVoiceInfo, TTSSynthesisResult } from '../../types/tts';
@@ -24,6 +25,7 @@ import {
 } from '@asaps/core';
 import type { TTSProviderConfig } from '../../types/tts';
 import { BaseTTSProvider } from './BaseTTSProvider';
+import { getAudioManager } from '@asaps/renderer';
 
 /** Whether we're running inside Electron (can call APIs directly, no CORS) */
 function isElectron(): boolean {
@@ -85,7 +87,16 @@ export class OpenAITTSProvider extends BaseTTSProvider {
       baseUrl: this.config!.baseUrl,
       model: isRealtimeModel(model) ? model : OPENAI_REALTIME_SPEECH_MODEL,
     });
-    return { audio: await this.realtime.read(text, voiceConfig?.voiceId, languageName(voiceConfig?.lang)) };
+    const language = languageName(voiceConfig?.lang);
+    // Muted: nothing is played, so nothing to play early either.
+    const audioManager = getAudioManager();
+    if (audioManager.isMuted?.()) return { audio: await this.realtime.read(text, voiceConfig?.voiceId, language) };
+    // Played while it arrives: the line starts about half a second after it
+    // was asked for. Where the page may not play sound yet, the whole line
+    // comes back for TTSService to play.
+    const volume = (voiceConfig?.volume ?? 1) * (audioManager.getMasterVolume?.() ?? 1);
+    const { heard, audio } = await this.realtime.speak(text, voiceConfig?.voiceId, language, volume);
+    return heard ? { audio: null, played: true } : { audio };
   }
 
   async synthesize(text: string, voiceConfig?: TTSVoiceConfig): Promise<TTSSynthesisResult> {

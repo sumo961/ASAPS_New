@@ -88,6 +88,12 @@ export interface TTSSynthesisResult {
   /** Raw fetch Response for streaming playback (cloud providers) */
   response?: Response;
 
+  /**
+   * The provider played the line itself, while it arrived, and it has been
+   * heard to the end (OpenAI's Realtime reader). Nothing is left to play.
+   */
+  played?: boolean;
+
   /** Estimated duration in milliseconds */
   durationMs?: number;
 }

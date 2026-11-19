@@ -21,7 +21,10 @@
  *    line as its only input, so nothing accumulates and the model has no
  *    earlier lines to "answer".
  *  - Audio arrives as base64 chunks of 24 kHz 16-bit PCM, faster than it
- *    plays; they are collected into one WAV.
+ *    plays. `speak()` plays them as they arrive (PcmStreamPlayer), so a line
+ *    starts about half a second after it was asked for instead of after its
+ *    last chunk; `read()` only collects them into one WAV, which `speak()`
+ *    also hands back for a page that isn't allowed to play sound yet.
  *
  * Used by the builder (OpenAITTSProvider) and the exported player
  * (WebTTSProvider).
@@ -107,6 +110,8 @@ interface Line {
   tag: string;
   responseId?: string;
   chunks: Uint8Array[];
+  /** Each piece of audio as it arrives. */
+  onAudio?: (pcm: Uint8Array) => void;
   resolve: (audio: Blob) => void;
   reject: (error: Error) => void;
 }
@@ -127,12 +132,12 @@ class Session {
     };
   }
 
-  read(text: string, language?: string): Promise<Blob> {
+  read(text: string, language?: string, onAudio?: (pcm: Uint8Array) => void): Promise<Blob> {
     this.cancel(); // one line at a time
     this.lastUsed = ++useClock;
     return new Promise<Blob>((resolve, reject) => {
       const tag = `line-${++this.counter}`;
-      this.line = { tag, chunks: [], resolve, reject };
+      this.line = { tag, chunks: [], onAudio, resolve, reject };
       this.ws.send(JSON.stringify({
         type: 'response.create',
         response: {
@@ -180,7 +185,11 @@ class Session {
         else if (event.response?.id) this.ws.send(JSON.stringify({ type: 'response.cancel', response_id: event.response.id }));
         break;
       case 'response.output_audio.delta':
-        if (line && event.response_id === line.responseId) line.chunks.push(decodeBase64(event.delta));
+        if (line && event.response_id === line.responseId) {
+          const pcm = decodeBase64(event.delta);
+          line.chunks.push(pcm);
+          line.onAudio?.(pcm);
+        }
         break;
       case 'response.done':
         if (!line || event.response?.id !== line.responseId) break;
@@ -199,6 +208,128 @@ class Session {
 
 let useClock = 0;
 
+/**
+ * Plays 16-bit mono PCM as it arrives, piece after piece without gaps.
+ *
+ * One line at a time: `start()` begins a line (and ends the one before),
+ * `push()` adds audio, `finish()` waits for the last piece to be heard.
+ * A page that hasn't been clicked yet may not play sound; `start()` then
+ * says no, or `finish()` reports that nothing was heard, and the caller
+ * plays the line some other way.
+ */
+export class PcmStreamPlayer {
+  private context: AudioContext | null = null;
+  private gain: GainNode | null = null;
+  private sources = new Set<AudioBufferSourceNode>();
+  /** When the next piece starts, on the context's clock. 0: nothing scheduled yet. */
+  private nextStart = 0;
+  /** The odd byte of a piece that ended in the middle of a sample. */
+  private carry: number | null = null;
+  private line = 0;
+  private settle: ((heard: boolean) => void) | null = null;
+
+  constructor(private sampleRate = SAMPLE_RATE) {}
+
+  /** Begin a line at `volume` (0–1). False when this page can't play sound now. */
+  start(volume = 1): boolean {
+    this.stop();
+    const Context: typeof AudioContext | undefined = (globalThis as any).AudioContext ?? (globalThis as any).webkitAudioContext;
+    if (!Context) return false;
+    // Not clicked yet: the browser would keep the audio silent.
+    const activation = (globalThis as any).navigator?.userActivation;
+    if (activation && activation.hasBeenActive === false) return false;
+    try {
+      if (!this.context || this.context.state === 'closed') {
+        this.context = new Context();
+        this.gain = this.context.createGain();
+        this.gain.connect(this.context.destination);
+      }
+      void this.context.resume?.().catch(() => undefined);
+      this.gain!.gain.value = Math.max(0, Math.min(1, volume));
+    } catch {
+      this.context = null;
+      return false;
+    }
+    this.line++;
+    this.nextStart = 0;
+    this.carry = null;
+    return true;
+  }
+
+  /** The next piece of the line (little-endian 16-bit samples). */
+  push(pcm: Uint8Array): void {
+    const context = this.context;
+    if (!context || !this.gain || pcm.length === 0) return;
+    let bytes = pcm;
+    if (this.carry !== null) {
+      bytes = new Uint8Array(pcm.length + 1);
+      bytes[0] = this.carry;
+      bytes.set(pcm, 1);
+      this.carry = null;
+    }
+    if (bytes.length % 2 === 1) {
+      this.carry = bytes[bytes.length - 1];
+      bytes = bytes.subarray(0, bytes.length - 1);
+    }
+    const count = bytes.length / 2;
+    if (count === 0) return;
+    const buffer = context.createBuffer(1, count, this.sampleRate);
+    const samples = buffer.getChannelData(0);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    for (let i = 0; i < count; i++) samples[i] = view.getInt16(i * 2, true) / 32768;
+
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.gain);
+    // A short lead before the first piece, so the second is there when it ends.
+    const at = Math.max(this.nextStart, context.currentTime + (this.nextStart === 0 ? 0.06 : 0.01));
+    source.start(at);
+    this.nextStart = at + buffer.duration;
+    this.sources.add(source);
+    source.onended = () => {
+      this.sources.delete(source);
+      if (this.sources.size === 0) this.settled(true);
+    };
+  }
+
+  /** No more audio is coming. Resolves when the line has been heard; false when nothing could be played. */
+  finish(): Promise<boolean> {
+    const context = this.context;
+    if (!context || context.state !== 'running') {
+      this.stop();
+      return Promise.resolve(false);
+    }
+    if (this.sources.size === 0) return Promise.resolve(this.nextStart > 0);
+    return new Promise<boolean>((resolve) => { this.settle = resolve; });
+  }
+
+  /** Cut the line off. */
+  stop(): void {
+    for (const source of this.sources) {
+      source.onended = null;
+      try { source.stop(); } catch { /* not started */ }
+      try { source.disconnect(); } catch { /* gone */ }
+    }
+    this.sources.clear();
+    this.nextStart = 0;
+    this.carry = null;
+    this.settled(true);
+  }
+
+  close(): void {
+    this.stop();
+    void this.context?.close?.().catch(() => undefined);
+    this.context = null;
+    this.gain = null;
+  }
+
+  private settled(heard: boolean): void {
+    const settle = this.settle;
+    this.settle = null;
+    settle?.(heard);
+  }
+}
+
 export interface RealtimeSpeechOptions {
   apiKey: string;
   /** 'https://api.openai.com/v1' unless the setup names another. */
@@ -211,11 +342,12 @@ export class OpenAIRealtimeSpeech {
   private sessions = new Map<string, Promise<Session>>();
   private current: Session | null = null;
   private generation = 0;
+  private player: PcmStreamPlayer | null = null;
 
   constructor(private options: RealtimeSpeechOptions) {}
 
   /** The line as a WAV. `language` is a name for the model ("German"). */
-  async read(text: string, voiceId?: string, language?: string): Promise<Blob> {
+  async read(text: string, voiceId?: string, language?: string, onAudio?: (pcm: Uint8Array) => void): Promise<Blob> {
     const generation = ++this.generation;
     const voice = realtimeVoice(voiceId);
     let session = await this.session(voice);
@@ -226,7 +358,26 @@ export class OpenAIRealtimeSpeech {
     }
     if (generation !== this.generation) throw aborted(); // stopped while connecting
     this.current = session;
-    return session.read(text, language);
+    return session.read(text, language, onAudio);
+  }
+
+  /**
+   * Read the line and play it while it arrives, at `volume` (0–1). Resolves
+   * when it has been heard. `heard` is false when this page couldn't play it
+   * (no click yet, no Web Audio): `audio` is the whole line, to play another
+   * way.
+   */
+  async speak(text: string, voiceId?: string, language?: string, volume = 1): Promise<{ heard: boolean; audio: Blob }> {
+    const player = (this.player ??= new PcmStreamPlayer());
+    const live = player.start(volume);
+    let audio: Blob;
+    try {
+      audio = await this.read(text, voiceId, language, live ? (pcm) => player.push(pcm) : undefined);
+    } catch (error) {
+      player.stop();
+      throw error;
+    }
+    return { heard: live ? await player.finish() : false, audio };
   }
 
   /** Stop the line being read. */
@@ -234,11 +385,14 @@ export class OpenAIRealtimeSpeech {
     this.generation++;
     this.current?.cancel();
     this.current = null;
+    this.player?.stop();
   }
 
   /** Close every session. */
   dispose(): void {
     this.stop();
+    this.player?.close();
+    this.player = null;
     for (const pending of this.sessions.values()) pending.then((s) => s.close()).catch(() => undefined);
     this.sessions.clear();
   }

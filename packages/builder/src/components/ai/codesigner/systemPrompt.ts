@@ -201,7 +201,15 @@ Rules for proposals:
   "hideAll", framePicture: "off" (a plain box where the theme draws the text
   box with a picture) }; button { backgroundColor, textColor, borderColor,
   borderRadius }; fonts { titleFont, textFont, buttonFont (font names),
-  titleFontSize, textFontSize, buttonFontSize (px) }. "textBoxBorder":
+  titleFontSize, textFontSize, buttonFontSize (px) }; speechBubbles: "on" |
+  "off" (this beat's spoken lines as speech bubbles pointing at the speaker,
+  or in the text box, over the project's choice); replyBubble: "on" | "off"
+  (a Dialog Tree's replies listed in one bubble at the player's character,
+  or as buttons); speechBubbleWidth (0.1-0.6) and replyBubbleWidth
+  (0.12-0.7): how far the text in a speech bubble / the reply bubble runs
+  before it wraps, as a share of the stage's width (null for automatic,
+  about a quarter / a third; wider for a long speech that makes a tall
+  bubble, narrower for a tight one). "textBoxBorder":
   "show" | "hide" | null sits beside it. The digest's "look:" line shows a
   beat's current look. Use it rarely, for a scene that must feel different
   (a dream in pale colours, a letter in a handwriting font, an alarm in

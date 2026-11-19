@@ -655,7 +655,11 @@ const injectStoryTool: Tool = {
                 'opacity (0-100), borderColor, borderWidth, borderRadius, padding (px), visibility: "all" | "hideText" | "hideAll", ' +
                 'framePicture: "off" (a plain box where the theme draws the text box with a picture) }; button { backgroundColor, textColor, ' +
                 'borderColor, borderRadius }; fonts { titleFont, textFont, buttonFont (font names), titleFontSize, textFontSize, ' +
-                'buttonFontSize (px) }. Set only the fields that change; most beats have none. "textBoxBorder": "show" | "hide" ' +
+                'buttonFontSize (px) }; speechBubbles: "on" | "off" (spoken lines as speech bubbles pointing at the speaker, or in the text box, ' +
+                'over the project\'s choice); replyBubble: "on" | "off" (a Dialog Tree\'s replies in one bubble at the player\'s character, or as buttons); ' +
+                'speechBubbleWidth (0.1-0.6) and replyBubbleWidth (0.12-0.7): how far the text in a speech bubble / the reply bubble runs before it ' +
+                'wraps, as a share of the stage\'s width (omit for automatic). ' +
+                'Set only the fields that change; most beats have none. "textBoxBorder": "show" | "hide" ' +
                 'draws or hides this beat\'s text-box border.',
             },
             x: { type: 'number', description: 'X position in editor (use ~300px spacing)' },

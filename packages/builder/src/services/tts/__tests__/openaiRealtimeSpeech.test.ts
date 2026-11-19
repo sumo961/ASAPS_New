@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { OpenAIRealtimeSpeech, pcmToWav, realtimeVoice } from '@asaps/core';
+import { OpenAIRealtimeSpeech, PcmStreamPlayer, pcmToWav, realtimeVoice } from '@asaps/core';
 import { OpenAITTSProvider } from '../OpenAITTSProvider';
 
 /** A socket that answers like the Realtime API. Tests drive the responses. */
@@ -154,6 +154,105 @@ describe('OpenAI Realtime speech', () => {
     await settle();
     FakeSocket.all[0].answer(0, [], 'failed');
     await expect(reading).rejects.toThrow(/did not read the line \(failed\)/);
+  });
+
+  describe('playing a line while it arrives', () => {
+    /** A Web Audio context that records what was scheduled; tests end the pieces. */
+    class FakeContext {
+      static all: FakeContext[] = [];
+      state = 'running';
+      currentTime = 10;
+      destination = {};
+      gainValue = 1;
+      started: Array<{ at: number; duration: number; samples: number[]; source: any }> = [];
+      constructor() { FakeContext.all.push(this); }
+      resume() { return Promise.resolve(); }
+      close() { this.state = 'closed'; return Promise.resolve(); }
+      createGain() { const self = this; return { connect() {}, gain: { set value(v: number) { self.gainValue = v; }, get value() { return self.gainValue; } } }; }
+      createBuffer(_channels: number, length: number, rate: number) { const data = new Float32Array(length); return { duration: length / rate, getChannelData: () => data }; }
+      createBufferSource() {
+        const self = this;
+        const source: any = { buffer: null, onended: null, stopped: false, connect() {}, disconnect() {}, stop() { source.stopped = true; },
+          start(at: number) { self.started.push({ at, duration: source.buffer.duration, samples: Array.from(source.buffer.getChannelData(0)), source }); } };
+        return source;
+      }
+      /** Every scheduled piece has played. */
+      playAll() { for (const piece of this.started) piece.source.onended?.(); }
+    }
+    const original = (globalThis as any).AudioContext;
+    beforeEach(() => { FakeContext.all = []; (globalThis as any).AudioContext = FakeContext; });
+    afterEach(() => { (globalThis as any).AudioContext = original; });
+
+    it('schedules the pieces one after the other, without a gap', async () => {
+      const player = new PcmStreamPlayer(24000);
+      expect(player.start(0.5)).toBe(true);
+      const context = FakeContext.all[0];
+      expect(context.gainValue).toBe(0.5);
+      player.push(new Uint8Array(4800)); // 0.1 s
+      player.push(new Uint8Array(2400)); // 0.05 s
+      expect(context.started.map((p) => p.duration)).toEqual([0.1, 0.05]);
+      expect(context.started[0].at).toBeGreaterThan(context.currentTime);
+      expect(context.started[1].at).toBeCloseTo(context.started[0].at + 0.1, 6);
+
+      let heard: boolean | null = null;
+      void player.finish().then((h) => { heard = h; });
+      await settle();
+      expect(heard).toBeNull(); // still playing
+      context.playAll();
+      await settle();
+      expect(heard).toBe(true);
+    });
+
+    it('joins a sample cut in two by the pieces', () => {
+      const player = new PcmStreamPlayer(24000);
+      player.start();
+      player.push(new Uint8Array([0x00, 0x40, 0x00])); // 16384, then half a sample
+      player.push(new Uint8Array([0xc0]));             // … its other half: -16384
+      const context = FakeContext.all[0];
+      expect(context.started.map((p) => p.samples)).toEqual([[0.5], [-0.5]]);
+    });
+
+    it('says so when the page may not play sound', async () => {
+      const player = new PcmStreamPlayer();
+      player.start();
+      FakeContext.all[0].state = 'suspended';
+      player.push(new Uint8Array(480));
+      expect(await player.finish()).toBe(false);
+
+      (globalThis as any).AudioContext = undefined;
+      expect(new PcmStreamPlayer().start()).toBe(false);
+    });
+
+    it('speak() plays the audio as it comes and resolves when it has been heard', async () => {
+      const speech = new OpenAIRealtimeSpeech({ apiKey: 'sk-test' });
+      let done: { heard: boolean; audio: Blob } | null = null;
+      void speech.speak('Guten Tag', 'marin', 'German', 0.8).then((r) => { done = r; });
+      await settle(); await settle();
+      const socket = FakeSocket.all[0];
+      socket.answer(0, [1, 2, 3, 4]);
+      await settle();
+      const context = FakeContext.all[0];
+      expect(context.started).toHaveLength(1); // scheduled before the line was complete for the caller
+      expect(done).toBeNull();
+      context.playAll();
+      await settle();
+      expect(done!.heard).toBe(true);
+      expect(done!.audio.size).toBe(48);
+    });
+
+    it('stop() cuts the line off', async () => {
+      const speech = new OpenAIRealtimeSpeech({ apiKey: 'sk-test' });
+      const spoken = speech.speak('Eine lange Zeile', 'marin');
+      spoken.catch(() => undefined);
+      await settle(); await settle();
+      const socket = FakeSocket.all[0];
+      socket.emit({ type: 'response.created', response: { id: 'r1', metadata: socket.lines[0].metadata } });
+      socket.emit({ type: 'response.output_audio.delta', response_id: 'r1', delta: btoa(String.fromCharCode(1, 2, 3, 4)) });
+      const piece = FakeContext.all[0].started[0];
+      speech.stop();
+      expect(piece.source.stopped).toBe(true);
+      await expect(spoken).rejects.toMatchObject({ name: 'AbortError' });
+    });
   });
 
   describe('through the OpenAI provider', () => {
