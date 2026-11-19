@@ -51,6 +51,12 @@ export interface BeatLook {
   speechBubbles?: 'on' | 'off';
   /** 'on'/'off': this beat's Dialog Tree replies in one bubble at the player's character, or as buttons, over Speaker Display's choice. */
   replyBubble?: 'on' | 'off';
+  /**
+   * How wide a speech bubble's text runs on this beat before it wraps, as a
+   * share of the stage's width (0.1–0.6). Unset: about a quarter of the stage.
+   * Set by resizing a bubble in the Visual Editor.
+   */
+  speechBubbleWidth?: number;
   /** Font names as an element's font (the renderer resolves the family); sizes in px. */
   fonts?: {
     titleFont?: string;

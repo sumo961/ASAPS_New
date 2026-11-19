@@ -300,7 +300,7 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
       lineHeight: cs?.lineHeight && cs.lineHeight !== 'normal' ? cs.lineHeight : '1.4',
       letterSpacing: cs?.letterSpacing || 'normal',
     };
-    Object.assign(measure.style, lettering, { maxWidth: `${bubbleTextMaxWidth(stageW)}px`, fontStyle: thought ? 'italic' : '' });
+    Object.assign(measure.style, lettering, { maxWidth: `${bubbleTextMaxWidth(stageW, theme.speakerDisplay?.bubbleWidth)}px`, fontStyle: thought ? 'italic' : '' });
     const m = measure.getBoundingClientRect();
     const textWidth = Math.ceil(m.width / scale) + 1;
     const textHeight = Math.ceil(m.height / scale);
@@ -351,7 +351,7 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
     const next: BubbleLayout = { ...placement, textWidth, textHeight, lettering };
     if (!sameLayout(layoutRef.current, next)) { layoutRef.current = next; setLayout(next); }
     report(true);
-  }, [speakerElementName, speakFrom?.x, speakFrom?.y, flipX, stroke, avoidRects, theme.fonts?.textFont, theme.fonts?.textFontSize, report, !!thought, earlier, headFound, headTick, (repliesInBubble ?? []).join('\u0000')]);
+  }, [speakerElementName, speakFrom?.x, speakFrom?.y, flipX, stroke, avoidRects, theme.fonts?.textFont, theme.fonts?.textFontSize, theme.speakerDisplay?.bubbleWidth, report, !!thought, earlier, headFound, headTick, (repliesInBubble ?? []).join('\u0000')]);
 
   // Place it before the first paint (no flash of the text box), then follow
   // the stage: a resized window, a picture that finished loading, a speaker

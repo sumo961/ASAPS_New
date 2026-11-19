@@ -2631,6 +2631,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   <button
                     key={b.id}
                     className="slotflow-btn"
+                    data-slotflow-button={b.id}
                     disabled={isVisited}
                     aria-disabled={isVisited || undefined}
                     onClick={handleClick}

@@ -117,3 +117,6 @@ export { renderMarkdownLite, markdownLiteToPlain } from './utils/markdownLite';
 export { generateDefaultLocations } from './utils/DefaultLocationGenerator';
 export { backfillUnplacedDefaults } from './renderers/ReactRenderer';
 export { CompactHudStrip, COMPACT_STRIP_HEIGHT, compactStripWidthEstimate, type CompactHudItem } from './components/CompactHudStrip';
+
+// A beat's own speech bubble width — for the Visual Editor's bubble resize handles.
+export { bubbleTextShareFor, bubbleTextMaxWidth, BUBBLE_TEXT_SHARE_MIN, BUBBLE_TEXT_SHARE_MAX } from './utils/speechBubble';

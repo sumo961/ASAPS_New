@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { applyTextBoxBorder, applyBeatLook } from '@asaps/renderer';
+import { applyTextBoxBorder, applyBeatLook, bubbleTextShareFor } from '@asaps/renderer';
+import { StepInBadges, type StepInTarget } from './StepInBadges';
 import {
   Move,
   Square,
@@ -177,6 +178,8 @@ interface VisualBeatEditorProps {
   textBoxBorder?: 'show' | 'hide';
   /** This beat's own look (Beat.look) over the project's. */
   look?: BeatLook;
+  /** The author changed the look on the canvas (a speech bubble resized). */
+  onLookChange?: (look: BeatLook) => void;
   backgroundAssetId?: string;
   backgroundUrl?: string; // Direct URL from ASML import
   /** Chat layouts: the frame picture (asset id) the chat window sits in, shown see-through so the window can be lined up with it. */
@@ -250,7 +253,8 @@ interface VisualBeatEditorProps {
 
 export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   textBoxBorder,
-  look,
+  look: beatLook,
+  onLookChange,
   backgroundAssetId,
   backgroundUrl: backgroundUrlProp,
   chatFrameImageAssetId,
@@ -440,6 +444,17 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const [zoom, setZoomInternal] = useState(initialZoom ?? 1);
   const setZoom = (z: number) => { setZoomInternal(z); onZoomChange?.(z); };
 
+  // A speech bubble being resized: its width while the handle is held, shown
+  // at once and written to the beat's look on release (one undo step).
+  const [bubbleWidthDraft, setBubbleWidthDraft] = useState<number | null>(null);
+  const bubbleWidthDraftRef = useRef<number | null>(null);
+  const look = useMemo<BeatLook | undefined>(
+    () => (bubbleWidthDraft == null ? beatLook : { ...(beatLook ?? {}), speechBubbleWidth: bubbleWidthDraft }),
+    [beatLook, bubbleWidthDraft],
+  );
+  // The beat has the new width (or another beat is shown): the draft is done.
+  useEffect(() => { bubbleWidthDraftRef.current = null; setBubbleWidthDraft(null); }, [beatLook?.speechBubbleWidth]);
+
   // Speech bubbles place themselves, away from the text box and buttons they
   // stand for. These helpers find them on the stage so a click on a bubble
   // and the selection frame act on what the author sees.
@@ -486,9 +501,82 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     return n ? choices.filter((c) => !c.continue)[parseInt(n[1], 10)] : undefined;
   };
 
+  /** The replies that have a next line, as drawn: lines in the reply bubble, or else the reply buttons. */
+  const stepInTargets = (host: HTMLElement): StepInTarget[] => {
+    if (!onStepIntoChoice) return [];
+    const targets: StepInTarget[] = [];
+    const lines = Array.from(host.querySelectorAll('[data-reply-line]'));
+    if (lines.length > 0) {
+      const replies = pickableReplies();
+      lines.forEach((node) => {
+        const choice = replies[parseInt(node.getAttribute('data-reply-line') || '-1', 10)];
+        if (choice?.dialogNode) targets.push({ key: `line:${String(choice.id ?? choice.text)}`, node, onStep: () => onStepIntoChoice(choice) });
+      });
+      return targets;
+    }
+    for (const el of elements) {
+      if (!el.visible || el.type !== 'button') continue;
+      const choice = choiceForButton(el);
+      if (!choice?.dialogNode) continue;
+      const node = Array.from(host.querySelectorAll('[data-drag-overlay]')).find((n) => n.getAttribute('data-element-id') === el.id);
+      if (node) targets.push({ key: `button:${el.id}`, node, onStep: () => onStepIntoChoice(choice) });
+    }
+    return targets;
+  };
+
+  /**
+   * A speech bubble's width handle. A bubble places itself and is as tall as
+   * its words need, so only its width is the author's: how far the text runs
+   * before it wraps (Beat.look.speechBubbleWidth, a share of the stage).
+   */
+  const startBubbleResize = (e: React.MouseEvent, side: 'w' | 'e', startWidth: number) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const root = canvasRef.current;
+    const bubble = root?.querySelector<HTMLElement>('[data-speech-bubble="current"]');
+    const stageEl = bubble?.closest<HTMLElement>('[data-speech-bubble-layer]')?.parentElement;
+    const line = root?.querySelector<HTMLElement>('[data-speech-line]');
+    if (!bubble || !stageEl || !onLookChange) return;
+    const stageW = stageEl.offsetWidth || stageWidth;
+    const fontPx = (line && parseFloat(getComputedStyle(line).fontSize)) || 18;
+    const thought = bubble.hasAttribute('data-thought');
+    const startX = e.clientX;
+    const move = (ev: MouseEvent) => {
+      const dx = ((ev.clientX - startX) / zoom) * (side === 'e' ? 1 : -1);
+      const share = Math.round(bubbleTextShareFor(startWidth + dx, stageW, fontPx, 2, thought) * 1000) / 1000;
+      bubbleWidthDraftRef.current = share;
+      setBubbleWidthDraft(share);
+    };
+    const done = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      window.removeEventListener('keydown', key, true);
+    };
+    // Escape while the handle is held: the bubble goes back to what it was.
+    const key = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape') return;
+      ev.stopPropagation();
+      done();
+      bubbleWidthDraftRef.current = null;
+      setBubbleWidthDraft(null);
+    };
+    const up = () => {
+      done();
+      const share = bubbleWidthDraftRef.current;
+      if (share == null) return; // a click without a drag
+      if (share === beatLook?.speechBubbleWidth) { bubbleWidthDraftRef.current = null; setBubbleWidthDraft(null); return; }
+      onLookChange({ ...(beatLook ?? {}), speechBubbleWidth: share });
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    window.addEventListener('keydown', key, true);
+  };
+
   // The selected line's bubble, for the selection frame. Bubbles are placed
   // after layout, so follow the stage while a text element is selected.
   const [bubbleFrame, setBubbleFrame] = useState<{ id: string; rect: StageRect } | null>(null);
+  /** A mousedown has just selected the bubble: its click is not a click on the stage. */
+  const bubbleClickRef = useRef(false);
   const findBubbleLineRef = useRef(findBubbleLine);
   findBubbleLineRef.current = findBubbleLine;
   const watchBubble = selectedElements.some((id) => {
@@ -1503,21 +1591,17 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
             outline: 'none',
           }}
           onMouseDownCapture={(e) => {
-            // A click on a speech bubble acts on the bubble: a reply steps
-            // into its next line, the spoken line selects its text element.
+            // A click on the spoken line's bubble selects its text element.
             // Bubbles lie under the elements' click targets, so look first.
+            // (A reply is followed with its "Step in" badge, not by a click.)
+            bubbleClickRef.current = false;
             if (tool !== 'select' || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
             const target = e.target as HTMLElement;
-            if (!target.closest?.('[data-speech-bubble-layer]') && !target.hasAttribute?.('data-drag-overlay')) return;
+            // The bubble layer lets clicks through, so the click lands on
+            // whatever lies under the bubble: an element's click target or
+            // the bare stage. Handles and badges keep their own clicks.
+            if (target.closest?.('[data-step-in-layer], [data-bubble-handle]') || /resize/.test(target.style?.cursor ?? '')) return;
             const root = e.currentTarget;
-            const replyLine = Array.from(root.querySelectorAll('[data-reply-line]')).find((n) => contains(n, e.clientX, e.clientY));
-            if (replyLine) {
-              e.stopPropagation();
-              e.preventDefault();
-              const choice = pickableReplies()[parseInt(replyLine.getAttribute('data-reply-line') || '-1', 10)];
-              if (choice) onStepIntoChoice?.(choice);
-              return;
-            }
             const bubble = root.querySelector('[data-speech-bubble="current"]');
             if (bubble && contains(bubble, e.clientX, e.clientY)) {
               const line = findBubbleLine();
@@ -1526,7 +1610,15 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
               e.preventDefault();
               canvasRef.current?.focus();
               onSelectElements([line.id]);
+              // The click that follows lands on the stage under the bubble,
+              // which would read it as a click on empty stage and deselect.
+              bubbleClickRef.current = true;
             }
+          }}
+          onClickCapture={(e) => {
+            if (!bubbleClickRef.current) return;
+            bubbleClickRef.current = false;
+            e.stopPropagation();
           }}
           onMouseDown={(e) => {
             // Focus canvas for keyboard events
@@ -1587,6 +1679,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
               }
             }}
           >
+            {/* "Step in" badges on a Dialog Tree's replies that have a next line. */}
+            {onStepIntoChoice && <StepInBadges findTargets={stepInTargets} />}
             {/* Wrapper for grid overlay */}
             <div
               style={{
@@ -2118,12 +2212,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                     <div
                       key={`drag-overlay-${el.id}`}
                       data-drag-overlay=""
-                      title={el.type === 'button' && onStepIntoChoice && choiceForButton(el) ? 'Double-click to step into this reply' : undefined}
-                      onDoubleClick={() => {
-                        if (el.type !== 'button' || !onStepIntoChoice) return;
-                        const choice = choiceForButton(el);
-                        if (choice) onStepIntoChoice(choice);
-                      }}
+                      data-element-id={el.id}
                       style={{
                         position: 'absolute',
                         left: `${effectiveX}px`,
@@ -2282,7 +2371,22 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                           zIndex: 10000,
                           boxShadow: '0 0 0 1px rgba(255,255,255,0.5), 0 0 20px rgba(59,130,246,0.3)',
                         }}
-                      />
+                      >
+                        {/* Width handles: a bubble places itself and is as tall as its words need. */}
+                        {isOnlySelected && !el.locked && onLookChange && (['w', 'e'] as const).flatMap((side) => (['top', 'bottom'] as const).map((edge) => (
+                          <div
+                            key={`${side}-${edge}`}
+                            data-bubble-handle={side}
+                            title="Drag to make this beat's speech bubbles wider or narrower"
+                            style={{
+                              position: 'absolute', [edge]: '-6px', [side === 'w' ? 'left' : 'right']: '-6px', width: '12px', height: '12px',
+                              backgroundColor: '#3b82f6', border: '2px solid white', borderRadius: '50%',
+                              cursor: 'ew-resize', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', pointerEvents: 'auto',
+                            }}
+                            onMouseDown={(e) => startBubbleResize(e, side, inBubble.width)}
+                          />
+                        )))}
+                      </div>
                     )}
                     {!inBubble && (
                     <div

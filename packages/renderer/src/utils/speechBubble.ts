@@ -110,8 +110,18 @@ export function drawnPictureRect(box: BubbleRect, natural: { width: number; heig
   return { x: box.x + (box.width - width) / 2, y: box.y + (box.height - height) / 2, width, height };
 }
 
-/** The widest a bubble's text runs before wrapping, for a stage this wide. */
-export function bubbleTextMaxWidth(stageWidth: number): number {
+/** The narrowest and widest an author can make a bubble's text, as shares of the stage's width. */
+export const BUBBLE_TEXT_SHARE_MIN = 0.1;
+export const BUBBLE_TEXT_SHARE_MAX = 0.6;
+
+const clampShare = (share: number) => Math.min(BUBBLE_TEXT_SHARE_MAX, Math.max(BUBBLE_TEXT_SHARE_MIN, share));
+
+/**
+ * The widest a bubble's text runs before wrapping, for a stage this wide.
+ * `share` is the author's own width for the beat (BeatLook.speechBubbleWidth).
+ */
+export function bubbleTextMaxWidth(stageWidth: number, share?: number | null): number {
+  if (typeof share === 'number' && Number.isFinite(share) && share > 0) return Math.round(stageWidth * clampShare(share));
   // About a quarter of the stage: a line of any length wraps into a rounder
   // bubble, as in comics, instead of a long flat oval.
   return Math.round(Math.min(300, Math.max(140, stageWidth * 0.26)));
@@ -133,6 +143,18 @@ export function bubbleSize(textWidth: number, textHeight: number, fontPx: number
 }
 
 /** Something on the stage a bubble should keep clear of; heavier weighs more. */
+/**
+ * `bubbleSize` backwards: the text share (BeatLook.speechBubbleWidth) that
+ * makes a bubble `bubbleWidth` wide on this stage. For the Visual Editor's
+ * resize handles. A thought's cloud is wider than its oval by its bumps.
+ */
+export function bubbleTextShareFor(bubbleWidth: number, stageWidth: number, fontPx: number, stroke = 2, thought = false): number {
+  const padX = Math.max(10, fontPx * 0.7);
+  const oval = bubbleWidth - (thought ? 2 * THOUGHT_BUMP : 0);
+  const textWidth = (oval - stroke) / 1.2 - 2 * padX;
+  return clampShare(stageWidth > 0 ? textWidth / stageWidth : BUBBLE_TEXT_SHARE_MIN);
+}
+
 export interface BubbleObstacle { rect: BubbleRect; weight: number }
 
 /** Buttons, HUDs and visible text: a bubble that covers them much is not placed at all. */

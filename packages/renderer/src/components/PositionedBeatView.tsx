@@ -598,6 +598,8 @@ export interface RenderThemeSettings {
     lineStyle?: 'box' | 'bubble';
     /** Dialog Tree replies: buttons, or one bubble at the player's character listing them. */
     replyStyle?: 'buttons' | 'bubble';
+    /** A beat's own bubble width: the share of the stage's width its text runs before wrapping (BeatLook.speechBubbleWidth). */
+    bubbleWidth?: number;
   };
 }
 

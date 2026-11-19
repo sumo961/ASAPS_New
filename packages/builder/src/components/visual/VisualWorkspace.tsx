@@ -32,6 +32,8 @@ import { resolveLayoutMode } from '../../utils/projectLayoutMode';
 import { SlotFlowView, SpatialFlowView, ChatDialogView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec, TimerHudDisplay, ScreenHudLayer, buildScreenHudLayout, resolveMeterFrame, toMeterCounterData, type TimerHudConfig, type ScreenHudCharacter , LEGACY_TEXT_LOCATION_NAME, applyTextBoxBorder, applyBeatLook } from '@asaps/renderer';
 import { hudStackWarnings, describeHudStackWarning } from '../../utils/hudStackWarning';
 import { HotspotEditOverlay } from './HotspotEditOverlay';
+import { StepInBadges } from './StepInBadges';
+import { tidyLook } from './BeatLookSection';
 import type { Hotspot } from '@asaps/core';
 
 // VE viewport presets for the slot-mode preview. Fixed presets are a real
@@ -189,9 +191,6 @@ function buildPhaseTree(dialogTree: DialogNode | undefined): PhaseTreeNode | nul
 
   return traverse(dialogTree, 0, 'root');
 }
-
-/** Shown when the author clicks a reply on the canvas that has nothing to step into. */
-const NO_NEXT_LINE_NOTICE = 'This reply has no next line in this dialog: it ends the dialog or leaves this beat.';
 
 /**
  * Flatten phase tree to array with depth info for rendering
@@ -7098,23 +7097,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           : res
                       )
                     }
-                    onAction={(id?: string) => {
-                      // dialogTree: clicking a choice button in the
-                      // preview walks the canvas into that choice's
-                      // nested dialogNode (if any). Mirrors the spatial
-                      // path's Step-in behavior so authors can navigate
-                      // the tree from either side. Choices without a
-                      // dialogNode are exits at runtime: a notice says so.
-                      if (!id || (beat!.type !== 'dialogTree' && beat!.type !== 'aiDialogTree')) return;
-                      const tree = (slotPreviewParams as any)?.dialogTree;
-                      const cur = dialogNodeAt(tree, dialogTreeNodePath);
-                      const choice = (cur?.choices ?? []).find((c: any) => c?.id === id);
-                      if (choice?.dialogNode) {
-                        setDialogTreeNodePath(prev => [...prev, id]);
-                      } else if (choice) {
-                        // Say so, or the click looks broken.
-                        notify.info(NO_NEXT_LINE_NOTICE);
-                      }
+                    onAction={() => {
+                      // Nothing plays in the editor. A Dialog Tree reply is
+                      // followed with its "Step in" badge (below), as on the
+                      // fixed canvas: a click selects, the badge steps in.
                     }}
                     editorMode={true}
                     selectedSlotKey={expandedSlotKey ?? undefined}
@@ -7126,6 +7112,31 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       setSelectedElementIds([]);
                     }}
                   />
+                  {/* "Step in" badges on a Dialog Tree's replies that have a
+                      next line: reply buttons, or the lines of the reply bubble. */}
+                  {(beat!.type === 'dialogTree' || beat!.type === 'aiDialogTree') && (
+                    <StepInBadges
+                      zIndex={200}
+                      findTargets={(host) => {
+                        const node = dialogNodeAt((slotPreviewParams as any)?.dialogTree, dialogTreeNodePath);
+                        const choices: any[] = Array.isArray(node?.choices) ? node.choices : [];
+                        const stepInto = (c: any) => () => setDialogTreeNodePath(prev => [...prev, c.id]);
+                        const lines = Array.from(host.querySelectorAll('[data-reply-line]'));
+                        if (lines.length > 0) {
+                          // The bubble lists the replies that have words, in order.
+                          const replies = choices.filter((c) => typeof c?.text === 'string' && c.text.trim());
+                          return lines.flatMap((line) => {
+                            const c = replies[parseInt(line.getAttribute('data-reply-line') || '-1', 10)];
+                            return c?.dialogNode && typeof c.id === 'string' ? [{ key: `line:${c.id}`, node: line, onStep: stepInto(c) }] : [];
+                          });
+                        }
+                        return Array.from(host.querySelectorAll('[data-slotflow-button]')).flatMap((button) => {
+                          const c = choices.find((x) => x?.id === button.getAttribute('data-slotflow-button'));
+                          return c?.dialogNode ? [{ key: `button:${c.id}`, node: button, onStep: stepInto(c) }] : [];
+                        });
+                      }}
+                    />
+                  )}
                   {/* Screen HUDs over the slot preview — the same layer the
                       runtime mounts, so this editor shows what plays. */}
                   {slotScreenHud && (
@@ -7398,6 +7409,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           <VisualBeatEditor
             textBoxBorder={beatTextBoxBorder}
             look={beatLook}
+            onLookChange={onBeatUpdate && beat.type !== 'panorama' ? (next) => {
+              // A speech bubble resized on the canvas. Not written onto the
+              // beat first: the update records the beat as it was, for Undo.
+              onBeatUpdate(beat.id, { look: tidyLook(next) } as any);
+              setHasChanges(true);
+            } : undefined}
             backgroundAssetId={backgroundAssetId}
             backgroundUrl={backgroundUrl}
             chatFrameImageAssetId={beat?.type === 'dialogTree' && /^chat-/.test(String((beat.getParameters?.() as any)?.layoutTemplate || '')) ? (beat.getParameters?.() as any)?.chatFrameImage : undefined}
@@ -7456,14 +7473,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             onOpenCharacterManager={onOpenCharacterManager}
             beatContent={content}
             onStepIntoChoice={beat.type === 'dialogTree' ? (choice) => {
-              // A reply with a next line steps into it, as in a responsive
-              // layout; one without leaves the dialog, so there is nowhere to go.
+              // From a reply's "Step in" badge; only replies with a next line have one.
               if (choice?.dialogNode && typeof choice.id === 'string') {
                 const id = choice.id;
                 setSelectedElementIds([]);
                 setDialogTreeNodePath(prev => [...prev, id]);
-              } else {
-                notify.info(NO_NEXT_LINE_NOTICE);
               }
             } : undefined}
             beatType={beat.type === 'endScreen' && selectedPhaseId === 'credits' ? 'endScreenCredits' : beat.type}

@@ -13,6 +13,7 @@ import {
   headPointFromAlpha,
   bubbleSize,
   bubbleTextMaxWidth,
+  bubbleTextShareFor,
   HEAVY,
   placeSpeechBubble,
   speakerLocation,
@@ -52,6 +53,26 @@ describe('bubbleSize', () => {
     expect(bubbleTextMaxWidth(1024)).toBe(266);
     expect(bubbleTextMaxWidth(320)).toBe(140);
     expect(bubbleTextMaxWidth(3000)).toBe(300);
+  });
+  it("uses the beat's own width, within its limits", () => {
+    expect(bubbleTextMaxWidth(1000, 0.4)).toBe(400);
+    expect(bubbleTextMaxWidth(1000, 0.01)).toBe(100);
+    expect(bubbleTextMaxWidth(1000, 0.95)).toBe(600);
+    expect(bubbleTextMaxWidth(1024, undefined)).toBe(266);
+  });
+  it('finds the width for a bubble dragged to a size (bubbleSize backwards)', () => {
+    // A bubble whose text is 400 wide on a 1000 stage…
+    const bubble = bubbleSize(400, 60, 18, 2);
+    expect(bubbleTextShareFor(bubble.width, 1000, 18, 2)).toBeCloseTo(0.4, 2);
+    // …and a thought's cloud, wider by its bumps.
+    expect(bubbleTextShareFor(bubble.width + 24, 1000, 18, 2, true)).toBeCloseTo(0.4, 2);
+    // Dragged past the limits
+    expect(bubbleTextShareFor(20, 1000, 18)).toBe(0.1);
+    expect(bubbleTextShareFor(5000, 1000, 18)).toBe(0.6);
+  });
+  it("a beat's bubble width reaches the theme", () => {
+    expect(applyBeatLook(DEFAULT_THEME, { speechBubbleWidth: 0.35 }).speakerDisplay?.bubbleWidth).toBe(0.35);
+    expect(applyBeatLook(DEFAULT_THEME, { stageColor: '#000000' }).speakerDisplay?.bubbleWidth).toBeUndefined();
   });
 });
 

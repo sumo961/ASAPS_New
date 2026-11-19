@@ -179,6 +179,25 @@ export const BeatLookSection: React.FC<Props> = ({ value, globalSettings, fonts,
                 <option value="off">Text box on this beat</option>
               </select>
             </Row>
+            <Row label="Bubble width" changed={!!look.speechBubbleWidth} onReset={() => onChange({ ...value, look: tidyLook({ ...look, speechBubbleWidth: undefined }) })}>
+              <input
+                type="number"
+                data-testid="beat-bubble-width"
+                min={10}
+                max={60}
+                step={1}
+                value={look.speechBubbleWidth ? Math.round(look.speechBubbleWidth * 100) : ''}
+                placeholder="auto"
+                onChange={(e) => {
+                  const n = parseFloat(e.target.value);
+                  const share = Number.isFinite(n) ? Math.min(60, Math.max(10, n)) / 100 : undefined;
+                  onChange({ ...value, look: tidyLook({ ...look, speechBubbleWidth: share }) });
+                }}
+                className="w-16 px-1 py-0.5 text-xs border border-gray-300 rounded"
+                title="How far a speech bubble's text runs before it wraps, in % of the stage's width. Or drag a selected bubble's handles on the canvas."
+              />
+              <span className="text-[11px] text-gray-500">% of the stage</span>
+            </Row>
             <Row label="Replies" changed={!!look.replyBubble} onReset={() => setTop('replyBubble', undefined)}>
               <select
                 data-testid="beat-reply-bubble"
