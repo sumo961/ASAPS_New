@@ -44,6 +44,31 @@ export const UI_STRING_DEFAULTS = {
   inventoryTitle: 'Inventory',
   inventoryExpandHint: '{title} ({count} items) - click to expand',
 
+  // Mood panel (a character's mood HUD): the disc's four sides…
+  moodAxisExcited: 'excited',
+  moodAxisCalm: 'calm',
+  moodAxisSad: 'sad',
+  moodAxisHappy: 'happy',
+  // …the one word beside a mood token…
+  moodNeutral: 'neutral',
+  moodElated: 'elated',
+  moodUpbeat: 'upbeat',
+  moodHostile: 'hostile',
+  moodTense: 'tense',
+  moodDespairing: 'despairing',
+  moodWithdrawn: 'withdrawn',
+  moodSerene: 'serene',
+  moodContent: 'content',
+  // …and the two words under the disc ("pleased, alert").
+  moodPleased: 'pleased',
+  moodDispleased: 'displeased',
+  moodEven: 'even',
+  moodEnergetic: 'energetic',
+  moodAlert: 'alert',
+  moodLethargic: 'lethargic',
+  moodSubdued: 'subdued',
+  moodSteady: 'steady',
+
   // Image-input beat picker
   imagePickBoth: 'Take or choose a photo',
   imagePickCamera: 'Take a photo',

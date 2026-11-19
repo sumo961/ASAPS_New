@@ -69,6 +69,21 @@ describe('useTranslatedHudData', () => {
     expect(globalSettings.hudOverlays.timerHud.label).toBe('Time left');
   });
 
+  it("sets the player's own words (mood panel, Inventory…) to the chosen language", async () => {
+    const { uiString } = await import('@asaps/core');
+    state.activeLanguage = 'de';
+    state.translations = [germanResource()];
+    const { rerender } = renderHook(() => useTranslatedHudData(characters, globalSettings));
+    expect(uiString('moodAxisHappy')).toBe('DE happy');
+    expect(uiString('moodSerene')).toBe('DE serene');
+    expect(uiString('inventoryTitle')).toBe('DE Inventory');
+    // Back to the source language
+    state.activeLanguage = null;
+    state.translations = [];
+    rerender();
+    expect(uiString('moodAxisHappy')).toBe('happy');
+  });
+
   it('draws the panels with those words', () => {
     state.activeLanguage = 'de';
     state.translations = [germanResource()];

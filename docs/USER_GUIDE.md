@@ -3734,7 +3734,7 @@ The Local TTS provider comes with built-in presets for popular open-source TTS s
 4. Start your local Kokoro server (see the mlx-audio documentation)
 5. A list of Kokoro voices appears automatically: American and British English, Spanish, French, Italian, Brazilian Portuguese, Hindi, Japanese and Mandarin
 
-A Kokoro voice reads one language. When the story is played in another of Kokoro's languages, a voice of that language reads the line (a man's voice for a man's, where there is one). Kokoro has no German, Dutch or Swedish, among others: those lines are read with your computer's built-in voice. Japanese and Mandarin need extra packages on the server (`misaki[ja]`, `misaki[zh]`).
+A Kokoro voice reads one language. When the story is played in another of Kokoro's languages, a voice of that language reads the line (a man's voice for a man's, where there is one). Kokoro has no German, Dutch or Swedish, among others: those lines are read with your computer's built-in voice. Japanese and Mandarin need extra packages on the server (`misaki[ja]`, `misaki[zh]`). If your speech server is off, fails on a line or answers without any sound, the line is read with your computer's built-in voice instead of staying silent, and a notice tells you once.
 
 Other presets include Coqui TTS, Piper, and Chatterbox. You can also enter a custom base URL for any OpenAI-compatible TTS server.
 

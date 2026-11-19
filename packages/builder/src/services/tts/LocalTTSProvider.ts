@@ -20,6 +20,7 @@ import { speechLanguageCode } from '@asaps/core';
 import { TTSUnavailableError } from '../../types/tts';
 import { BaseTTSProvider } from './BaseTTSProvider';
 import { KOKORO_VOICES, describeKokoroVoice, isKokoro, kokoroVoiceFor } from './kokoro';
+import { fetchFromOwnServer, refuseServerFailure, withSound } from './ownServer';
 
 /** Built-in presets for common local TTS servers */
 export const LOCAL_TTS_PRESETS: LocalTTSPreset[] = [
@@ -92,6 +93,8 @@ export const LOCAL_TTS_PRESETS: LocalTTSPreset[] = [
     },
   },
 ];
+
+const SERVER = 'The local speech server';
 
 export class LocalTTSProvider extends BaseTTSProvider {
   readonly name = 'Local TTS';
@@ -189,11 +192,11 @@ export class LocalTTSProvider extends BaseTTSProvider {
     let response: Response;
 
     if (this.template.method === 'GET') {
-      response = await fetch(url, {
+      response = await fetchFromOwnServer(url, {
         method: 'GET',
         headers,
         signal: this.abortController.signal,
-      });
+      }, SERVER);
     } else if (this.template.contentType === 'multipart') {
       const formData = new FormData();
       if (this.template.body) {
@@ -207,12 +210,12 @@ export class LocalTTSProvider extends BaseTTSProvider {
         formData.append(this.template.referenceAudioField, this.referenceAudios[0]);
       }
       // Don't set Content-Type for multipart — browser sets boundary automatically
-      response = await fetch(url, {
+      response = await fetchFromOwnServer(url, {
         method: 'POST',
         headers,
         body: formData,
         signal: this.abortController.signal,
-      });
+      }, SERVER);
     } else {
       // JSON body
       headers['Content-Type'] = 'application/json';
@@ -221,14 +224,15 @@ export class LocalTTSProvider extends BaseTTSProvider {
         : { text, voice: vars.voice };
       if (kokoroLangCode) body.lang_code = kokoroLangCode;
 
-      response = await fetch(url, {
+      response = await fetchFromOwnServer(url, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
         signal: this.abortController.signal,
-      });
+      }, SERVER);
     }
 
+    await refuseServerFailure(response, SERVER);
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Local TTS error ${response.status}: ${errorText}`);
@@ -246,7 +250,7 @@ export class LocalTTSProvider extends BaseTTSProvider {
     }
 
     // Default: return raw response for streaming playback
-    return { audio: null, response };
+    return { audio: null, response: await withSound(response, SERVER) };
   }
 
   stop(): void {

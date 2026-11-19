@@ -302,13 +302,22 @@ export class WebTTSService {
       // Play audio — use blob approach for compatibility with file:// origins
       // (MediaSource streaming doesn't work with null origins)
       const blob = await response.blob();
+      if (blob.size === 0) {
+        // "200 OK" without any sound: some speech servers answer a line
+        // they couldn't read that way.
+        console.warn(`[WebTTS] ${provider} answered without any sound; reading with the browser's voice`);
+        this.speaking = false;
+        return this.speakWebSpeech(text, speaker);
+      }
       await this.playAudioBlob(blob);
       this.speaking = false;
     } catch (err: any) {
-      if (err?.name !== 'AbortError') {
-        console.warn('[WebTTS] Speech failed:', err);
-      }
       this.speaking = false;
+      if (err?.name === 'AbortError') return; // stopped, or the next line came
+      // The speech service can't be reached (offline, a server that is
+      // down): the story is still read.
+      console.warn("[WebTTS] Speech failed; reading with the browser's voice:", err?.message || err);
+      return this.speakWebSpeech(text, speaker);
     }
   }
 

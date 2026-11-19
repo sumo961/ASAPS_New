@@ -186,13 +186,23 @@ describe('LocalTTSProvider', () => {
     it('should throw on non-OK response', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: false,
+        status: 400,
+        text: () => Promise.resolve('Bad voice'),
+      });
+
+      await expect(provider.synthesize('Hello')).rejects.toThrow(
+        'Local TTS error 400: Bad voice',
+      );
+    });
+
+    it('a server failure (5xx) is handed to the browser voice', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
         status: 500,
         text: () => Promise.resolve('Server Error'),
       });
 
-      await expect(provider.synthesize('Hello')).rejects.toThrow(
-        'Local TTS error 500: Server Error',
-      );
+      await expect(provider.synthesize('Hello')).rejects.toMatchObject({ name: 'TTSUnavailableError', unexpected: true });
     });
   });
 

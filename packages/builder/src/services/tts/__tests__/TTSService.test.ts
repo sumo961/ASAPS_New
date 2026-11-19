@@ -384,6 +384,35 @@ describe('TTSService', () => {
       expect((spoken[0].voice as any)?.name).toBe('Anna');
     });
 
+    it('tells the author once when a server is down, and again after it has answered in between', async () => {
+      const { notify } = await import('../../../utils/notify');
+      const warn = vi.spyOn(notify, 'warning').mockImplementation(() => undefined as any);
+      const down = () => Object.assign(new Error("The local speech server can't be reached at http://localhost:4123"), { name: 'TTSUnavailableError', unexpected: true });
+      let fail = true;
+      const provider = createMockProvider({ synthesize: vi.fn(async () => { if (fail) throw down(); return { audio: null }; }) });
+      service.registerProvider(provider);
+      service.setProvider(provider.name);
+
+      await service.speak('One');
+      await service.speak('Two');
+      expect(spoken.map((u) => u.text)).toEqual(['One', 'Two']);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toMatch(/can't be reached.*browser's voice/);
+
+      fail = false; await service.speak('Three');
+      fail = true; await service.speak('Four');
+      expect(warn).toHaveBeenCalledTimes(2);
+
+      // A language the provider doesn't have is by design: no notice.
+      warn.mockClear();
+      const quiet = createMockProvider({ name: 'quiet', synthesize: vi.fn(async () => { throw unavailable(); }) });
+      service.registerProvider(quiet);
+      service.setProvider('quiet');
+      await service.speak('Fünf');
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
     it('stays silent for any other error', async () => {
       const provider = createMockProvider({ synthesize: vi.fn(async () => { throw new Error('401'); }) });
       service.registerProvider(provider);

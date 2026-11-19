@@ -104,7 +104,12 @@ export interface TTSSynthesisResult {
  * hands such a line to the browser's voice instead of staying silent.
  */
 export class TTSUnavailableError extends Error {
-  constructor(message: string) {
+  /**
+   * `unexpected`: the provider should have been able to read the line (its
+   * server is off or failed), so the author is told. Left out when it is by
+   * design, such as a language the provider doesn't have.
+   */
+  constructor(message: string, readonly unexpected = false) {
     super(message);
     this.name = 'TTSUnavailableError';
   }

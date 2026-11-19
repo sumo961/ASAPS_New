@@ -1,4 +1,5 @@
 import React from 'react';
+import { moodLabel } from '../utils/moodWords';
 import {
   type MoodFrameConfig,
   type MoodFrameAnchor,
@@ -183,7 +184,7 @@ const MoodChip: React.FC<MoodChipProps> = ({
           )}
           {showLabel && (
             <span style={{ fontSize: wordSize, color: 'rgba(255,255,255,0.62)', fontFamily: 'ui-monospace, Menlo, monospace' }}>
-              {moodWord(valence, arousal)}
+              {moodLabel(moodWord(valence, arousal))}
             </span>
           )}
         </span>

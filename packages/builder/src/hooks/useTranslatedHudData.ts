@@ -14,6 +14,7 @@
  */
 
 import { useMemo } from 'react';
+import { UI_STRING_DEFAULTS, setUIStrings } from '@asaps/core';
 import { useTranslationState } from '../contexts/TranslationContext';
 import { applyTranslationResource } from '../export/StoryTranslator';
 
@@ -23,18 +24,34 @@ export function useTranslatedHudData<C, G>(characters: C[] | undefined, globalSe
 
   return useMemo(() => {
     const original = { hudCharacters: characters ?? [], hudGlobalSettings: globalSettings };
-    if (!resource) return original;
+    // The player's own words (the mood panel's "happy" and "calm", "Inventory",
+    // "Continue"…) come from one catalog per window, which the stage reads
+    // while it draws. This window plays no story, so the editor sets it to
+    // the language it shows, here, before the stage below is drawn.
+    const ownWords = (globalSettings as { uiStrings?: Record<string, string> } | null | undefined)?.uiStrings;
+    if (!resource) {
+      setUIStrings(ownWords);
+      return original;
+    }
     try {
       const translated = applyTranslationResource(
-        { project: { story: { beats: [], characters: characters ?? [] }, globalSettings } },
+        {
+          project: {
+            story: { beats: [], characters: characters ?? [] },
+            // Seeded, as an export seeds it: a translation fills the catalog in.
+            globalSettings: { ...(globalSettings as object), uiStrings: { ...UI_STRING_DEFAULTS, ...(ownWords ?? {}) } },
+          },
+        },
         resource,
       );
+      setUIStrings(translated.project.globalSettings?.uiStrings);
       return {
         hudCharacters: (translated.project.story.characters ?? []) as C[],
         hudGlobalSettings: (translated.project.globalSettings ?? globalSettings) as G,
       };
     } catch (error) {
       console.warn('[useTranslatedHudData] Could not apply the translation; showing the original', error);
+      setUIStrings(ownWords);
       return original;
     }
   }, [characters, globalSettings, resource]);

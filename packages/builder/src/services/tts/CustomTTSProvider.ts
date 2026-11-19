@@ -13,6 +13,9 @@ import type { TTSVoiceConfig, TTSVoiceInfo, TTSSynthesisResult } from '../../typ
 import { TTSUnavailableError } from '../../types/tts';
 import { BaseTTSProvider } from './BaseTTSProvider';
 import { KOKORO_VOICES, isKokoro, kokoroVoiceFor } from './kokoro';
+import { fetchFromOwnServer, refuseServerFailure, withSound } from './ownServer';
+
+const SERVER = 'The speech server';
 
 export class CustomTTSProvider extends BaseTTSProvider {
   readonly name = 'Custom TTS';
@@ -58,20 +61,21 @@ export class CustomTTSProvider extends BaseTTSProvider {
 
     this.abortController = new AbortController();
 
-    const response = await fetch(endpoint, {
+    const response = await fetchFromOwnServer(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),
       signal: this.abortController.signal,
-    });
+    }, SERVER);
 
+    await refuseServerFailure(response, SERVER);
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Custom TTS error ${response.status}: ${errorText}`);
     }
 
     // Return raw response for streaming playback
-    return { audio: null, response };
+    return { audio: null, response: await withSound(response, SERVER) };
   }
 
   stop(): void {

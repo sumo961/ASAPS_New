@@ -162,13 +162,23 @@ describe('CustomTTSProvider', () => {
     it('should throw on non-OK response', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: false,
-        status: 500,
-        text: () => Promise.resolve('Internal Server Error'),
+        status: 400,
+        text: () => Promise.resolve('Bad voice'),
       });
 
       await expect(provider.synthesize('Hello')).rejects.toThrow(
-        'Custom TTS error 500: Internal Server Error'
+        'Custom TTS error 400: Bad voice',
       );
+    });
+
+    it('a server failure (5xx) is handed to the browser voice', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve('Server Error'),
+      });
+
+      await expect(provider.synthesize('Hello')).rejects.toMatchObject({ name: 'TTSUnavailableError', unexpected: true });
     });
   });
 

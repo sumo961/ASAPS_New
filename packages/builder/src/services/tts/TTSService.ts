@@ -5,7 +5,8 @@
  * Mirrors AIService pattern: provider registry + high-level API.
  */
 
-import type { ITTSProvider, TTSVoiceConfig } from '../../types/tts';
+import type { ITTSProvider, TTSVoiceConfig, TTSUnavailableError } from '../../types/tts';
+import { notify } from '../../utils/notify';
 import { getAudioManager } from '@asaps/renderer';
 import { WebSpeechProvider } from './WebSpeechProvider';
 
@@ -25,6 +26,8 @@ export class TTSService {
   private defaultVoiceConfig: TTSVoiceConfig = {};
   /** The browser's voice, for a line the active provider can't read at all. */
   private browserVoice: ITTSProvider | null = null;
+  /** The provider whose failing server the author has been told about. */
+  private toldUnavailableFor: ITTSProvider | null = null;
   /** A line playing from a whole sound file (OpenAI's Realtime reader). */
   private speechPlayback: { element: HTMLAudioElement; finish: () => void } | null = null;
 
@@ -174,6 +177,7 @@ export class TTSService {
     console.log(`[TTSService] isSpeaking → true (gen ${gen})`);
     try {
       const result = await this.activeProvider.synthesize(text, voiceConfig);
+      this.toldUnavailableFor = null; // it answers (again)
       const audioManager = getAudioManager();
 
       if (result.response) {
@@ -198,6 +202,12 @@ export class TTSService {
         // model that was switched off): the browser's voice reads it, in
         // the line's language and without the provider's voice id.
         console.warn(`[TTSService] ${error.message}; reading with the browser's voice`);
+        // A server that is off or failing: say so, once per setup, or the
+        // author only hears a different voice and wonders.
+        if ((error as TTSUnavailableError).unexpected && this.toldUnavailableFor !== this.activeProvider) {
+          this.toldUnavailableFor = this.activeProvider;
+          notify.warning(`${error.message}. Lines are read with the browser's voice until it answers again.`);
+        }
         await this.speakWithBrowserVoice(text, voiceConfig);
       } else {
         console.error('[TTSService] Speech failed:', error);

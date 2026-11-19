@@ -1,4 +1,5 @@
 import React from 'react';
+import { moodLabel } from '../utils/moodWords';
 
 /**
  * CharacterMoodFrame — HUD widget rendering a 2D mood pad (Russell's
@@ -315,10 +316,10 @@ export const CharacterMoodFrame: React.FC<CharacterMoodFrameProps> = ({
 
           {showLabels && (
             <>
-              <text x={50} y={7} textAnchor="middle" fontSize={5} fill="#d9d6cc" fontWeight={600}>excited</text>
-              <text x={50} y={97} textAnchor="middle" fontSize={5} fill="#d9d6cc" fontWeight={600}>calm</text>
-              <text x={3} y={52} textAnchor="start" fontSize={5} fill="#d9d6cc" fontWeight={600}>sad</text>
-              <text x={97} y={52} textAnchor="end" fontSize={5} fill="#d9d6cc" fontWeight={600}>happy</text>
+              <text x={50} y={7} textAnchor="middle" fontSize={5} fill="#d9d6cc" fontWeight={600}>{moodLabel('excited')}</text>
+              <text x={50} y={97} textAnchor="middle" fontSize={5} fill="#d9d6cc" fontWeight={600}>{moodLabel('calm')}</text>
+              <text x={3} y={52} textAnchor="start" fontSize={5} fill="#d9d6cc" fontWeight={600}>{moodLabel('sad')}</text>
+              <text x={97} y={52} textAnchor="end" fontSize={5} fill="#d9d6cc" fontWeight={600}>{moodLabel('happy')}</text>
             </>
           )}
 
@@ -343,7 +344,7 @@ export const CharacterMoodFrame: React.FC<CharacterMoodFrameProps> = ({
           overflow: 'hidden',
           textOverflow: 'ellipsis',
         }}>
-          {describeMood(v, a)}
+          {describeMood(v, a).split(', ').map(moodLabel).join(', ')}
         </div>
       )}
     </div>
