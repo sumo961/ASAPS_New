@@ -20,6 +20,7 @@ import {
   LIGHT,
   placeSpeechBubble,
   replyBubbleSize,
+  replyTextMaxWidth,
   speakerLocation,
   type BubbleHistory,
   type BubbleObstacle,
@@ -163,7 +164,7 @@ const ReplyBubbleLayer: React.FC<{
       lineHeight: cs?.lineHeight && cs.lineHeight !== 'normal' ? cs.lineHeight : '1.4',
       letterSpacing: cs?.letterSpacing || 'normal',
     };
-    Object.assign(measure.style, lettering, { maxWidth: `${Math.round(Math.min(380, Math.max(160, stageW * 0.34)))}px` });
+    Object.assign(measure.style, lettering, { maxWidth: `${replyTextMaxWidth(stageW, theme.speakerDisplay?.replyBubbleWidth)}px` });
     const m = measure.getBoundingClientRect();
     const textWidth = Math.ceil(m.width / scale) + 1;
     const textHeight = Math.ceil(m.height / scale);
@@ -220,7 +221,7 @@ const ReplyBubbleLayer: React.FC<{
       setLayout(next);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [player.name, player.speakFrom?.x, player.speakFrom?.y, player.flipX, repliesKey, stroke, avoidRects, theme.fonts?.textFont, theme.fonts?.textFontSize, conceal, restore, headFound, headTick]);
+  }, [player.name, player.speakFrom?.x, player.speakFrom?.y, player.flipX, repliesKey, stroke, avoidRects, theme.fonts?.textFont, theme.fonts?.textFontSize, theme.speakerDisplay?.replyBubbleWidth, conceal, restore, headFound, headTick]);
 
   // Place it before the first paint, then follow the stage: the buttons
   // arriving once the line has been read, a resized window, the other

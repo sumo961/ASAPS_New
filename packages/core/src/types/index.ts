@@ -57,6 +57,8 @@ export interface BeatLook {
    * Set by resizing a bubble in the Visual Editor.
    */
   speechBubbleWidth?: number;
+  /** The same for the bubble that lists the player's replies (0.12–0.7). Unset: about a third of the stage. */
+  replyBubbleWidth?: number;
   /** Font names as an element's font (the renderer resolves the family); sizes in px. */
   fonts?: {
     titleFont?: string;

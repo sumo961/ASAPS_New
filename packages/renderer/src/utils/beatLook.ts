@@ -35,12 +35,13 @@ export function applyBeatLook<T extends RenderThemeSettings | undefined>(theme: 
     ...(tb.framePicture === 'off' ? { textboxFrameUrl: undefined } : {}),
     // Speech bubbles, and replies in a bubble, on or off for this beat, over Speaker Display;
     // and how wide this beat's bubbles are.
-    ...(look.speechBubbles || look.replyBubble || look.speechBubbleWidth ? {
+    ...(look.speechBubbles || look.replyBubble || look.speechBubbleWidth || look.replyBubbleWidth ? {
       speakerDisplay: {
         ...(t.speakerDisplay ?? { nameStyle: 'off' as const, namePosition: 'left' as const, graphicPosition: 'off' as const }),
         ...(look.speechBubbles ? { lineStyle: look.speechBubbles === 'on' ? 'bubble' as const : 'box' as const } : {}),
         ...(look.replyBubble ? { replyStyle: look.replyBubble === 'on' ? 'bubble' as const : 'buttons' as const } : {}),
         ...(look.speechBubbleWidth ? { bubbleWidth: look.speechBubbleWidth } : {}),
+        ...(look.replyBubbleWidth ? { replyBubbleWidth: look.replyBubbleWidth } : {}),
       },
     } : {}),
     textBox: set(t.textBox, {

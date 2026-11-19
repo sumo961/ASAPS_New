@@ -32,7 +32,7 @@ import { resolveLayoutMode } from '../../utils/projectLayoutMode';
 import { SlotFlowView, SpatialFlowView, ChatDialogView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec, TimerHudDisplay, ScreenHudLayer, buildScreenHudLayout, resolveMeterFrame, toMeterCounterData, type TimerHudConfig, type ScreenHudCharacter , LEGACY_TEXT_LOCATION_NAME, applyTextBoxBorder, applyBeatLook } from '@asaps/renderer';
 import { hudStackWarnings, describeHudStackWarning } from '../../utils/hudStackWarning';
 import { HotspotEditOverlay } from './HotspotEditOverlay';
-import { StepInBadges } from './StepInBadges';
+import { StepInBadges, type StepInTarget } from './StepInBadges';
 import { tidyLook } from './BeatLookSection';
 import type { Hotspot } from '@asaps/core';
 
@@ -971,6 +971,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
    * No engine in the editor, so derived counters read their authored range at
    * rest rather than a live affect value.
    */
+  /** Where a Dialog Tree reply without a next line leads, for its badge on the canvas. */
+  const replyExit = (choice: Record<string, unknown>): { label: string; title: string } => {
+    const targetId = typeof choice.target === 'string' ? choice.target : '';
+    const target = targetId ? beats.find((b) => b.id === targetId) : undefined;
+    if (target) {
+      const name = (target as any).name || target.id;
+      return { label: `→ ${name}`, title: `This reply leaves this beat and goes to “${name}”.` };
+    }
+    if (targetId) return { label: '→ missing beat', title: 'This reply goes to a beat that no longer exists.' };
+    return { label: 'Ends the dialog', title: 'This reply has no next line and no beat of its own to go to: the dialog ends here.' };
+  };
+
   // The HUD panels show the language chosen in the header.
   const { hudCharacters, hudGlobalSettings } = useTranslatedHudData(characters, globalSettings);
   const slotScreenHud = useMemo(() => {
@@ -7121,18 +7133,23 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                         const node = dialogNodeAt((slotPreviewParams as any)?.dialogTree, dialogTreeNodePath);
                         const choices: any[] = Array.isArray(node?.choices) ? node.choices : [];
                         const stepInto = (c: any) => () => setDialogTreeNodePath(prev => [...prev, c.id]);
+                        const badge = (key: string, el: Element, c: any): StepInTarget[] => {
+                          if (c?.dialogNode && typeof c.id === 'string') return [{ key, node: el, onStep: stepInto(c) }];
+                          const exit = c ? replyExit(c) : null;
+                          return exit ? [{ key, node: el, ...exit }] : [];
+                        };
                         const lines = Array.from(host.querySelectorAll('[data-reply-line]'));
                         if (lines.length > 0) {
                           // The bubble lists the replies that have words, in order.
                           const replies = choices.filter((c) => typeof c?.text === 'string' && c.text.trim());
                           return lines.flatMap((line) => {
                             const c = replies[parseInt(line.getAttribute('data-reply-line') || '-1', 10)];
-                            return c?.dialogNode && typeof c.id === 'string' ? [{ key: `line:${c.id}`, node: line, onStep: stepInto(c) }] : [];
+                            return badge(`line:${c?.id}`, line, c);
                           });
                         }
                         return Array.from(host.querySelectorAll('[data-slotflow-button]')).flatMap((button) => {
                           const c = choices.find((x) => x?.id === button.getAttribute('data-slotflow-button'));
-                          return c?.dialogNode ? [{ key: `button:${c.id}`, node: button, onStep: stepInto(c) }] : [];
+                          return badge(`button:${c?.id}`, button, c);
                         });
                       }}
                     />
@@ -7409,6 +7426,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           <VisualBeatEditor
             textBoxBorder={beatTextBoxBorder}
             look={beatLook}
+            describeReplyExit={beat.type === 'dialogTree' ? replyExit : undefined}
             onLookChange={onBeatUpdate && beat.type !== 'panorama' ? (next) => {
               // A speech bubble resized on the canvas. Not written onto the
               // beat first: the update records the beat as it was, for Undo.

@@ -1,9 +1,11 @@
 /**
  * "Step in →" badges on a Dialog Tree's replies in the Visual Editor.
  *
- * A reply that has a next line gets a badge at its top right corner; a click
- * on the badge shows that line on the canvas. A click on the reply itself
- * never steps in: on the fixed canvas it selects the reply's button, and a
+ * Every reply says where it leads, in a badge at its top right corner. One
+ * that has a next line reads "Step in →", and a click on the badge shows that
+ * line on the canvas. One that leaves the beat names the beat it goes to, and
+ * one that ends the dialog says so; those two only tell, there is nothing to
+ * step into. A click on the reply itself never steps in: on the fixed canvas it selects the reply's button, and a
  * reply can't be both selected and followed by the same click. One rule for
  * buttons and for replies listed in a bubble, on both canvases; hotspots
  * have had the same badge all along (HotspotEditOverlay).
@@ -20,16 +22,21 @@ export interface StepInTarget {
   key: string;
   /** The reply as drawn: a button, or a line in the reply bubble. */
   node: Element;
-  onStep: () => void;
+  /** The reply has a next line: show it. Left out for a reply that leaves or ends the dialog. */
+  onStep?: () => void;
+  /** What the badge says when there is nothing to step into ("→ The forest"). */
+  label?: string;
+  /** The same in a sentence, for the tooltip. */
+  title?: string;
 }
 
 interface Props {
-  /** The replies that have a next line, among the elements under `host`. */
+  /** The replies drawn under `host`, each with where it leads. */
   findTargets: (host: HTMLElement) => StepInTarget[];
   zIndex?: number;
 }
 
-interface Badge { key: string; x: number; y: number }
+interface Badge { key: string; x: number; y: number; label?: string; title?: string; steps: boolean }
 
 const hidden = (node: Element): boolean => {
   for (let n: Element | null = node; n; n = n.parentElement) {
@@ -63,13 +70,13 @@ export const StepInBadges: React.FC<Props> = ({ findTargets, zIndex = 10001 }) =
       for (const target of findRef.current(host)) {
         const r = target.node.getBoundingClientRect();
         if (r.width <= 0 || r.height <= 0 || hidden(target.node)) continue;
-        steps.set(target.key, target.onStep);
-        next.push({ key: target.key, x: (r.right - box.left) / s, y: (r.top - box.top) / s });
+        if (target.onStep) steps.set(target.key, target.onStep);
+        next.push({ key: target.key, x: (r.right - box.left) / s, y: (r.top - box.top) / s, label: target.label, title: target.title, steps: !!target.onStep });
       }
       stepsRef.current = steps;
       setScale((prev) => (Math.abs(prev - s) < 0.001 ? prev : s));
       setBadges((prev) => (
-        prev.length === next.length && prev.every((b, i) => b.key === next[i].key && Math.abs(b.x - next[i].x) < 0.5 && Math.abs(b.y - next[i].y) < 0.5)
+        prev.length === next.length && prev.every((b, i) => b.key === next[i].key && b.label === next[i].label && b.steps === next[i].steps && Math.abs(b.x - next[i].x) < 0.5 && Math.abs(b.y - next[i].y) < 0.5)
           ? prev
           : next
       ));
@@ -100,7 +107,7 @@ export const StepInBadges: React.FC<Props> = ({ findTargets, zIndex = 10001 }) =
 
   // Which replies exist changed (another line stepped into) before the stage did.
   const host = layerRef.current?.parentElement;
-  const signature = host ? findTargets(host).map((t) => t.key).join('\u0000') : '';
+  const signature = host ? findTargets(host).map((t) => `${t.key}\u0001${t.label ?? ''}`).join('\u0000') : '';
   useEffect(() => { measureRef.current?.(); }, [signature]);
 
   return (
@@ -109,7 +116,7 @@ export const StepInBadges: React.FC<Props> = ({ findTargets, zIndex = 10001 }) =
         <button
           key={badge.key}
           type="button"
-          data-step-in={badge.key}
+          {...(badge.steps ? { 'data-step-in': badge.key } : { 'data-reply-leads': badge.key })}
           onMouseDown={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
@@ -117,7 +124,7 @@ export const StepInBadges: React.FC<Props> = ({ findTargets, zIndex = 10001 }) =
             e.stopPropagation();
             stepsRef.current.get(badge.key)?.();
           }}
-          title="Show the line that follows this reply"
+          title={badge.steps ? 'Show the line that follows this reply' : badge.title}
           style={{
             position: 'absolute',
             left: badge.x,
@@ -128,18 +135,22 @@ export const StepInBadges: React.FC<Props> = ({ findTargets, zIndex = 10001 }) =
             fontSize: 10,
             lineHeight: '14px',
             whiteSpace: 'nowrap',
-            background: 'rgba(59, 130, 246, 0.95)',
+            maxWidth: 220,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            // Blue steps in; grey only tells where the reply goes.
+            background: badge.steps ? 'rgba(59, 130, 246, 0.95)' : 'rgba(55, 65, 81, 0.92)',
             color: '#fff',
             padding: '1px 6px',
             borderRadius: 3,
             border: 'none',
             boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
-            cursor: 'pointer',
+            cursor: badge.steps ? 'pointer' : 'default',
             pointerEvents: 'auto',
             userSelect: 'none',
           }}
         >
-          Step in →
+          {badge.steps ? 'Step in →' : badge.label}
         </button>
       ))}
     </div>

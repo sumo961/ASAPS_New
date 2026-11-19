@@ -191,6 +191,24 @@ function boxRadius(rx: number, ry: number, dx: number, dy: number): number {
   return Math.min(c > 1e-6 ? rx / c : Infinity, s > 1e-6 ? ry / s : Infinity);
 }
 
+/** The narrowest and widest an author can make the reply bubble's text, as shares of the stage's width. */
+export const REPLY_TEXT_SHARE_MIN = 0.12;
+export const REPLY_TEXT_SHARE_MAX = 0.7;
+
+const clampReplyShare = (share: number) => Math.min(REPLY_TEXT_SHARE_MAX, Math.max(REPLY_TEXT_SHARE_MIN, share));
+
+/** The widest the reply bubble's lines run before wrapping; `share` is the beat's own width (BeatLook.replyBubbleWidth). */
+export function replyTextMaxWidth(stageWidth: number, share?: number | null): number {
+  if (typeof share === 'number' && Number.isFinite(share) && share > 0) return Math.round(stageWidth * clampReplyShare(share));
+  return Math.round(Math.min(380, Math.max(160, stageWidth * 0.34)));
+}
+
+/** `replyBubbleSize` backwards: the share that makes the reply bubble `bubbleWidth` wide. For the Visual Editor's handles. */
+export function replyTextShareFor(bubbleWidth: number, stageWidth: number, fontPx: number, stroke = 2): number {
+  const padX = Math.max(12, fontPx * 0.8);
+  return clampReplyShare(stageWidth > 0 ? (bubbleWidth - stroke - 2 * padX) / stageWidth : REPLY_TEXT_SHARE_MIN);
+}
+
 /**
  * The box around a list of the player's replies (its measured width and
  * height): a rounded box rather than an oval, since a list of lines fills a

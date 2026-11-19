@@ -14,6 +14,8 @@ import {
   bubbleSize,
   bubbleTextMaxWidth,
   bubbleTextShareFor,
+  replyTextMaxWidth,
+  replyTextShareFor,
   HEAVY,
   placeSpeechBubble,
   speakerLocation,
@@ -69,6 +71,14 @@ describe('bubbleSize', () => {
     // Dragged past the limits
     expect(bubbleTextShareFor(20, 1000, 18)).toBe(0.1);
     expect(bubbleTextShareFor(5000, 1000, 18)).toBe(0.6);
+  });
+  it('the reply bubble has its own width, with the same round trip', () => {
+    expect(replyTextMaxWidth(1024)).toBe(348);
+    expect(replyTextMaxWidth(1000, 0.5)).toBe(500);
+    expect(replyTextMaxWidth(1000, 0.99)).toBe(700);
+    const box = replyBubbleSize(500, 90, 18, 2);
+    expect(replyTextShareFor(box.width, 1000, 18, 2)).toBeCloseTo(0.5, 2);
+    expect(applyBeatLook(DEFAULT_THEME, { replyBubbleWidth: 0.5 }).speakerDisplay?.replyBubbleWidth).toBe(0.5);
   });
   it("a beat's bubble width reaches the theme", () => {
     expect(applyBeatLook(DEFAULT_THEME, { speechBubbleWidth: 0.35 }).speakerDisplay?.bubbleWidth).toBe(0.35);

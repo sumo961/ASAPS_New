@@ -600,6 +600,8 @@ export interface RenderThemeSettings {
     replyStyle?: 'buttons' | 'bubble';
     /** A beat's own bubble width: the share of the stage's width its text runs before wrapping (BeatLook.speechBubbleWidth). */
     bubbleWidth?: number;
+    /** The same for the bubble that lists the player's replies (BeatLook.replyBubbleWidth). */
+    replyBubbleWidth?: number;
   };
 }
 

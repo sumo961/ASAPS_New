@@ -211,6 +211,25 @@ export const BeatLookSection: React.FC<Props> = ({ value, globalSettings, fonts,
                 <option value="off">Buttons on this beat</option>
               </select>
             </Row>
+            <Row label="Reply width" changed={!!look.replyBubbleWidth} onReset={() => onChange({ ...value, look: tidyLook({ ...look, replyBubbleWidth: undefined }) })}>
+              <input
+                type="number"
+                data-testid="beat-reply-bubble-width"
+                min={12}
+                max={70}
+                step={1}
+                value={look.replyBubbleWidth ? Math.round(look.replyBubbleWidth * 100) : ''}
+                placeholder="auto"
+                onChange={(e) => {
+                  const n = parseFloat(e.target.value);
+                  const share = Number.isFinite(n) ? Math.min(70, Math.max(12, n)) / 100 : undefined;
+                  onChange({ ...value, look: tidyLook({ ...look, replyBubbleWidth: share }) });
+                }}
+                className="w-16 px-1 py-0.5 text-xs border border-gray-300 rounded"
+                title="How far the replies run before they wrap when they are listed in one bubble, in % of the stage's width. Or drag the selected reply bubble's handles on the canvas."
+              />
+              <span className="text-[11px] text-gray-500">% of the stage</span>
+            </Row>
           </div>
 
           <div className="space-y-1.5">
