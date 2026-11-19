@@ -97,7 +97,32 @@ export class WebTTSService {
       // true so old exports (pre-v0.9.49) keep behaving as before.
       this.enabled = this.config.enabled !== false;
       console.log(`[WebTTS] Initialized with provider: ${this.config.provider}, enabled: ${this.enabled}`);
+      this.warmUp();
     }
+  }
+
+  /** The Realtime reader, for a story that reads through it. */
+  private reader(): OpenAIRealtimeSpeech {
+    const model = this.config!.model;
+    this.realtime ??= new OpenAIRealtimeSpeech({
+      apiKey: this.config!.apiKey!,
+      baseUrl: this.config!.baseUrl,
+      model: isRealtimeSpeechModel(model) ? model : undefined,
+    });
+    return this.realtime;
+  }
+
+  /**
+   * Open the Realtime sessions of the story's voices ahead of their first
+   * line, which would otherwise wait a few seconds for it. Only for a story
+   * that reads aloud through the Realtime API.
+   */
+  private warmUp(first?: string): void {
+    const config = this.config;
+    if (!config || !this.enabled || this.muted || config.provider !== 'openai' || !config.apiKey) return;
+    if (!isRealtimeSpeechModel(config.model) && !this.speechApiGone) return;
+    const voices = [config.defaultVoiceId, ...Object.values(config.speakerVoices ?? {})];
+    this.reader().warm(first ? [first, ...voices] : voices);
   }
 
   /** Whether prompts (questions, input prompts) are spoken as well as story text. */
@@ -116,6 +141,7 @@ export class WebTTSService {
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
     if (!enabled) this.stop();
+    else this.warmUp();
   }
 
   /** The player's mute switch silences speech too, and stops a line being read. */
@@ -323,18 +349,13 @@ export class WebTTSService {
 
   /** Read a line through OpenAI's Realtime API; the browser's voice when that fails. */
   private async speakRealtime(text: string, voiceId: string, speaker?: string): Promise<void> {
-    const model = this.config!.model;
-    this.realtime ??= new OpenAIRealtimeSpeech({
-      apiKey: this.config!.apiKey!,
-      baseUrl: this.config!.baseUrl,
-      model: isRealtimeSpeechModel(model) ? model : undefined,
-    });
+    this.warmUp(voiceId); // the rest of the cast, while this line is fetched
     this.speaking = true;
     let line: Blob;
     try {
       // Played while it arrives; `heard` is false where the page may not
       // play sound yet, and the whole line is played below instead.
-      const spoken = await this.realtime.speak(text, voiceId, readerLanguageName(this.language));
+      const spoken = await this.reader().speak(text, voiceId, readerLanguageName(this.language));
       if (spoken.heard) { this.speaking = false; return; }
       line = spoken.audio;
     } catch (err: any) {

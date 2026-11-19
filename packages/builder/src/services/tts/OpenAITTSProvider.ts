@@ -80,22 +80,34 @@ export class OpenAITTSProvider extends BaseTTSProvider {
     super.configure(config);
   }
 
-  private async readRealtime(text: string, voiceConfig?: TTSVoiceConfig): Promise<TTSSynthesisResult> {
+  private reader(): OpenAIRealtimeSpeech {
     const model = this.config!.model || '';
     this.realtime ??= new OpenAIRealtimeSpeech({
       apiKey: this.config!.apiKey!,
       baseUrl: this.config!.baseUrl,
       model: isRealtimeModel(model) ? model : OPENAI_REALTIME_SPEECH_MODEL,
     });
+    return this.realtime;
+  }
+
+  /** Open the Realtime sessions of these voices ahead of their first line. */
+  warmUp(voiceIds: Array<string | undefined>): void {
+    if (!this.isReady()) return;
+    if (!isRealtimeModel(this.config!.model || 'tts-1') && !this.speechApiGone) return;
+    this.reader().warm(voiceIds);
+  }
+
+  private async readRealtime(text: string, voiceConfig?: TTSVoiceConfig): Promise<TTSSynthesisResult> {
+    this.reader();
     const language = languageName(voiceConfig?.lang);
     // Muted: nothing is played, so nothing to play early either.
     const audioManager = getAudioManager();
-    if (audioManager.isMuted?.()) return { audio: await this.realtime.read(text, voiceConfig?.voiceId, language) };
+    if (audioManager.isMuted?.()) return { audio: await this.reader().read(text, voiceConfig?.voiceId, language) };
     // Played while it arrives: the line starts about half a second after it
     // was asked for. Where the page may not play sound yet, the whole line
     // comes back for TTSService to play.
     const volume = (voiceConfig?.volume ?? 1) * (audioManager.getMasterVolume?.() ?? 1);
-    const { heard, audio } = await this.realtime.speak(text, voiceConfig?.voiceId, language, volume);
+    const { heard, audio } = await this.reader().speak(text, voiceConfig?.voiceId, language, volume);
     return heard ? { audio: null, played: true } : { audio };
   }
 

@@ -156,6 +156,55 @@ describe('OpenAI Realtime speech', () => {
     await expect(reading).rejects.toThrow(/did not read the line \(failed\)/);
   });
 
+  describe('warming up', () => {
+    it("opens each voice's session ahead of its first line, once per voice", async () => {
+      const speech = new OpenAIRealtimeSpeech({ apiKey: 'sk-test' });
+      speech.warm(['marin', 'cedar', 'nova', undefined, 'marin']); // nova is read by Marin; no voice is Alloy
+      await settle(); await settle();
+      expect(FakeSocket.all).toHaveLength(3);
+      const voices = FakeSocket.all.map((s) => s.sent.find((e) => e.type === 'session.update').session.audio.output.voice);
+      expect(voices.sort()).toEqual(['alloy', 'cedar', 'marin']);
+      // Nothing was asked to be read
+      expect(FakeSocket.all.flatMap((s) => s.lines)).toHaveLength(0);
+
+      // The first line in a warmed voice uses the open session
+      const read = speech.read('Hej', 'marin');
+      await settle();
+      expect(FakeSocket.all).toHaveLength(3);
+      FakeSocket.all.find((s) => s.lines.length === 1)!.answer(0);
+      await read;
+    });
+
+    it('keeps to the number of sessions it holds', async () => {
+      const speech = new OpenAIRealtimeSpeech({ apiKey: 'sk-test' });
+      speech.warm(['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage']);
+      await settle(); await settle();
+      expect(FakeSocket.all).toHaveLength(4);
+    });
+
+    it('a failed warm-up is not an error; the line reports it', async () => {
+      global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 401, text: () => Promise.resolve('bad key') });
+      const speech = new OpenAIRealtimeSpeech({ apiKey: 'sk-test' });
+      expect(() => speech.warm(['marin'])).not.toThrow();
+      await settle();
+      await expect(speech.read('Hej', 'marin')).rejects.toThrow(/sign-in failed \(401\)/);
+    });
+
+    it('the provider warms up only when it reads through the Realtime API', async () => {
+      const realtime = new OpenAITTSProvider();
+      realtime.configure({ provider: 'openai', apiKey: 'sk-test', model: 'gpt-realtime-2.1-mini' } as any);
+      realtime.warmUp(['marin']);
+      await settle(); await settle();
+      expect(FakeSocket.all).toHaveLength(1);
+
+      const older = new OpenAITTSProvider();
+      older.configure({ provider: 'openai', apiKey: 'sk-test', model: 'tts-1' } as any);
+      older.warmUp(['marin']);
+      await settle(); await settle();
+      expect(FakeSocket.all).toHaveLength(1);
+    });
+  });
+
   describe('playing a line while it arrives', () => {
     /** A Web Audio context that records what was scheduled; tests end the pieces. */
     class FakeContext {

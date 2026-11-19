@@ -113,6 +113,17 @@ export class TTSService {
     this.defaultVoiceConfig = config;
   }
 
+  /**
+   * Get the provider ready for the story's voices: the default voice and
+   * every speaker's, `first` ahead of them. Call it when a story starts and
+   * when its voices are known. A no-op for providers with nothing to prepare.
+   */
+  warmUp(first?: string): void {
+    if (!this._enabled || !this.activeProvider?.isReady() || !this.activeProvider.warmUp) return;
+    const voices = [first, this.defaultVoiceConfig.voiceId, ...Array.from(this.speakerVoices.values()).map((v) => v.voiceId)];
+    this.activeProvider.warmUp(voices.filter((id, i) => i > 0 || id !== undefined));
+  }
+
   isSpeaking(): boolean {
     return this._isSpeaking;
   }
@@ -172,6 +183,9 @@ export class TTSService {
     // Capture generation so old speak() calls don't clobber _isSpeaking.
     // Race: new speak() → stop() → old finally runs → sets _isSpeaking=false
     // after new speak() already set it true. The generation counter prevents this.
+    // The rest of the cast gets ready while this line is fetched.
+    this.warmUp(voiceConfig.voiceId);
+
     const gen = ++this._speakGeneration;
     this._isSpeaking = true;
     console.log(`[TTSService] isSpeaking → true (gen ${gen})`);

@@ -137,6 +137,13 @@ export interface ITTSProvider {
   /** Stop any in-progress speech */
   stop(): void;
 
+  /**
+   * Get ready to read in these voices (the story's cast), where a provider
+   * has something to prepare: OpenAI's Realtime reader opens its sessions,
+   * which otherwise makes each voice's first line wait a few seconds.
+   */
+  warmUp?(voiceIds: Array<string | undefined>): void;
+
   /** Get available voices, optionally filtered by language prefix */
   getVoices(lang?: string): Promise<TTSVoiceInfo[]>;
 }

@@ -1745,6 +1745,10 @@ export const PreviewWindow: React.FC = () => {
         }
         console.log('[PreviewWindow] Applied persisted speaker voices for', providerKey + ':', Object.keys(persistedVoices).length);
       }
+      // The story's voices are known: get them ready before the first line
+      // (OpenAI's Realtime reader opens its sessions; a no-op elsewhere, and
+      // while "Read text aloud" is off).
+      getTTSService().warmUp();
     }
 
     // Set up AI service for AI-powered beats (update on every previewData change)
@@ -2682,6 +2686,7 @@ export const PreviewWindow: React.FC = () => {
       getTTSService().setEnabled(newEnabled);
       localStorage.setItem('asaps_tts_enabled', String(newEnabled));
       if (!newEnabled) getTTSService().stop();
+      else getTTSService().warmUp();
     } catch (error) {
       console.warn('[PreviewWindow] Error toggling TTS:', error);
     }

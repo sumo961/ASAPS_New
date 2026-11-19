@@ -424,6 +424,40 @@ describe('TTSService', () => {
     });
   });
 
+  describe('warmUp()', () => {
+    it("gives the provider the story's voices, the one about to speak first", async () => {
+      const warmUp = vi.fn();
+      const provider = createMockProvider({ warmUp } as any);
+      service.registerProvider(provider);
+      service.setProvider(provider.name);
+      service.setDefaultVoiceConfig({ voiceId: 'alloy' });
+      service.setSpeakerVoice('Wolf', { voiceId: 'cedar' });
+      service.setSpeakerVoice('Red', { voiceId: 'marin' });
+
+      service.warmUp();
+      expect(warmUp).toHaveBeenLastCalledWith(['alloy', 'cedar', 'marin']);
+
+      await service.speak('Hello', 'Red');
+      expect(warmUp).toHaveBeenLastCalledWith(['marin', 'alloy', 'cedar', 'marin']);
+    });
+
+    it('does nothing while reading aloud is off, or for a provider with nothing to prepare', () => {
+      const warmUp = vi.fn();
+      const provider = createMockProvider({ warmUp } as any);
+      service.registerProvider(provider);
+      service.setProvider(provider.name);
+      service.setEnabled(false);
+      service.warmUp();
+      expect(warmUp).not.toHaveBeenCalled();
+
+      const plain = createMockProvider({ name: 'plain' });
+      service.registerProvider(plain);
+      service.setProvider('plain');
+      service.setEnabled(true);
+      expect(() => service.warmUp()).not.toThrow();
+    });
+  });
+
   describe('speakPrompt()', () => {
     let provider: ITTSProvider;
 

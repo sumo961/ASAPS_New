@@ -16,7 +16,8 @@
  *    browsers) and the secret opens the socket as a subprotocol.
  *  - A session's voice cannot change once it has spoken, so there is one
  *    session per voice. Sessions end after 60 minutes; the next line opens a
- *    new one.
+ *    new one. `warm()` opens the sessions of a story's voices ahead of
+ *    their first line.
  *  - Each line is an out-of-band response (`conversation: 'none'`) with the
  *    line as its only input, so nothing accumulates and the model has no
  *    earlier lines to "answer".
@@ -378,6 +379,18 @@ export class OpenAIRealtimeSpeech {
       throw error;
     }
     return { heard: live ? await player.finish() : false, audio };
+  }
+
+  /**
+   * Open the sessions for these voices now, so their first line doesn't
+   * wait for it (signing in and opening a session takes a few seconds; a
+   * line on an open one starts in about half a second). Nothing is read
+   * and nothing is billed until a line is. Failures are left for the line
+   * itself to report. At most as many voices as sessions are kept.
+   */
+  warm(voiceIds: Array<string | undefined>): void {
+    const voices = [...new Set(voiceIds.map((id) => realtimeVoice(id)))].slice(0, MAX_SESSIONS);
+    for (const voice of voices) this.session(voice).catch(() => undefined);
   }
 
   /** Stop the line being read. */
