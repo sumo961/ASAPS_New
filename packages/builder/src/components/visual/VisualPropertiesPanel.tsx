@@ -2,6 +2,7 @@ import beatDefinitions from '../../../../../beat-definitions/core-beats.json';
 import { SchemaFormGenerator } from '../SchemaFormGenerator';
 import type { BeatDefinition } from '../SchemaFormGenerator';
 import { BeatLookSection, type BeatLookValue } from './BeatLookSection';
+import { beatTypeLabel } from '../../utils/changeBeatType';
 import React, { useState } from 'react';
 import { duplicateHudCounterOwner } from '../../utils/duplicateHudCounter';
 import {
@@ -186,14 +187,6 @@ interface VisualPropertiesPanelProps {
   beatParameters?: Record<string, any>;
   onBeatParameterChange?: (param: string, value: any) => void;
 }
-
-// Helper to format beat type for display (camelCase -> Title Case)
-const formatBeatType = (beatType: string): string => {
-  return beatType
-    .replace(/([A-Z])/g, ' $1')  // Add space before capitals
-    .replace(/^./, str => str.toUpperCase())  // Capitalize first letter
-    .trim();
-};
 
 export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   dialogStackDrawn,
@@ -748,8 +741,9 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
       <div className="flex-shrink-0 p-4 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-800">Visual Properties</h2>
         <div className="text-sm text-gray-500 mt-1">
-          {beatName || (beatType ? formatBeatType(beatType) : 'No beat selected')}
-          {beatType && <span className="text-gray-400 ml-1">({beatType})</span>}
+          {beatName || (beatType ? beatTypeLabel(beatType) : 'No beat selected')}
+          {/* The type as the palette names it ("Multi Choice"), once. */}
+          {beatType && beatName && <span className="text-gray-400 ml-1">({beatTypeLabel(beatType)})</span>}
         </div>
       </div>
 

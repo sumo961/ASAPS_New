@@ -483,19 +483,28 @@
           "type": "string",
           "required": true,
           "default": "Untitled Story",
-          "description": "Story title text"
+          "description": "Story title text",
+          "ui": {
+            "help": "The story's title, shown large on the opening screen."
+          }
         },
         "author": {
           "type": "string",
           "required": false,
           "default": "Anonymous",
-          "description": "Author name"
+          "description": "Author name",
+          "ui": {
+            "help": "Who wrote the story, shown under the title."
+          }
         },
         "buttonText": {
           "type": "string",
           "required": false,
           "default": "Start",
-          "description": "Start button text"
+          "description": "Start button text",
+          "ui": {
+            "help": "The words on the button that starts the story."
+          }
         },
         "spatialFit": {
           "type": "string",
@@ -625,7 +634,7 @@
             "control": "text-variations",
             "label": "Text Variations",
             "addLabel": "Add Variation",
-            "help": "One variation (including main text) selected randomly each time"
+            "help": "Other wordings of the text. One of them, or the main text, is picked at random each time the beat plays."
           }
         },
         "buttonText": {
@@ -1142,7 +1151,8 @@
             "min": 0,
             "max": 30,
             "step": 0.5,
-            "label": "Choice Delay (seconds)"
+            "label": "Choice Delay (seconds)",
+            "help": "Seconds before the choices fade in, so the player reads first."
           }
         },
         "markVisited": {
@@ -1293,7 +1303,8 @@
           "required": true,
           "ui": {
             "control": "textarea",
-            "rows": 3
+            "rows": 3,
+            "help": "The question shown above the characters to choose from."
           },
           "default": "Who will you be?",
           "description": "Prompt shown above the characters. Supports ${@role.name} placeholders like any text."
@@ -1342,7 +1353,8 @@
             "min": 0,
             "max": 30,
             "step": 0.5,
-            "label": "Choice Delay (seconds)"
+            "label": "Choice Delay (seconds)",
+            "help": "Seconds before the choices fade in, so the player reads first."
           }
         },
         "markVisited": {
@@ -1526,7 +1538,8 @@
           "default": false,
           "description": "Dim buttons the player already picked and stop them being picked again.",
           "ui": {
-            "label": "Block and dim visited choices"
+            "label": "Block and dim visited choices",
+            "help": "Dim a button the player has already picked, and stop it being picked again."
           }
         },
         "effectsOncePerChoice": {
@@ -1570,7 +1583,8 @@
           "required": true,
           "ui": {
             "control": "textarea",
-            "rows": 3
+            "rows": 3,
+            "help": "The question shown above the places the player can go."
           },
           "default": "Where do you want to go?",
           "description": "Question prompt"
@@ -1716,7 +1730,8 @@
           "required": true,
           "ui": {
             "control": "textarea",
-            "rows": 3
+            "rows": 3,
+            "help": "What the player is asked to do, shown above the things they can pick."
           },
           "default": "What do you want to interact with?",
           "description": "Interaction prompt"
@@ -2062,13 +2077,19 @@
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Show restart button"
+          "description": "Show restart button",
+          "ui": {
+            "help": "Offer a button that starts the story again."
+          }
         },
         "showCredits": {
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Show credits button"
+          "description": "Show credits button",
+          "ui": {
+            "help": "Offer a button that opens the credits page."
+          }
         },
         "reset": {
           "type": "boolean",
@@ -2090,7 +2111,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Variables"
+            "label": "Variables",
+            "help": "Restarting sets every variable back to its starting value."
           }
         },
         "resetCounters": {
@@ -2104,7 +2126,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Counters"
+            "label": "Counters",
+            "help": "Restarting sets the story's counters and every character's counters back to their starting values."
           }
         },
         "resetInventory": {
@@ -2118,7 +2141,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Inventory"
+            "label": "Inventory",
+            "help": "Restarting empties the inventory, apart from the items characters start with."
           }
         },
         "resetTimers": {
@@ -2200,19 +2224,28 @@
           "type": "string",
           "required": false,
           "default": "Play Again",
-          "description": "Text for restart button"
+          "description": "Text for restart button",
+          "ui": {
+            "help": "The words on the button that starts the story again."
+          }
         },
         "creditsText": {
           "type": "string",
           "required": false,
           "default": "Credits",
-          "description": "Text for credits button"
+          "description": "Text for credits button",
+          "ui": {
+            "help": "The words on the button that opens the credits page."
+          }
         },
         "creditsPageTitle": {
           "type": "string",
           "required": false,
           "default": "Credits",
-          "description": "Title text for the credits page"
+          "description": "Title text for the credits page",
+          "ui": {
+            "help": "The heading at the top of the credits page."
+          }
         },
         "creditsPageBody": {
           "type": "string",
@@ -2229,7 +2262,10 @@
           "type": "string",
           "required": false,
           "default": "Close",
-          "description": "Text for the close button on credits page"
+          "description": "Text for the close button on credits page",
+          "ui": {
+            "help": "The words on the button that closes the credits page."
+          }
         },
         "speaker": {
           "type": "string",
@@ -2481,7 +2517,10 @@
           "type": "string",
           "required": false,
           "default": "",
-          "description": "Optional instruction text overlay (e.g. 'Look around to explore')"
+          "description": "Optional instruction text overlay (e.g. 'Look around to explore')",
+          "ui": {
+            "help": "A short instruction shown over the panorama, for example \"Look around to explore\". Leave empty for none."
+          }
         },
         "promptDisplay": {
           "type": "string",
@@ -3019,7 +3058,7 @@
             "control": "text-variations",
             "label": "Text Variations",
             "addLabel": "Add Variation",
-            "help": "One variation (including main text) selected randomly each time"
+            "help": "Other wordings of the text. One of them, or the main text, is picked at random each time the beat plays."
           }
         },
         "duration": {
@@ -3172,7 +3211,10 @@
         "name": {
           "type": "string",
           "required": true,
-          "description": "Timer name"
+          "description": "Timer name",
+          "ui": {
+            "help": "The timer this beat starts, stops or changes. Other beats refer to it by this name."
+          }
         },
         "value": {
           "type": "number",
@@ -3224,7 +3266,10 @@
         "item": {
           "type": "string",
           "required": true,
-          "description": "Item name"
+          "description": "Item name",
+          "ui": {
+            "help": "The item to give or take. Pick one from the story's items, or type a new name."
+          }
         },
         "quantity": {
           "type": "string",
@@ -3236,7 +3281,7 @@
             "control": "text",
             "label": "Quantity",
             "placeholder": "1 or $variableName",
-            "help": "Use a number or $variableName to reference a variable value"
+            "help": "How many. A number, or $variableName to use a variable's value."
           }
         },
         "character": {
@@ -3506,7 +3551,8 @@
           "description": "Instructional text shown over the map (e.g. 'Walk to the meeting point at the fountain').",
           "ui": {
             "label": "Instructional text",
-            "control": "textarea"
+            "control": "textarea",
+            "help": "What the player should do, shown over the map, for example \"Walk to the fountain\"."
           }
         },
         "buttonText": {
@@ -3524,7 +3570,8 @@
           "required": false,
           "description": "Optional skip / cancel button label. Lets the player exit the beat without waiting for arrival.",
           "ui": {
-            "label": "Skip button text"
+            "label": "Skip button text",
+            "help": "The words on a button that lets the player go on without arriving. Leave empty for no such button."
           }
         },
         "timeoutMs": {
@@ -3558,7 +3605,8 @@
                 "value": "minimal",
                 "label": "Minimal"
               }
-            ]
+            ],
+            "help": "How the map is drawn: streets, a satellite picture, or a plain map with little detail."
           }
         },
         "showPlayerMarker": {
@@ -3567,7 +3615,8 @@
           "default": true,
           "description": "Whether to show the player's current location on the map.",
           "ui": {
-            "label": "Show player marker"
+            "label": "Show player marker",
+            "help": "Show where the player is on the map."
           }
         },
         "connection": {
@@ -3640,7 +3689,8 @@
           "description": "Instructional text shown over the floor plan (e.g. 'Find the artefact in the east wing').",
           "ui": {
             "label": "Instructional text",
-            "control": "textarea"
+            "control": "textarea",
+            "help": "What the player should do, shown over the floor plan, for example \"Find the artefact in the east wing\"."
           }
         },
         "buttonText": {
@@ -3658,7 +3708,8 @@
           "required": false,
           "description": "Optional skip / cancel button label.",
           "ui": {
-            "label": "Skip button text"
+            "label": "Skip button text",
+            "help": "The words on a button that lets the player go on without arriving. Leave empty for no such button."
           }
         },
         "timeoutMs": {
@@ -3766,12 +3817,18 @@
         "minLength": {
           "type": "number",
           "required": false,
-          "description": "Minimum character length"
+          "description": "Minimum character length",
+          "ui": {
+            "help": "The fewest characters the player must type before they can send their answer."
+          }
         },
         "maxLength": {
           "type": "number",
           "required": false,
-          "description": "Maximum character length"
+          "description": "Maximum character length",
+          "ui": {
+            "help": "The most characters the player can type."
+          }
         },
         "required": {
           "type": "boolean",
@@ -3786,7 +3843,10 @@
           "type": "string",
           "required": false,
           "default": "Continue",
-          "description": "Text for submit button"
+          "description": "Text for submit button",
+          "ui": {
+            "help": "The words on the button that sends the player's answer."
+          }
         },
         "speaker": {
           "type": "string",
@@ -3899,7 +3959,8 @@
           "ui": {
             "control": "textarea",
             "rows": 2,
-            "label": "Prompt"
+            "label": "Prompt",
+            "help": "What the player is asked to photograph or choose, shown above the picture button."
           }
         },
         "analysisPrompt": {
@@ -3944,20 +4005,27 @@
                 "label": "Upload only"
               }
             ],
-            "label": "Image Source"
+            "label": "Image Source",
+            "help": "Where the picture comes from: the camera, a file the player picks, or either."
           }
         },
         "buttonText": {
           "type": "string",
           "required": false,
           "default": "Analyze",
-          "description": "Submit button label"
+          "description": "Submit button label",
+          "ui": {
+            "help": "The words on the button that sends the picture."
+          }
         },
         "cancelButtonText": {
           "type": "string",
           "required": false,
           "default": "Skip",
-          "description": "Skip button label (lets the player continue without an image)"
+          "description": "Skip button label (lets the player continue without an image)",
+          "ui": {
+            "help": "The words on a button that lets the player go on without a picture."
+          }
         },
         "fallbackValue": {
           "type": "string",
@@ -4083,7 +4151,10 @@
           "type": "string",
           "required": true,
           "default": "Enter the code:",
-          "description": "Prompt text displayed above the keypad"
+          "description": "Prompt text displayed above the keypad",
+          "ui": {
+            "help": "What the player is asked to enter, shown above the keypad."
+          }
         },
         "layout": {
           "type": "string",
@@ -4105,13 +4176,19 @@
           "type": "number",
           "required": false,
           "default": 4,
-          "description": "Maximum number of digits"
+          "description": "Maximum number of digits",
+          "ui": {
+            "help": "The most digits the player can enter."
+          }
         },
         "minDigits": {
           "type": "number",
           "required": false,
           "default": 1,
-          "description": "Minimum number of digits"
+          "description": "Minimum number of digits",
+          "ui": {
+            "help": "The fewest digits the player must enter before they can send the code."
+          }
         },
         "correctCode": {
           "type": "string",
@@ -4146,7 +4223,10 @@
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Show * instead of digits"
+          "description": "Show * instead of digits",
+          "ui": {
+            "help": "Show a star for each digit, as for a secret code."
+          }
         },
         "saveToType": {
           "type": "string",
@@ -4187,19 +4267,28 @@
           "type": "string",
           "required": false,
           "default": "Enter",
-          "description": "Submit button text"
+          "description": "Submit button text",
+          "ui": {
+            "help": "The words on the button that sends the code."
+          }
         },
         "clearButtonText": {
           "type": "string",
           "required": false,
           "default": "Clear",
-          "description": "Clear button text"
+          "description": "Clear button text",
+          "ui": {
+            "help": "The words on the button that clears what was entered."
+          }
         },
         "showDisplay": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Show digit display area above keypad"
+          "description": "Show digit display area above keypad",
+          "ui": {
+            "help": "Show the digits entered so far above the keys."
+          }
         },
         "connection": {
           "type": "connection",
@@ -4277,7 +4366,8 @@
           "ui": {
             "control": "textarea",
             "rows": 2,
-            "label": "Prompt"
+            "label": "Prompt",
+            "help": "What the player should scan, shown above the camera picture."
           }
         },
         "saveTo": {
@@ -4317,7 +4407,8 @@
                 "label": "Front (selfie)"
               }
             ],
-            "label": "Camera"
+            "label": "Camera",
+            "help": "The camera to use: the one on the back of the device, or the one facing the player."
           }
         },
         "matchPatterns": {
@@ -4345,14 +4436,18 @@
           "description": "Small helper text shown near the scan target",
           "ui": {
             "control": "text",
-            "label": "Helper Text"
+            "label": "Helper Text",
+            "help": "A short tip shown near the scanning frame, for example \"Hold the code inside the square\"."
           }
         },
         "cancelButtonText": {
           "type": "string",
           "required": false,
           "default": "Skip",
-          "description": "Cancel/skip button label"
+          "description": "Cancel/skip button label",
+          "ui": {
+            "help": "The words on a button that lets the player go on without scanning."
+          }
         },
         "speaker": {
           "type": "string",
@@ -4476,7 +4571,8 @@
           "ui": {
             "control": "textarea",
             "rows": 2,
-            "label": "Prompt"
+            "label": "Prompt",
+            "help": "What the player should do, shown above the camera view."
           }
         },
         "trackingMode": {
@@ -4599,7 +4695,10 @@
           "type": "string",
           "required": false,
           "default": "Skip",
-          "description": "Cancel button label"
+          "description": "Cancel button label",
+          "ui": {
+            "help": "The words on a button that lets the player leave the camera view."
+          }
         },
         "fallbackTarget": {
           "type": "string",
@@ -4740,7 +4839,8 @@
           "ui": {
             "control": "textarea",
             "rows": 2,
-            "label": "Prompt"
+            "label": "Prompt",
+            "help": "A short instruction shown above the web page. Leave empty for none."
           }
         },
         "exitUrlPattern": {
@@ -4774,7 +4874,10 @@
           "type": "string",
           "required": false,
           "default": "Done",
-          "description": "Label for the manual exit button"
+          "description": "Label for the manual exit button",
+          "ui": {
+            "help": "The words on the button the player presses when they have finished with the page."
+          }
         },
         "speaker": {
           "type": "string",
@@ -4890,7 +4993,10 @@
           "type": "string",
           "required": true,
           "default": "Click on any word to explore.",
-          "description": "Main text content with hyperlinked words"
+          "description": "Main text content with hyperlinked words",
+          "ui": {
+            "help": "The text shown on this screen. Words you turn into links take the player to other beats."
+          }
         },
         "hyperlinks": {
           "type": "array<object>",
@@ -4914,13 +5020,19 @@
           "type": "string",
           "required": false,
           "default": "#0066cc",
-          "description": "Color for hyperlinked text"
+          "description": "Color for hyperlinked text",
+          "ui": {
+            "help": "The colour of the words that are links."
+          }
         },
         "hoverColor": {
           "type": "string",
           "required": false,
           "default": "#003366",
-          "description": "Color when hovering over hyperlinks"
+          "description": "Color when hovering over hyperlinks",
+          "ui": {
+            "help": "The colour of a link while the pointer is over it."
+          }
         },
         "speaker": {
           "type": "string",
@@ -5082,7 +5194,10 @@
           "type": "number",
           "required": false,
           "default": 150,
-          "description": "Maximum word count for AI-generated content"
+          "description": "Maximum word count for AI-generated content",
+          "ui": {
+            "help": "The most words the AI may write."
+          }
         },
         "displayTemplate": {
           "type": "string",
@@ -5100,7 +5215,10 @@
           "type": "string",
           "required": false,
           "default": "Continue",
-          "description": "Continue button text"
+          "description": "Continue button text",
+          "ui": {
+            "help": "The words on the Continue button."
+          }
         },
         "errorMessage": {
           "type": "string",
@@ -5110,7 +5228,8 @@
           "ui": {
             "control": "textarea",
             "rows": 2,
-            "label": "Error Message"
+            "label": "Error Message",
+            "help": "What the player reads when the content can't be fetched."
           }
         },
         "connection": {
@@ -5659,7 +5778,8 @@
               "narrative",
               "bullet-points",
               "reflection"
-            ]
+            ],
+            "help": "How the summary reads: as a told story, as a list of points, or as a reflection on the player's choices."
           }
         },
         "maxLength": {
@@ -5673,26 +5793,36 @@
               "short",
               "medium",
               "long"
-            ]
+            ],
+            "help": "How long the summary is: short, medium or long."
           }
         },
         "title": {
           "type": "string",
           "required": false,
           "default": "Your Journey",
-          "description": "Title above summary"
+          "description": "Title above summary",
+          "ui": {
+            "help": "The heading above the summary."
+          }
         },
         "showRestart": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Show restart button"
+          "description": "Show restart button",
+          "ui": {
+            "help": "Offer a button that starts the story again."
+          }
         },
         "showCredits": {
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Show credits button"
+          "description": "Show credits button",
+          "ui": {
+            "help": "Offer a button that opens the credits page."
+          }
         },
         "restartTarget": {
           "type": "string",
@@ -5735,7 +5865,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Variables"
+            "label": "Variables",
+            "help": "Restarting sets every variable back to its starting value."
           }
         },
         "resetCounters": {
@@ -5749,7 +5880,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Counters"
+            "label": "Counters",
+            "help": "Restarting sets the story's counters and every character's counters back to their starting values."
           }
         },
         "resetInventory": {
@@ -5763,7 +5895,8 @@
               "value": true
             },
             "group": "resetOptions",
-            "label": "Inventory"
+            "label": "Inventory",
+            "help": "Restarting empties the inventory, apart from the items characters start with."
           }
         },
         "resetTimers": {
@@ -5845,19 +5978,28 @@
           "type": "string",
           "required": false,
           "default": "Play Again",
-          "description": "Text for restart button"
+          "description": "Text for restart button",
+          "ui": {
+            "help": "The words on the button that starts the story again."
+          }
         },
         "creditsText": {
           "type": "string",
           "required": false,
           "default": "Credits",
-          "description": "Text for credits button"
+          "description": "Text for credits button",
+          "ui": {
+            "help": "The words on the button that opens the credits page."
+          }
         },
         "creditsPageTitle": {
           "type": "string",
           "required": false,
           "default": "Credits",
-          "description": "Title text for the credits page"
+          "description": "Title text for the credits page",
+          "ui": {
+            "help": "The heading at the top of the credits page."
+          }
         },
         "creditsPageBody": {
           "type": "string",
@@ -5874,7 +6016,10 @@
           "type": "string",
           "required": false,
           "default": "Close",
-          "description": "Text for the close button on credits page"
+          "description": "Text for the close button on credits page",
+          "ui": {
+            "help": "The words on the button that closes the credits page."
+          }
         },
         "explainHuds": {
           "type": "boolean",
@@ -6076,7 +6221,10 @@
           "type": "string",
           "required": false,
           "default": "Continue",
-          "description": "Continue button text"
+          "description": "Continue button text",
+          "ui": {
+            "help": "The words on the Continue button."
+          }
         },
         "connection": {
           "type": "connection",

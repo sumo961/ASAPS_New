@@ -1,3 +1,4 @@
+import { beatTypeLabel } from '../../utils/changeBeatType';
 import React, { useMemo, useState } from 'react';
 import { useAIFeatures } from '../../utils/aiFeatures';
 import { Sparkles, AlertTriangle, CheckCircle, GitMerge, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react';
@@ -176,7 +177,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
                       <ChevronRight className="w-4 h-4 text-gray-500" />
                     )}
                     <span className="font-medium">{hub.beatName}</span>
-                    <span className="text-xs text-gray-500">({hub.beatType})</span>
+                    <span className="text-xs text-gray-500">({beatTypeLabel(hub.beatType)})</span>
                     <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded ml-auto">
                       {hub.arrivalCount > 0 ? `${hub.arrivalCount} states` : `${hub.waysIn.length} ways in`}
                     </span>
