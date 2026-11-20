@@ -221,10 +221,15 @@ export class WebTTSService {
       return this.speakWebSpeech(text, speaker);
     }
 
-    const voiceId = this.getVoiceId(speaker);
+    let voiceId = this.getVoiceId(speaker);
     if (!voiceId) {
-      // No voice assigned — use Web Speech as fallback
-      return this.speakWebSpeech(text, speaker);
+      // No voice chosen for this speaker and no default voice. ElevenLabs
+      // can't read without one of its own voices, so the browser's voice
+      // reads. The others have a voice of their own to fall back on, as in
+      // the builder: an export set to OpenAI voices used to read every line
+      // with the browser's voice when the story had no voices assigned.
+      if (provider === 'elevenlabs') return this.speakWebSpeech(text, speaker);
+      voiceId = provider === 'local' && this.config!.localTemplate ? 'default' : 'alloy';
     }
 
     if (provider === 'openai' && (isRealtimeSpeechModel(this.config!.model) || this.speechApiGone)) {
