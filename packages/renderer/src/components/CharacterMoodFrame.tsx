@@ -187,6 +187,18 @@ function describeAxis(value: number, axis: 'valence' | 'arousal'): string {
 // The component
 // ---------------------------------------------------------------------------
 
+/**
+ * How big the disc card is drawn: header (when the character is named), the
+ * disc, the two words under it. The screen HUD layout reserves this box so
+ * other panels in the same corner stack clear of it.
+ */
+export function moodCardSize(config: Pick<MoodFrameConfig, 'size' | 'showQualitativeLabel'>, hasName: boolean): { width: number; height: number } {
+  const discSize = config.size || 140;
+  const headerH = hasName ? 22 : 0;
+  const labelH = config.showQualitativeLabel !== false ? 18 : 0;
+  return { width: discSize + 8, height: headerH + discSize + labelH + 4 * 2 };
+}
+
 export const CharacterMoodFrame: React.FC<CharacterMoodFrameProps> = ({
   valence, arousal, config, palette,
   characterName, characterPortraitUrl, characterColor,
@@ -212,9 +224,8 @@ export const CharacterMoodFrame: React.FC<CharacterMoodFrameProps> = ({
   // Card sizing — header + disc + (optional) label rows.
   const headerH = showHeader ? 22 : 0;
   const labelH = showQualitativeLabel ? 18 : 0;
-  const padH = 4;
-  const cardWidth = discSize + 8;          // disc + a tiny border on each side
-  const cardHeight = headerH + discSize + labelH + padH * 2;
+  // disc + a tiny border on each side; header + disc + label + padding
+  const { width: cardWidth, height: cardHeight } = moodCardSize(config, showHeader);
 
   const pos = config.dockMode === 'screen' && containerDimensions
     ? calculateScreenPosition(config.screenPosition, containerDimensions, config.offset, cardWidth, cardHeight)

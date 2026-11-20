@@ -38,7 +38,7 @@ import {
   type CompactHudItem,
 } from './CompactHudStrip';
 import { CharacterInventoryFrame, type InventoryItemData } from './CharacterInventoryFrame';
-import { CharacterMoodFrame } from './CharacterMoodFrame';
+import { CharacterMoodFrame, moodCardSize } from './CharacterMoodFrame';
 import { MoodRail, type MoodRailEntry } from './CharacterMoodToken';
 import { HudExplanationLayer } from './HudExplanationLayer';
 import {
@@ -183,8 +183,9 @@ export function buildScreenHudLayout(input: ScreenHudLayoutInput): ScreenHudLayo
   const inventories: ScreenHudLayout['inventories'] = [];
 
   for (const c of characters || []) {
-    // Token-style mood HUDs group into a per-corner rail; disc-style ones are
-    // self-anchored cards and are not packed with the rest.
+    // Token-style mood HUDs group into a per-corner rail; a disc-style one is
+    // a card of its own, packed into its corner like a meter or an inventory.
+    // (It used to place itself and sat on top of whatever shared the corner.)
     const mf = c.moodFrame;
     if (mf?.enabled && mf.dockMode === 'screen' && c.mood) {
       if ((mf.displayStyle ?? 'token') === 'disc') {
@@ -251,6 +252,12 @@ export function buildScreenHudLayout(input: ScreenHudLayoutInput): ScreenHudLayo
   for (const corner of Object.keys(rails)) {
     cardBoxes.push({ id: `mood-rail-${corner}`, corner: toCorner(corner), width: 200, height: 54, kind: 'mood' });
   }
+  for (const c of discs) {
+    cardBoxes.push({
+      id: `mood-disc-${c.id}`, corner: toCorner(c.moodFrame.screenPosition ?? 'screen-top-right'),
+      ...moodCardSize(c.moodFrame, !!c.name), kind: 'mood',
+    });
+  }
 
   const toRects = (bs: HudBox[], pl: Map<string, HudPlacement>): HudRect[] => bs.map((b) => {
     const p = pl.get(b.id);
@@ -281,6 +288,10 @@ export function buildScreenHudLayout(input: ScreenHudLayoutInput): ScreenHudLayo
     for (const e of entries) {
       push(toCorner(corner), { kind: 'mood', characterId: e.key, name: e.characterName ?? '', valence: e.valence, arousal: e.arousal });
     }
+  }
+  for (const c of discs) {
+    push(toCorner(c.moodFrame.screenPosition ?? 'screen-top-right'),
+      { kind: 'mood', characterId: c.id, name: c.name, valence: c.mood!.valence, arousal: c.mood!.arousal });
   }
   const strips: CompactStrip[] = [];
   const stripBoxes: HudBox[] = [...boxes];
@@ -464,12 +475,15 @@ export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 4
           offsetY={offsetFor(`mood-rail-${corner}`)}
         />
       ))}
-      {discs.map((c) => (
+      {discs.filter((c) => showCard(cornerOf(c.moodFrame.screenPosition, 'screen-top-right'))).map((c) => (
         <CharacterMoodFrame
           key={`mood-hud-${c.id}`}
           valence={c.mood!.valence}
           arousal={c.mood!.arousal}
-          config={c.moodFrame}
+          config={{
+            ...c.moodFrame,
+            offset: { x: c.moodFrame.offset?.x ?? 0, y: (c.moodFrame.offset?.y ?? 0) + offsetFor(`mood-disc-${c.id}`) },
+          }}
           palette={palette}
           characterName={c.name}
           characterPortraitUrl={c.portraitUrl}
