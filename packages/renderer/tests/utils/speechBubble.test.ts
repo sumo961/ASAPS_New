@@ -18,6 +18,8 @@ import {
   replyTextShareFor,
   HEAVY,
   placeSpeechBubble,
+  placeOffstageBubble,
+  OFFSTAGE_TAIL,
   speakerLocation,
   speakPoint,
 } from '../../src/utils/speechBubble';
@@ -322,3 +324,29 @@ describe('bubbleReadingMs: the replies wait while the line is read', () => {
     expect(bubbleReadingMs('  ')).toBe(0);
   });
 });
+
+describe('placeOffstageBubble: replies when the player is not on the stage', () => {
+  const stage = { width: 1024, height: 768 };
+  const size = { width: 360, height: 90 };
+
+  it('sits along the bottom, in the middle, with its tail pointing out of the picture', () => {
+    const p = placeOffstageBubble({ stage, size })!;
+    expect(p.rect.x + p.rect.width / 2).toBeCloseTo(512, 0);
+    expect(p.rect.y + p.rect.height + OFFSTAGE_TAIL).toBeLessThanOrEqual(stage.height);
+    expect(p.rect.y + p.rect.height).toBeGreaterThan(stage.height * 0.8);
+    expect(p.tip).toEqual({ x: p.rect.x + p.rect.width / 2, y: p.rect.y + p.rect.height + OFFSTAGE_TAIL });
+  });
+
+  it('moves aside for the line being answered and for panels', () => {
+    const line = { rect: { x: 380, y: 600, width: 300, height: 150 }, weight: HEAVY };
+    const p = placeOffstageBubble({ stage, size, obstacles: [line] })!;
+    const hits = !(p.rect.x + p.rect.width <= line.rect.x || line.rect.x + line.rect.width <= p.rect.x);
+    expect(hits).toBe(false);
+  });
+
+  it('gives up when the replies are too big to be a bubble', () => {
+    expect(placeOffstageBubble({ stage, size: { width: 1100, height: 90 } })).toBeNull();
+    expect(placeOffstageBubble({ stage, size: { width: 360, height: 500 } })).toBeNull();
+  });
+});
+

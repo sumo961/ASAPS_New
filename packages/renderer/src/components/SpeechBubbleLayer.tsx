@@ -193,7 +193,8 @@ function fillOf(color: string | undefined, opacity: number | undefined): { fill:
   return { fill: c, fillOpacity: /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(c) ? Math.max(0, Math.min(100, opacity ?? 100)) / 100 : 1 };
 }
 
-const flat = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
+// Without whitespace: a line break in a reply is no space in its button's text (see ReplyBubbleLayer's norm).
+const flat = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, '');
 
 /**
  * The line's own reveal: as the text box's typewriter, so both finish together.

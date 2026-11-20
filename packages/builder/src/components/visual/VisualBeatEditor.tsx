@@ -764,7 +764,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     if (beatType !== 'dialogTree' && beatType !== 'aiDialogTree') return undefined;
     const player = (characters as Array<{ id?: string; role?: string }> | undefined)?.find((c) => c?.role === 'player')?.id;
     const replies = (beatContent?.choices ?? []).map((c) => c.text).filter((t): t is string => !!t?.trim());
-    return player && replies.length > 0 ? { player, replies } : undefined;
+    // Without a player character the replies still go in a bubble, from this side of the screen.
+    return replies.length > 0 ? { player, replies } : undefined;
   }, [beatType, characters, beatContent?.choices]);
 
   // The translated words of a reply button, found by the reply as written.

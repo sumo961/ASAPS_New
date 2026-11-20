@@ -143,6 +143,47 @@ export function bubbleSize(textWidth: number, textHeight: number, fontPx: number
 }
 
 /** Something on the stage a bubble should keep clear of; heavier weighs more. */
+/** How far below the reply bubble its tail reaches when the player isn't on the stage. */
+export const OFFSTAGE_TAIL = 22;
+
+/**
+ * Where the player's reply bubble goes when their character is not on the
+ * stage: the story is told from the player's own eyes, so the replies come
+ * from this side of the screen. The bubble sits along the bottom of the
+ * stage with its tail pointing down and out of the picture, where it is
+ * least in the way: clear of the line being answered and of the panels,
+ * over other characters only if it must be.
+ *
+ * Null when the bubble is too big to be one (the buttons stay).
+ */
+export function placeOffstageBubble(opts: {
+  stage: { width: number; height: number };
+  size: { width: number; height: number };
+  obstacles?: BubbleObstacle[];
+  margin?: number;
+}): BubblePlacement | null {
+  const { stage, size, obstacles = [] } = opts;
+  const margin = opts.margin ?? 8;
+  const w = size.width;
+  const h = size.height;
+  if (!(w > 0 && h > 0)) return null;
+  if (w > stage.width - 2 * margin || h + OFFSTAGE_TAIL > stage.height * 0.6) return null;
+
+  const y = stage.height - margin - OFFSTAGE_TAIL - h;
+  const room = stage.width - 2 * margin - w;
+  // Along the bottom, the middle first: that is where "this side of the screen" reads best.
+  const places = [0.5, 0.35, 0.65, 0.2, 0.8, 0, 1];
+  let best: { rect: BubbleRect; score: number } | null = null;
+  places.forEach((at, order) => {
+    const rect = { x: margin + room * at, y, width: w, height: h };
+    let score = order * 4; // a small pull towards the middle
+    for (const o of obstacles) score += (overlap(rect, o.rect) / (w * h)) * 1000 * o.weight;
+    if (!best || score < best.score) best = { rect, score };
+  });
+  const rect = best!.rect;
+  return { rect, tip: { x: rect.x + rect.width / 2, y: rect.y + rect.height + OFFSTAGE_TAIL } };
+}
+
 /**
  * `bubbleSize` backwards: the text share (BeatLook.speechBubbleWidth) that
  * makes a bubble `bubbleWidth` wide on this stage. For the Visual Editor's

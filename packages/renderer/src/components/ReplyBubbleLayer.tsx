@@ -21,6 +21,7 @@ import {
   placeSpeechBubble,
   replyBubbleSize,
   replyTextMaxWidth,
+  placeOffstageBubble,
   speakerLocation,
   type BubbleHistory,
   type BubbleObstacle,
@@ -29,7 +30,13 @@ import {
 } from '../utils/speechBubble';
 import { aimAtSpeaker, quoteAttr, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
 
-const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
+/**
+ * A reply's words, for telling which button stands for it. Without any
+ * whitespace: a reply written over two lines is drawn with a line break,
+ * which a button's text content doesn't have ("you.Thanks"), so matching
+ * on spaces missed every reply with a line break in it.
+ */
+const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, '');
 
 /**
  * What a reply button looks like while its line is in the bubble. Without
@@ -80,7 +87,8 @@ interface ReplyLayout {
 }
 
 const ReplyBubbleLayer: React.FC<{
-  player: BubbleSpeakerLocation;
+  /** The player's character on the stage; null when it isn't there, and the replies come from off-stage. */
+  player: BubbleSpeakerLocation | null;
   replies: string[];
   theme: RenderThemeSettings;
   avoidRects?: ReadonlyArray<{ x: number; y: number; width: number; height: number }>;
@@ -146,9 +154,13 @@ const ReplyBubbleLayer: React.FC<{
       height: r.height / scale,
     });
 
-    const playerEl = root.querySelector<HTMLElement>(`[data-character-name="${quoteAttr(player.name)}"]`);
+    const playerEl = player ? root.querySelector<HTMLElement>(`[data-character-name="${quoteAttr(player.name)}"]`) : null;
     const playerRect = playerEl ? toStage(playerEl.getBoundingClientRect()) : null;
-    if (!playerRect || playerRect.width <= 0 || playerRect.height <= 0) return fail();
+    if (player && (!playerRect || playerRect.width <= 0 || playerRect.height <= 0)) return fail();
+    // Off-stage replies answer a line that is in a bubble. Where the line
+    // is in the text box (narration, a speaker who isn't shown either, a
+    // bubble that didn't fit), the replies stay buttons under it.
+    if (!player && !root.querySelector('[data-speech-bubble="current"]')) return fail();
     const buttons = findReplyButtons(root, replies);
     if (!buttons || buttons.length === 0) return fail();
 
@@ -194,16 +206,22 @@ const ReplyBubbleLayer: React.FC<{
       if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: HEAVY });
     });
 
-    const { mouth, stopShort } = aimAtSpeaker(playerEl, playerRect, player.speakFrom, player.flipX, toStage, headFound);
-    const placement = placeSpeechBubble({
-      stage: { width: stageW, height: stageH },
-      size,
-      mouth,
-      speaker: playerRect,
-      obstacles,
-      stopShort,
-      shape: 'box',
-    });
+    let placement;
+    if (player && playerRect) {
+      const { mouth, stopShort } = aimAtSpeaker(playerEl, playerRect, player.speakFrom, player.flipX, toStage, headFound);
+      placement = placeSpeechBubble({
+        stage: { width: stageW, height: stageH },
+        size,
+        mouth,
+        speaker: playerRect,
+        obstacles,
+        stopShort,
+        shape: 'box',
+      });
+    } else {
+      // The player is not shown: the replies come from this side of the screen.
+      placement = placeOffstageBubble({ stage: { width: stageW, height: stageH }, size, obstacles });
+    }
     if (!placement) return fail();
 
     buttonsRef.current = buttons;
@@ -220,7 +238,7 @@ const ReplyBubbleLayer: React.FC<{
       setLayout(next);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [player.name, player.speakFrom?.x, player.speakFrom?.y, player.flipX, repliesKey, stroke, avoidRects, theme.fonts?.textFont, theme.fonts?.textFontSize, theme.speakerDisplay?.replyBubbleWidth, conceal, restore, headFound, headTick]);
+  }, [player?.name, player?.speakFrom?.x, player?.speakFrom?.y, player?.flipX, repliesKey, stroke, avoidRects, theme.fonts?.textFont, theme.fonts?.textFontSize, theme.speakerDisplay?.replyBubbleWidth, conceal, restore, headFound, headTick]);
 
   // Place it before the first paint, then follow the stage: the buttons
   // arriving once the line has been read, a resized window, the other
@@ -356,9 +374,13 @@ const ReplyBubbleLayer: React.FC<{
 };
 
 /**
- * The player's replies in one bubble, when Speaker Display asks for it, the
- * stage is a Dialog Tree's with replies to pick, and the player's character
- * is on the stage. Every stage view mounts this beside StageBubbles.
+ * The player's replies in one bubble, when Speaker Display asks for it and
+ * the stage is a Dialog Tree's with replies to pick. It points at the
+ * player's character where that is on the stage. Where it isn't (many
+ * stories never show the player), the bubble comes from this side of the
+ * screen, along the bottom, as long as the line being answered is in a
+ * bubble too: next to a text box, buttons stay buttons. Every stage view
+ * mounts this beside StageBubbles.
  */
 export const ReplyBubble: React.FC<{
   locations: ReadonlyArray<BubbleSpeakerLocation> | undefined;
@@ -373,8 +395,9 @@ export const ReplyBubble: React.FC<{
   if (theme?.speakerDisplay?.replyStyle !== 'bubble') return null;
   const replies = history?.replies?.filter((r) => typeof r === 'string' && r.trim());
   if (!replies || replies.length === 0) return null;
-  const player = speakerLocation(locations, history?.player);
-  if (!player) return null;
+  const player = speakerLocation(locations, history?.player) ?? null;
+  // Off-stage replies only in a conversation of bubbles.
+  if (!player && theme?.speakerDisplay?.lineStyle !== 'bubble') return null;
   return (
     <ReplyBubbleLayer
       key={replies.join('\u0000')}

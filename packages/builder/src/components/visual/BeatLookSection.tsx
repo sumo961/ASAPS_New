@@ -204,7 +204,7 @@ export const BeatLookSection: React.FC<Props> = ({ value, globalSettings, fonts,
                 value={look.replyBubble ?? ''}
                 onChange={(e) => setTop('replyBubble', e.target.value || undefined)}
                 className="w-full px-1 py-0.5 text-xs border border-gray-300 rounded"
-                title="Dialog Tree replies in one bubble at the player's character, or as buttons (Project Settings ▸ Dialogue)."
+                title="Dialog Tree replies in one bubble (at the player's character, or at the bottom of the stage when the player isn't shown), or as buttons (Project Settings ▸ Dialogue)."
               >
                 <option value="">Project ({globalSettings?.speakerDisplay?.replyStyle === 'bubble' ? 'in a bubble' : 'buttons'})</option>
                 <option value="on">In a bubble on this beat</option>

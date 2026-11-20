@@ -2332,10 +2332,10 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       className="w-full px-3 py-2 border rounded"
                     >
                       <option value="buttons">Buttons</option>
-                      <option value="bubble">One bubble at the player's character</option>
+                      <option value="bubble">One bubble</option>
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
-                      In a Dialog Tree, the replies the player can pick appear as lines in one bubble pointing at the player's character (the character whose role is "player"); clicking one goes straight to the answer. Other choices, and any Dialog Tree whose player character isn't on the stage or whose bubble doesn't fit, keep the buttons.
+                      In a Dialog Tree, the replies the player can pick appear as lines in one bubble; clicking one goes straight to the answer. The bubble points at the player's character (the character whose role is "player") where that character is on the stage. Where the player isn't shown, it sits at the bottom of the stage and points out of the picture, towards the player, as long as the line being answered is in a speech bubble. Other choices, and a bubble that doesn't fit, keep the buttons.
                     </p>
                   </div>
 

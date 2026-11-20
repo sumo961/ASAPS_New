@@ -204,7 +204,7 @@ Rules for proposals:
   titleFontSize, textFontSize, buttonFontSize (px) }; speechBubbles: "on" |
   "off" (this beat's spoken lines as speech bubbles pointing at the speaker,
   or in the text box, over the project's choice); replyBubble: "on" | "off"
-  (a Dialog Tree's replies listed in one bubble at the player's character,
+  (a Dialog Tree's replies listed in one bubble at the player's character (at the bottom of the stage, pointing out of the picture, when the player is not shown),
   or as buttons); speechBubbleWidth (0.1-0.6) and replyBubbleWidth
   (0.12-0.7): how far the text in a speech bubble / the reply bubble runs
   before it wraps, as a share of the stage's width (null for automatic,

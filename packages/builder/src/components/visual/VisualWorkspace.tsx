@@ -33,6 +33,9 @@ import { SlotFlowView, SpatialFlowView, ChatDialogView, isSlotModeBeatType, isSp
 import { hudStackWarnings, describeHudStackWarning } from '../../utils/hudStackWarning';
 import { HotspotEditOverlay } from './HotspotEditOverlay';
 import { StepInBadges, type StepInTarget } from './StepInBadges';
+
+/** Under the Dialog path bar: how to get to the line behind a reply. */
+const STEP_IN_HINT = 'click a reply\'s "Step in" badge on the canvas, or use the Inspector tree';
 import { tidyLook } from './BeatLookSection';
 import type { Hotspot } from '@asaps/core';
 
@@ -2058,8 +2061,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Tree node's replies and the player's character, as the Preview passes them.
   const slotPreviewBubbleHistory = (() => {
     if (!beat || (beat.type !== 'dialogTree' && beat.type !== 'aiDialogTree')) return undefined;
+    // No player character in the story: the replies still go in a bubble,
+    // from this side of the screen (the renderer decides, as in play).
     const player = (characters as Array<{ id?: string; role?: string }> | undefined)?.find((c) => c?.role === 'player')?.id;
-    if (!player) return undefined;
     const node = dialogNodeAt((slotPreviewParams as any)?.dialogTree, dialogTreeNodePath) ?? (slotPreviewParams as any)?.dialogTree;
     const replies = (Array.isArray(node?.choices) ? node.choices as Array<{ text?: string; continue?: boolean }> : [])
       .filter((c) => !c.continue && c.text?.trim())
@@ -6440,7 +6444,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 );
               })}
               {labels.length === 0 && (
-                <span className="text-slate-500 text-sm ml-2 italic min-w-0 truncate" title={isSlotPreview ? 'click a reply on the canvas to step in, or use the Inspector tree' : 'double-click a reply on the canvas to step in (in a reply bubble, click it), or use the Inspector tree'}>{isSlotPreview ? 'click a reply on the canvas to step in, or use the Inspector tree' : 'double-click a reply to step in (click it in a reply bubble), or use the Inspector tree'}</span>
+                <span className="text-slate-500 text-sm ml-2 italic min-w-0 truncate" title={STEP_IN_HINT}>{STEP_IN_HINT}</span>
               )}
               {beat?.type === 'dialogTree' && (
                 <label className="ml-auto max-w-full flex flex-wrap items-center gap-2 text-sm text-slate-600" title="Show the choices a player in this state would see (conditions evaluated)">
