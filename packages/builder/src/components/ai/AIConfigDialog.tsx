@@ -393,7 +393,9 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
               type="text"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder={preset.defaultModel}
+              // An empty field showed the default's name alone, in grey, and
+              // read as a model that had been chosen.
+              placeholder={provider !== 'local' ? `Default: ${preset.defaultModel}` : preset.defaultModel}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
             <p className="mt-1 text-xs text-gray-500">{preset.modelHelp}</p>
