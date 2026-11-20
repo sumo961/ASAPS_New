@@ -358,7 +358,36 @@ function valueSnapshot(layout: ScreenHudLayout): Map<string, { label: string; va
 /** Draw a built layout. Pointer-events stay off so the stage below is usable. */
 export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 40, collapseKey, fontScale = 1 }: ScreenHudLayerProps) {
   const { rails, discs, meters, inventories, boxes, placements, compact, strips } = layout;
-  const cardPlacements = compact && layout.expanded ? layout.expanded.placements : placements;
+  const packed = compact && layout.expanded ? layout.expanded.placements : placements;
+
+  // The layout packs a corner from ESTIMATED heights: it is computed before
+  // anything is drawn. A card that comes out taller (a counter's name that
+  // wraps, as translations often do: "Ingrids Vertrauen" over two lines)
+  // would reach into the card stacked after it. So the cards are measured
+  // once drawn, and a corner is packed again when one needs more room.
+  const layerRef = React.useRef<HTMLDivElement>(null);
+  const [drawnHeights, setDrawnHeights] = React.useState<Record<string, number>>({});
+  React.useLayoutEffect(() => {
+    const root = layerRef.current;
+    if (!root || compact) return;
+    const next: Record<string, number> = {};
+    root.querySelectorAll<HTMLElement>('[data-hud-card]').forEach((holder) => {
+      const card = holder.firstElementChild as HTMLElement | null;
+      const height = card?.offsetHeight ?? 0;
+      if (height > 0) next[holder.dataset.hudCard!] = height;
+    });
+    setDrawnHeights((prev) => {
+      const keys = Object.keys(next);
+      const same = keys.length === Object.keys(prev).length && keys.every((k) => Math.abs((prev[k] ?? 0) - next[k]) <= 1);
+      return same ? prev : next;
+    });
+  });
+  const cardPlacements = React.useMemo(() => {
+    if (compact) return packed;
+    const taller = boxes.filter((b) => (drawnHeights[b.id] ?? 0) > b.height + 1);
+    if (taller.length === 0) return packed;
+    return placementMap(layoutScreenHuds(boxes.map((b) => ((drawnHeights[b.id] ?? 0) > b.height + 1 ? { ...b, height: drawnHeights[b.id] } : b)), stage));
+  }, [compact, packed, boxes, drawnHeights, stage.width, stage.height]);
   const offsetFor = (id: string) => cardPlacements.get(id)?.offsetY ?? 0;
 
   // ---- compact-mode interaction state ----
@@ -438,7 +467,7 @@ export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 4
   const showCard = (corner: HudCorner) => !compact || expandedCorner === corner;
 
   return (
-    <div className="absolute inset-0 pointer-events-none" style={{ zIndex }}>
+    <div ref={layerRef} className="absolute inset-0 pointer-events-none" style={{ zIndex }}>
       {compact && (
         <style>{`@keyframes asapsHudPulse { 0% { opacity: 0; transform: translateY(-4px); } 12% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; } }`}</style>
       )}
@@ -476,8 +505,8 @@ export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 4
         />
       ))}
       {discs.filter((c) => showCard(cornerOf(c.moodFrame.screenPosition, 'screen-top-right'))).map((c) => (
+        <div key={`mood-hud-${c.id}`} data-hud-card={`mood-disc-${c.id}`} style={{ display: 'contents' }}>
         <CharacterMoodFrame
-          key={`mood-hud-${c.id}`}
           valence={c.mood!.valence}
           arousal={c.mood!.arousal}
           config={{
@@ -492,10 +521,11 @@ export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 4
           characterDimensions={{ width: 0, height: 0 }}
           containerDimensions={stage}
         />
+        </div>
       ))}
       {meters.filter(({ frame }) => showCard(cornerOf(frame.screenPosition, 'screen-top-left'))).map(({ c, frame, counters }) => (
+        <div key={`meter-hud-${c.id}`} data-hud-card={`meter-${c.id}`} style={{ display: 'contents' }}>
         <CharacterMeterFrame
-          key={`meter-hud-${c.id}`}
           counters={counters}
           config={{
             ...frame,
@@ -507,10 +537,11 @@ export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 4
           characterName={c.name}
           characterColor={c.color}
         />
+        </div>
       ))}
       {inventories.filter(({ frame }) => showCard(cornerOf(frame.screenPosition, 'screen-bottom-right'))).map(({ c, frame, items }) => (
+        <div key={`inventory-hud-${c.id}`} data-hud-card={`inv-${c.id}`} style={{ display: 'contents' }}>
         <CharacterInventoryFrame
-          key={`inventory-hud-${c.id}`}
           items={items}
           config={{
             ...frame,
@@ -521,6 +552,7 @@ export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 4
           containerDimensions={stage}
           isVisible={true}
         />
+        </div>
       ))}
       {explanation && (
         <HudExplanationLayer

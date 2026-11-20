@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render } from '@testing-library/react';
 import { ScreenHudLayer, buildScreenHudLayout, type ScreenHudCharacter } from '../../src/components/ScreenHudLayer';
 
@@ -52,5 +52,29 @@ describe('a disc-style mood HUD on the screen', () => {
     expect(layout.compact).toBe(true);
     const strip = layout.strips.find((s) => s.corner === 'top-right')!;
     expect(strip.items.map((i) => i.kind).sort()).toEqual(['meter', 'mood']);
+  });
+
+  describe('when a card is drawn taller than the layout estimated', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('the card under it moves down by the difference', () => {
+      const layout = buildScreenHudLayout({ characters: cast(disc), stage });
+      const meterRect = layout.rects.find((r) => r.id === 'meter-tomas')!;
+      const discRect = layout.rects.find((r) => r.id === 'mood-disc-ingrid')!;
+      const find = (container: HTMLElement) => Array.from(container.querySelectorAll<HTMLElement>('div')).find((d) => d.style.width === '148px' && d.style.position === 'absolute')!;
+
+      // As estimated: the disc where the layout put it.
+      const plain = render(<ScreenHudLayer layout={layout} stage={stage} />);
+      const before = parseFloat(find(plain.container).style.top);
+      plain.unmount();
+
+      // The meter's counter name wraps (a translation): 30 px taller than estimated.
+      const extra = 30;
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
+        return this.hasAttribute('data-meter-frame') ? meterRect.height + extra : this.parentElement?.getAttribute('data-hud-card')?.startsWith('mood-disc') ? discRect.height : 0;
+      });
+      const tall = render(<ScreenHudLayer layout={layout} stage={stage} />);
+      expect(parseFloat(find(tall.container).style.top) - before).toBe(extra);
+    });
   });
 });

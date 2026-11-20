@@ -79,3 +79,26 @@ describe('isKnownCharacter', () => {
     expect(isKnownCharacter('Granny', null)).toBe(false);
   });
 });
+
+describe('resolveCharacter: a character played in translation', () => {
+  // The story's lines say "Old Sven"; in German the character is "Der alte Sven".
+  const cast = [
+    { id: 'c1', name: 'Der alte Sven', displayName: 'Der alte Sven', alsoKnownAs: ['Old Sven'] },
+    { id: 'c2', name: 'Kapitänin Ingrid', displayName: 'Kapitänin Ingrid', alsoKnownAs: ['Captain Ingrid', 'Ingrid'] },
+    { id: 'c3', name: 'Tomas', displayName: 'Tomas' },
+  ];
+  it('is still found by the names its lines use', () => {
+    expect(resolveCharacter('Old Sven', cast)?.id).toBe('c1');
+    expect(resolveCharacter('ingrid', cast)?.id).toBe('c2');
+    expect(resolveCharacter('Captain Ingrid', cast)?.id).toBe('c2');
+  });
+  it('and by its translated names, which win over a former name of someone else', () => {
+    expect(resolveCharacter('Der alte Sven', cast)?.id).toBe('c1');
+    const clash = [{ id: 'a', name: 'Ingrid', displayName: 'Ingrid' }, { id: 'b', name: 'Inga', alsoKnownAs: ['Ingrid'] }];
+    expect(resolveCharacter('Ingrid', clash)?.id).toBe('a');
+  });
+  it('a stranger is still nobody', () => {
+    expect(resolveCharacter('Narrator', cast)).toBeNull();
+  });
+});
+

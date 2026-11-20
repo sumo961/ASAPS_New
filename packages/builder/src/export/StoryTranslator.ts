@@ -468,8 +468,31 @@ export function applyTranslations(projectData: any, translations: Record<string,
   for (const [path, value] of Object.entries(translations)) {
     setNestedValue(translated, path, value);
   }
+  keepCharacterNamesAsKeys(projectData, translated);
 
   return translated;
+}
+
+/**
+ * A character whose name or display name was translated keeps the names it
+ * was written with as `alsoKnownAs`. Lines refer to their speaker by those
+ * names, and such a reference is a key that stays as written (see
+ * refersToDefinedCharacter): "Old Sven" must still find the character now
+ * called "Der alte Sven". core's resolveCharacter reads the field. The
+ * exported player's own applyTranslations does the same (HtmlExporter).
+ */
+function keepCharacterNamesAsKeys(source: any, translated: any): void {
+  const before = source?.project?.story?.characters;
+  const after = translated?.project?.story?.characters;
+  if (!Array.isArray(before) || !Array.isArray(after)) return;
+  for (let i = 0; i < after.length; i++) {
+    const was = before[i];
+    const now = after[i];
+    if (!was || !now) continue;
+    const former = [was.name, was.displayName, ...(Array.isArray(was.alsoKnownAs) ? was.alsoKnownAs : [])]
+      .filter((n): n is string => typeof n === 'string' && !!n && n !== now.name && n !== now.displayName);
+    if (former.length > 0) now.alsoKnownAs = [...new Set(former)];
+  }
 }
 
 /**

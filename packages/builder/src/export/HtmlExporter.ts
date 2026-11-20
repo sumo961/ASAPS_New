@@ -654,6 +654,21 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
         for (var path in translations) {
           setNested(clone, path, translations[path]);
         }
+        // A character keeps the names it was written with as alsoKnownAs:
+        // lines name their speaker by them (see keepCharacterNamesAsKeys in
+        // StoryTranslator; core's resolveCharacter reads the field).
+        var before = projectData && projectData.project && projectData.project.story && projectData.project.story.characters;
+        var after = clone && clone.project && clone.project.story && clone.project.story.characters;
+        if (Array.isArray(before) && Array.isArray(after)) {
+          for (var ci = 0; ci < after.length; ci++) {
+            var was = before[ci], now = after[ci];
+            if (!was || !now) continue;
+            var former = [was.name, was.displayName].concat(Array.isArray(was.alsoKnownAs) ? was.alsoKnownAs : []).filter(function (n, idx, all) {
+              return typeof n === 'string' && n && n !== now.name && n !== now.displayName && all.indexOf(n) === idx;
+            });
+            if (former.length > 0) now.alsoKnownAs = former;
+          }
+        }
         return clone;
       }
 
@@ -673,7 +688,9 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
         else if (current && typeof current === 'object') current[last] = value;
       }
 
-      // AI API call
+      // AI API call. With no model in the export's AI setup, the models the
+      // builder itself defaults to (DEFAULT_OPENAI_MODEL / DEFAULT_ANTHROPIC_MODEL
+      // in core; a test keeps these in step).
       async function callAI(systemPrompt, userMessage, config) {
         // Relay mode: no key in the page — POST { provider, body } to the
         // same-origin relay (see README-RELAY.md) which injects the key
@@ -695,7 +712,7 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
             if (!/json/i.test(systemPrompt + userMessage)) {
               rMsgs[0].content += '\n\nRespond with a single valid JSON object.';
             }
-            relayBody = { model: config.model || 'gpt-4o-mini', messages: rMsgs, temperature: 0.3, response_format: { type: 'json_object' } };
+            relayBody = { model: config.model || 'gpt-6-astra', messages: rMsgs, temperature: 0.3, response_format: { type: 'json_object' } };
             if (/^(gpt-5|gpt-6|o1|o3|o4)/i.test(relayBody.model) || /gpt-4o/i.test(relayBody.model)) {
               relayBody.max_completion_tokens = 8192;
             }
@@ -756,7 +773,7 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
           if (!/json/i.test(systemPrompt + userMessage)) {
             msgs[0].content += '\\n\\nRespond with a single valid JSON object.';
           }
-          var oaiBody = { model: config.model || 'gpt-4o-mini', messages: msgs, temperature: 0.3, response_format: { type: 'json_object' } };
+          var oaiBody = { model: config.model || 'gpt-6-astra', messages: msgs, temperature: 0.3, response_format: { type: 'json_object' } };
           // GPT-5 / o-series / gpt-4o reject the legacy max_tokens field; only
           // the newer models need an explicit budget here, and they take
           // max_completion_tokens.

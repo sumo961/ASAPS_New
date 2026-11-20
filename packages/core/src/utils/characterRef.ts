@@ -13,7 +13,7 @@
  *   - The original ref string if no record matched (legacy / inline persona)
  *
  * Matching priority: `id` (exact) → `name` (case-insensitive) → `displayName`
- * (case-insensitive). The case-insensitive fallbacks exist because legacy beats
+ * (case-insensitive) → `alsoKnownAs` (its names before translation). The case-insensitive fallbacks exist because legacy beats
  * and inline AI personas often store user-entered display strings.
  */
 
@@ -21,6 +21,15 @@ interface CharacterLike {
   id: string;
   name?: string;
   displayName?: string;
+  /**
+   * Names this character is also referred to by: its name and display name
+   * as written, on a story that is being played in translation. A line's
+   * speaker ("Old Sven") is a KEY and stays as written, while the
+   * character's own names are translated ("Der alte Sven"); without these
+   * the speaker no longer found its character, and nothing tied to the
+   * character happened: its HUD never appeared, for one.
+   */
+  alsoKnownAs?: string[];
 }
 
 /**
@@ -45,6 +54,10 @@ export function resolveCharacter<C extends CharacterLike>(
   // 3. Case-insensitive displayName match
   const byDisplay = characters.find((c) => c.displayName?.toLowerCase() === lower);
   if (byDisplay) return byDisplay;
+
+  // 4. The names it had before it was translated (see alsoKnownAs)
+  const byFormerName = characters.find((c) => c.alsoKnownAs?.some((n) => n?.toLowerCase() === lower));
+  if (byFormerName) return byFormerName;
 
   return null;
 }
