@@ -24,6 +24,8 @@ import {
   syncTranslation,
   applySyncResult,
   buildChatRequestBody,
+  DEFAULT_OPENAI_MODEL,
+  DEFAULT_ANTHROPIC_MODEL,
 } from '@asaps/core';
 
 export interface TranslationAIConfig {
@@ -715,6 +717,65 @@ async function translateBatch(
 }
 
 /**
+ * How much a translation batch may write. Generous, for Brahmic / CJK / RTL
+ * targets where one source word can become 5-10 output tokens; Latin-script
+ * targets never get near it.
+ */
+const TRANSLATION_MAX_TOKENS = 32768;
+
+/**
+ * Models that turned the default down, and what they allow instead. Learned
+ * from the provider's own refusal, so no table of models has to be kept:
+ * gpt-4o and gpt-4o-mini stop at 16384, some local models far lower.
+ */
+const outputLimits = new Map<string, number>();
+
+/**
+ * The output limit a provider names when it refuses a request for asking
+ * too much, or null when the refusal is about something else.
+ *   OpenAI:    "max_tokens is too large: 32768. This model supports at most 16384 completion tokens…"
+ *   Anthropic: "max_tokens: 32768 > 8192, which is the maximum allowed number of output tokens for …"
+ */
+export function outputLimitFromRefusal(errorBody: string): number | null {
+  if (!/max_(completion_)?tokens|output tokens|completion tokens/i.test(errorBody)) return null;
+  const m = /supports at most (\d+)/i.exec(errorBody)
+    ?? />\s*(\d+),?\s*which is the maximum/i.exec(errorBody)
+    ?? /maximum (?:allowed )?(?:value|number)?[^0-9]{0,40}?(\d{3,7})/i.exec(errorBody);
+  const limit = m ? parseInt(m[1], 10) : NaN;
+  return Number.isFinite(limit) && limit >= 256 ? limit : null;
+}
+
+const limitFor = (model: string) => Math.min(TRANSLATION_MAX_TOKENS, outputLimits.get(model) ?? TRANSLATION_MAX_TOKENS);
+
+/**
+ * POST a translation request; when the model allows less output than was
+ * asked for, ask again for what it allows and remember that for the model.
+ * `build` makes the request body for an output limit.
+ */
+async function postWithOutputLimit(
+  url: string,
+  headers: Record<string, string>,
+  model: string,
+  build: (maxTokens: number) => unknown,
+  signal: AbortSignal | undefined,
+  errorLabel: string,
+): Promise<any> {
+  for (let attempt = 0; ; attempt++) {
+    const asked = limitFor(model);
+    const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(build(asked)), signal });
+    if (response.ok) return response.json();
+    const errorBody = await response.text().catch(() => '');
+    const limit = response.status === 400 && attempt === 0 ? outputLimitFromRefusal(errorBody) : null;
+    if (limit !== null && limit < asked) {
+      console.warn(`[StoryTranslator] ${model} allows ${limit} output tokens, not ${asked}; asking again`);
+      outputLimits.set(model, limit);
+      continue;
+    }
+    throw new Error(`${errorLabel} ${response.status}: ${errorBody.substring(0, 200)}`);
+  }
+}
+
+/**
  * Call Anthropic Messages API directly.
  */
 async function callAnthropic(
@@ -728,33 +789,25 @@ async function callAnthropic(
   const base = (baseUrl || 'https://api.anthropic.com').replace(/\/+$/, '');
   const url = base.endsWith('/v1') ? `${base}/messages` : `${base}/v1/messages`;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
+  const usedModel = model || DEFAULT_ANTHROPIC_MODEL;
+  const data = await postWithOutputLimit(
+    url,
+    {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true',
     },
-    body: JSON.stringify({
-      model: model || 'claude-sonnet-5',
-      // 32K (was 8192) for Brahmic / CJK / RTL targets where one source
-      // word can expand to 5-10 output tokens. Sonnet 4 supports up to
-      // 64K. Hindi / Gujarati / Sinhala / Bengali / Thai / Burmese / etc
-      // all benefit; Latin-script targets ignore the headroom entirely.
-      max_tokens: 32768,
+    usedModel,
+    (maxTokens) => ({
+      model: usedModel,
+      max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     }),
     signal,
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => '');
-    throw new Error(`Anthropic API error ${response.status}: ${errorBody.substring(0, 200)}`);
-  }
-
-  const data = await response.json();
+    'Anthropic API error',
+  );
   // Surface a clear diagnostic when the response was truncated by
   // max_tokens — otherwise the truncated JSON bubbles up as an
   // opaque "Unterminated string" parse error.
@@ -809,28 +862,21 @@ async function callOpenAI(
   }
   // Shared request builder: emits max_completion_tokens vs the legacy max_tokens
   // per model (gpt-4o-mini and the GPT-5 family reject max_tokens) and drops
-  // temperature for reasoning models. Same 32768 headroom as the Anthropic path
-  // — prevents Brahmic / CJK / RTL translations being truncated mid-JSON.
-  const body: any = buildChatRequestBody(model || 'gpt-4o-mini', messages, 32768, {
-    temperature: 0.3,
-    responseFormat: jsonMode ? { type: 'json_object' } : undefined,
-  });
-  // Explicit: Apple's `fm serve` streams when the flag is omitted.
-  body.stream = false;
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-    signal,
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => '');
-    throw new Error(`AI API error ${response.status}: ${errorBody.substring(0, 200)}`);
-  }
-
-  const data = await response.json();
+  // temperature for reasoning models. The same headroom as the Anthropic
+  // path, turned down for a model that allows less (gpt-4o: 16384).
+  // No model in the AI setup: the model the rest of the app uses then. (This
+  // was 'gpt-4o-mini', a model the app stopped defaulting to long ago, whose
+  // 16384-token limit refused every batch.)
+  const usedModel = model || (provider === 'openai' ? DEFAULT_OPENAI_MODEL : 'gpt-4o-mini');
+  const data = await postWithOutputLimit(url, headers, usedModel, (maxTokens) => {
+    const body: any = buildChatRequestBody(usedModel, messages, maxTokens, {
+      temperature: 0.3,
+      responseFormat: jsonMode ? { type: 'json_object' } : undefined,
+    });
+    // Explicit: Apple's `fm serve` streams when the flag is omitted.
+    body.stream = false;
+    return body;
+  }, signal, 'AI API error');
   // Surface clear diagnostic on truncation so it doesn't manifest as a
   // confusing JSON-parse error downstream.
   if (data.choices?.[0]?.finish_reason === 'length') {
