@@ -46,7 +46,7 @@ export {
   type AssetDeviceClass,
 } from './assetVariant';
 export { waitForTTS, waitForReadingTime } from './ttsWait';
-export { resolveCharacter, resolveCharacterKey, isKnownCharacter, findSpeakerCharacter, findSpeakerCharacterId } from './characterRef';
+export { resolveCharacter, resolveCharacterKey, isKnownCharacter, findSpeakerCharacter, findSpeakerCharacterId, speakerLabel } from './characterRef';
 export { splitVoicedSegments, type VoicedSegment } from './voicedSegments';
 export { speechLocale, speechLanguageCode, voiceSpeaksLanguage } from './speechLanguage';
 export { storyLinks, beatLinks, dedupeLinks, beatTargetIds, type StoryLink } from './storyLinks';

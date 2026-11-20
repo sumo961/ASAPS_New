@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveCharacter, resolveCharacterKey, isKnownCharacter } from '../../src/utils/characterRef';
+import { resolveCharacter, resolveCharacterKey, isKnownCharacter, speakerLabel } from '../../src/utils/characterRef';
 
 const characters = [
   { id: 'char_1', name: 'Granny', displayName: 'Grandma' },
@@ -99,6 +99,29 @@ describe('resolveCharacter: a character played in translation', () => {
   });
   it('a stranger is still nobody', () => {
     expect(resolveCharacter('Narrator', cast)).toBeNull();
+  });
+});
+
+describe('speakerLabel: the name above a line', () => {
+  const german = [
+    { id: 'c1', name: 'Der alte Sven', displayName: 'Der alte Sven', alsoKnownAs: ['Old Sven'] },
+    { id: 'c2', name: 'Kapitänin Ingrid', displayName: 'Kapitänin Ingrid', alsoKnownAs: ['Captain Ingrid', 'Ingrid'] },
+    { id: 'c3', name: 'Tomas', displayName: 'Tomas' },
+  ];
+  it('follows the translation for a character of the story', () => {
+    expect(speakerLabel('Ingrid', german)).toBe('Kapitänin Ingrid');
+    expect(speakerLabel('Captain Ingrid', german)).toBe('Kapitänin Ingrid');
+    expect(speakerLabel('Old Sven', german)).toBe('Der alte Sven');
+    expect(speakerLabel('Tomas', german)).toBe('Tomas');
+  });
+  it('shows a free-text speaker as written', () => {
+    expect(speakerLabel('Narrator', german)).toBe('Narrator');
+    expect(speakerLabel('A voice', undefined)).toBe('A voice');
+  });
+  it('changes nothing in the language the story was written in', () => {
+    const source = [{ id: 'c2', name: 'Captain Ingrid', displayName: 'Ingrid' }];
+    expect(speakerLabel('Captain Ingrid', source)).toBe('Captain Ingrid');
+    expect(speakerLabel('Ingrid', source)).toBe('Ingrid');
   });
 });
 

@@ -6,7 +6,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
 import { ReactRenderer, type RenderContext, OrientationGate, type OrientationPolicy, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, computeStageFitScale, type ScreenHudCharacter, type HudBox, type HudCorner , harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor } from '@asaps/renderer';
-import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage, resolveProjectLayoutMode, type LayoutMode } from '@asaps/core';
+import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage, resolveProjectLayoutMode, speakerLabel, type LayoutMode } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
 import { WebSTTService } from './WebSTTProvider';
@@ -569,6 +569,12 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           const context = engine.getContext();
           const timerManager = context.getTimerManager();
           const story = engine.getStory();
+
+          // The name above a line follows the language being played: the
+          // speaker is written as in the source language and stays a key,
+          // the character carries its translated name (see speakerLabel).
+          (renderer as any).setSpeakerNameResolver?.((speaker: string) =>
+            speakerLabel(speaker, (engine.getStory() as any)?.getCharacters?.()));
 
           // HUD overlay re-render trigger — subscribe to mood / variant
           // events so the screen-docked mood pad refreshes during play.

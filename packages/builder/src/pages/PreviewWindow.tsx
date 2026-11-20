@@ -12,7 +12,7 @@ import { simulationProgressShort } from '../components/debug/debugWording';
 import type { SimulationProgress } from '@asaps/core';
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech, Download, Mic, MicOff, MessagesSquare } from 'lucide-react';
-import { Story, StoryEngine, Beat, BeatTypeRegistry, findSpeakerCharacter, findSpeakerCharacterId } from '@asaps/core';
+import { Story, StoryEngine, Beat, BeatTypeRegistry, findSpeakerCharacter, findSpeakerCharacterId, speakerLabel } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, buildLoadingTranslationMap, type UIStringKey } from '@asaps/core';
 import { harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, ConversationHistoryPanel } from '@asaps/renderer';
@@ -1602,11 +1602,18 @@ export const PreviewWindow: React.FC = () => {
       });
       reactRenderer.setTTSStopCallback(() => getTTSService().stop());
 
-      // Resolve speaker names to translated display names when a language is active
-      if (previewData.activeLanguage && previewData.characters?.length) {
+      // The name above a line follows the translation: a line's speaker is
+      // written as in the source language ("Ingrid") and stays a key, while
+      // the character is "Kapitänin Ingrid" in German. The story being played
+      // is the translated one, so its characters carry the translated names.
+      {
         const lang = previewData.activeLanguage;
-        const chars = previewData.characters;
+        const chars = previewData.characters ?? [];
         reactRenderer.setSpeakerNameResolver((speaker: string) => {
+          const playing = (engineRef.current?.getContext() as any)?.getStory?.()?.getCharacters?.();
+          const label = speakerLabel(speaker, playing);
+          if (label !== speaker || !lang) return label;
+          // Older projects keep a translated name on the character itself.
           const lowerSpeaker = speaker.toLowerCase();
           const char = chars.find(
             (c: any) => c.displayName?.toLowerCase() === lowerSpeaker || c.name?.toLowerCase() === lowerSpeaker

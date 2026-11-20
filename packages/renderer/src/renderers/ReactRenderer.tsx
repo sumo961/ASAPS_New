@@ -1500,6 +1500,12 @@ export class ReactRenderer extends BaseRenderer {
   /**
    * Set a resolver that maps speaker names to translated display names.
    */
+  /** A speaker's name as the player reads it (the translated character name, where the host resolves one). */
+  private speakerNameForPlayer(raw: string | undefined | null): string {
+    if (!raw) return '';
+    return this.speakerNameResolver ? this.speakerNameResolver(raw) : raw;
+  }
+
   setSpeakerNameResolver(resolver: ((speaker: string) => string) | null): void {
     this.speakerNameResolver = resolver;
   }
@@ -1734,8 +1740,25 @@ export class ReactRenderer extends BaseRenderer {
    * this render. "Reply to …" belongs above replies only, not above the
    * Continue button of a line nobody answers.
    */
+  /**
+   * The exchange with its speakers named as the player reads them: earlier
+   * lines and "Reply to …" follow the translation like the name above the
+   * current line (see setSpeakerNameResolver). Unchanged when no name differs.
+   */
+  private exchangeNamedForPlayer(exchange: DialogExchange | undefined): DialogExchange | undefined {
+    const resolve = this.speakerNameResolver;
+    if (!exchange || !resolve) return exchange;
+    const earlier = exchange.earlier?.map((line) => {
+      const speaker = line.speaker ? resolve(line.speaker) : line.speaker;
+      return speaker === line.speaker ? line : { ...line, speaker };
+    });
+    const replyTo = exchange.replyTo ? resolve(exchange.replyTo) : exchange.replyTo;
+    const same = replyTo === exchange.replyTo && (!earlier || earlier.every((line, i) => line === exchange.earlier[i]));
+    return same ? exchange : { ...exchange, ...(earlier ? { earlier } : {}), ...(replyTo ? { replyTo } : {}) };
+  }
+
   protected exchangeForChoices(choices: Array<{ isContinue?: boolean }>): DialogExchange | undefined {
-    const exchange = this.getState('dialogExchange') as DialogExchange | undefined;
+    const exchange = this.exchangeNamedForPlayer(this.getState('dialogExchange') as DialogExchange | undefined);
     if (!exchange?.replyTo || choices.some(c => !c.isContinue)) return exchange;
     const { replyTo: _replyTo, ...rest } = exchange;
     return rest;
@@ -3618,7 +3641,7 @@ export class ReactRenderer extends BaseRenderer {
               beatType="dialogTree"
               spatial={spatialSpec}
               content={{
-                speaker: speakerVisible ? (dialogContext.speaker || '') : '',
+                speaker: speakerVisible ? this.speakerNameForPlayer(dialogContext.speaker) : '',
                 text: dialogContext.text || '',
               }}
               theme={this.speakerTheme()}
@@ -3742,7 +3765,7 @@ export class ReactRenderer extends BaseRenderer {
             beatType={beatType}
             slots={effectiveSlotSpec}
             content={{
-              speaker: dialogContext.speaker || '',
+              speaker: this.speakerNameForPlayer(dialogContext.speaker),
               [bodyKey]: dialogContext.text || '',
             }}
             theme={this.speakerTheme()}

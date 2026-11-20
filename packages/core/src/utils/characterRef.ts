@@ -63,6 +63,24 @@ export function resolveCharacter<C extends CharacterLike>(
 }
 
 /**
+ * The name to show for a line's speaker.
+ *
+ * As written, unless the story is being played in translation and the
+ * speaker is one of its characters: then the character's translated display
+ * name ("Kapitänin Ingrid" for a line whose speaker is written "Ingrid").
+ * A free-text speaker ("Narrator", "A voice") is shown as written, and so is
+ * every speaker in the language the story was written in.
+ */
+export function speakerLabel<C extends CharacterLike>(
+  speaker: string,
+  characters: ReadonlyArray<C> | null | undefined,
+): string {
+  const character = resolveCharacter(speaker, characters);
+  if (!character || !character.alsoKnownAs || character.alsoKnownAs.length === 0) return speaker;
+  return character.displayName || character.name || speaker;
+}
+
+/**
  * Return the canonical storage key for a character ref.
  *
  * If the ref matches a defined Character, returns that character's `id`.
