@@ -9,6 +9,7 @@ import { downloadHtmlExport, previewStoryZip, SINGLE_FILE_LIMIT_BYTES, singleFil
 import { DEFAULT_RELAY_PATH } from '../../export/relayKit';
 import { getSavedAIConfig, getRuntimeAIConfig } from '../../hooks/useAI';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
+import { exportSpeechOptions, summarizeSpeechSetup, type ExportSpeechSource } from '../../export/exportSpeech';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { buildManifestEntry, type TranslationResource } from '@asaps/core';
 import { recommendWebExportMode } from '../../export/webExportMode';
@@ -31,6 +32,9 @@ interface HtmlExportDialogProps {
   /** Total size of the project's media in bytes — drives the suggested output. */
   mediaBytes?: number;
 }
+
+/** Remembers, on this computer, which voices the last export used. */
+const EXPORT_SPEECH_SOURCE_KEY = 'asaps_export_speech_source';
 
 export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   isOpen,
@@ -72,6 +76,17 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     if (!aiOn) { setEnableAI(false); setEnableAIOnTheFly(false); }
   }, [aiOn]);
   const [showSessionLog, setShowSessionLog] = useState(false);
+  // Which voices read aloud in the export. The browser's own unless the
+  // author chooses this computer's speech setup, which puts its key into the
+  // file; the choice is remembered on this computer.
+  const [speechSource, setSpeechSourceState] = useState<ExportSpeechSource>(() => {
+    try { return localStorage.getItem(EXPORT_SPEECH_SOURCE_KEY) === 'setup' ? 'setup' : 'browser'; } catch { return 'browser'; }
+  });
+  const setSpeechSource = (source: ExportSpeechSource) => {
+    setSpeechSourceState(source);
+    try { localStorage.setItem(EXPORT_SPEECH_SOURCE_KEY, source); } catch { /* not remembered */ }
+  };
+  const speechSetup = summarizeSpeechSetup(isOpen ? getSavedTTSConfig() : null);
   const [includedTranslations, setIncludedTranslations] = useState<Set<string>>(new Set());
   // Pre-export size-warning gate. When the dialog is in 'single-file'
   // mode AND the story zip exceeds a tier, we stage the warning here
@@ -182,14 +197,18 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
       // AI on-the-fly needs AI config
       const needsAIConfig = (enableAI && hasAIConfig) || enableAIOnTheFly;
 
-      // Get TTS config to embed (includes API key for cloud providers)
-      const savedTTS = getSavedTTSConfig();
-      // Get speaker voice mapping from project global settings
+      // Reading aloud: the browser's voice, or this computer's speech setup
+      // (with its key) when the author chose that below. See exportSpeech.ts.
       const { getStorageManager } = await import('../../storage');
       const projResult = await getStorageManager().getProject(projectId);
       const ttsSettings = projResult.data?.globalSettings?.tts;
-      const providerKey = savedTTS?.providerType || 'web-speech';
-      const speakerVoices = ttsSettings?.speakerVoices?.[providerKey];
+      const speech = exportSpeechOptions({
+        readAloud: exportSpeech,
+        source: speechSource,
+        saved: getSavedTTSConfig(),
+        speakerVoices: ttsSettings?.speakerVoices,
+        readPrompts: ttsSettings?.readPrompts !== false,
+      });
 
       const options: HtmlExportOptions = {
         mode,
@@ -201,18 +220,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         aiProxyUrl: needsAIConfig && relayMode ? (aiProxyUrl.trim() || DEFAULT_RELAY_PATH) : undefined,
         aiBaseUrl: needsAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
         aiModel: needsAIConfig && aiModel ? aiModel : undefined,
-        // No saved speech setup means the browser's own voice, as in the
-        // Preview: without a provider the export had no speech at all.
-        ttsProvider: savedTTS?.providerType || 'web-speech',
-        ttsApiKey: savedTTS?.apiKey,
-        ttsModel: savedTTS?.model,
-        ttsBaseUrl: savedTTS?.baseUrl,
-        ttsDefaultVoiceId: savedTTS?.defaultVoiceId,
-        ttsReadPrompts: ttsSettings?.readPrompts !== false,
-        ttsSpeakerVoices: speakerVoices,
-        // Project setting (tts.exportSpeech) — the same project exports the
-        // same player on every machine (UX-Eval B3).
-        ttsEnabled: exportSpeech,
+        ...speech,
         existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
         enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
         showSessionLog,
@@ -265,7 +273,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech]);
+  }, [mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
 
   // Called from the size-warning banner's "Continue anyway" button.
   // Reuses the pre-computed zip so the user isn't waiting for it twice.
@@ -282,12 +290,16 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         t => includedTranslations.has(t.languageCode)
       );
       const needsAIConfig = (enableAI && hasAIConfig) || enableAIOnTheFly;
-      const savedTTS = getSavedTTSConfig();
       const { getStorageManager } = await import('../../storage');
       const projResult = await getStorageManager().getProject(projectId);
       const ttsSettings = projResult.data?.globalSettings?.tts;
-      const providerKey = savedTTS?.providerType || 'web-speech';
-      const speakerVoices = ttsSettings?.speakerVoices?.[providerKey];
+      const speech = exportSpeechOptions({
+        readAloud: exportSpeech,
+        source: speechSource,
+        saved: getSavedTTSConfig(),
+        speakerVoices: ttsSettings?.speakerVoices,
+        readPrompts: ttsSettings?.readPrompts !== false,
+      });
       const options: HtmlExportOptions = {
         mode,
         responsive: true,
@@ -298,16 +310,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         aiProxyUrl: needsAIConfig && relayMode ? (aiProxyUrl.trim() || DEFAULT_RELAY_PATH) : undefined,
         aiBaseUrl: needsAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
         aiModel: needsAIConfig && aiModel ? aiModel : undefined,
-        // No saved speech setup means the browser's own voice, as in the
-        // Preview: without a provider the export had no speech at all.
-        ttsProvider: savedTTS?.providerType || 'web-speech',
-        ttsApiKey: savedTTS?.apiKey,
-        ttsModel: savedTTS?.model,
-        ttsBaseUrl: savedTTS?.baseUrl,
-        ttsDefaultVoiceId: savedTTS?.defaultVoiceId,
-        ttsReadPrompts: ttsSettings?.readPrompts !== false,
-        ttsSpeakerVoices: speakerVoices,
-        ttsEnabled: exportSpeech,
+        ...speech,
         existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
         enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
         showSessionLog,
@@ -322,7 +325,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech]);
+  }, [sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
 
   const handleSwitchToFolder = useCallback(() => {
     setSizeWarning(null);
@@ -787,11 +790,64 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                   Read text aloud in the exported player
                 </div>
                 <div className="text-xs text-gray-500 mt-0.5">
-                  Uses the text-to-speech voices set up for this story; players can still mute it.
-                  Saved with the project, so everyone who exports it gets the same player.
+                  Players can still mute it. Saved with the project, so everyone who exports it gets the same player.
                 </div>
               </div>
             </label>
+
+            {exportSpeech && (
+              <div className="mt-3 ml-7 space-y-2" data-testid="export-speech-source">
+                <div className="text-sm font-medium text-gray-700">Voices</div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="export-speech-source"
+                    className="mt-1"
+                    checked={speechSource === 'browser' || speechSetup.kind === 'none'}
+                    onChange={() => setSpeechSource('browser')}
+                  />
+                  <span className="text-sm text-gray-800">
+                    The browser's own voice
+                    <span className="block text-xs text-gray-500">Works everywhere and needs no key. How it sounds depends on the player's device.</span>
+                  </span>
+                </label>
+                {speechSetup.kind !== 'none' ? (
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="export-speech-source"
+                      className="mt-1"
+                      checked={speechSource === 'setup'}
+                      onChange={() => setSpeechSource('setup')}
+                    />
+                    <span className="text-sm text-gray-800">
+                      {speechSetup.kind === 'cloud' ? `${speechSetup.name} voices, as set up on this computer` : 'Your speech server, as set up on this computer'}
+                      <span className="block text-xs text-gray-500">The voices you chose for the story's characters.</span>
+                    </span>
+                  </label>
+                ) : (
+                  <p className="text-xs text-gray-500">
+                    For ElevenLabs or OpenAI voices, set them up first with the TTS button in the header.
+                  </p>
+                )}
+                {speechSource === 'setup' && speechSetup.kind !== 'none' && speechSetup.embedsKey && (
+                  <p className="text-xs text-amber-700" data-testid="export-speech-key-warning">
+                    Warning: your {speechSetup.kind === 'cloud' ? speechSetup.name : 'speech server'} key will be visible in the exported HTML source code. Anyone with the file can use it.
+                  </p>
+                )}
+                {speechSource === 'setup' && speechSetup.kind !== 'none' && !speechSetup.reachable && (
+                  <p className="text-xs text-amber-700">
+                    {speechSetup.kind === 'cloud'
+                      ? `No ${speechSetup.name} key is saved, so players will hear the browser's own voice.`
+                      : "This server runs on your own computer, so players can't reach it and will hear the browser's own voice."}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <p className="mt-3 ml-7 text-xs text-gray-500">
+              Voice input (the microphone in conversations) uses the browser's own speech recognition in an exported story. Nothing is exported for it.
+            </p>
           </div>
 
           {/* Session Log Option */}
