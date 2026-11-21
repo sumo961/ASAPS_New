@@ -523,7 +523,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     const lineNode = host.querySelector('[data-speech-bubble="current"]')
       ?? (lineElement ? Array.from(host.querySelectorAll('[data-drag-overlay]')).find((n) => n.getAttribute('data-element-id') === lineElement.id) : undefined);
     if (next && lineNode) {
-      const speaker = String((next.dialogNode as Record<string, unknown>).speaker ?? '').trim();
+      // Named as the line's speaker is shown: in the translation, when one is up.
+      const written = String((next.dialogNode as Record<string, unknown>).speaker ?? '').trim();
+      const speaker = written ? speakerLabel(resolveTranslatedSpeakerName(written, characters, translationState.activeLanguage) ?? written, hudCharacters as any) : '';
       targets.push({
         key: `next:${String(next.id ?? '')}`, node: lineNode, onStep: () => onStepIntoChoice(next),
         label: speaker ? `Next: ${speaker} →` : 'Next line →', title: 'Show the line that follows this one',

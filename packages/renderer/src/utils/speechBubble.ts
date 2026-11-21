@@ -200,6 +200,8 @@ export interface BubbleObstacle { rect: BubbleRect; weight: number }
 
 /** Buttons, HUDs and visible text: a bubble that covers them much is not placed at all. */
 export const HEAVY = 3;
+/** How near the rim of a bubble's oval a button or panel may come (1 = the rim): closer in, the bubble is on it. */
+export const OVAL_CLEAR = 0.92;
 /** Other characters on the stage: better not covered, but allowed. */
 export const LIGHT = 0.6;
 
@@ -337,7 +339,17 @@ export function placeSpeechBubble(opts: {
     for (const x of [face.x - margin - rx, face.x + face.width + margin + rx]) candidates.push({ cx: x, cy: face.y + ry });
   }
 
-  let best: { score: number; rect: BubbleRect; heavy: number } | null = null;
+  // Does the oval itself reach into something the player needs to see or
+  // press (a button, a panel)? Its box may: an oval leaves its corners free.
+  // A few pixels at the rim don't count. A box reaches as far as its box.
+  const reachesInto = (cx: number, cy: number, o: BubbleRect): boolean => {
+    if (opts.shape === 'box') return false;
+    const px = Math.min(o.x + o.width, Math.max(o.x, cx));
+    const py = Math.min(o.y + o.height, Math.max(o.y, cy));
+    return ((px - cx) / rx) ** 2 + ((py - cy) / ry) ** 2 < OVAL_CLEAR * OVAL_CLEAR;
+  };
+
+  let best: { score: number; rect: BubbleRect; heavy: number; into: boolean } | null = null;
   for (const c of candidates) {
     const wantX = c.cx - rx;
     const wantY = c.cy - ry;
@@ -354,20 +366,29 @@ export function placeSpeechBubble(opts: {
     if (reach - stopShort < 8) score += 10000;
     score += Math.abs(reach - stopShort - tail);
     let heavy = 0;
+    let into = false;
     for (const o of obstacles) {
       const share = overlap(rect, o.rect) / area;
       score += share * o.weight * 1000;
-      if (o.weight >= HEAVY) heavy += share;
+      if (o.weight >= HEAVY) {
+        heavy += share;
+        if (share > 0 && reachesInto(cx, cy, o.rect)) into = true;
+      }
     }
+    // Any place clear of them is better than one that is not.
+    if (into) score += 3000;
     if (speaker) score += (overlap(rect, speaker) / area) * 400;
     if (face) score += (overlap(rect, face) / (face.width * face.height)) * 1500;
     // Lean away from the middle of the stage, as in comics where two
     // speakers' bubbles sit above and outside them.
     score += Math.max(0, ((cx - mouth.x) / w) * towardMiddle) * 40;
     if (c.below) score += 60;
-    if (!best || score < best.score) best = { score, rect, heavy };
+    if (!best || score < best.score) best = { score, rect, heavy, into };
   }
-  if (!best || best.score >= 10000 || best.heavy > 0.25) return null;
+  // No bubble (the text box shows) when the best place still sits on a
+  // button or a panel: on a phone held upright the replies fill the width
+  // and a long line's bubble dipped into the first of them.
+  if (!best || best.score >= 10000 || best.heavy > 0.25 || best.into) return null;
 
   const { rect } = best;
   const cx = rect.x + rx;

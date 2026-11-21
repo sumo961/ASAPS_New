@@ -17,6 +17,7 @@ import {
   replyTextMaxWidth,
   replyTextShareFor,
   HEAVY,
+  OVAL_CLEAR,
   placeSpeechBubble,
   placeOffstageBubble,
   OFFSTAGE_TAIL,
@@ -350,3 +351,36 @@ describe('placeOffstageBubble: replies when the player is not on the stage', () 
   });
 });
 
+
+describe('a bubble that would sit on a button or panel', () => {
+  // A phone held upright: the replies fill the width under the speaker's head.
+  const stage = { width: 390, height: 740 };
+  const size = { width: 196, height: 276 };
+  const mouth = { x: 60, y: 330 };
+  const speaker = { x: 20, y: 300, width: 91, height: 440 };
+
+  it('is not placed when every place reaches into a button', () => {
+    const rows = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({ rect: { x: 0, y: i * 95, width: 390, height: 80 }, weight: HEAVY }));
+    expect(placeSpeechBubble({ stage, size, mouth, speaker, obstacles: rows })).toBeNull();
+  });
+
+  it('takes a place clear of the button when there is one', () => {
+    const button = { rect: { x: 24, y: 400, width: 341, height: 88 }, weight: HEAVY };
+    const placed = placeSpeechBubble({ stage, size, mouth, speaker, obstacles: [button] });
+    expect(placed).not.toBeNull();
+    const r = placed!.rect;
+    const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+    const px = Math.min(365, Math.max(24, cx)), py = Math.min(488, Math.max(400, cy));
+    expect(((px - cx) / (r.width / 2)) ** 2 + ((py - cy) / (r.height / 2)) ** 2).toBeGreaterThanOrEqual(OVAL_CLEAR * OVAL_CLEAR);
+  });
+
+  it('may have a button under a free corner of its box', () => {
+    const wide = { width: 1024, height: 768 };
+    const corner = { rect: { x: 0, y: 0, width: 1024, height: 768 }, weight: 0 };
+    const free = placeSpeechBubble({ stage: wide, size: { width: 300, height: 160 }, mouth: { x: 500, y: 400 }, obstacles: [corner] })!;
+    // A small button just inside the box's corner, outside the oval.
+    const tucked = { rect: { x: free.rect.x, y: free.rect.y, width: 20, height: 12 }, weight: HEAVY };
+    const again = placeSpeechBubble({ stage: wide, size: { width: 300, height: 160 }, mouth: { x: 500, y: 400 }, obstacles: [tucked] });
+    expect(again).not.toBeNull();
+  });
+});

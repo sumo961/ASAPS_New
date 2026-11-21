@@ -313,7 +313,9 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
 
     const obstacles: BubbleObstacle[] = [];
     for (const r of avoidRects ?? []) obstacles.push({ rect: { x: r.x, y: r.y, width: r.width, height: r.height }, weight: HEAVY });
-    const unseen = new Set((repliesInBubble ?? []).map((r) => flat(markdownLiteToPlain(r))).filter(Boolean));
+    // Replies that go into their own bubble leave their buttons unseen —
+    // unless that bubble turned out not to fit and they stay buttons.
+    const unseen = new Set((root.hasAttribute('data-replies-as-buttons') ? [] : repliesInBubble ?? []).map((r) => flat(markdownLiteToPlain(r))).filter(Boolean));
     root.querySelectorAll<HTMLElement>('button, [role="button"]').forEach((el) => {
       // Bubbles' own lines (the player's replies) are not in the way: that bubble keeps clear of this one.
       if (el.closest('[data-speech-bubble-layer]')) return;
@@ -372,8 +374,18 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
     const moves = typeof MutationObserver !== 'undefined' ? new MutationObserver((records) => {
       if (records.some((r) => !layerRef.current?.contains(r.target))) schedule();
     }) : null;
-    moves?.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'src'] });
+    moves?.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'src', 'data-replies-as-buttons'] });
+    // Buttons that slide or fade in change nothing in the DOM while they
+    // move: look again where they come to rest (a bubble placed while the
+    // replies were still on their way ended up on the first of them).
+    const settled = (e: Event) => {
+      if (!layerRef.current?.contains(e.target as Node)) schedule();
+    };
+    root.addEventListener('animationend', settled);
+    root.addEventListener('transitionend', settled);
     return () => {
+      root.removeEventListener('animationend', settled);
+      root.removeEventListener('transitionend', settled);
       if (frame) cancelAnimationFrame(frame);
       resize?.disconnect();
       moves?.disconnect();
@@ -608,7 +620,7 @@ export const StageBubbles: React.FC<{
         skipAnimation={skipAnimation}
         onPlaced={onPlaced}
         onShown={onShown}
-        repliesInBubble={theme.speakerDisplay?.replyStyle === 'bubble' && speakerLocation(locations, history?.player) ? history?.replies : undefined}
+        repliesInBubble={theme.speakerDisplay?.replyStyle === 'bubble' ? history?.replies : undefined}
         zIndex={zIndex}
       />
     </>

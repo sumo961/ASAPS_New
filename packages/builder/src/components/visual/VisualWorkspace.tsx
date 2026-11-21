@@ -6408,7 +6408,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             const choice = (cur?.choices ?? []).find((c: any) => c?.id === id);
             if (!choice) break;
             // A "then another character speaks" step has no text: name the next speaker.
-            labels.push({ idx: i, label: choice.text || (choice.continue ? `→ ${choice.dialogNode?.speaker || 'next line'}` : choice.id) });
+            labels.push({ idx: i, label: choice.text || (choice.continue ? `→ ${choice.dialogNode?.speaker ? shownSpeaker(choice.dialogNode.speaker) : 'next line'}` : choice.id) });
             cur = choice.dialogNode;
           }
           // Wraps instead of scrolling: at 1280 with both sidebars open the
@@ -6488,7 +6488,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             // A continue step has no text: name it by the line it leads to.
             .map((c: any) => ({
               text: c?.continue
-                ? `${c?.dialogNode?.speaker || 'Next'}: ${c?.dialogNode?.text || '…'}`
+                ? `${c?.dialogNode?.speaker ? shownSpeaker(c.dialogNode.speaker) : 'Next'}: ${c?.dialogNode?.text || '…'}`
                 : (c?.text || c?.id),
               when: choiceConditionSummary(c),
             }))
@@ -7073,7 +7073,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           // A "then another character speaks" step plays as a
                           // Continue button; say whose line it leads to.
                           return cs.length > 0
-                            ? cs.map((c) => ({ id: c.id, text: c.text || (c.continue ? `Continue → ${c.dialogNode?.speaker || 'next line'}` : c.id) }))
+                            ? cs.map((c) => ({ id: c.id, text: c.text || (c.continue ? `Continue → ${c.dialogNode?.speaker ? shownSpeaker(c.dialogNode.speaker) : 'next line'}` : c.id) }))
                             : [{ id: '__preview_placeholder__', text: '(Add a choice to preview)' }];
                         })()
                       : undefined}
