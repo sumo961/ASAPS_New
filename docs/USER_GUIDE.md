@@ -2343,12 +2343,17 @@ In the **Mood HUD** card on the Affect tab:
 
 - **Enable HUD pad** — master on/off switch. Off by default.
 - **Dock mode** — *Anchored to character* (HUD floats next to the character's sprite on stage) or *Fixed to screen corner* (HUD pinned to one of the four screen corners).
-- **Anchor / Corner** — eight character-relative positions (top, bottom, left, right, top-left, top-right, bottom-left, bottom-right) when docked to a character; four screen corners when fixed.
+- **Anchor / Corner** — when docked to a character: *at their feet*, or one of eight positions around them (top, bottom, left, right, top-left, top-right, bottom-left, bottom-right); four screen corners when fixed. *At their feet* puts the HUD on the character, at the foot of their picture. Speech bubbles go above heads, so this is the place they leave free, and it is what a Mood HUD starts with when you switch it on in a story that shows lines as [speech bubbles](#speech-bubbles).
+- **Name and mood** (token display) — *Always shown* (the default) or *Shown on click*. With *Shown on click* the token is only its coloured square until the player clicks it; a second click closes it again. It takes far less room, but the mood word is the part players can read without learning the colours, so keep it shown unless space is tight.
 - **Size (px)** — between 48 and 320; defaults to ~140.
 - **Opacity** — 0.2 to 1.0.
 - **Show emotion-palette markers** — overlays the project's emotion palette on the disc.
 - **Show axis labels** — the *sad / happy / calm / excited* corner labels.
 - **Show qualitative mood label** — a one-line plain-English description below the disc (e.g. *"sad, alert"*).
+
+A Mood HUD fixed to a screen corner shares that corner with the meters and inventories docked there: the panels stack one under another and don't cover each other. Its words follow the language the story is played in.
+
+A token never shows the character's initial and name together. On its own character (at their feet, above or below them) it shows the mood word alone, since it is clear whose it is. Beside a character, or in a screen corner, it shows the name and the mood word; closed, it shows the initial (or the portrait) in place of the name. Where characters stand close together, their tokens move up or down a little so that none lies on another or under a panel.
 
 Like the character's meters, the Mood HUD follows the **[Show HUD](#hud-reveal)** setting: by default it appears when the character first appears in the story. Having variants no longer hides it — the base character is a persona in play from the start. If you want the HUD to wait until the player has picked a persona, choose *When a variant is chosen* there.
 
@@ -2683,9 +2688,9 @@ Your project's colours, text box and fonts live in [Project Settings](#global-se
 
 - **Stage colour** and **Text colour**
 - **Spoken lines:** *Speech bubbles on this beat* or *Text box on this beat*, over the project's [Show lines as](#speech-bubbles) choice
-- **Bubble width:** how far a speech bubble's text runs on this beat before it wraps, in % of the stage's width (10–60). Empty means automatic, about a quarter of the stage. On a fixed canvas you can also drag a selected bubble's handles
-- **Reply width:** the same for the bubble that lists the player's replies (12–70; automatic is about a third of the stage)
+- **Bubble width:** how far a speech bubble's text runs on this beat before it wraps, in % of the stage's width (10–60). Empty (*auto*) means about a quarter of the stage. On a fixed canvas you can also drag a selected bubble's handles
 - **Replies:** *In a bubble on this beat* or *Buttons on this beat*, over the project's [Show the player's replies as](#reply-bubbles) choice
+- **Reply width:** the same for the bubble that lists the player's replies (12–70; *auto* is about a third of the stage)
 - **Text box:** **Boxes** (*Show all boxes*, *Hide text/dialog boxes*, *Hide all boxes* — this works even when the project hides them), **Frame picture** (*Off on this beat (plain box)*, for a theme that draws the text box with a picture), **Colour**, **Opacity %**, **Corners px**, **Padding px**, **Border** (*Show on this beat* or *Hide on this beat*), **Border width** and **Border colour**
 - **Buttons:** **Colour**, **Text colour**, **Border colour** and **Corners px**
 - **Fonts:** the **Title**, **Text** and **Buttons** fonts and their sizes
@@ -2765,7 +2770,15 @@ Useful for "click on the suspicious painting" interactions.
 <a id="dialog-choices-visual-editor"></a>
 ### Dialog-Tree Choices in the Visual Editor
 
-When a Dialog Tree is open in the Visual Editor, a **Dialog path** bar runs across the top of the canvas: **Root** plus one crumb per choice you've stepped into (every reply carries a small badge at its top right corner saying where it leads: a blue **Step in →** when another line follows, and a click on that badge shows the line; a grey **→ beat name** when the reply leaves this beat; an amber **⚠ No exit** when it has neither a next line nor an exit, which is a missing connection (Story Warnings lists it too). A click on the reply itself never steps in, and a crumb steps back out. Where another character speaks next, a fixed canvas has no reply to carry the badge, so the line itself carries **Next: Billie →**). Clicking a character's line in the Inspector's Dialog Tree editor takes the canvas to that line too. Where another character speaks next (*Then another character speaks*), the canvas shows a **Continue → Billie** button and the crumb reads **→ Billie**. As you step through, each line's **Look** shows on the stage: a line set to *angry* switches that character's picture from that line on, as in play. The look is only shown — moving or resizing the character there keeps their own picture.
+When a Dialog Tree is open in the Visual Editor, a **Dialog path** bar runs across the top of the canvas: **Root** plus one crumb per choice you've stepped into. Click a crumb to step back out. Clicking a character's line in the Inspector's Dialog Tree editor takes the canvas to that line too.
+
+**Every reply says where it leads.** On the canvas, each reply (a button, or a line in the reply bubble) carries a small badge at its top right corner:
+
+- a blue **Step in →** when another line follows. Click the badge to show that line. A click on the reply itself never steps in (on a fixed canvas it selects the button)
+- a grey **→ beat name** when the reply leaves this beat, or **↺ Starts the dialog again** when it goes back to the dialog's first line
+- an amber **⚠ No exit** when it has neither a next line nor an exit. That is a missing connection, and Debug ▸ Problems lists it too (*Reply goes nowhere*). An amber **⚠ Missing beat** means the reply's exit points at a beat that has been deleted
+
+Where another character speaks next (*Then another character speaks*), a responsive canvas shows a **Continue → Billie** button with its own **Step in →** badge. A fixed canvas has no reply to carry the badge there, so the line itself (its bubble or text box) carries **Next: Billie →**. The crumb reads **→ Billie** in both. With a translation chosen in the header, these names follow it. As you step through, each line's **Look** shows on the stage: a line set to *angry* switches that character's picture from that line on, as in play. The look is only shown — moving or resizing the character there keeps their own picture.
 
 **The buttons are a stack (fixed canvas).** A dialog's choice buttons sit one after another, in the order of the choices, normally right below the text. You decide three things:
 
@@ -2893,7 +2906,7 @@ The OpenAI provider defaults to **gpt-6-astra**, OpenAI's flagship since Septemb
 | **gpt-5.6-terra** | Balanced — roughly gpt-5.5-level performance at about half Sol's price |
 | **gpt-5.6-luna** | Fastest and cheapest |
 
-Leave the field empty to use the default. Older models (gpt-5.5, GPT-4o) keep working if you name them explicitly.
+Leave the field empty to use the default; the empty field names it in grey (*Default: gpt-6-astra*). Older models (gpt-5.5, GPT-4o) keep working if you name them explicitly.
 
 Two Astra-specific behaviours ASAPS handles for you: Astra has no **None** or **Minimal** reasoning tier (those settings are sent as **Low**, and **Max** is honoured), and Astra only supports tools through OpenAI's Responses API — so the Ideator's web search now runs through that API on every OpenAI model when you use the official endpoint. Custom or local endpoints (Ollama, Kimi, proxies) keep the plain chat-completions path.
 
@@ -3706,9 +3719,9 @@ ASAPS Modern can read your story aloud using text-to-speech. This is useful for 
 2. Click **Enable TTS** to turn on text-to-speech
 3. Click **Configure Provider** to open the provider settings dialog
 4. Choose a **TTS provider**:
-   - **Web Speech** — Free, built into your browser. Quality varies by OS and browser.
+   - **Built-in Voices** — Free, built into your browser (Web Speech). Quality varies by OS and browser.
    - **ElevenLabs** — High-quality cloud voices. Requires an API key from [elevenlabs.io](https://elevenlabs.io).
-   - **OpenAI** — Cloud TTS via OpenAI. Requires an API key. Choose **GPT Realtime mini**: OpenAI ends its older speech models (TTS-1, TTS-1 HD, GPT-4o mini TTS) on 6 January 2027, and a setup still on one of them moves to GPT Realtime mini by itself that day. It has ten voices; Fable, Nova and Onyx don't exist there and are read by Alloy, Marin and Cedar. A line starts playing as soon as its first sound arrives, about half a second after it is asked for. The connections for your story's voices (up to four) are opened when the Preview or an exported story starts, so a voice's first line doesn't wait for it either. Exported stories do the same: one exported with an older model keeps its OpenAI voices after that date. A story exported with version 0.9.158 or earlier can't; it is read with the browser's voice from then on, so export it again.
+   - **OpenAI TTS** — Cloud TTS via OpenAI. Requires an API key. Choose **GPT Realtime mini** (the default): OpenAI ends its older speech models (TTS-1, TTS-1 HD, GPT-4o mini TTS) on 6 January 2027, and a setup still on one of them moves to GPT Realtime mini by itself that day. It has ten voices; Fable, Nova and Onyx don't exist there and are read by Alloy, Marin and Cedar. A line starts playing as soon as its first sound arrives, about half a second after it is asked for. The connections for your story's voices (up to four) are opened when the Preview or an exported story starts, so a voice's first line doesn't wait for it either. Exported stories do the same: one exported with an older model keeps its OpenAI voices after that date. A story exported with version 0.9.158 or earlier can't; it is read with the browser's voice from then on, so export it again.
    - **Local TTS** — Run open-source TTS models on your own machine. Supports Kokoro (via mlx-audio), Coqui, Piper, and Chatterbox with built-in presets. No API key needed.
    - **Custom Server** — Connect to any OpenAI-compatible TTS endpoint.
 5. Enter your API key if using a cloud provider
@@ -3774,11 +3787,11 @@ This means you do not need to configure TTS language manually -- it follows your
 
 **Character voices in a translation.** A character keeps their voice when the story is played in another language, even though their name is translated too. With the browser's built-in voices there is one limit: a voice belongs to a language. If the voice you gave a character can't read the language being played (an English voice and a German translation), the best voice for that language reads the line instead, so the text is pronounced properly. The same happens when the story is opened on a computer that doesn't have that voice installed.
 
-**In exported stories.** With **Read text aloud in the exported player** ticked, you choose the **Voices** in the export window: *The browser's own voice* (the default: no key, works everywhere) or the voices of your speech setup on this computer, for example *ElevenLabs voices*. The second puts your speech key into the exported file, where anyone with the file can read it, and the window says so; your choice is remembered on this computer. With reading aloud unticked, nothing of your speech setup is exported. Voice input in an exported story always uses the browser's own speech recognition. A speech server on your own computer can't be reached by your players, so those exports use the browser's voice as well. The **Sound On / Muted** switch in the player's Settings silences the reading along with music and sounds.
+**In exported stories.** With **Read text aloud in the exported player** ticked, you choose the **Voices** in the export window: *The browser's own voice* (the default: no key, works everywhere) or the voices of your speech setup on this computer, for example *ElevenLabs voices*. The second puts your speech key into the exported file, where anyone with the file can read it, and the window says so; your choice is remembered on this computer. With reading aloud unticked, nothing of your speech setup is exported. Voice input in an exported story always uses the browser's own speech recognition. A speech server on your own computer can't be reached by your players, and a cloud setup with no key saved can't read either: those exports use the browser's voice as well, and the window tells you so. The **Sound On / Muted** switch in the player's Settings silences the reading along with music and sounds.
 
 ### TTS in Project Settings
 
-Your chosen TTS provider type and model are saved with the project, so collaborators automatically use the same configuration. API keys are **not** saved in the project — they stay in your browser's local storage for security.
+Your chosen TTS provider type and model are saved with the project, so collaborators automatically use the same configuration. API keys are **not** saved in the project — they stay on your computer: encrypted by the operating system in the desktop app, in the browser's storage in the browser version.
 
 ## Speech-to-Text (STT)
 
@@ -3788,8 +3801,8 @@ ASAPS Modern supports voice input for AI Conversation beats and other text entry
 
 1. Click the **Mic** button in the header toolbar (next to the TTS button)
 2. Configure a **STT provider**:
-   - **Web Speech** — Free, built into your browser. Real-time streaming, but quality varies.
-   - **Whisper (OpenAI)** — Cloud-based, high accuracy. Requires an OpenAI API key. Uses OpenAI's **GPT Transcribe**; Whisper v1 can still be chosen until OpenAI ends it on 26 February 2027.
+   - **Built-in** — Free, built into your browser (Web Speech). Real-time streaming, but quality varies.
+   - **Whisper** — OpenAI's cloud service, high accuracy. Requires an OpenAI API key. Uses OpenAI's **GPT Transcribe**; Whisper v1 can still be chosen until OpenAI ends it on 26 February 2027.
    - **Local Server** — Self-hosted Whisper server (any OpenAI-compatible endpoint).
    - **Vosk** — Offline streaming recognition via WebSocket.
    - **Whisper.cpp** — Local whisper.cpp server for accurate offline recognition (default port: 8178).
@@ -3877,12 +3890,14 @@ Export your story as a single standalone HTML file that anyone can open in a bro
 
 1. Click **Export → Web page (HTML)…** (under *Publish for players*)
 2. Configure options:
-   - **Title** - Page title
-   - **Include splash screen** - Show a start screen before the story begins
-   - **Embed assets** - Bundle images/audio directly into the HTML
+   - **Start beat** - Where the exported story begins (your project's [Story starts at](#global-settings) unless you change it here)
+   - **Export Format** - *One file — easiest to send* (everything in one HTML file) or *Folder — for a website* (a zip to upload to a web server)
+   - **Translations** - Which of your translations to include
+   - **Read text aloud in the exported player** - With its **Voices** choice; see [In exported stories](#tts-language-awareness)
+   - **Enable session log export** - Adds **Save Log** to the player's menu
 3. Click Export
 
-The resulting HTML file includes the full renderer, all story data, and embedded assets. Share it via email, upload it to a website, or distribute it however you like. Recipients just double-click to play.
+The resulting single HTML file includes the full renderer, all story data, and embedded assets. Share it via email, upload it to a website, or distribute it however you like. Recipients just double-click to play.
 
 **Advanced HTML Export Options:**
 - **Mobile-responsive** - Automatic font scaling and layout adaptation on phones/tablets
@@ -4322,7 +4337,7 @@ Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual 
     - *Above left / Above right* — Larger portrait above the text box
   - **Portrait size** — Size in pixels (default: 48px inside, 80px above)
   - <a id="speech-bubbles"></a>**Show lines as** — *A text box* (the default) or *Speech bubbles*. With speech bubbles, when a character you placed on the stage speaks, their line appears in a comic-style bubble next to them, its tail pointing at them, instead of in the text box. The bubble goes above the speaker, leaning away from the middle of the stage so two speakers' bubbles don't meet, and keeps clear of the buttons, the HUDs and the speaker's face. It uses your text box's colours, border and font. Narration, and characters who aren't on the stage, keep the text box, and so does a line whose bubble doesn't fit (on a small phone screen, when it would sit on a button or a panel, or when the speaker's head is off the screen). In the Visual Editor the text box and the reply buttons a bubble stands for are not drawn and can't be clicked while the bubble shows; to move or resize them, set **Spoken lines** (or **Replies**) to the text box or buttons in [This beat's look](#this-beats-look) for a moment. Click a bubble to select it: on a fixed canvas the frame around it has handles, and dragging one makes this beat's bubbles wider or narrower (**Esc** while dragging puts it back). A bubble finds its own place and is as tall as its words need, so only its width is yours to set; the same width is in [This beat's look](#this-beats-look) as **Bubble width**. The bubble that lists the player's replies is selected and resized the same way, with its own **Reply width**. Choose where the tail points by selecting the character in the Visual Editor ([Speech bubble points at](#speech-bubble-points-at)), and turn bubbles on or off for one beat in [This beat's look](#this-beats-look). When one character's line is followed by another's (after **Continue**), the line just before stays up beside the new one, a little faded, when its speaker is on the stage too. A reply the player picks isn't shown again: they have just read and clicked it, so the line answering it starts right away. In a Dialog Tree, the player's replies (buttons or their bubble) also wait until the line in the bubble can be read with some margin — about 300 ms a word plus a second and a half, between 2.5 and 10 seconds (a longer Choice Delay you set still applies); clicking the stage shows them at once. The line before goes when the player's next replies come up, so only the line being answered and the replies are on the stage, and when the story moves on to another line. An [inner voice](#inner-voices) thinks in a cloud with a trail of small circles, in the voice's Theme Color, pointing at the player's character when the inner voice isn't on the stage itself.
-  - <a id="reply-bubbles"></a>**Show the player's replies as** — *Buttons* (the default) or *One bubble*. In a Dialog Tree, the replies the player can pick appear as lines in one rounded bubble. It points at the player's character (the character whose role is *Player*) where that character is on the stage. Many stories never show the player: there the bubble sits at the bottom of the stage with its tail pointing out of the picture, towards the player, whenever the line being answered is in a speech bubble. Each line is drawn like your story's buttons (their colours, border and corners) so it's clear they can be clicked. Click (or tap) a line to pick that reply; the bubble goes and the line answering it starts right away (the player has just read their reply, so it isn't said again). Lines for replies already taken are greyed out, as their buttons would be. The buttons come back when the line being answered is in the text box and the player's character isn't on the stage, when a reply's button shows a picture instead of text, or when the bubble doesn't fit. Other choices, such as where to go next, stay buttons. In the Visual Editor the buttons stay as empty dashed outlines, so you can still select them. Turn it on or off for one beat in [This beat's look](#this-beats-look).
+  - <a id="reply-bubbles"></a>**Show the player's replies as** — *Buttons* (the default) or *One bubble*. In a Dialog Tree, the replies the player can pick appear as lines in one rounded bubble. It points at the player's character (the character whose role is *Player*) where that character is on the stage. Many stories never show the player: there the bubble sits at the bottom of the stage with its tail pointing out of the picture, towards the player, whenever the line being answered is in a speech bubble. Each line is drawn like your story's buttons (their colours, border and corners) so it's clear they can be clicked. Click (or tap) a line to pick that reply; the bubble goes and the line answering it starts right away (the player has just read their reply, so it isn't said again). Lines for replies already taken are greyed out, as their buttons would be. The buttons come back when the line being answered is in the text box and the player's character isn't on the stage, when a reply's button shows a picture instead of text, or when the bubble doesn't fit. Other choices, such as where to go next, stay buttons. In the Visual Editor, click the reply bubble to select it and set its width (see **Show lines as** above); the buttons it stands for aren't drawn while it shows. Turn it on or off for one beat in [This beat's look](#this-beats-look).
   - <a id="dim-silent-characters"></a>**Dim characters who aren't speaking** — for scenes where you placed several characters on the stage with **Add Character** in the Visual Editor: while one of them speaks, the others are drawn darker and greyer, so the player sees at a glance who is talking. When the next line belongs to someone else, the light moves to them. With speech bubbles the light follows whose turn it is, also when only two characters are on the stage: it moves to the player's character while their replies are up in a bubble, then, once they pick one, straight to the character answering. During narration, or when the speaker isn't standing on the stage, nobody is dimmed. **How strongly** sets how dark they get (default 50%). The Visual Editor shows it for the beat's speaker, so you can see the effect while you place characters. Off by default.
 
   Individual beats can override these global settings. This lets you hide the speaker name for narration beats while showing it for dialog, for example.
@@ -4893,7 +4908,7 @@ Create localized versions of your story with AI-assisted translation:
 - Translations are stored alongside the story data
 - **Staleness detection** highlights translations that may be outdated when the source text changes
 
-**Everything the player sees translates (v0.9.71+).** Translation coverage isn't limited to your authored beat text — since v0.9.71 *all* player-facing text follows the active language, in the Preview Window and in exports alike. That includes the pieces that used to be easy to miss: the inventory HUD title and hints, the AI loading messages ("Thinking…", "…is getting ready to speak"), runtime UI chrome like Continue/Play Again/Credits fallbacks and input placeholders, Multi Choice choice labels, the words on a [Free Layout](#free-layout)'s text boxes and buttons, and an AI Conversation's scripted opening line. One deliberate exception: the Input Image beat's **AI Analysis Prompt** stays in the source language, because it's an instruction to the AI rather than player-facing text.
+**Everything the player sees translates (v0.9.71+).** Translation coverage isn't limited to your authored beat text — since v0.9.71 *all* player-facing text follows the active language, in the Preview Window and in exports alike. That includes the pieces that used to be easy to miss: the inventory HUD title and hints, the AI loading messages ("Thinking…", "…is getting ready to speak"), runtime UI chrome like Continue/Play Again/Credits fallbacks and input placeholders, Multi Choice choice labels, the words on a [Free Layout](#free-layout)'s text boxes and buttons, the words on a character's [Mood HUD](#mood-hud--show-a-characters-mood-on-stage) (*excited / calm / sad / happy* and the mood label), and an AI Conversation's scripted opening line. A translation made before v0.9.159 lists the mood words as new, untranslated strings until you translate them. One deliberate exception: the Input Image beat's **AI Analysis Prompt** stays in the source language, because it's an instruction to the AI rather than player-facing text.
 
 **Linked characters stay linked (v0.9.110).** When an AI Dialog Tree's **NPC Character** is a defined character, it isn't offered for translation: it's a link, not text, and translating it would turn it into a plain name (and cut the character's description off from the AI). The character's name is translated once, through its [display-name translations](#character-name-translations). A free-text NPC name is still translated like any other text.
 

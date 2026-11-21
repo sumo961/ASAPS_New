@@ -52,11 +52,11 @@ And this is a story made with it, exported as a web page. **[Play it yourself](h
 - **Desktop apps** for macOS, Windows and Linux (beta) that update themselves.
 - **Work together** with Git built in: commit, push, pull, merge two versions of a story.
 
-## 🆕 Latest release: v0.9.158, the tidy-up release
+## 🆕 Latest release: v0.9.159, the read-aloud release
 
 ASAPS is in **beta**: the core works, and new releases arrive often.
 
-v0.9.158 was made after walking through the app as a new user. Project Settings has seven tabs grouped by what a setting does. Roles are set up in the Characters window. A new **Story Data** window lists the story's variables and counters with the beats that set, test and show each one. 268 field hints are rewritten in plain words, beat types are named as in the palette, and "Learn more" links open the User Guide at the right section. The flowchart marks where the story starts, a welcome card greets first-time users, and the toolbar is calmer. The HTML export starts at the title screen unless you set another start.
+v0.9.159 makes stories speak. Reading aloud and voice input now work in exported stories and in languages other than English, and each character keeps their voice in a translation. With an OpenAI key, lines are read by a live voice that starts speaking while the line is still arriving; a speech server that fails falls back to the browser's voice instead of silence. The export window shows which speech a story is exported with and never includes a speech key unless you choose it. In the Visual Editor every reply of a Dialog Tree carries a badge that says where it leads ("Step in →", the next beat's name, or a warning when it leads nowhere), speech bubbles can be selected and made wider or narrower, and lines, replies, names and panels appear in the language you chose. The player's replies can be listed in one bubble even when the player's character is never shown, and bubbles keep clear of buttons, panels and the other characters' faces. A character's mood token can sit at their feet, where bubbles don't go, and can stay a small coloured square until the player clicks it. Every field now has a hint in plain words.
 
 Earlier releases:
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)**: a summary of every release
