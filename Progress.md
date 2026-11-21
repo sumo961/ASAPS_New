@@ -1,6 +1,6 @@
 # ASAPS Modern - Progress Log
 
-## 2026-11-21: The full-stage release: bubbles, tokens and panels on a crowded stage (v0.9.160)
+## 2026-11-21: The full-stage release: bubbles, tokens and panels on a crowded stage (v0.9.161)
 
 ### Overview
 A stage full of characters now sorts itself out. Speech bubbles keep clear of mood tokens; the player's replies stay buttons rather than cover a face, and an earlier line is left out rather than put over one; bubbles look again when the stage has come to rest. Mood tokens, meters and inventories set to sit at a character show in the responsive layout too, and a token moves off the story's buttons. On a phone a list of replies that scrolls says so. The Preview shows a fixed canvas's corner panels where an exported story shows them. All of it came out of the checks left open at v0.9.159, done afterwards: the device-preset sweep in both layout modes and an exported copy at two window sizes, on a throwaway story with four characters across the stage, mood tokens at their feet, corner panels and up to four long replies. The User Guide follow-ups from that release's audit are done too.
@@ -13,6 +13,13 @@ A stage full of characters now sorts itself out. Speech bubbles keep clear of mo
 - **Checked** in the Preview at Desktop, Tablet landscape and portrait, Phone landscape and portrait and Fit window, in both layout modes, at seven dialog states of the fixed canvas and six of the responsive layout: no bubble on a button, panel or token, nothing outside the stage, no face covered by the replies or by an earlier line. Exported (one file, AI and reading aloud off) and played through both dialog scenes at 1130×690 and at 500×780: the same, and nothing outside the window.
 - **Seen and left:** an oval bubble's rim may still reach a few pixels into a panel or button (the existing `OVAL_CLEAR` allowance). On a stage this full the fallback buttons themselves cover faces, where the story's layout puts them.
 - **Files:** `packages/renderer/src/utils/speechBubble.ts`, `components/{SpeechBubbleLayer,ReplyBubbleLayer,ScreenHudLayer}.tsx`, tests `tests/utils/{speechBubble,hudFramesOver}.test.ts`, `tests/components/{ReplyBubbleSettles,ScreenHudLayoutEvent}.test.tsx`
+
+### Fixed: replies that fell back to buttons for a moment stayed buttons (found in the v0.9.160 build, which was not published)
+- Reported by the author while v0.9.160 was building: in a story with a wolf and a girl the player's three replies showed as buttons across the wolf, with the line's bubble on top of them; v0.9.159 showed them in a bubble at the girl. While the stage settled the reply bubble found no place for a moment and said so (`data-replies-as-buttons`); the line's bubble, told to keep clear of the buttons, moved into the one place the reply bubble has; from then on every try failed, and the tries ran out. What made the first try fail was not found; this batch's extra looks at a settling stage and its face rule are the likely reasons.
+- The reply layer now tells the two cases apart. When only the line's bubble is in the way and the replies are marked as buttons, it takes the mark back and looks again two frames later, once the line's bubble has gone home. A miss counts once per situation (the obstacles and the point it aims at), not once per look, so looking often at a stage that has not changed no longer uses up the tries; a real to-and-fro still ends after four.
+- **Checked** on a read-only copy of the author's story in an isolated browser, arriving at the scene by playing from the start: the replies are a bubble at the girl, as in v0.9.159. The faulty state itself was seen only in the author's own window, not reproduced in the copy. On the four-character story the reply states are unchanged at all six sizes, and in the scene where buttons are right the mark does not flip (watched for four seconds: no change).
+- v0.9.160 was tagged and built with this fault and its draft was left unpublished; this release is v0.9.161.
+- **Files:** `packages/renderer/src/components/ReplyBubbleLayer.tsx`, test `tests/components/ReplyBubbleSettles.test.tsx`
 
 ### Fixed: the Preview shows a fixed canvas's corner panels where an exported story does
 - With a device preset, the Preview laid the screen panels (meters, mood, inventory) of a fixed canvas out for the preset's box: in the letterbox beside the stage, folded into corner strips on a phone. An exported story draws them on the fitted stage, scaled with it. The stage was also told of them in the preset's coordinates, so bubbles and text kept clear of places where no panel was (and not quite of where they were).
@@ -35,7 +42,7 @@ A stage full of characters now sorts itself out. Speech bubbles keep clear of mo
 - On Phone portrait and landscape the spoken line and the replies each sit in their own scrolling pane when they don't fit. Measured on two dialog scenes (three and four long replies): every reply can be scrolled fully into view and is the element under its own middle there; the last reply, reached by scrolling, was picked and the story moved on; the line's text is fully readable by scrolling its pane (in landscape 39–45% of it shows at once). Nothing is unreachable.
 - **Seen and left:** in landscape (360 high) the two panes are 142 and 218 high, which is cramped with long text. (The missing scroll hint seen here is added above.)
 
-### Release checks (v0.9.160)
+### Release checks (v0.9.161)
 - The Last Ferry played to an ending in the Preview on the final build, with no bubble, panel or button overlapping. Exported (one file, AI and reading aloud off) and played to an ending at 1130×690 and at a phone's 740×360: nothing outside the window. The device-preset sweep is the one described above, run on the final build in both layout modes. Suites green: builder 3,334, core 3,241 (78 skipped), renderer 838, player 10; lint without errors.
 - The playable example on `gh-pages` is re-exported from this build.
 
