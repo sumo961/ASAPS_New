@@ -204,6 +204,8 @@ export const HEAVY = 3;
 export const OVAL_CLEAR = 0.92;
 /** Other characters on the stage: better not covered, but allowed. */
 export const LIGHT = 0.6;
+/** How much of a character's picture, from the top, is taken to be their head. */
+const HEAD_SHARE = 0.28;
 
 export interface BubblePlacement {
   /** The bubble's box on the stage. */
@@ -317,7 +319,8 @@ export function placeSpeechBubble(opts: {
     return { x: mouth.x - fw / 2, y: mouth.y - fh * 0.8, width: fw, height: fh * 2 };
   })() : null;
 
-  type Candidate = { cx: number; cy: number; below?: boolean; moved?: boolean };
+  /** `moves`: how often this place was moved clear of something (twice at most: off a panel, then off a face). */
+  type Candidate = { cx: number; cy: number; below?: boolean; moves?: number };
   const candidates: Candidate[] = [];
   for (const lift of [tail, tail * 1.8]) {
     for (const k of [-0.6, -0.35, 0, 0.35, 0.6]) {
@@ -381,17 +384,27 @@ export function placeSpeechBubble(opts: {
     for (const o of obstacles) {
       const share = overlap(rect, o.rect) / area;
       score += share * o.weight * 1000;
+      if (o.weight < HEAVY && share > 0) {
+        // Another character: over their body is a pity, over their face is
+        // worse (the top of their picture, where a head is).
+        const head = { x: o.rect.x, y: o.rect.y, width: o.rect.width, height: o.rect.height * HEAD_SHARE };
+        const onHead = overlap(rect, head);
+        score += (onHead / (head.width * head.height || 1)) * 600;
+        // Also tried just above that head, where there is often room.
+        if (onHead > 0 && (c.moves ?? 0) < 2) candidates.push({ cx, cy: o.rect.y - 2 - ry, below: c.below, moves: (c.moves ?? 0) + 1 });
+      }
       if (o.weight >= HEAVY) {
         heavy += share;
         if (share > 0 && reachesInto(cx, cy, o.rect)) {
           into = true;
-          if (!c.moved) {
+          if ((c.moves ?? 0) < 2) {
             const gap = 2;
+            const moves = (c.moves ?? 0) + 1;
             candidates.push(
-              { cx: o.rect.x - gap - rx, cy, below: c.below, moved: true },
-              { cx: o.rect.x + o.rect.width + gap + rx, cy, below: c.below, moved: true },
-              { cx, cy: o.rect.y - gap - ry, below: c.below, moved: true },
-              { cx, cy: o.rect.y + o.rect.height + gap + ry, below: c.below, moved: true },
+              { cx: o.rect.x - gap - rx, cy, below: c.below, moves },
+              { cx: o.rect.x + o.rect.width + gap + rx, cy, below: c.below, moves },
+              { cx, cy: o.rect.y - gap - ry, below: c.below, moves },
+              { cx, cy: o.rect.y + o.rect.height + gap + ry, below: c.below, moves },
             );
           }
         }

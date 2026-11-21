@@ -17,6 +17,7 @@ import {
   replyTextMaxWidth,
   replyTextShareFor,
   HEAVY,
+  LIGHT,
   OVAL_CLEAR,
   placeSpeechBubble,
   placeOffstageBubble,
@@ -405,5 +406,20 @@ describe("the player's replies beside corner panels", () => {
     const placed = place(110);
     expect(placed).not.toBeNull();
     expect(placed!.rect.x + placed!.rect.width).toBeLessThanOrEqual(866 + 6);
+  });
+});
+
+describe("the player's replies and the other characters' faces", () => {
+  it('take the free space above the heads rather than cover a face', () => {
+    const heavy = [[866, 87, 148, 188], [868, 10, 146, 69], [127, 177, 354, 136]].map(([x, y, width, height]) => ({ rect: { x, y, width, height }, weight: HEAVY }));
+    const others = [30, 280, 530].map((x) => ({ rect: { x, y: 310, width: 300, height: 600 }, weight: LIGHT }));
+    for (const [stopShort, mouthY] of [[0, 330], [60, 330], [110, 330], [78, 408], [0, 408]]) {
+      const placed = placeSpeechBubble({
+        stage: { width: 1024, height: 768 }, size: { width: 368, height: 286 }, mouth: { x: 930, y: mouthY },
+        speaker: { x: 780, y: 310, width: 300, height: 600 }, obstacles: [...heavy, ...others], stopShort, shape: 'box',
+      });
+      expect(placed, `stopShort ${stopShort}, mouth ${mouthY}`).not.toBeNull();
+      expect(placed!.rect.y + placed!.rect.height, `stopShort ${stopShort}, mouth ${mouthY}`).toBeLessThanOrEqual(312);
+    }
   });
 });

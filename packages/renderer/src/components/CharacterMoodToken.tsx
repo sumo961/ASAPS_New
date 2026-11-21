@@ -239,6 +239,17 @@ export const CharacterMoodToken: React.FC<CharacterMoodTokenProps> = ({
     ? calculateScreenPosition(config.screenPosition, containerDimensions, config.offset, w, h)
     : calculateCharacterAnchorPosition(config.anchor, characterPosition, characterDimensions, config.offset, w, h);
 
+  // Beside a character at the edge of the stage there is no room: the chip
+  // goes above (or below) them instead. Sliding it back onto the stage put
+  // it on the neighbour's chip.
+  if (containerDimensions && config.dockMode !== 'screen') {
+    const m = 4;
+    const offStage = pos.x < m || pos.x + w > containerDimensions.width - m;
+    const over = config.anchor === 'top-left' || config.anchor === 'top-right' ? 'top'
+      : config.anchor === 'bottom-left' || config.anchor === 'bottom-right' ? 'bottom' : null;
+    if (offStage && over) pos = calculateCharacterAnchorPosition(over, characterPosition, characterDimensions, config.offset, w, h);
+  }
+
   // Clamp into the container so the chip never leaves the stage — this is
   // the fix for the old frame being pushed off-screen on small viewports.
   if (containerDimensions) {
