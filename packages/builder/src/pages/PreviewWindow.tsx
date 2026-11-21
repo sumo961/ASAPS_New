@@ -15,7 +15,7 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, M
 import { Story, StoryEngine, Beat, BeatTypeRegistry, findSpeakerCharacter, findSpeakerCharacterId, speakerLabel } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, buildLoadingTranslationMap, type UIStringKey } from '@asaps/core';
-import { harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, ConversationHistoryPanel } from '@asaps/renderer';
+import { harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, sideInventoriesShownFromStart, ConversationHistoryPanel } from '@asaps/renderer';
 import type { ConversationLine } from '@asaps/core';
 import { ReactRenderer, getAudioManager, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, computeStageFitScale, type ScreenHudCharacter } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
@@ -2928,16 +2928,14 @@ export const PreviewWindow: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isRunning, isPaused, isWaitingToStart, story, startBeatId, startPreview, stopPreview, pausePreview, resumePreview]);
 
-  // Initialize inventory visibility based on player character's showOnDemand setting
+  // Inventories at a character's side start shown unless each is set to show
+  // on demand: the rule exported stories use (sideInventoriesShownFromStart).
   // This runs once when previewData is first loaded
   const initialInventorySetRef = useRef(false);
   useEffect(() => {
     if (previewData?.characters && !initialInventorySetRef.current) {
-      const playerChar = previewData.characters.find(c => c.role === 'player' && c.inventoryFrame);
-      if (playerChar?.inventoryFrame) {
-        const showByDefault = !playerChar.inventoryFrame.showOnDemand;
-        console.log(`[PreviewWindow] Setting initial inventory visibility: ${showByDefault} (showOnDemand=${playerChar.inventoryFrame.showOnDemand})`);
-        setInventoryVisible(showByDefault);
+      if (previewData.characters.some(c => c.inventoryFrame)) {
+        setInventoryVisible(sideInventoriesShownFromStart(previewData.characters as any));
         initialInventorySetRef.current = true;
       }
     }

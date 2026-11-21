@@ -33,6 +33,7 @@ import { CharacterMoodFrame } from './CharacterMoodFrame';
 import { CharacterMoodToken } from './CharacterMoodToken';
 import { DIM_TRANSITION, silentCharacterFilters } from '../utils/speakerDimming';
 import type { AnimationPath, Location } from '@asaps/core';
+import { detectDeviceClass } from '@asaps/core';
 import { getAnimationManager } from '../animation/AnimationEngine';
 import type { SpriteSheetData } from './PositionedBeatView';
 
@@ -558,13 +559,17 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
           if (!meters && !inventory && !mood) return null;
           const at = { characterPosition: { x, y }, characterDimensions: { width: visualW, height: visualH }, containerDimensions: stage.width && stage.height ? stage : undefined };
           const fontScale = huds.fontScale ?? 1;
+          // A stage of a phone's size, as the corner panels judge it. An
+          // exported responsive story has no enlarged font to go by, and its
+          // inventory stayed open across the replies on a phone.
+          const phoneStage = stage.width > 0 && stage.height > 0 && detectDeviceClass(stage.width, stage.height) === 'phone';
           return (
             <>
               {meters && meters.counters.length > 0 && (
                 <CharacterMeterFrame counters={meters.counters} config={meters.config} characterName={meters.characterName} characterColor={meters.characterColor} {...at} fontScale={fontScale} />
               )}
               {inventory && inventory.items.length > 0 && huds.inventoryVisible && (
-                <CharacterInventoryFrame items={inventory.items} config={inventory.config} {...at} isVisible={true} fontScale={fontScale} autoMinimize={fontScale > 1.0} />
+                <CharacterInventoryFrame items={inventory.items} config={inventory.config} {...at} isVisible={true} fontScale={fontScale} autoMinimize={fontScale > 1.0 || phoneStage} />
               )}
               {mood && mood.config.enabled && ((mood.config.displayStyle ?? 'token') === 'disc' ? (
                 <CharacterMoodFrame valence={mood.valence} arousal={mood.arousal} config={mood.config} palette={mood.palette} characterName={mood.characterName} characterPortraitUrl={mood.characterPortraitUrl} characterColor={mood.characterColor} {...at} />

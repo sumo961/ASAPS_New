@@ -63,6 +63,20 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<PlayerEngine | null>(null);
   const rendererRef = useRef<ReactRenderer | null>(null);
+
+  // Ctrl/Cmd+I shows or hides the inventories at the characters, as in the
+  // Preview. It takes effect with the next screen the story paints.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || (e.key !== 'i' && e.key !== 'I')) return;
+      const renderer = rendererRef.current as any;
+      if (!renderer?.setInventoryVisible) return;
+      e.preventDefault();
+      renderer.setInventoryVisible(!renderer.getInventoryVisible?.());
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
   const [state, setState] = useState<PlayerState>('splash');
   const [error, setError] = useState<string | null>(null);
   // The story stopped on a beat with no way on (not an End Screen): say so,

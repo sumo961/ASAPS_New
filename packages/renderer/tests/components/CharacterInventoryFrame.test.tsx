@@ -148,3 +148,42 @@ describe('folding on any screen', () => {
     expect(badge.style.top).toBe(top);
   });
 });
+
+describe('staying on the stage', () => {
+  it('leaves room for the whole frame above the stage\'s bottom edge', () => {
+    // A character standing on the bottom edge, the frame beside them.
+    const view = renderInv({
+      config: config({ dockMode: 'character', anchor: 'bottom-right', showLabels: false }),
+      characterPosition: { x: 300, y: 768 },
+      characterDimensions: { width: 200, height: 400 },
+      containerDimensions: { width: 1024, height: 768 },
+    });
+    const frame = view.container.querySelector('[data-hud-frame="inventory"]') as HTMLElement;
+    // As drawn: title line 18 + 4 + rule 1 + 6, one row of 48, padding 8 twice, border 1 twice.
+    const drawn = 18 + 4 + 1 + 6 + 48 + 16 + 2;
+    expect(frame.style.lineHeight || (frame.firstElementChild as HTMLElement).style.lineHeight).toBe('18px');
+    expect(parseFloat(frame.style.top) + drawn).toBeLessThanOrEqual(768);
+  });
+});
+
+describe('a stage that turns out to be phone-sized', () => {
+  it('folds once that is known', () => {
+    const view = renderInv({ config: config({ dockMode: 'character' }) });
+    expect(view.container.querySelector('[data-hud-frame="inventory"]')!.textContent).toContain('Brass Key');
+    view.rerender(
+      <CharacterInventoryFrame items={[item()]} config={config({ dockMode: 'character' })} characterPosition={{ x: 100, y: 100 }}
+        characterDimensions={{ width: 80, height: 120 }} containerDimensions={{ width: 390, height: 740 }} autoMinimize />,
+    );
+    expect(view.container.querySelector('[data-hud-frame="inventory"]')!.textContent).not.toContain('Brass Key');
+  });
+
+  it('stays open when the player opened it', () => {
+    const props = { items: [item()], config: config({ dockMode: 'character', anchor: 'top' }), characterPosition: { x: 100, y: 300 }, characterDimensions: { width: 80, height: 120 }, containerDimensions: { width: 390, height: 740 } };
+    const view = render(<CharacterInventoryFrame {...props} autoMinimize />);
+    fireEvent.click(view.container.querySelector('[data-hud-frame="inventory"]')!);
+    expect(view.container.textContent).toContain('Brass Key');
+    view.rerender(<CharacterInventoryFrame {...props} autoMinimize={false} />);
+    view.rerender(<CharacterInventoryFrame {...props} autoMinimize />);
+    expect(view.container.textContent).toContain('Brass Key');
+  });
+});

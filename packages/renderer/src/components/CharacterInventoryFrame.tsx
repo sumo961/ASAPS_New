@@ -411,10 +411,18 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
   const [minimized, setMinimizedState] = React.useState(() => autoMinimize || foldedFrames.has(foldKey));
   // The player can fold it on any screen (a full frame can cover the story,
   // speech bubbles included); phones start folded (autoMinimize).
+  const openedByHand = React.useRef(false);
   const setMinimized = (fold: boolean) => {
     if (fold) foldedFrames.add(foldKey); else foldedFrames.delete(foldKey);
+    openedByHand.current = !fold;
     setMinimizedState(fold);
   };
+  // The stage turned out to be phone-sized after the frame was first drawn
+  // (its size wasn't known yet, or the phone was turned): fold now, unless
+  // the player has opened the frame themselves.
+  React.useEffect(() => {
+    if (autoMinimize && !openedByHand.current) setMinimizedState(true);
+  }, [autoMinimize]);
 
   // Hide if no items or not visible
   if (items.length === 0 || !isVisible) {
@@ -437,14 +445,17 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
   });
 
   // Calculate frame dimensions based on content
-  const headerHeight = 24; // Height for "Inventory" title
+  // The title row as drawn: its line, 4px under it, the rule and 6px to the
+  // items. Counted short, the frame hung over the stage's bottom edge.
+  const headerLine = Math.round(18 * fontScale);
+  const headerHeight = headerLine + 11;
   const rows = Math.ceil(items.length / columns);
   const labelHeight = showLabels ? 14 : 0;
   const itemTotalHeight = itemSize + labelHeight;
   const frameContentWidth = columns * itemSize + (columns - 1) * itemSpacing;
   const frameContentHeight = rows * itemTotalHeight + (rows - 1) * itemSpacing;
   const frameWidth = frameContentWidth + style.padding * 2;
-  const frameHeight = frameContentHeight + style.padding * 2 + headerHeight;
+  const frameHeight = frameContentHeight + style.padding * 2 + headerHeight + style.borderWidth * 2;
 
   // Calculate position based on dock mode
   const rawPosition = dockMode === 'screen' && containerDimensions
@@ -560,6 +571,7 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
 
   const headerStyle: React.CSSProperties = {
     fontSize: Math.round(12 * fontScale),
+    lineHeight: `${headerLine}px`,
     fontWeight: 'bold',
     color: 'white',
     textAlign: 'center',

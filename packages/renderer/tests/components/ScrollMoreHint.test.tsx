@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, act, fireEvent } from '@testing-library/react';
 import { ScrollMoreHint } from '../../src/components/ScrollIndicator';
 
@@ -70,5 +70,66 @@ describe('the hint that a list scrolls', () => {
     const root = view.container.querySelector<HTMLElement>('[data-scroll-more]')!;
     expect(root.style.height).toBe('0px');
     expect(root.style.position).toBe('sticky');
+  });
+  it('looks again when an entry has finished easing in', () => {
+    // The list fitted when the hint first looked and grew afterwards, with
+    // nothing scrolled and the list's own box unchanged.
+    const view = render(
+      <div data-testid="list" style={{ overflowY: 'auto' }}>
+        <button>One</button>
+        <ScrollMoreHint />
+      </div>,
+    );
+    const list = view.getByTestId('list');
+    const hint = () => view.container.querySelector('[data-scroll-more]')!.getAttribute('data-scroll-more');
+    expect(hint()).toBe('no');
+    Object.defineProperty(list, 'scrollHeight', { configurable: true, get: () => 400 });
+    Object.defineProperty(list, 'clientHeight', { configurable: true, get: () => 200 });
+    act(() => { fireEvent.transitionEnd(view.getByText('One')); });
+    expect(hint()).toBe('yes');
+  });
+  it('looks again a frame after replies were made visible', async () => {
+    // In the instant they are shown again the replies still read as hidden.
+    const view = render(
+      <div data-testid="list" style={{ overflowY: 'auto' }}>
+        <button style={{ visibility: 'hidden' }}>One</button>
+        <ScrollMoreHint />
+      </div>,
+    );
+    const list = view.getByTestId('list');
+    Object.defineProperty(list, 'scrollHeight', { configurable: true, get: () => 400 });
+    Object.defineProperty(list, 'clientHeight', { configurable: true, get: () => 200 });
+    const hint = () => view.container.querySelector('[data-scroll-more]')!.getAttribute('data-scroll-more');
+    const button = view.getByText('One');
+    const real = window.getComputedStyle;
+    let late = false;
+    const spy = vi.spyOn(window, 'getComputedStyle').mockImplementation((el: Element, ...rest: any[]) => {
+      const cs = real.call(window, el, ...rest);
+      return el === button && !late ? new Proxy(cs, { get: (t, k) => (k === 'visibility' ? 'hidden' : (t as any)[k]) }) : cs;
+    });
+    await act(async () => { button.style.visibility = ''; await Promise.resolve(); });
+    expect(hint()).toBe('no');
+    late = true;
+    await act(async () => { await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))); await new Promise((r) => requestAnimationFrame(() => r(null))); });
+    expect(hint()).toBe('yes');
+    spy.mockRestore();
+  });
+  it('looks again when the stage shows replies it had kept back', async () => {
+    // The wait is an attribute on the stage's root; nothing in the list changes.
+    const view = render(
+      <div data-testid="stage" data-replies-wait="">
+        <div data-testid="list" style={{ overflowY: 'auto' }}>
+          <button>One</button>
+          <ScrollMoreHint />
+        </div>
+      </div>,
+    );
+    const list = view.getByTestId('list');
+    const hint = () => view.container.querySelector('[data-scroll-more]')!.getAttribute('data-scroll-more');
+    expect(hint()).toBe('no');
+    Object.defineProperty(list, 'scrollHeight', { configurable: true, get: () => 400 });
+    Object.defineProperty(list, 'clientHeight', { configurable: true, get: () => 200 });
+    await act(async () => { view.getByTestId('stage').removeAttribute('data-replies-wait'); await Promise.resolve(); });
+    expect(hint()).toBe('yes');
   });
 });

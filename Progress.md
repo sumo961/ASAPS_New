@@ -1,5 +1,42 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.161, 2026-11-22)
+
+### Overview
+The checks left open at v0.9.161, run on the released code, and what they turned up: the scroll hint stayed off when replies first appeared, an inventory at a character hung over the stage's edge, never showed in an exported story unless it was the player's own, and stayed open on a phone. Plus the User Guide corrections from the v0.9.161 audit.
+
+### Fixed: the scroll hint stayed off when the replies first appeared
+- On a phone in landscape the third reply was cut off 47 px below the edge and the ▾ hint was not there. It appeared only after something else made it look again (turning the device, scrolling).
+- Replies are kept back while the line is read, and while they may still go into a bubble, by a marker on the stage's root (`data-replies-wait`, `data-replies-as-buttons`). Nothing inside the list changes when they are shown, and the hint watched the list only. It now watches the stage above it too, looks again a frame after any change (replies just made visible still read as hidden in the instant of the change), and when an entry changes size or finishes easing in.
+- **Checked** in the Preview at Phone landscape, playing from the start: the ▾ is there when the replies appear, a tap scrolls to the last reply, and the hint goes at the end.
+- **Files:** `packages/renderer/src/components/ScrollIndicator.tsx`, test `tests/components/ScrollMoreHint.test.tsx`
+
+### Fixed: an inventory at a character
+- **It hung over the stage's bottom edge.** The frame's height was counted 7 px short (the title row is 29 px, not 24, and the border wasn't counted), so a frame beside a character standing on the bottom edge was cut off. Both layouts. The title row now has a set line height and the count matches what is drawn.
+- **It never showed in an exported story unless it was the player's.** Whether such inventories are on at the start was asked of the player's character only, in the Preview and in the player engine alike: another character's inventory stayed off in an export, with nothing to switch it on. One rule now (`sideInventoriesShownFromStart`): on, unless every inventory at a character is set to *Show on demand only*. Exported stories also get the Ctrl/Cmd+I shortcut the option's label promises (the Preview had it).
+- **It stayed open on a phone in an exported responsive story**, across the replies and the tokens. Folding went by the enlarged phone font, which only the Preview and fixed canvases have. In the responsive layout it now also folds on a phone-sized stage, by the test the corner panels use (`detectDeviceClass`), and folds when the stage turns out to be phone-sized after the first paint (not when the player has opened it).
+- **Checked** on the four-character story with an item given to an NPC: the frame ends at the stage's edge in the Preview (both layouts) and in the export; it shows from the start in the export; at 390×740 the export shows it as the folded badge.
+- **Files:** `packages/renderer/src/components/{CharacterInventoryFrame,ResponsiveCharacterLayer}.tsx`, `packages/renderer/src/utils/runtimeInventory.ts`, `packages/renderer/src/index.ts`, `packages/player/src/PlayerEngine.ts`, `packages/player-web/src/WebPlayer.tsx`, `packages/builder/src/pages/PreviewWindow.tsx`, tests `tests/components/CharacterInventoryFrame.test.tsx`, `tests/utils/runtimeInventory.test.ts`
+
+### Checked after v0.9.161 (the sweep and export not re-run after the last reply fix)
+- **Fixed canvas, Preview:** the four-character scene at Desktop, both tablets, both phones and Fit window, at each line and at the replies: nothing overlapping, nothing outside the stage; replies in their bubble.
+- **Responsive, Preview:** the same, plus each phone size played from the start (a phone never changes size mid-scene). Clean at Phone portrait. At Phone landscape a mood token is partly behind the Continue button and the third reply scrolls (now with its hint).
+- **Exports** of both layouts at 1130×690 (scale 0.9) and the responsive one at 390×740: clean. The replies stay buttons in the export where the Preview has a bubble: the language button takes the top-right corner there and the panels move down.
+- **The author's story (copy):** the replies of the first conversation are a bubble at the girl. The walk did not get past the Pick Prop beat to the wolf.
+- **Seen and left, for a decision:** the *current* line's bubble has no limit on covering another character's face (the reply bubble and the earlier line have one). In the exported responsive story at 390×740 it covered 46% of the neighbour's face at the replies step, while the three lines before used the text box. And the earlier line can be placed low, over the characters' bodies, when there is no room above (responsive, Tablet landscape).
+- **Seen and left:** switching the Preview's inventory button takes effect with the next screen, not at once.
+
+### User Guide
+- Mood HUD: says what a token and a disc are, adds the **Display** setting, and marks which settings belong to which.
+- Meter Frame: the Phone toggle's sentence now says the strip is for responsive stories; a fixed canvas keeps its cards.
+- Compact strip screenshot: captioned as a responsive story.
+- The scroll hint is described under Multi Choice too.
+- "Show lines as" split into sub-points (nothing dropped).
+- Character Inventory: when a panel is shown, and what *Show on demand only* does.
+- **Files:** `docs/USER_GUIDE.md`
+
+---
+
 ## 2026-11-21: The full-stage release: bubbles, tokens and panels on a crowded stage (v0.9.161)
 
 ### Overview

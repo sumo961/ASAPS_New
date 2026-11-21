@@ -1,7 +1,7 @@
 import { StoryEngine, Story, SerializedStoryState, ASMLParser, BeatTypeRegistry, findSpeakerCharacter, findSpeakerCharacterId } from '@asaps/core';
 import type { IRenderer, StoryMetadata, BeatConfig, ConversationLine, ConversationRecord } from '@asaps/core';
 import type { RenderThemeSettings } from '@asaps/renderer';
-import { toMeterCounterData, resolveMeterFrame, harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, getAudioManager } from '@asaps/renderer';
+import { toMeterCounterData, resolveMeterFrame, harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, sideInventoriesShownFromStart, getAudioManager } from '@asaps/renderer';
 import { AssetResolver } from './AssetResolver';
 import { fontFamilyFromAssetFilename, registerFontAsset } from './utils/customFonts';
 import { SaveSystem, SaveSlot, ISaveStorageAdapter } from './SaveSystem';
@@ -1136,14 +1136,11 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         };
       });
 
-      // Set initial inventory visibility based on player character's showOnDemand setting
-      const playerChar = characters.find((c: any) => c.role === 'player' && c.inventoryFrame);
-      if (playerChar?.inventoryFrame) {
-        const showByDefault = !playerChar.inventoryFrame.showOnDemand;
-        if ('setInventoryVisible' in renderer) {
-          renderer.setInventoryVisible(showByDefault);
-          console.log(`[PlayerEngine] Inventory visibility set to ${showByDefault} (showOnDemand=${playerChar.inventoryFrame.showOnDemand})`);
-        }
+      // Inventories at a character's side start shown unless each is set to
+      // show on demand: one rule with the Preview. This asked the player's
+      // character only, so another character's inventory never came up.
+      if (characters.some((c: any) => c.inventoryFrame) && 'setInventoryVisible' in renderer) {
+        renderer.setInventoryVisible(sideInventoriesShownFromStart(characters));
       }
     }
 

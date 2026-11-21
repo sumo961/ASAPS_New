@@ -33,7 +33,7 @@ export { applyBeatLook } from './utils/beatLook';
 export { framePictureStyle, framePicturePadding, usePictureSize, FRAME_BAND, type PictureSize } from './utils/framePicture';
 export { toMeterCounterData, resolveMeterFrame, completeMeterFrame, FALLBACK_METER_FRAME, type MeterCounterDef } from './utils/meterData';
 export { LEGACY_TEXT_LOCATION_NAME, TEXT_ALIAS_SLOT_NAMES, TEXT_ALIAS_BEAT_TYPES, isTextAliasSlot } from './utils/legacyTextAlias';
-export { harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, type RuntimeInventoryEntry } from './utils/runtimeInventory';
+export { harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, sideInventoriesShownFromStart, type RuntimeInventoryEntry } from './utils/runtimeInventory';
 export { HudExplanationLayer, DEFAULT_HUD_CAPTIONS, type HudExplanationLayerProps } from './components/HudExplanationLayer';
 // Screen-docked HUD assembly — one authority for what exists, where it packs,
 // and what it draws, shared by both players and the Visual Editor.

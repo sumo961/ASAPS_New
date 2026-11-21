@@ -88,6 +88,9 @@ export const ScrollBadge: React.FC<{ visible: boolean; fontScale?: number }> = (
   );
 };
 
+/** Set on the stage's root while replies wait or stay buttons (SpeechBubbleLayer, ReplyBubbleLayer). */
+const STAGE_REPLY_ATTRS = ['data-replies-wait', 'data-replies-as-buttons', 'style', 'class'];
+
 /**
  * "There is more below", for a list that scrolls inside the stage (the
  * player's replies on a phone). Put it last inside the scrolling element: it
@@ -122,18 +125,52 @@ export const ScrollMoreHint: React.FC = () => {
       setMore(shown && left > 6 && (!measured || cut > 2));
     };
     check();
+    // Now, and again once it has been drawn: replies that have just been
+    // made visible still read as hidden in the instant of the change (their
+    // own easing starts from "hidden"), and the hint stayed off for good.
+    let frame = 0;
+    const settled = () => {
+      check();
+      if (typeof requestAnimationFrame !== 'function') return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => { frame = requestAnimationFrame(check); });
+    };
     scroller.addEventListener('scroll', check, { passive: true });
     const resize = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(check) : null;
-    resize?.observe(scroller);
+    // The list and each of its entries: a reply that grows after it arrived
+    // (its words wrapping once the stage has settled) makes the list longer
+    // without the list's own box changing, and the hint stayed off.
+    const watch = () => {
+      if (!resize) return;
+      resize.disconnect();
+      resize.observe(scroller);
+      Array.from(scroller.children).forEach((el) => { if (el !== ref.current) resize.observe(el); });
+    };
+    watch();
     // Replies arriving, a reply wrapping onto another line.
     const changes = typeof MutationObserver !== 'undefined' ? new MutationObserver((records) => {
-      if (records.some((r) => !ref.current?.contains(r.target))) check();
+      if (records.some((r) => r.type === 'childList' && r.target === scroller)) watch();
+      if (records.some((r) => !ref.current?.contains(r.target))) settled();
     }) : null;
     changes?.observe(scroller, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['style'] });
+    // Replies kept back while the line is read, or while they stand in a
+    // bubble, are hidden from the stage's root: nothing inside the list
+    // changes when they are shown, and the hint never looked again.
+    const shownAgain = typeof MutationObserver !== 'undefined' ? new MutationObserver(settled) : null;
+    for (let up = scroller.parentElement; up; up = up.parentElement) {
+      shownAgain?.observe(up, { attributes: true, attributeFilter: STAGE_REPLY_ATTRS });
+    }
+    // Entries easing in, or the stage easing to another size.
+    scroller.addEventListener('transitionend', check);
+    scroller.addEventListener('animationend', check);
     return () => {
       scroller.removeEventListener('scroll', check);
+      scroller.removeEventListener('transitionend', check);
+      scroller.removeEventListener('animationend', check);
       resize?.disconnect();
       changes?.disconnect();
+      shownAgain?.disconnect();
+      if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame);
     };
   }, []);
   const onward = (e: React.MouseEvent) => {
