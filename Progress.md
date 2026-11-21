@@ -1,9 +1,9 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.159, 2026-11-21)
+## 2026-11-21: The full-stage release: bubbles, tokens and panels on a crowded stage (v0.9.160)
 
 ### Overview
-The checks left open at the v0.9.159 release, done afterwards: the device-preset sweep in both layout modes and an exported copy at two window sizes, on a throwaway story with four characters across the stage, mood tokens at their feet, corner panels and up to four long replies. The sweep found four faults in where bubbles go on a full stage, fixed here. The User Guide follow-ups from the release audit are done too.
+A stage full of characters now sorts itself out. Speech bubbles keep clear of mood tokens; the player's replies stay buttons rather than cover a face, and an earlier line is left out rather than put over one; bubbles look again when the stage has come to rest. Mood tokens, meters and inventories set to sit at a character show in the responsive layout too, and a token moves off the story's buttons. On a phone a list of replies that scrolls says so. The Preview shows a fixed canvas's corner panels where an exported story shows them. All of it came out of the checks left open at v0.9.159, done afterwards: the device-preset sweep in both layout modes and an exported copy at two window sizes, on a throwaway story with four characters across the stage, mood tokens at their feet, corner panels and up to four long replies. The User Guide follow-ups from that release's audit are done too.
 
 ### Fixed: bubbles on a full stage
 - **Bubbles keep clear of mood tokens.** A token at a character was no obstacle to a bubble: the reply bubble, low on the stage, covered the token at a character's feet. Tokens now count like the corner panels (`hudFramesOver`).
@@ -35,7 +35,12 @@ The checks left open at the v0.9.159 release, done afterwards: the device-preset
 - On Phone portrait and landscape the spoken line and the replies each sit in their own scrolling pane when they don't fit. Measured on two dialog scenes (three and four long replies): every reply can be scrolled fully into view and is the element under its own middle there; the last reply, reached by scrolling, was picked and the story moved on; the line's text is fully readable by scrolling its pane (in landscape 39–45% of it shows at once). Nothing is unreachable.
 - **Seen and left:** in landscape (360 high) the two panes are 142 and 218 high, which is cramped with long text. (The missing scroll hint seen here is added above.)
 
+### Release checks (v0.9.160)
+- The Last Ferry played to an ending in the Preview on the final build, with no bubble, panel or button overlapping. Exported (one file, AI and reading aloud off) and played to an ending at 1130×690 and at a phone's 740×360: nothing outside the window. The device-preset sweep is the one described above, run on the final build in both layout modes. Suites green: builder 3,334, core 3,241 (78 skipped), renderer 838, player 10; lint without errors.
+- The playable example on `gh-pages` is re-exported from this build.
+
 ### User Guide
+- The new behaviour is described where the guide already covers it: bubbles and mood tokens, replies that stay buttons rather than cover a face, the earlier line left out, HUDs at a character in both layouts, the token and the story's buttons, the scroll hint on a phone, and the Preview's corner panels on a fixed canvas.
 - Screenshots retaken: "This beat's look" (with the Spoken lines, Bubble width, Replies and Reply width rows) and the Dialog Tree's "Show as" (with the badges on the replies); captions rewritten to match.
 - HTML Export no longer opens with "a single standalone HTML file": it names both formats and says what the folder format needs.
 - The glossary's speech entries use the provider names the app shows.

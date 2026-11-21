@@ -5,7 +5,7 @@ for detailed release notes (including file-level changes and the *why* behind
 decisions) see [`Progress.md`](Progress.md). For the latest published build,
 visit the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
 
-Current release: **v0.9.159**. This is a **beta**: core functionality works,
+Current release: **v0.9.160**. This is a **beta**: core functionality works,
 and new releases arrive often. The release summaries below cover v0.9.88
 onward, newest first. Below them are an archived feature table and deep-dives
 for the releases up to v0.9.89. Detailed notes for every release are in
@@ -16,6 +16,8 @@ for the releases up to v0.9.89. Detailed notes for every release are in
 One paragraph per release, as it appeared on the project's front page. The
 latest release is described in the [README](README.md); when a new version
 comes out, its predecessor's paragraph moves to the top of this list.
+
+**v0.9.159 was the read-aloud release**: it makes stories speak. Reading aloud and voice input now work in exported stories and in languages other than English, and each character keeps their voice in a translation. With an OpenAI key, lines are read by a live voice that starts speaking while the line is still arriving; a speech server that fails falls back to the browser's voice instead of silence. The export window shows which speech a story is exported with and never includes a speech key unless you choose it. In the Visual Editor every reply of a Dialog Tree carries a badge that says where it leads ("Step in →", the next beat's name, or a warning when it leads nowhere), speech bubbles can be selected and made wider or narrower, and lines, replies, names and panels appear in the language you chose. The player's replies can be listed in one bubble even when the player's character is never shown, and bubbles keep clear of buttons, panels and the other characters' faces. A character's mood token can sit at their feet, where bubbles don't go, and can stay a small coloured square until the player clicks it. Every field now has a hint in plain words.
 
 **v0.9.158 was the tidy-up release**, made after walking through the app as a new user. Project Settings has seven tabs grouped by what a setting does. Roles are set up in the Characters window. A new **Story Data** window lists the story's variables and counters with the beats that set, test and show each one. 268 field hints are rewritten in plain words, beat types are named as in the palette, and "Learn more" links open the User Guide at the right section. The flowchart marks where the story starts, a welcome card greets first-time users, and the toolbar is calmer. The HTML export starts at the title screen unless you set another start.
 
