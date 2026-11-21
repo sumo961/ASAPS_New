@@ -198,7 +198,8 @@ export interface Character {
 export interface MoodFrameConfig {
   enabled: boolean;
   dockMode: MeterFrameDockMode;
-  anchor: MeterFrameAnchor;
+  /** 'base': on the character, at the foot of their picture (clear of speech bubbles). */
+  anchor: MeterFrameAnchor | 'base';
   screenPosition: MeterFrameScreenPosition;
   offset: { x: number; y: number };
   /** Pixel size of the disc inside the HUD card. The card itself adds
@@ -225,6 +226,8 @@ export interface MoodFrameConfig {
    * Russell's-circumplex card (precise, but the old hard-to-read HUD).
    */
   displayStyle?: 'token' | 'disc';
+  /** Token style: the name and mood word always shown (default), or only after a click on the token. */
+  labelMode?: 'always' | 'onClick';
 }
 
 export const DEFAULT_MOOD_FRAME_CONFIG: MoodFrameConfig = {

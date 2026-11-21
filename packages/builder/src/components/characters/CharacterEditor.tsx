@@ -87,6 +87,8 @@ interface CharacterEditorProps {
    *  preview so screen-docked character frames are shown flowing clear of the
    *  global chrome. */
   hudOverlays?: HudOverlaySettings;
+  /** The story shows lines as speech bubbles (Project Settings ▸ Dialogue). */
+  bubbleLines?: boolean;
   /** The rest of the cast. A counter bound to a sentiment needs someone to
    *  point at, and may show a *different* character's feeling — the
    *  player-facing "do they trust me?" meter. */
@@ -102,6 +104,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   emotionPalette,
   focusVariantId,
   hudOverlays,
+  bubbleLines,
   allCharacters = [],
 }) => {
   const [activeTab, setActiveTab] = useState<'basic' | 'visual' | 'states' | 'counters' | 'inventory' | 'affect' | 'translations'>(focusVariantId ? 'affect' : 'basic');
@@ -3197,7 +3200,12 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                 <input
                   type="checkbox"
                   checked={!!mf.enabled}
-                  onChange={(e) => updateMoodFrame({ enabled: e.target.checked })}
+                  onChange={(e) => updateMoodFrame({
+                    enabled: e.target.checked,
+                    // Switched on for the first time in a story with speech
+                    // bubbles: at the character's feet, where bubbles don't go.
+                    ...(e.target.checked && !editedCharacter.moodFrame && bubbleLines ? { anchor: 'base' as const } : {}),
+                  })}
                 />
                 Enable HUD pad
               </label>
@@ -3234,6 +3242,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                         onChange={(e) => updateMoodFrame({ anchor: e.target.value as any })}
                         className="border rounded px-2 py-1"
                       >
+                        <option value="base">at their feet (clear of speech bubbles)</option>
                         {['top','bottom','left','right','top-left','top-right','bottom-left','bottom-right'].map((a) => (
                           <option key={a} value={a}>{a}</option>
                         ))}
@@ -3250,6 +3259,21 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                         {['screen-top-left','screen-top-right','screen-bottom-left','screen-bottom-right'].map((a) => (
                           <option key={a} value={a}>{a.replace('screen-','')}</option>
                         ))}
+                      </select>
+                    </div>
+                  )}
+                  {(mf.displayStyle ?? 'token') === 'token' && (
+                    <div className="flex items-center gap-2">
+                      <label className="w-24 text-gray-600">Name and mood:</label>
+                      <select
+                        value={mf.labelMode ?? 'always'}
+                        onChange={(e) => updateMoodFrame({ labelMode: e.target.value as 'always' | 'onClick' })}
+                        className="border rounded px-2 py-1"
+                        title="Always shown: the token carries the character's name and a mood word. Shown on click: only the coloured square (with the character's initial or portrait when it is away from them) until the player clicks it. Smaller, but the mood word is the part players can read without learning the colours."
+                        data-testid="mood-label-mode"
+                      >
+                        <option value="always">Always shown</option>
+                        <option value="onClick">Shown on click</option>
                       </select>
                     </div>
                   )}

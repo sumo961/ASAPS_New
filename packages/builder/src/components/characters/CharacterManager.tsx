@@ -82,6 +82,7 @@ interface CharacterManagerProps {
    *  preview so screen-docked frames are shown flowing clear of the
    *  timer / countdown chrome configured in General Settings. */
   hudOverlays?: HudOverlaySettings;
+  bubbleLines?: boolean;
   /** The project's items (the Items tab). Without onItemsChange there is no Items tab. */
   items?: ItemDefinition[];
   onItemsChange?: (items: ItemDefinition[]) => void;
@@ -103,6 +104,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   onEmotionPaletteChange,
   onGenerateWithAI,
   hudOverlays,
+  bubbleLines,
   items = [],
   onItemsChange,
   roles = [],
@@ -863,6 +865,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
           emotionPalette={emotionPalette}
           focusVariantId={focusVariantId || undefined}
           hudOverlays={hudOverlays}
+          bubbleLines={bubbleLines}
           allCharacters={characters}
         />
       )}

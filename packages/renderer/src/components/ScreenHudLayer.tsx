@@ -200,6 +200,7 @@ export function buildScreenHudLayout(input: ScreenHudLayoutInput): ScreenHudLayo
           characterPortraitUrl: c.portraitUrl,
           characterColor: c.color,
           showLabel: mf.showQualitativeLabel !== false,
+          collapsible: mf.labelMode === 'onClick',
         });
       }
     }

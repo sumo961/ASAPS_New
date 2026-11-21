@@ -23,7 +23,9 @@ import { moodLabel } from '../utils/moodWords';
 export type MoodFrameDockMode = 'character' | 'screen';
 export type MoodFrameAnchor =
   | 'top' | 'bottom' | 'left' | 'right'
-  | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  /** On the character, at the foot of their picture: clear of speech bubbles, which go above heads. */
+  | 'base';
 export type MoodFrameScreenPosition =
   | 'screen-top-left' | 'screen-top-right'
   | 'screen-bottom-left' | 'screen-bottom-right';
@@ -57,6 +59,12 @@ export interface MoodFrameConfig {
    * full Russell's-circumplex card (precise, but the old hard-to-read HUD).
    */
   displayStyle?: 'token' | 'disc';
+  /**
+   * Token style: whether the name and the mood word are always shown
+   * (default) or only after a click on the token, which then is as small as
+   * its coloured square.
+   */
+  labelMode?: 'always' | 'onClick';
 }
 
 export const DEFAULT_MOOD_FRAME_CONFIG: MoodFrameConfig = {
@@ -106,6 +114,9 @@ export interface CharacterMoodFrameProps {
 // Positioning math — mirrors CharacterMeterFrame.
 // ---------------------------------------------------------------------------
 
+/** How far above the foot of the character's picture a panel docked at their base sits. */
+const BASE_INSET = 8;
+
 export function calculateCharacterAnchorPosition(
   anchor: MoodFrameAnchor,
   charPos: { x: number; y: number },
@@ -127,6 +138,7 @@ export function calculateCharacterAnchorPosition(
     case 'top-right': x = charPos.x + charDims.width; y = charPos.y - cardHeight; break;
     case 'bottom-left': x = charPos.x - cardWidth; y = charPos.y + charDims.height; break;
     case 'bottom-right': x = charPos.x + charDims.width; y = charPos.y + charDims.height; break;
+    case 'base': x = cx - cardWidth / 2; y = charPos.y + charDims.height - cardHeight - BASE_INSET; break;
   }
   return { x: x + offset.x, y: y + offset.y };
 }

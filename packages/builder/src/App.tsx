@@ -7639,6 +7639,7 @@ function App() {
                 onEmotionPaletteChange={setEmotionPalette}
                 onGenerateWithAI={aiOn ? () => setDevelopCharSession({ seed: {}, askFirst: true }) : undefined}
                 hudOverlays={(globalSettings as any).hudOverlays}
+                bubbleLines={(globalSettings as any).speakerDisplay?.lineStyle === 'bubble'}
                 items={globalSettings.items || []}
                 onItemsChange={handleProjectItemsChange}
                 roles={globalSettings.roles || []}

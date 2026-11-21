@@ -139,30 +139,65 @@ interface MoodChipProps {
   characterColor?: string;
   showLabel: boolean;
   backgroundOpacity: number;
+  /** The token sits on its own character: who it belongs to needs no saying. */
+  own?: boolean;
+  /** Name and mood word only after a click (MoodFrameConfig.labelMode 'onClick'). */
+  collapsible?: boolean;
+  /** It opened or closed, and so changed size. */
+  onResize?: () => void;
+}
+
+/**
+ * What a chip shows. Never the initial (or portrait) and the name together:
+ * the mark stands for the name while the name is not shown.
+ *  - open: the coloured square, the name (unless the chip sits on its own
+ *    character and is always open) and the mood word;
+ *  - closed (collapsible, before a click): the square, and the mark when the
+ *    chip is away from its character.
+ */
+export function chipParts(opts: { hasName: boolean; showLabel: boolean; own: boolean; collapsible: boolean; open: boolean }): { mark: boolean; name: boolean; word: boolean } {
+  const name = opts.open && opts.hasName && (!opts.own || opts.collapsible);
+  return { name, word: opts.open && opts.showLabel, mark: opts.hasName && !name && !opts.own };
 }
 
 const MoodChip: React.FC<MoodChipProps> = ({
   valence, arousal, tokenSize, fontScale,
   characterName, characterPortraitUrl, characterColor, showLabel, backgroundOpacity,
+  own = false, collapsible = false, onResize,
 }) => {
+  const [opened, setOpened] = React.useState(false);
+  const open = !collapsible || opened;
+  const resized = React.useRef(onResize);
+  resized.current = onResize;
+  React.useLayoutEffect(() => { resized.current?.(); }, [open]);
+  const parts = chipParts({ hasName: !!characterName, showLabel, own, collapsible, open });
+  const word = moodLabel(moodWord(valence, arousal));
   const accent = characterColor || '#6a5be0';
   const avatarSize = Math.round(tokenSize * 0.9);
   const nameSize = Math.round(11 * fontScale);
   const wordSize = Math.round(10 * fontScale);
-  return (
-    <div style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: Math.round(7 * fontScale),
-      padding: `${Math.round(4 * fontScale)}px ${Math.round(10 * fontScale)}px ${Math.round(4 * fontScale)}px ${Math.round(4 * fontScale)}px`,
-      background: `rgba(15,18,28,${0.62 * backgroundOpacity})`,
-      border: '1px solid rgba(255,255,255,0.12)',
-      borderRadius: 999,
-      color: '#eef2f9',
-      backdropFilter: 'blur(6px)',
-      WebkitBackdropFilter: 'blur(6px)',
-    }}>
-      {characterName && (
+  const labelled = parts.name || parts.word;
+  const pad = Math.round(4 * fontScale);
+  const chipStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: Math.round(7 * fontScale),
+    padding: `${pad}px ${labelled ? Math.round(10 * fontScale) : pad}px ${pad}px ${pad}px`,
+    background: `rgba(15,18,28,${0.62 * backgroundOpacity})`,
+    border: '1px solid rgba(255,255,255,0.12)',
+    borderRadius: 999,
+    color: '#eef2f9',
+    backdropFilter: 'blur(6px)',
+    WebkitBackdropFilter: 'blur(6px)',
+    font: 'inherit',
+    margin: 0,
+  };
+  // A click opens and closes it, and is the token's own: it must not also
+  // count as a click on the stage (which continues a line).
+  const mine = (e: React.SyntheticEvent) => e.stopPropagation();
+  const inside = (
+    <>
+      {parts.mark && characterName && (
         characterPortraitUrl ? (
           <img src={characterPortraitUrl} alt={characterName}
             style={{ width: avatarSize, height: avatarSize, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `1px solid ${accent}` }} />
@@ -175,21 +210,35 @@ const MoodChip: React.FC<MoodChipProps> = ({
         )
       )}
       <MoodToken valence={valence} arousal={arousal} size={tokenSize} />
-      {(characterName || showLabel) && (
-        <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}>
-          {characterName && (
+      {labelled && (
+        <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0, textAlign: 'start' }}>
+          {parts.name && (
             <b style={{ fontSize: nameSize, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>
               {characterName}
             </b>
           )}
-          {showLabel && (
+          {parts.word && (
             <span style={{ fontSize: wordSize, color: 'rgba(255,255,255,0.62)', fontFamily: 'ui-monospace, Menlo, monospace' }}>
-              {moodLabel(moodWord(valence, arousal))}
+              {word}
             </span>
           )}
         </span>
       )}
-    </div>
+    </>
+  );
+  return collapsible ? (
+    <button
+      type="button"
+      data-mood-chip={open ? 'open' : 'closed'}
+      aria-expanded={open}
+      aria-label={[characterName, word].filter(Boolean).join(', ')}
+      title={open ? undefined : [characterName, word].filter(Boolean).join(' · ')}
+      onClick={(e) => { e.stopPropagation(); setOpened((o) => !o); }}
+      onMouseDown={mine} onPointerDown={mine} onTouchStart={mine}
+      style={{ ...chipStyle, cursor: 'pointer', pointerEvents: 'auto' }}
+    >{inside}</button>
+  ) : (
+    <div data-mood-chip="open" style={chipStyle}>{inside}</div>
   );
 };
 
@@ -212,14 +261,58 @@ export interface CharacterMoodTokenProps {
 }
 
 /** Estimated chip footprint for anchor math (rough but keeps it on-screen). */
-function chipFootprint(tokenSize: number, hasName: boolean, showLabel: boolean, fontScale: number) {
+function chipFootprint(tokenSize: number, parts: { mark: boolean; name: boolean; word: boolean }, fontScale: number) {
   const h = Math.round(tokenSize + 8 * fontScale);
+  const labelled = parts.name || parts.word;
   const w = Math.round(
-    tokenSize + 20 * fontScale +
-    (hasName ? tokenSize * 0.9 + 8 : 0) +
-    (hasName || showLabel ? 96 * fontScale : 0),
+    tokenSize + (labelled ? 20 : 10) * fontScale +
+    (parts.mark ? tokenSize * 0.9 + 8 : 0) +
+    (parts.name ? 96 * fontScale : parts.word ? 70 * fontScale : 0),
   );
   return { w, h };
+}
+
+/** The character-docked tokens now drawn, so they can make room for one another. */
+const onStage = new Set<{ el: React.RefObject<HTMLDivElement | null>; settle: () => void }>();
+function settleAll(): void {
+  const live = Array.from(onStage).filter((t) => t.el.current);
+  live.sort((a, b) => (a.el.current!.compareDocumentPosition(b.el.current!) & 4 ? -1 : 1));
+  for (const t of live) t.settle();
+}
+
+/** Anchors that put the token on its own character's axis: above, below, or at their feet. */
+const ON_OWN_CHARACTER = new Set<MoodFrameAnchor>(['base', 'top', 'bottom']);
+
+interface Box { left: number; top: number; right: number; bottom: number }
+const crosses = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+
+/**
+ * How far to move a token so it stands clear of the tokens placed before
+ * it: straight up, or down where there is no room above. Characters who
+ * stand close together would otherwise have their tokens on top of one
+ * another. `mine` and `others` in the same coordinates as `stage`.
+ */
+export function stepAside(mine: Box, others: ReadonlyArray<Box>, stage: Box, gap = 4): number {
+  const h = mine.bottom - mine.top;
+  const { left, right } = mine;
+  const hitAt = (dy: number) => others.find((o) => crosses({ left, right, top: mine.top + dy, bottom: mine.bottom + dy }, o));
+  if (!hitAt(0)) return 0;
+  // All the way one way, past whatever else is there.
+  const go = (up: boolean): number | null => {
+    let dy = 0;
+    for (let pass = 0; pass <= others.length; pass++) {
+      const hit = hitAt(dy);
+      if (!hit) return dy;
+      dy = up ? hit.top - gap - h - mine.top : hit.bottom + gap - mine.top;
+      if (up ? mine.top + dy < stage.top : mine.bottom + dy > stage.bottom) return null;
+    }
+    return null;
+  };
+  const above = go(true);
+  const below = go(false);
+  // The shorter way, so it stays near its character; up when it is a tie.
+  if (above === null || below === null) return above ?? below ?? 0;
+  return -above <= below ? above : below;
 }
 
 export const CharacterMoodToken: React.FC<CharacterMoodTokenProps> = ({
@@ -233,7 +326,60 @@ export const CharacterMoodToken: React.FC<CharacterMoodTokenProps> = ({
   const tokenSize = Math.max(20, Math.round(Math.min(config.size || 140, 88) * 0.34 * fontScale));
   const showLabel = config.showQualitativeLabel !== false;
   const hasName = !!characterName;
-  const { w, h } = chipFootprint(tokenSize, hasName, showLabel, fontScale);
+  const own = config.dockMode !== 'screen' && ON_OWN_CHARACTER.has(config.anchor);
+  const collapsible = config.labelMode === 'onClick';
+  // Placed by its size when closed (or always open): opening it grows it to the right.
+  const { w, h } = chipFootprint(tokenSize, chipParts({ hasName, showLabel, own, collapsible, open: !collapsible }), fontScale);
+  const ref = React.useRef<HTMLDivElement>(null);
+  // Clear of the tokens before it on this stage (see stepAside).
+  const settle = React.useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.transform = '';
+    // Each token is drawn inside its own character's element: the stage is
+    // the first thing around this one that holds other tokens too.
+    let host: HTMLElement | null = el.parentElement;
+    while (host && host !== host.ownerDocument.body && host.querySelectorAll('[data-mood-token]').length < 2) host = host.parentElement;
+    // A plain box: a DOMRect's sides are not its own properties, so a copy of one ({...rect}) is empty.
+    const chipOf = (t: HTMLElement): Box & { width: number } => {
+      const r = (t.firstElementChild ?? t).getBoundingClientRect();
+      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width };
+    };
+    const box = chipOf(el);
+    if (!host || host === host.ownerDocument.body || box.width <= 0) return;
+    const before: Box[] = [];
+    for (const other of Array.from(host.querySelectorAll<HTMLElement>('[data-mood-token]'))) {
+      if (other === el) break;
+      before.push(chipOf(other));
+    }
+    if (before.length === 0) return;
+    // Not under a meter, an inventory or a mood panel on the way either
+    // (those are drawn over the stage, some from outside it).
+    host.ownerDocument.querySelectorAll<HTMLElement>('[data-hud-frame]').forEach((panel) => {
+      const r = panel.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) before.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+    });
+    const scale = el.offsetWidth > 0 ? el.getBoundingClientRect().width / el.offsetWidth || 1 : 1;
+    const dy = stepAside(box, before, host.getBoundingClientRect(), 4 * scale);
+    if (dy) el.style.transform = `translateY(${dy / scale}px)`;
+  }, []);
+  const docked = config.dockMode !== 'screen';
+  // Tokens come and go one by one (each appears when its character is met),
+  // and one that opens grows: whenever that happens, all of them look again,
+  // first to last, so each sees where the ones before it ended up.
+  React.useLayoutEffect(() => {
+    if (!docked) return;
+    const entry = { el: ref, settle };
+    onStage.add(entry);
+    settleAll();
+    // A stage drawn before it has a size (or scaled later) gives no
+    // measurements at first: look again once this token has its size.
+    const chip = ref.current?.firstElementChild;
+    const sized = chip && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => settleAll()) : null;
+    if (chip) sized?.observe(chip);
+    return () => { sized?.disconnect(); onStage.delete(entry); settleAll(); };
+  }, [docked, settle]);
+  React.useLayoutEffect(() => { if (docked) settleAll(); }, [docked, config.anchor, characterPosition.x, characterPosition.y, characterDimensions.width, characterDimensions.height, w, h]);
 
   let pos = config.dockMode === 'screen' && containerDimensions
     ? calculateScreenPosition(config.screenPosition, containerDimensions, config.offset, w, h)
@@ -261,12 +407,13 @@ export const CharacterMoodToken: React.FC<CharacterMoodTokenProps> = ({
   }
 
   return (
-    <div style={{ position: 'absolute', left: pos.x, top: pos.y, pointerEvents: 'none', zIndex: 50 }}>
+    <div ref={ref} data-mood-token={characterName || ''} style={{ position: 'absolute', left: pos.x, top: pos.y, pointerEvents: 'none', zIndex: 50 }}>
       <MoodChip
         valence={valence} arousal={arousal} tokenSize={tokenSize} fontScale={fontScale}
         characterName={characterName} characterPortraitUrl={characterPortraitUrl}
         characterColor={characterColor} showLabel={showLabel}
         backgroundOpacity={config.backgroundOpacity ?? 0.95}
+        own={own} collapsible={collapsible} onResize={docked ? settleAll : undefined}
       />
     </div>
   );
@@ -284,6 +431,8 @@ export interface MoodRailEntry {
   characterPortraitUrl?: string;
   characterColor?: string;
   showLabel: boolean;
+  /** Name and mood word only after a click. */
+  collapsible?: boolean;
 }
 
 export interface MoodRailProps {
@@ -329,7 +478,7 @@ export const MoodRail: React.FC<MoodRailProps> = ({
           valence={e.valence} arousal={e.arousal} tokenSize={tokenSize} fontScale={fontScale}
           characterName={e.characterName} characterPortraitUrl={e.characterPortraitUrl}
           characterColor={e.characterColor} showLabel={e.showLabel}
-          backgroundOpacity={backgroundOpacity}
+          backgroundOpacity={backgroundOpacity} collapsible={e.collapsible}
         />
       ))}
     </div>
