@@ -45,6 +45,8 @@ const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, '');
  */
 /** On the stage root while the replies could not be put in a bubble and stay buttons (the line's bubble then keeps clear of them). */
 export const REPLIES_AS_BUTTONS_ATTR = 'data-replies-as-buttons';
+/** After this many misses the same replies at the same size stay buttons. */
+const MAX_MISSES = 4;
 const HIDDEN: Record<string, string> = { transition: 'none', visibility: 'hidden' };
 /** In the Visual Editor: nothing drawn, but still laid out where the editor can find it. */
 const GHOST: Record<string, string> = {
@@ -123,7 +125,7 @@ const ReplyBubbleLayer: React.FC<{
   }, []);
 
   /** The replies and stage size for which these replies turned out to be no bubble. */
-  const asButtonsRef = React.useRef<string | null>(null);
+  const triesRef = React.useRef<{ key: string; misses: number }>({ key: '', misses: 0 });
 
   const conceal = React.useCallback((buttons: HTMLElement[]) => {
     const look = editorMode ? GHOST : HIDDEN;
@@ -170,16 +172,22 @@ const ReplyBubbleLayer: React.FC<{
     if (!buttons || buttons.length === 0) return fail();
     // From here on a failure means these replies are no bubble on this stage
     // (too big for one, nowhere to put it). The line's bubble is told, so it
-    // keeps clear of the buttons, which stay. Once said it holds for these
-    // replies at this size: the line moving aside must not start a to-and-fro.
+    // keeps clear of the buttons, which stay. After a few misses it holds for
+    // these replies at this size: the line moving aside must not start a
+    // to-and-fro.
     const attempt = `${repliesKey}|${stageW}x${stageH}|${theme.speakerDisplay?.replyBubbleWidth ?? ''}|${theme.fonts?.textFontSize ?? ''}`;
+    // Not on the first miss: the stage may still be settling (the line's
+    // bubble finding its place, buttons sliding in).
+    if (triesRef.current.key !== attempt) triesRef.current = { key: attempt, misses: 0 };
     const staysButtons = () => {
-      asButtonsRef.current = attempt;
+      triesRef.current.misses += 1;
       if (!root.hasAttribute(REPLIES_AS_BUTTONS_ATTR)) root.setAttribute(REPLIES_AS_BUTTONS_ATTR, '');
       fail();
     };
-    if (asButtonsRef.current === attempt) return staysButtons();
-    asButtonsRef.current = null;
+    if (triesRef.current.misses >= MAX_MISSES) {
+      if (!root.hasAttribute(REPLIES_AS_BUTTONS_ATTR)) root.setAttribute(REPLIES_AS_BUTTONS_ATTR, '');
+      return fail();
+    }
 
     // The lettering of the spoken lines (their text box), so the player's
     // replies read like the rest of the conversation.

@@ -317,7 +317,7 @@ export function placeSpeechBubble(opts: {
     return { x: mouth.x - fw / 2, y: mouth.y - fh * 0.8, width: fw, height: fh * 2 };
   })() : null;
 
-  type Candidate = { cx: number; cy: number; below?: boolean };
+  type Candidate = { cx: number; cy: number; below?: boolean; moved?: boolean };
   const candidates: Candidate[] = [];
   for (const lift of [tail, tail * 1.8]) {
     for (const k of [-0.6, -0.35, 0, 0.35, 0.6]) {
@@ -341,16 +341,23 @@ export function placeSpeechBubble(opts: {
 
   // Does the oval itself reach into something the player needs to see or
   // press (a button, a panel)? Its box may: an oval leaves its corners free.
-  // A few pixels at the rim don't count. A box reaches as far as its box.
+  // A few pixels at the rim don't count. A box (the player's replies)
+  // reaches as far as its box.
   const reachesInto = (cx: number, cy: number, o: BubbleRect): boolean => {
-    if (opts.shape === 'box') return false;
+    if (opts.shape === 'box') {
+      const rim = 6;
+      return overlap({ x: cx - rx + rim, y: cy - ry + rim, width: Math.max(0, w - 2 * rim), height: Math.max(0, h - 2 * rim) }, o) > 0;
+    }
     const px = Math.min(o.x + o.width, Math.max(o.x, cx));
     const py = Math.min(o.y + o.height, Math.max(o.y, cy));
     return ((px - cx) / rx) ** 2 + ((py - cy) / ry) ** 2 < OVAL_CLEAR * OVAL_CLEAR;
   };
 
   let best: { score: number; rect: BubbleRect; heavy: number; into: boolean } | null = null;
-  for (const c of candidates) {
+  // The list grows while it is walked: a place that sits on a button or a
+  // panel is tried again moved just clear of it, to each side.
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
     const wantX = c.cx - rx;
     const wantY = c.cy - ry;
     const x = Math.min(stage.width - margin - w, Math.max(margin, wantX));
@@ -363,7 +370,11 @@ export function placeSpeechBubble(opts: {
     let score = Math.hypot(x - wantX, y - wantY) * 1.5;
     // The tail needs room: the bubble must not sit on the point itself.
     const reach = Math.hypot(mouth.x - cx, mouth.y - cy) - edgeAt(rx, ry, mouth.x - cx, mouth.y - cy);
-    if (reach - stopShort < 8) score += 10000;
+    // On the point itself is no place at all. Nearer than the tail would
+    // like (it stops short of a face found in the picture) is a poor one,
+    // but better than sitting on a button or a panel.
+    if (reach < 8) score += 10000;
+    else if (reach - stopShort < 8) score += 200;
     score += Math.abs(reach - stopShort - tail);
     let heavy = 0;
     let into = false;
@@ -372,7 +383,18 @@ export function placeSpeechBubble(opts: {
       score += share * o.weight * 1000;
       if (o.weight >= HEAVY) {
         heavy += share;
-        if (share > 0 && reachesInto(cx, cy, o.rect)) into = true;
+        if (share > 0 && reachesInto(cx, cy, o.rect)) {
+          into = true;
+          if (!c.moved) {
+            const gap = 2;
+            candidates.push(
+              { cx: o.rect.x - gap - rx, cy, below: c.below, moved: true },
+              { cx: o.rect.x + o.rect.width + gap + rx, cy, below: c.below, moved: true },
+              { cx, cy: o.rect.y - gap - ry, below: c.below, moved: true },
+              { cx, cy: o.rect.y + o.rect.height + gap + ry, below: c.below, moved: true },
+            );
+          }
+        }
       }
     }
     // Any place clear of them is better than one that is not.

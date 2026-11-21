@@ -254,7 +254,7 @@ export const CharacterMoodFrame: React.FC<CharacterMoodFrameProps> = ({
   };
 
   return (
-    <div style={cardStyle}>
+    <div style={cardStyle} data-hud-frame="mood">
       {showHeader && (
         <div style={{
           display: 'flex',

@@ -384,3 +384,26 @@ describe('a bubble that would sit on a button or panel', () => {
     expect(again).not.toBeNull();
   });
 });
+
+describe("the player's replies beside corner panels", () => {
+  // Four characters in a row, the player's at the right under a meter and a
+  // mood panel; the line being answered is in its bubble at the left.
+  const panels = [[866, 87, 148, 188], [868, 10, 146, 69]].map(([x, y, width, height]) => ({ rect: { x, y, width, height }, weight: HEAVY }));
+  const line = { rect: { x: 127, y: 177, width: 354, height: 136 }, weight: HEAVY };
+  const place = (stopShort: number) => placeSpeechBubble({
+    stage: { width: 1024, height: 768 }, size: { width: 381, height: 296 }, mouth: { x: 930, y: 330 },
+    speaker: { x: 780, y: 310, width: 300, height: 600 }, obstacles: [...panels, line], stopShort, shape: 'box',
+  });
+
+  it('go in a bubble moved clear of the panels', () => {
+    const r = place(0)!.rect;
+    expect(r.x + r.width).toBeLessThanOrEqual(866 + 6);
+    expect(r.x).toBeGreaterThanOrEqual(481 - 6);
+  });
+
+  it('and still do when that leaves the tail short', () => {
+    const placed = place(110);
+    expect(placed).not.toBeNull();
+    expect(placed!.rect.x + placed!.rect.width).toBeLessThanOrEqual(866 + 6);
+  });
+});
