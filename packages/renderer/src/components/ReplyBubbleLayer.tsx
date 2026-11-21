@@ -128,7 +128,9 @@ const ReplyBubbleLayer: React.FC<{
   }, []);
 
   /** The replies and stage size for which these replies turned out to be no bubble. */
-  const triesRef = React.useRef<{ key: string; misses: number }>({ key: '', misses: 0 });
+  const triesRef = React.useRef<{ key: string; misses: number; seen?: string }>({ key: '', misses: 0 });
+  /** Looks again two frames on: after the line's bubble, told something new, has found its place. */
+  const againRef = React.useRef<() => void>(() => {});
 
   const conceal = React.useCallback((buttons: HTMLElement[]) => {
     const look = editorMode ? GHOST : HIDDEN;
@@ -182,8 +184,14 @@ const ReplyBubbleLayer: React.FC<{
     // Not on the first miss: the stage may still be settling (the line's
     // bubble finding its place, buttons sliding in).
     if (triesRef.current.key !== attempt) triesRef.current = { key: attempt, misses: 0 };
-    const staysButtons = () => {
-      triesRef.current.misses += 1;
+    // A miss counts once per situation: looking again at a stage that has
+    // not changed (the stage is looked at often while it settles) used up
+    // the tries before anything had moved.
+    const staysButtons = (situation: string) => {
+      if (triesRef.current.seen !== situation) {
+        triesRef.current.seen = situation;
+        triesRef.current.misses += 1;
+      }
       if (!root.hasAttribute(REPLIES_AS_BUTTONS_ATTR)) root.setAttribute(REPLIES_AS_BUTTONS_ATTR, '');
       fail();
     };
@@ -229,29 +237,43 @@ const ReplyBubbleLayer: React.FC<{
       if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: LIGHT });
     });
     // The line being answered stays readable.
+    const lineBubbles: BubbleObstacle[] = [];
     root.querySelectorAll<HTMLElement>('[data-speech-bubble="current"]').forEach((el) => {
       const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) obstacles.push({ rect: toStage(r), weight: HEAVY });
+      if (r.width > 0 && r.height > 0) lineBubbles.push({ rect: toStage(r), weight: HEAVY });
     });
 
-    let placement;
-    if (player && playerRect) {
-      const { mouth, stopShort } = aimAtSpeaker(playerEl, playerRect, player.speakFrom, player.flipX, toStage, headFound);
-      placement = placeSpeechBubble({
+    const aim = player && playerRect ? aimAtSpeaker(playerEl, playerRect, player.speakFrom, player.flipX, toStage, headFound) : null;
+    const place = (around: BubbleObstacle[]) => (aim && playerRect
+      ? placeSpeechBubble({
         stage: { width: stageW, height: stageH },
         size,
-        mouth,
+        mouth: aim.mouth,
         speaker: playerRect,
-        obstacles,
-        stopShort,
+        obstacles: around,
+        stopShort: aim.stopShort,
         shape: 'box',
         maxFaceCover: REPLY_MAX_FACE_COVER,
-      });
-    } else {
+      })
       // The player is not shown: the replies come from this side of the screen.
-      placement = placeOffstageBubble({ stage: { width: stageW, height: stageH }, size, obstacles });
+      : placeOffstageBubble({ stage: { width: stageW, height: stageH }, size, obstacles: around }));
+    const placement = place([...obstacles, ...lineBubbles]);
+    if (!placement) {
+      const box = (o: BubbleObstacle) => `${Math.round(o.rect.x)},${Math.round(o.rect.y)},${Math.round(o.rect.width)},${Math.round(o.rect.height)}`;
+      const situation = [...obstacles, ...lineBubbles].map(box).join(';') + `|${aim ? `${Math.round(aim.mouth.x)},${Math.round(aim.mouth.y)}` : ''}`;
+      // Only the line's bubble is in the way, and it is where it is because
+      // the replies were buttons a moment ago: told to keep clear of them, it
+      // moved into the one place this bubble has, and so they stayed buttons
+      // for good. Take the word back and look again once it has gone back.
+      if (lineBubbles.length > 0 && root.hasAttribute(REPLIES_AS_BUTTONS_ATTR) && place(obstacles)) {
+        if (triesRef.current.seen !== situation) { triesRef.current.seen = situation; triesRef.current.misses += 1; }
+        root.removeAttribute(REPLIES_AS_BUTTONS_ATTR);
+        fail();
+        againRef.current();
+        return;
+      }
+      return staysButtons(situation);
     }
-    if (!placement) return staysButtons();
     if (root.hasAttribute(REPLIES_AS_BUTTONS_ATTR)) root.removeAttribute(REPLIES_AS_BUTTONS_ATTR);
 
     buttonsRef.current = buttons;
@@ -282,6 +304,11 @@ const ReplyBubbleLayer: React.FC<{
       if (frame) return;
       frame = requestAnimationFrame(() => { frame = 0; compute(); });
     };
+    let again = 0;
+    againRef.current = () => {
+      if (again) return;
+      again = requestAnimationFrame(() => { again = requestAnimationFrame(() => { again = 0; compute(); }); });
+    };
     const resize = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null;
     resize?.observe(root);
     root.querySelectorAll('[data-character-name]').forEach((el) => resize?.observe(el));
@@ -295,7 +322,7 @@ const ReplyBubbleLayer: React.FC<{
     // What happens around the stage is a new situation: the misses counted
     // so far (some of them measured while things were still moving) no
     // longer say that these replies are no bubble here.
-    const afresh = () => { triesRef.current.misses = 0; schedule(); };
+    const afresh = () => { triesRef.current.misses = 0; triesRef.current.seen = undefined; schedule(); };
     // Screen-docked panels are drawn outside the stage: they say when they have moved.
     window.addEventListener(HUD_LAYOUT_EVENT, afresh);
     // Something on the stage, or something the stage is inside (a preview
@@ -312,6 +339,8 @@ const ReplyBubbleLayer: React.FC<{
     doc.addEventListener('animationend', settled);
     doc.addEventListener('transitionend', settled);
     return () => {
+      if (again) cancelAnimationFrame(again);
+      againRef.current = () => {};
       doc.removeEventListener('animationend', settled);
       doc.removeEventListener('transitionend', settled);
       window.removeEventListener(HUD_LAYOUT_EVENT, afresh);

@@ -52,11 +52,11 @@ And this is a story made with it, exported as a web page. **[Play it yourself](h
 - **Desktop apps** for macOS, Windows and Linux (beta) that update themselves.
 - **Work together** with Git built in: commit, push, pull, merge two versions of a story.
 
-## 🆕 Latest release: v0.9.160, the full-stage release
+## 🆕 Latest release: v0.9.161, the full-stage release
 
 ASAPS is in **beta**: the core works, and new releases arrive often.
 
-v0.9.160 is about a stage full of characters. Speech bubbles now keep clear of the mood tokens as well as of buttons and panels. When the bubble with the player's replies would cover someone's face, the replies stay buttons instead, and the line before is left out rather than put over a face. A mood token, meters or an inventory set to sit at a character now show in the responsive layout too, not only on a fixed canvas, and a token moves off the story's buttons where it can. On a phone, a list of replies that scrolls fades at its bottom edge and shows a ▾ to tap. In the Preview, a fixed-canvas story's corner panels are drawn on the stage at every device size, exactly as an exported story shows them.
+v0.9.161 is about a stage full of characters. Speech bubbles now keep clear of the mood tokens as well as of buttons and panels. When the bubble with the player's replies would cover someone's face, the replies stay buttons instead, and the line before is left out rather than put over a face. A mood token, meters or an inventory set to sit at a character now show in the responsive layout too, not only on a fixed canvas, and a token moves off the story's buttons where it can. On a phone, a list of replies that scrolls fades at its bottom edge and shows a ▾ to tap. In the Preview, a fixed-canvas story's corner panels are drawn on the stage at every device size, exactly as an exported story shows them.
 
 Earlier releases:
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)**: a summary of every release

@@ -96,3 +96,50 @@ describe('the reply bubble looks again once things around the stage have come to
     expect(now ? { left: now.style.left, top: now.style.top } : null).not.toEqual(was);
   });
 });
+
+/**
+ * Replies that were buttons for a moment (the stage still settling) told the
+ * line's bubble to keep clear of the buttons; it moved into the one place the
+ * reply bubble has, and the replies stayed buttons for good (author report,
+ * 2026-11-21: a wolf, a girl, three replies).
+ */
+describe('replies that fell back to buttons while the stage settled', () => {
+  it('become a bubble again once the line has gone back to its place', async () => {
+    const { host, panel, bubble } = mount();
+    const stage = host.querySelector<HTMLElement>('[data-testid="stage"]')!;
+    const line = host.querySelector<HTMLElement>('[data-speech-bubble="current"]')!;
+    const first = bubble()!;
+    const place: [number, number, number, number] = [parseFloat(first.style.left), parseFloat(first.style.top), parseFloat(first.style.width), parseFloat(first.style.height)];
+
+    // For a moment there is no place at all (a panel across the stage, on its way): buttons.
+    at(panel, 0, 0, 1000, 700);
+    await act(async () => { window.dispatchEvent(new Event(HUD_LAYOUT_EVENT)); await frame(); await frame(); });
+    expect(bubble()).toBeNull();
+    expect(stage.hasAttribute('data-replies-as-buttons')).toBe(true);
+
+    // The panel is gone, but the line's bubble, keeping clear of the buttons, has moved into the reply bubble's place.
+    at(panel, 2000, 0, 10, 10);
+    at(line, place[0] + 10, place[1] + 10, 60, 30);
+    await act(async () => { window.dispatchEvent(new Event(HUD_LAYOUT_EVENT)); await new Promise((r) => setTimeout(r, 1)); });
+    // The word was taken back at that moment (the line's bubble is told through this attribute).
+    expect(stage.hasAttribute('data-replies-as-buttons')).toBe(false);
+
+    // So the line goes home, out of the way (its move is a change the layer sees): the replies are a bubble.
+    at(line, 100, 40, 10, 10);
+    await act(async () => { line.style.left = '100px'; await frame(); await frame(); await frame(); });
+    expect(bubble()).toBeTruthy();
+    expect(stage.hasAttribute('data-replies-as-buttons')).toBe(false);
+  });
+
+  it('stay buttons when the line is in the way wherever it is', async () => {
+    const { host, bubble } = mount();
+    const stage = host.querySelector<HTMLElement>('[data-testid="stage"]')!;
+    at(host.querySelector<HTMLElement>('[data-speech-bubble="current"]')!, 0, 0, 1000, 700);
+    for (let i = 0; i < 12; i++) {
+      await act(async () => { window.dispatchEvent(new Event(HUD_LAYOUT_EVENT)); await frame(); await frame(); });
+    }
+    expect(bubble()).toBeNull();
+    expect(stage.hasAttribute('data-replies-as-buttons')).toBe(true);
+  });
+});
+
