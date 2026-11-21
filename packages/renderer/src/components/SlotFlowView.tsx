@@ -47,6 +47,7 @@ import { runSlotPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer } from './ResponsiveCharacterLayer';
 import { StageBubbles, useStageTurn, REPLIES_WAIT_ATTR, REPLIES_WAIT_STYLE, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
 import { ReplyBubble } from './ReplyBubbleLayer';
+import { ScrollMoreHint } from './ScrollIndicator';
 import { bubbleSpeakerFor, type BubbleHistory } from '../utils/speechBubble';
 import type { SpeechLineMode } from './PositionedBeatView';
 
@@ -2652,6 +2653,9 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   </button>
                 );
               })}
+              {/* A list that scrolls says so: on a phone the last reply was
+                  cut off at the edge with nothing else to show there was more. */}
+              {hasDynamicChoices && !isConversation && !customActionStyle && <ScrollMoreHint />}
             </div>
             {renderPinned(false)}
           </>

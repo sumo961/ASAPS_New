@@ -280,6 +280,55 @@ function settleAll(): void {
   for (const t of live) t.settle();
 }
 
+/**
+ * The stage around a character layer or a token's box: the same box, a few
+ * levels up (the views wrap their layers), so the story's buttons are in it.
+ */
+function stageAround(host: HTMLElement): HTMLElement {
+  const box = host.getBoundingClientRect();
+  let stage = host;
+  for (let i = 0; i < 4; i++) {
+    const up = stage.parentElement;
+    if (!up || up === up.ownerDocument.body) break;
+    const r = up.getBoundingClientRect();
+    if (Math.abs(r.left - box.left) > 2 || Math.abs(r.top - box.top) > 2 || Math.abs(r.width - box.width) > 2 || Math.abs(r.height - box.height) > 2) break;
+    stage = up;
+  }
+  return stage;
+}
+
+/** The story's buttons on that stage that can be seen: not a token's own, not a bubble's lines, not the Visual Editor's badges. */
+function stageButtons(host: HTMLElement): HTMLElement[] {
+  return Array.from(stageAround(host).querySelectorAll<HTMLElement>('button, [role="button"]')).filter((b) => {
+    if (b.closest('[data-mood-token], [data-speech-bubble-layer], [data-step-in-layer], [data-scroll-more]')) return false;
+    const r = b.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return false;
+    return typeof getComputedStyle !== 'function' || getComputedStyle(b).visibility !== 'hidden';
+  });
+}
+
+/** Where the story's text is on that stage, as far as it can be seen (a text that scrolls shows only part of itself). */
+function stageText(host: HTMLElement): Box[] {
+  const stage = stageAround(host);
+  const out: Box[] = [];
+  stage.querySelectorAll<HTMLElement>('[data-speech-line], [data-slotflow-slot]').forEach((el) => {
+    if (el.querySelector('button, [role="button"]') || el.closest('[data-mood-token], [data-speech-bubble-layer]')) return;
+    const r = el.getBoundingClientRect();
+    const box = { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+    for (let up = el.parentElement; up && up !== stage.parentElement; up = up.parentElement) {
+      if (typeof getComputedStyle !== 'function' || !/(hidden|auto|scroll|clip)/.test(getComputedStyle(up).overflowY)) continue;
+      const c = up.getBoundingClientRect();
+      box.left = Math.max(box.left, c.left); box.top = Math.max(box.top, c.top);
+      box.right = Math.min(box.right, c.right); box.bottom = Math.min(box.bottom, c.bottom);
+    }
+    if (box.right - box.left > 0 && box.bottom - box.top > 0) out.push(box);
+  });
+  return out;
+}
+
+/** The furthest a token steps aside, in its own heights. */
+const MAX_STEP = 2.5;
+
 /** Anchors that put the token on its own character's axis: above, below, or at their feet. */
 const ON_OWN_CHARACTER = new Set<MoodFrameAnchor>(['base', 'top', 'bottom']);
 
@@ -337,9 +386,12 @@ export const CharacterMoodToken: React.FC<CharacterMoodTokenProps> = ({
     if (!el) return;
     el.style.transform = '';
     // Each token is drawn inside its own character's element: the stage is
-    // the first thing around this one that holds other tokens too.
+    // the first thing around this one that holds other tokens too. A token
+    // on its own takes the layer its character is drawn in, or the box it
+    // is placed in.
     let host: HTMLElement | null = el.parentElement;
     while (host && host !== host.ownerDocument.body && host.querySelectorAll('[data-mood-token]').length < 2) host = host.parentElement;
+    if (!host || host === host.ownerDocument.body) host = el.closest<HTMLElement>('[data-layer="characters"]') ?? (el.offsetParent as HTMLElement | null);
     // A plain box: a DOMRect's sides are not its own properties, so a copy of one ({...rect}) is empty.
     const chipOf = (t: HTMLElement): Box & { width: number } => {
       const r = (t.firstElementChild ?? t).getBoundingClientRect();
@@ -352,16 +404,30 @@ export const CharacterMoodToken: React.FC<CharacterMoodTokenProps> = ({
       if (other === el) break;
       before.push(chipOf(other));
     }
-    if (before.length === 0) return;
     // Not under a meter, an inventory or a mood panel on the way either
     // (those are drawn over the stage, some from outside it).
     host.ownerDocument.querySelectorAll<HTMLElement>('[data-hud-frame]').forEach((panel) => {
       const r = panel.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) before.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
     });
+    // Nor on a button of the story (on a phone the Continue button and the
+    // replies lie across the characters, where a token at their feet is).
+    const buttons = stageButtons(host);
+    for (const b of buttons) {
+      const r = b.getBoundingClientRect();
+      before.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+    }
+    if (before.length === 0) return;
+    // Moving off a button must not put it on (or half under) the text: with
+    // the text in the way too and nowhere left, it stays with its character.
+    if (buttons.length > 0) before.push(...stageText(host));
     const scale = el.offsetWidth > 0 ? el.getBoundingClientRect().width / el.offsetWidth || 1 : 1;
     const dy = stepAside(box, before, host.getBoundingClientRect(), 4 * scale);
-    if (dy) el.style.transform = `translateY(${dy / scale}px)`;
+    // Only a short way: further off it no longer reads as this character's
+    // (on a phone one ended up beside another speaker's name). With no room
+    // nearby it stays where its character is, under what covers them both.
+    const far = (box.bottom - box.top) * MAX_STEP;
+    if (dy && Math.abs(dy) <= far) el.style.transform = `translateY(${dy / scale}px)`;
   }, []);
   const docked = config.dockMode !== 'screen';
   // Tokens come and go one by one (each appears when its character is met),
@@ -377,7 +443,31 @@ export const CharacterMoodToken: React.FC<CharacterMoodTokenProps> = ({
     const chip = ref.current?.firstElementChild;
     const sized = chip && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => settleAll()) : null;
     if (chip) sized?.observe(chip);
-    return () => { sized?.disconnect(); onStage.delete(entry); settleAll(); };
+    // Buttons come and go with every line, and slide in: look again when
+    // the stage changes and when something on it has come to rest. Not for
+    // what the tokens themselves change (their own step aside).
+    const layer = ref.current?.closest<HTMLElement>('[data-layer="characters"]') ?? (ref.current?.offsetParent as HTMLElement | null | undefined);
+    const stage = layer ? stageAround(layer) : null;
+    let frame = 0;
+    const later = () => {
+      if (frame || typeof requestAnimationFrame !== 'function') return;
+      frame = requestAnimationFrame(() => { frame = 0; settleAll(); });
+    };
+    const notMine = (n: Node | null) => !!n && !(n instanceof Element ? n : n.parentElement)?.closest('[data-mood-token]');
+    const changes = stage && typeof MutationObserver !== 'undefined'
+      ? new MutationObserver((records) => { if (records.some((r) => notMine(r.target))) later(); })
+      : null;
+    if (stage) changes?.observe(stage, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'disabled'] });
+    const rested = (e: Event) => { if (notMine(e.target as Node | null)) later(); };
+    stage?.addEventListener('animationend', rested);
+    stage?.addEventListener('transitionend', rested);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      changes?.disconnect();
+      stage?.removeEventListener('animationend', rested);
+      stage?.removeEventListener('transitionend', rested);
+      sized?.disconnect(); onStage.delete(entry); settleAll();
+    };
   }, [docked, settle]);
   React.useLayoutEffect(() => { if (docked) settleAll(); }, [docked, config.anchor, characterPosition.x, characterPosition.y, characterDimensions.width, characterDimensions.height, w, h]);
 

@@ -88,4 +88,98 @@ export const ScrollBadge: React.FC<{ visible: boolean; fontScale?: number }> = (
   );
 };
 
+/**
+ * "There is more below", for a list that scrolls inside the stage (the
+ * player's replies on a phone). Put it last inside the scrolling element: it
+ * takes no room, stays at the bottom edge of what is visible, and shows a
+ * fade and a round ▾ while there is something further down. A tap on the ▾
+ * scrolls on. No words, so nothing to translate.
+ */
+export const ScrollMoreHint: React.FC = () => {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [more, setMore] = React.useState(false);
+  // The list's own padding under its last entry: "sticky" stops above it,
+  // which left the hint floating a strip above the edge.
+  const [inset, setInset] = React.useState(0);
+  React.useLayoutEffect(() => {
+    const scroller = ref.current?.parentElement;
+    if (!scroller) return;
+    const check = () => {
+      const pad = typeof getComputedStyle === 'function' ? parseFloat(getComputedStyle(scroller).paddingBottom) || 0 : 0;
+      setInset((was) => (Math.abs(was - pad) < 0.5 ? was : pad));
+      const left = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
+      // Not for a list that isn't shown: replies drawn in a bubble leave
+      // their buttons in place, hidden.
+      const shown = Array.from(scroller.children).some((el) => el !== ref.current
+        && (typeof getComputedStyle !== 'function' || getComputedStyle(el).visibility !== 'hidden'));
+      // Something of the list itself is out of sight below, not only the
+      // empty strip under its last entry (a single Continue button in a
+      // tight row "scrolled" by its padding and got a hint it didn't need).
+      const entries = Array.from(scroller.children).filter((el) => el !== ref.current);
+      const last = entries[entries.length - 1];
+      const cut = last ? last.getBoundingClientRect().bottom - scroller.getBoundingClientRect().bottom : 0;
+      const measured = !!last && last.getBoundingClientRect().height > 0;
+      setMore(shown && left > 6 && (!measured || cut > 2));
+    };
+    check();
+    scroller.addEventListener('scroll', check, { passive: true });
+    const resize = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(check) : null;
+    resize?.observe(scroller);
+    // Replies arriving, a reply wrapping onto another line.
+    const changes = typeof MutationObserver !== 'undefined' ? new MutationObserver((records) => {
+      if (records.some((r) => !ref.current?.contains(r.target))) check();
+    }) : null;
+    changes?.observe(scroller, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['style'] });
+    return () => {
+      scroller.removeEventListener('scroll', check);
+      resize?.disconnect();
+      changes?.disconnect();
+    };
+  }, []);
+  const onward = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const scroller = ref.current?.parentElement;
+    if (!scroller) return;
+    const top = scroller.scrollTop + scroller.clientHeight * 0.8;
+    if (typeof scroller.scrollTo === 'function') scroller.scrollTo({ top, behavior: 'smooth' });
+    else scroller.scrollTop = top;
+  };
+  return (
+    <div
+      ref={ref}
+      data-scroll-more={more ? 'yes' : 'no'}
+      style={{
+        position: 'sticky', bottom: -inset, height: 0, width: '100%', flex: '0 0 0px', gridColumn: '1 / -1',
+        alignSelf: 'stretch', overflow: 'visible', pointerEvents: 'none', zIndex: 6,
+        // A flex or grid gap before an element without height would add a strip of nothing to scroll.
+        margin: 0,
+      }}
+    >
+      {more && (
+        <div
+          style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0, height: 44,
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.5))',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 4,
+          }}
+        >
+          <button
+            type="button"
+            aria-label="More below"
+            onClick={onward}
+            style={{
+              pointerEvents: 'auto', width: 28, height: 28, borderRadius: 14, padding: 0,
+              border: '1px solid rgba(255,255,255,0.6)', background: 'rgba(0,0,0,0.65)', color: '#fff',
+              fontSize: 16, lineHeight: '26px', textAlign: 'center', cursor: 'pointer',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+            }}
+          >
+            ▾
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default ScrollIndicator;

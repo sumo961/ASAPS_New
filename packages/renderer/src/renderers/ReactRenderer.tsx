@@ -6,6 +6,7 @@ import ReactDOM from 'react-dom/client';
 import { BaseRenderer } from './BaseRenderer';
 import { getAudioManager } from '../audio/AudioManager';
 import { computeStageFitScale } from '../utils/hudLayout';
+import { CharacterHudContext, type CharacterHudLookups } from '../components/CharacterHudContext';
 import type { Location, AnimationPath, SlotIntent, DialogExchange, FreeLayoutScreen, BeatLook } from '@asaps/core';
 import { placeByPercent } from '../utils/freeLayoutPlacement';
 import { applyTextBoxBorder } from '../utils/textBoxBorder';
@@ -1359,8 +1360,17 @@ export class ReactRenderer extends BaseRenderer {
         />
       </>
     );
+    // A new object each time: the lookups read live state (a mood that has
+    // moved, an inventory that has grown), so every paint asks again.
+    const characterHuds: CharacterHudLookups = {
+      meters: this.characterMeterFrameResolver || undefined,
+      inventory: this.characterInventoryResolver || undefined,
+      mood: this.characterMoodFrameResolver || undefined,
+      inventoryVisible: this.inventoryVisible,
+      fontScale: this.mobileFontScale,
+    };
 
-    this.root.render(content);
+    this.root.render(<CharacterHudContext.Provider value={characterHuds}>{content}</CharacterHudContext.Provider>);
 
     // If there's a pending transition, apply it now that content is rendered
     if (this.pendingTransitionType && this.context.container) {

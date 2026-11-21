@@ -25,7 +25,12 @@
  *    sprite-sheet metadata is supplied). Frame cycling along the path
  *    is the next iteration.
  */
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { CharacterHudContext } from './CharacterHudContext';
+import { CharacterMeterFrame } from './CharacterMeterFrame';
+import { CharacterInventoryFrame } from './CharacterInventoryFrame';
+import { CharacterMoodFrame } from './CharacterMoodFrame';
+import { CharacterMoodToken } from './CharacterMoodToken';
 import { DIM_TRANSITION, silentCharacterFilters } from '../utils/speakerDimming';
 import type { AnimationPath, Location } from '@asaps/core';
 import { getAnimationManager } from '../animation/AnimationEngine';
@@ -119,6 +124,8 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
   speakingCharacter,
   dimSettings,
 }, ref) => {
+  // Meters, inventory and mood token set to sit at a character (see CharacterHudContext).
+  const huds = useContext(CharacterHudContext);
   // Speaker Display → "Dim characters who aren't speaking".
   const silentFilters = useMemo(
     () => silentCharacterFilters(locations, speakingCharacter, dimSettings),
@@ -541,6 +548,34 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
             }
           : undefined;
 
+        // What the character carries at its side: the same frames the fixed
+        // canvas draws, placed from where the character is drawn here.
+        const hudsAt = (): React.ReactNode => {
+          if (loc.kind !== 'character' || !loc.characterId || !huds) return null;
+          const meters = huds.meters?.(loc.characterId);
+          const inventory = huds.inventory?.(loc.characterId);
+          const mood = huds.mood?.(loc.characterId);
+          if (!meters && !inventory && !mood) return null;
+          const at = { characterPosition: { x, y }, characterDimensions: { width: visualW, height: visualH }, containerDimensions: stage.width && stage.height ? stage : undefined };
+          const fontScale = huds.fontScale ?? 1;
+          return (
+            <>
+              {meters && meters.counters.length > 0 && (
+                <CharacterMeterFrame counters={meters.counters} config={meters.config} characterName={meters.characterName} characterColor={meters.characterColor} {...at} fontScale={fontScale} />
+              )}
+              {inventory && inventory.items.length > 0 && huds.inventoryVisible && (
+                <CharacterInventoryFrame items={inventory.items} config={inventory.config} {...at} isVisible={true} fontScale={fontScale} autoMinimize={fontScale > 1.0} />
+              )}
+              {mood && mood.config.enabled && ((mood.config.displayStyle ?? 'token') === 'disc' ? (
+                <CharacterMoodFrame valence={mood.valence} arousal={mood.arousal} config={mood.config} palette={mood.palette} characterName={mood.characterName} characterPortraitUrl={mood.characterPortraitUrl} characterColor={mood.characterColor} {...at} />
+              ) : (
+                <CharacterMoodToken valence={mood.valence} arousal={mood.arousal} config={mood.config} characterName={mood.characterName} characterPortraitUrl={mood.characterPortraitUrl} characterColor={mood.characterColor} {...at} fontScale={fontScale} />
+              ))}
+            </>
+          );
+        };
+        const key = loc.id ?? `${loc.name}-${idx}`;
+
         if (useSprite) {
           // When the sprite sheet is smaller/larger than the visual
           // frame size (responsive stageScale ≠ 1), background-image
@@ -554,30 +589,34 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
           const bgPosX = bgX * stageScale;
           const bgPosY = bgY * stageScale;
           return (
-            <div
-              key={loc.id ?? `${loc.name}-${idx}`}
-              data-character-name={loc.name}
-              onClick={handleEditorClick}
-              style={{
-                ...commonStyle,
-                backgroundImage: `url(${url})`,
-                backgroundPosition: `${bgPosX}px ${bgPosY}px`,
-                backgroundSize: sheetW && sheetH ? `${sheetW}px ${sheetH}px` : undefined,
-                backgroundRepeat: 'no-repeat',
-              }}
-            />
+            <React.Fragment key={key}>
+              <div
+                data-character-name={loc.name}
+                onClick={handleEditorClick}
+                style={{
+                  ...commonStyle,
+                  backgroundImage: `url(${url})`,
+                  backgroundPosition: `${bgPosX}px ${bgPosY}px`,
+                  backgroundSize: sheetW && sheetH ? `${sheetW}px ${sheetH}px` : undefined,
+                  backgroundRepeat: 'no-repeat',
+                }}
+              />
+              {hudsAt()}
+            </React.Fragment>
           );
         }
         return (
-          <img
-            key={loc.id ?? `${loc.name}-${idx}`}
-            data-character-name={loc.name}
-            src={url}
-            alt=""
-            draggable={false}
-            onClick={handleEditorClick}
-            style={commonStyle}
-          />
+          <React.Fragment key={key}>
+            <img
+              data-character-name={loc.name}
+              src={url}
+              alt=""
+              draggable={false}
+              onClick={handleEditorClick}
+              style={commonStyle}
+            />
+            {hudsAt()}
+          </React.Fragment>
         );
       })}
     </div>
