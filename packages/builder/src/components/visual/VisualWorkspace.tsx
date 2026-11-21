@@ -81,7 +81,7 @@ import { getCommandManager } from '../../commands/CommandManager';
 import { VisualElementsSnapshotCommand } from '../../commands/ElementCommands';
 import { notifyUndoable } from '../../utils/undoNotice';
 import { notify } from '../../utils/notify';
-import { isMultiChoiceLike } from '@asaps/core';
+import { isMultiChoiceLike, speakerLabel } from '@asaps/core';
 import { useRolePreview } from '../../contexts/RolesContext';
 import { previewRoles } from '../../utils/rolePreview';
 import { useIsDark } from '../../utils/appearance';
@@ -2036,6 +2036,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // runtime's resolveSpeakerForSlot. Beat-level showSpeaker wins;
   // otherwise the global theme.speakerDisplay.showNames flag decides.
   // titleScreen has no speaker concept and stays blank.
+  // The speaker's name in the language shown: a translation names the
+  // characters too (the panels already followed it; the name above a line
+  // stayed as written).
+  const shownSpeaker = (raw: string): string =>
+    speakerLabel(resolveTranslatedSpeakerName(raw, characters, translationState.activeLanguage) ?? raw, hudCharacters as any);
   const slotPreviewSpeaker: string = (() => {
     if (!beat || beat.type === 'titleScreen') return '';
     const override = (beat as any).showSpeaker as boolean | undefined;
@@ -2043,7 +2048,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const show = override === true ? true : override === false ? false : globalOn;
     if (!show) return '';
     const raw = previewRoles(((beat as any).speaker as string) || '', previewHolder);
-    return raw ? resolveTranslatedSpeakerName(raw, characters, translationState.activeLanguage) ?? raw : raw;
+    return raw ? shownSpeaker(raw) : raw;
   })();
   // Speaker Display → "Dim characters who aren't speaking": who speaks in the
   // previewed line (a Dialog Tree's current line), as a character id.
@@ -2111,7 +2116,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               const cur = dialogNodeAt(slotPreviewParams.dialogTree, dialogTreeNodePath)
                 ?? slotPreviewParams.dialogTree;
               return {
-                speaker: cur?.speaker || 'Speaker',
+                speaker: cur?.speaker ? shownSpeaker(cur.speaker) : 'Speaker',
                 text: cur?.text || 'Dialogue text...',
               };
             })()
@@ -4863,7 +4868,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           ? dialogNodeAt(shown.dialogTree, dialogTreeNodePath)
           : null;
         return {
-          speaker: params.speaker || params.dialogTree?.speaker || 'Character',
+          // The line stepped into has its own speaker; the root's was shown
+          // for every line (name label, dimming, and whom the bubble points at).
+          speaker: (stepped ? dialogNodeAt(params.dialogTree, dialogTreeNodePath)?.speaker : undefined) || params.speaker || params.dialogTree?.speaker || 'Character',
           text: stepped ? (stepped.text || '') : (shown.text || shown.dialogTree?.text || ''),
           // Reply buttons on the canvas are named after the reply as written;
           // sourceText lets the editor find a button's translated words.

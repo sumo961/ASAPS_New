@@ -1218,6 +1218,7 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         if (!character || !character.moodFrame || !character.moodFrame.enabled) {
           return null;
         }
+        if (this.config.screenHudsDrawnByHost && character.moodFrame.dockMode === 'screen') return null;
         const ctx = this.engine?.getContext();
         if (!ctx) return null;
         // Hidden until the player has met the character and their variant

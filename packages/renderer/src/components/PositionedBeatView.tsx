@@ -3,7 +3,7 @@ import React from 'react';
 import { pillSafeRadius } from '../utils/pillRadius';
 import ReactDOM from 'react-dom';
 import type { Location, AnimationPath, AnimationState } from '@asaps/core';
-import { getPresetSound, isPresetSound, getFontFamily, isBuiltInFont, barFill, resolveBand, isMultiChoiceLike } from '@asaps/core';
+import { getPresetSound, isPresetSound, getFontFamily, isBuiltInFont, barFill, resolveBand, isMultiChoiceLike, uiString } from '@asaps/core';
 import { getAudioManager } from '../audio/AudioManager';
 import { LEGACY_TEXT_LOCATION_NAME, TEXT_ALIAS_BEAT_TYPES } from '../utils/legacyTextAlias';
 import { useReservedHudRects } from '../utils/useReservedHudRects';
@@ -5977,21 +5977,25 @@ function getContentForLocation(
     }
     // Button elements - match by choice text or index
     if (loc.kind === 'button' && content.choices && content.choices.length > 0) {
+      // A continue step ("then another character speaks") has no words of
+      // its own: players see Continue, and so does the editor (it drew an
+      // empty button).
+      const words = (c: any) => c.text || (c.continue ? uiString('continue') : c.text);
       // Try exact match first
       const exactChoice = content.choices.find((c: any) => c.text === loc.name);
       if (exactChoice) {
-        return exactChoice.text;
+        return words(exactChoice);
       }
       // Try matching by index (e.g., "button1" → choices[0], "button2" → choices[1])
       const indexMatch = nameLower.match(/button\s*(\d+)/);
       if (indexMatch) {
         const index = parseInt(indexMatch[1], 10) - 1; // button1 = index 0
         if (index >= 0 && index < content.choices.length) {
-          return content.choices[index].text;
+          return words(content.choices[index]);
         }
       }
       // Fallback: return first choice text for any button
-      return content.choices[0].text;
+      return words(content.choices[0]);
     }
   }
 

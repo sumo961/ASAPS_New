@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import type { Location, BeatLook } from '@asaps/core';
-import { findSpeakerCharacterId } from '@asaps/core';
+import { findSpeakerCharacterId, speakerLabel } from '@asaps/core';
 import type { Character } from '../../types/character';
 import type { GlobalSettings } from '../../storage/types';
 import type { ThemeAssetUrls } from '../../hooks/useThemes';
@@ -781,8 +781,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const resolvedSpeakerName = React.useMemo(() => {
     const raw = beatContent?.speaker;
     if (!raw) return raw;
-    return resolveTranslatedSpeakerName(raw, characters, translationState.activeLanguage);
-  }, [beatContent?.speaker, characters, translationState.activeLanguage]);
+    // A translation names the characters too (hudCharacters are the story's
+    // characters in the language shown).
+    return speakerLabel(resolveTranslatedSpeakerName(raw, characters, translationState.activeLanguage) ?? raw, hudCharacters as any);
+  }, [beatContent?.speaker, characters, translationState.activeLanguage, hudCharacters]);
 
 
   // Get stage background color from global settings (used when no background image is set)

@@ -1487,6 +1487,9 @@ export const PreviewWindow: React.FC = () => {
         if (!character || !(character as any).moodFrame || !(character as any).moodFrame.enabled) {
           return null;
         }
+        // A screen-docked one is drawn by the screen HUD layer, like meters
+        // and inventories; drawn here too, a character on the stage had two.
+        if ((character as any).moodFrame.dockMode === 'screen') return null;
         const ctx = engineRef.current?.getContext();
         if (!ctx) return null;
         // Hidden until the player has met the character and their variant
