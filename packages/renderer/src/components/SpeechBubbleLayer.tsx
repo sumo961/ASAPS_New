@@ -41,6 +41,7 @@ import {
   type BubbleRect,
   type SpeakFrom,
   hudFramesOver,
+  HUD_LAYOUT_EVENT,
 } from '../utils/speechBubble';
 
 export interface SpeechBubbleLayerProps {
@@ -154,6 +155,9 @@ export const quoteAttr = (s: string) => s.replace(/["\\]/g, '\\$&');
  * on the picture, or else the head found on the picture as drawn (and the
  * tail stops at the head's edge), or else the top middle of its box.
  */
+/** The line before is not shown where its bubble would cover more of another character's face than this. */
+export const EARLIER_MAX_FACE_COVER = 0.3;
+
 export function aimAtSpeaker(
   speakerEl: HTMLElement | null,
   speakerRect: BubbleRect,
@@ -349,6 +353,10 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
       speaker: speakerRect,
       obstacles,
       stopShort,
+      // The line before is there for context only: it is left out rather
+      // than put over someone's face (on a full stage it landed on the face
+      // of whoever was speaking now).
+      maxFaceCover: earlier ? EARLIER_MAX_FACE_COVER : undefined,
     });
     if (!placement) return fail();
     const next: BubbleLayout = { ...placement, textWidth, textHeight, lettering };
@@ -383,7 +391,20 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
     };
     root.addEventListener('animationend', settled);
     root.addEventListener('transitionend', settled);
+    // The same for something the stage is inside (a preview easing to
+    // another zoom): what was measured on the way no longer holds.
+    const doc = root.ownerDocument;
+    const around = (e: Event) => {
+      const t = e.target as Node | null;
+      if (t && t !== root && t.contains(root)) schedule();
+    };
+    doc.addEventListener('animationend', around);
+    doc.addEventListener('transitionend', around);
+    window.addEventListener(HUD_LAYOUT_EVENT, schedule);
     return () => {
+      window.removeEventListener(HUD_LAYOUT_EVENT, schedule);
+      doc.removeEventListener('animationend', around);
+      doc.removeEventListener('transitionend', around);
       root.removeEventListener('animationend', settled);
       root.removeEventListener('transitionend', settled);
       if (frame) cancelAnimationFrame(frame);

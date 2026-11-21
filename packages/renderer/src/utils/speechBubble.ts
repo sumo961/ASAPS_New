@@ -206,6 +206,10 @@ export const OVAL_CLEAR = 0.92;
 export const LIGHT = 0.6;
 /** How much of a character's picture, from the top, is taken to be their head. */
 const HEAD_SHARE = 0.28;
+/** How much of that head, from its lower end, is taken to be the face. */
+const FACE_SHARE = 0.6;
+/** How much of the picture's width, around its middle, is taken to be the face. */
+const FACE_WIDTH = 0.6;
 
 export interface BubblePlacement {
   /** The bubble's box on the stage. */
@@ -290,6 +294,15 @@ export function placeSpeechBubble(opts: {
   stopShort?: number;
   /** 'box': a rounded box (the player's replies), whose edge reaches further at the corners than an oval's. */
   shape?: 'oval' | 'box';
+  /**
+   * The most of another character's face (as a share of it) the bubble may
+   * cover; the face is taken to be the lower part of the head, under the
+   * hair. A place that covers more counts like one on a button: any other
+   * place is better, and with no other place there is no bubble. For the
+   * player's replies, a tall box that on a full stage otherwise lands on
+   * the face of whoever just spoke.
+   */
+  maxFaceCover?: number;
 }): BubblePlacement | null {
   const { stage, size, mouth, speaker, obstacles = [] } = opts;
   const edgeAt = opts.shape === 'box' ? boxRadius : ovalRadius;
@@ -389,7 +402,17 @@ export function placeSpeechBubble(opts: {
         // worse (the top of their picture, where a head is).
         const head = { x: o.rect.x, y: o.rect.y, width: o.rect.width, height: o.rect.height * HEAD_SHARE };
         const onHead = overlap(rect, head);
-        score += (onHead / (head.width * head.height || 1)) * 600;
+        const headCover = onHead / (head.width * head.height || 1);
+        score += headCover * 600;
+        if (opts.maxFaceCover != null) {
+          // Coming down over the hair hides little; coming up over the chin and mouth hides the face.
+          // The middle of the picture's width: a face is narrower than the picture it is in.
+          const theirFace = {
+            x: head.x + head.width * (1 - FACE_WIDTH) / 2, y: head.y + head.height * (1 - FACE_SHARE),
+            width: head.width * FACE_WIDTH, height: head.height * FACE_SHARE,
+          };
+          if (overlap(rect, theirFace) / (theirFace.width * theirFace.height || 1) > opts.maxFaceCover) into = true;
+        }
         // Also tried just above that head, where there is often room.
         if (onHead > 0 && (c.moves ?? 0) < 2) candidates.push({ cx, cy: o.rect.y - 2 - ry, below: c.below, moves: (c.moves ?? 0) + 1 });
       }
@@ -413,7 +436,13 @@ export function placeSpeechBubble(opts: {
     // Any place clear of them is better than one that is not.
     if (into) score += 3000;
     if (speaker) score += (overlap(rect, speaker) / area) * 400;
-    if (face) score += (overlap(rect, face) / (face.width * face.height)) * 1500;
+    if (face) {
+      const ownFace = overlap(rect, face) / (face.width * face.height);
+      score += ownFace * 1500;
+      // Where faces are to be left alone, the speaker's own is one of them
+      // (the player's replies sat on the player's character).
+      if (opts.maxFaceCover != null && ownFace > opts.maxFaceCover) into = true;
+    }
     // Lean away from the middle of the stage, as in comics where two
     // speakers' bubbles sit above and outside them.
     score += Math.max(0, ((cx - mouth.x) / w) * towardMiddle) * 40;
@@ -421,8 +450,9 @@ export function placeSpeechBubble(opts: {
     if (!best || score < best.score) best = { score, rect, heavy, into };
   }
   // No bubble (the text box shows) when the best place still sits on a
-  // button or a panel: on a phone held upright the replies fill the width
-  // and a long line's bubble dipped into the first of them.
+  // button or a panel (or, where asked, on someone's face): on a phone held
+  // upright the replies fill the width and a long line's bubble dipped into
+  // the first of them.
   if (!best || best.score >= 10000 || best.heavy > 0.25 || best.into) return null;
 
   const { rect } = best;
@@ -646,11 +676,21 @@ export function bubbleSpeakerFor<T extends StageCharacterLike>(
  * Where the meter and inventory panels over the stage are, in page
  * coordinates: a character's own, drawn inside the stage, and screen-docked
  * ones, which the screen HUD layer draws outside it. Bubbles keep clear of
- * both. Panels that don't overlap the stage (another view's) are left out.
+ * both, and of the mood tokens at the characters (a reply bubble low on a
+ * full stage covered the token at a character's feet). Panels that don't
+ * overlap the stage (another view's) are left out.
  */
+/**
+ * Sent on the window when the screen HUD layer has drawn its panels somewhere
+ * new. They are drawn outside the stage, so nothing the bubbles watch on the
+ * stage tells them: a bubble placed while the panels were still on their way
+ * (another device size in the Preview, a panel unfolding) kept that place.
+ */
+export const HUD_LAYOUT_EVENT = 'asaps-hud-layout';
+
 export function hudFramesOver(root: HTMLElement, rootBox: { left: number; top: number; right: number; bottom: number }): DOMRect[] {
   const out: DOMRect[] = [];
-  root.ownerDocument.querySelectorAll<HTMLElement>('[data-hud-frame]').forEach((el) => {
+  root.ownerDocument.querySelectorAll<HTMLElement>('[data-hud-frame], [data-mood-token]').forEach((el) => {
     const r = el.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) return;
     if (r.right <= rootBox.left || r.left >= rootBox.right || r.bottom <= rootBox.top || r.top >= rootBox.bottom) return;

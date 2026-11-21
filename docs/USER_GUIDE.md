@@ -2695,7 +2695,7 @@ Your project's colours, text box and fonts live in [Project Settings](#global-se
 - **Buttons:** **Colour**, **Text colour**, **Border colour** and **Corners px**
 - **Fonts:** the **Title**, **Text** and **Buttons** fonts and their sizes
 
-![This beat's look, open in the Visual Editor's left panel: Boxes set to Show all boxes, the text box Colour set to a red #aa2222 and Opacity to 100, all three in bold with a ↺ beside them; the other rows show the project's values, and the header says 4 changed.](images/108-this-beats-look.png)
+![This beat's look, open in the Visual Editor's left panel: Spoken lines, Bubble width, Replies and Reply width at the project's values; under Text box, Boxes set to Show all boxes, Colour set to a red #aa2222 and Opacity to 100, all three in bold with a ↺ beside them; the other rows show the project's values, and the header says 3 changed.](images/108-this-beats-look.png)
 *Changed rows are bold; the rest show the project's values.*
 
 Each row shows the project's value until you change it. Rows you've changed turn bold, and the section's header counts them (*2 changed*). The **↺** button next to a row puts that one back to the project setting; **Use the project's look for everything** puts them all back. Every change can be undone, and picking a colour is one undo step.
@@ -2796,8 +2796,8 @@ When conditions hide some choices, the visible ones close ranks and fill the slo
 - **Start fresh (no prior state)** — what a player who has done nothing yet would see.
 - **The states a player can really arrive in** — the same [path-based states](#path-based-state-presets) the Preview's *Start as if…* menu offers, so you can check each one without playing through.
 
-![A Dialog Tree in the Visual Editor: the Dialog path bar with Root, the Show as dropdown set to All choices, and the amber strip naming the one conditional choice — "if candor (char_clare) >= 2"](images/76-dialog-choices-show-as.png)
-*"Show as" on All choices: the amber strip names the conditional choice and its condition. Pick a state from the dropdown to see the choices exactly as that player would.*
+![A Dialog Tree in the Visual Editor, two lines in: the Dialog path bar reads Root, Ingrid, Old Sven; the Show as dropdown is set to All choices; the amber strip names the one conditional choice and its condition, Ingrid's trust toward the player at 0.25 or more. On the canvas each reply carries a badge: three name the beat they lead to, the fourth reads Step in.](images/76-dialog-choices-show-as.png)
+*"Show as" on All choices: the amber strip names the conditional choice and its condition. Pick a state from the dropdown to see the choices exactly as that player would. The badges on the replies say where each one leads.*
 
 Finding those states means playing every path through the story, which takes a moment on a big project. It runs in the background as soon as you open a dialog tree: a small spinner reads **Tracing paths… n/N beats** while it works, the editor stays usable, and the states appear in the dropdown when it's done. Moving to another beat cancels the run.
 
@@ -3886,7 +3886,7 @@ The **Export** menu is grouped by what the person receiving it will do:
 
 ### HTML Export
 
-Export your story as a single standalone HTML file that anyone can open in a browser—no server needed.
+Export your story as a web page that anyone can play in a browser. Pick one standalone HTML file (no server needed, easiest to send) or a folder to upload to a website.
 
 1. Click **Export → Web page (HTML)…** (under *Publish for players*)
 2. Configure options:
@@ -3897,7 +3897,7 @@ Export your story as a single standalone HTML file that anyone can open in a bro
    - **Enable session log export** - Adds **Save Log** to the player's menu
 3. Click Export
 
-The resulting single HTML file includes the full renderer, all story data, and embedded assets. Share it via email, upload it to a website, or distribute it however you like. Recipients just double-click to play.
+Exported as *One file*, the HTML file includes the full renderer, all story data, and embedded assets. Share it via email, upload it to a website, or distribute it however you like. Recipients just double-click to play. Exported as *Folder*, you get a zip with `index.html` and the story beside it (`story.asaps.zip`): upload its contents to a web server. It loads faster for a story with many pictures or sounds, but it has to be served from a website; it won't play from a double-click. See [Deployment & Troubleshooting](#deployment--troubleshooting).
 
 **Advanced HTML Export Options:**
 - **Mobile-responsive** - Automatic font scaling and layout adaptation on phones/tablets
@@ -5179,9 +5179,9 @@ Quick reference for all beat types.
 
 **Speaker Portrait** - A small face/head image assigned to a character that appears in or above the text box during dialog. Configured in the Character Editor's Visual tab.
 
-**STT (Speech-to-Text)** - Voice input that converts spoken words to text. Used in AI Conversation beats and other input scenarios. Supports Web Speech, Whisper (OpenAI), local Whisper servers, Vosk, and whisper.cpp.
+**STT (Speech-to-Text)** - Voice input that converts spoken words to text. Used in AI Conversation beats and other input scenarios. Providers: Built-in (the browser's own recognition), Whisper (OpenAI's cloud service, which uses GPT Transcribe), Local Server, Vosk, and Whisper.cpp.
 
-**TTS (Text-to-Speech)** - The system that reads story text aloud using synthesized voices. Supports multiple providers including ElevenLabs, OpenAI, Web Speech, Local TTS (Kokoro, Coqui, Piper), and custom servers.
+**TTS (Text-to-Speech)** - The system that reads story text aloud using synthesized voices. Providers: Built-in Voices (the browser's own), ElevenLabs, OpenAI TTS, Local TTS (Kokoro, Coqui, Piper, Chatterbox), and Custom Server.
 
 **Fictional Time** - An in-story date/time value independent of real-world time. Used for day/night cycles, deadlines, and time-based branching.
 

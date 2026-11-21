@@ -422,4 +422,87 @@ describe("the player's replies and the other characters' faces", () => {
       expect(placed!.rect.y + placed!.rect.height, `stopShort ${stopShort}, mouth ${mouthY}`).toBeLessThanOrEqual(312);
     }
   });
+
+  // Four characters across the stage, mood tokens at their feet, a long
+  // line's bubble above them and four long replies: the only places left
+  // for the reply bubble were on the tokens, or on the face of whoever had
+  // just spoken.
+  const crowded = (maxFaceCover?: number) => {
+    const heavy = [[866, 87, 148, 188], [868, 10, 146, 69], [10, 10, 146, 69], [379, 98, 354, 210], [330, 704, 95, 41], [620, 704, 41, 41], [830, 704, 95, 41]]
+      .map(([x, y, width, height]) => ({ rect: { x, y, width, height }, weight: HEAVY }));
+    const others = [30, 280, 530].map((x) => ({ rect: { x, y: 310, width: 300, height: 600 }, weight: LIGHT }));
+    return { others, placed: placeSpeechBubble({
+      stage: { width: 1024, height: 768 }, size: { width: 381, height: 314 }, mouth: { x: 930, y: 408 },
+      speaker: { x: 780, y: 310, width: 300, height: 600 }, obstacles: [...heavy, ...others], stopShort: 78, shape: 'box', maxFaceCover,
+    }) };
+  };
+  // The face: the lower 60% of the head, which is the top 28% of the picture.
+  const faceCover = (rect: { x: number; y: number; width: number; height: number }, o: { x: number; y: number; width: number; height: number }) => {
+    const top = o.y + o.height * 0.28 * 0.4;
+    const bottom = o.y + o.height * 0.28;
+    const left = o.x + o.width * 0.2;
+    const right = o.x + o.width * 0.8;
+    const w = Math.min(rect.x + rect.width, right) - Math.max(rect.x, left);
+    const h = Math.min(rect.y + rect.height, bottom) - Math.max(rect.y, top);
+    return w > 0 && h > 0 ? (w * h) / ((right - left) * (bottom - top)) : 0;
+  };
+
+  it('on a full stage would land on a face', () => {
+    const { placed, others } = crowded();
+    expect(placed).not.toBeNull();
+    expect(Math.max(...others.map((o) => faceCover(placed!.rect, o.rect)))).toBeGreaterThan(0.3);
+  });
+
+  it('so stay buttons there when asked to leave faces alone', () => {
+    expect(crowded(0.3).placed).toBeNull();
+  });
+
+  it('a little of a head (the hair) is no reason to give up the bubble', () => {
+    // The same stage without the line's bubble in the way: room above the heads but for a few pixels.
+    const others = [30, 280, 530].map((x) => ({ rect: { x, y: 310, width: 300, height: 600 }, weight: LIGHT }));
+    const placed = placeSpeechBubble({
+      stage: { width: 1024, height: 768 }, size: { width: 381, height: 330 }, mouth: { x: 930, y: 408 },
+      speaker: { x: 780, y: 310, width: 300, height: 600 }, obstacles: others, stopShort: 78, shape: 'box', maxFaceCover: 0.3,
+    });
+    expect(placed).not.toBeNull();
+    expect(Math.max(...others.map((o) => faceCover(placed!.rect, o.rect)))).toBeLessThanOrEqual(0.3);
+    // It does come down over the hair.
+    expect(placed!.rect.y + placed!.rect.height).toBeGreaterThan(310);
+  });
+});
+
+describe('the line before, on a full stage', () => {
+  // Responsive layout, four characters side by side: Ingrid (left) spoke
+  // before, Tomas (next to her) speaks now and his bubble has the room above
+  // them. The only place left for Ingrid's earlier line was over Tomas.
+  const scene = (maxFaceCover?: number) => {
+    const others = [330, 590, 850].map((x) => ({ rect: { x, y: 310, width: 200, height: 460 }, weight: LIGHT }));
+    const heavy = [[174, 8, 357, 334], [10, 10, 146, 69], [868, 10, 146, 69], [866, 87, 148, 188], [648, 42, 148, 44]]
+      .map(([x, y, width, height]) => ({ rect: { x, y, width, height }, weight: HEAVY }));
+    return placeSpeechBubble({
+      stage: { width: 1024, height: 768 }, size: { width: 357, height: 334 }, mouth: { x: 170, y: 420 },
+      speaker: { x: 70, y: 310, width: 200, height: 460 }, obstacles: [...heavy, ...others], stopShort: 60, maxFaceCover,
+    });
+  };
+
+  it('would be put over the face of the one speaking now', () => {
+    const placed = scene();
+    expect(placed).not.toBeNull();
+    const face = { top: 310 + 460 * 0.28 * 0.4, bottom: 310 + 460 * 0.28 };
+    expect(placed!.rect.x + placed!.rect.width).toBeGreaterThan(330);
+    expect(placed!.rect.y).toBeLessThan(face.bottom);
+    expect(placed!.rect.y + placed!.rect.height).toBeGreaterThan(face.top);
+  });
+
+  it('goes where it covers no face (or nowhere)', () => {
+    const placed = scene(0.3);
+    if (!placed) return;
+    const top = 310 + 460 * 0.28 * 0.4;
+    const bottom = 310 + 460 * 0.28;
+    for (const x of [330, 590, 850]) {
+      const w = Math.min(placed.rect.x + placed.rect.width, x + 160) - Math.max(placed.rect.x, x + 40);
+      const h = Math.min(placed.rect.y + placed.rect.height, bottom) - Math.max(placed.rect.y, top);
+      expect(w > 0 && h > 0 ? (w * h) / (120 * (bottom - top)) : 0, `face at ${x}`).toBeLessThanOrEqual(0.3);
+    }
+  });
 });

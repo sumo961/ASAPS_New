@@ -1,5 +1,27 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.159, 2026-11-21)
+
+### Overview
+The checks left open at the v0.9.159 release, done afterwards: the device-preset sweep in both layout modes and an exported copy at two window sizes, on a throwaway story with four characters across the stage, mood tokens at their feet, corner panels and up to four long replies. The sweep found four faults in where bubbles go on a full stage, fixed here. The User Guide follow-ups from the release audit are done too.
+
+### Fixed: bubbles on a full stage
+- **Bubbles keep clear of mood tokens.** A token at a character was no obstacle to a bubble: the reply bubble, low on the stage, covered the token at a character's feet. Tokens now count like the corner panels (`hudFramesOver`).
+- **The player's replies stay buttons rather than cover a face.** With no free place left, the reply bubble landed on the face of whoever had just spoken, or on the player's own character. A place that covers more than 30% of a face (the lower part of a head, the middle of the picture's width; the speaker's own face included) now counts like one on a button: any other place is better, and with none the replies stay buttons (`maxFaceCover`, `REPLY_MAX_FACE_COVER`). Coming down over the hair is still allowed.
+- **The line before is left out rather than put over a face** (`EARLIER_MAX_FACE_COVER`). In the responsive layout it sat on the face of the character speaking now.
+- **Bubbles look again when things around the stage have come to rest.** Going from Desktop to a tablet in the Preview left the replies in a place measured while the Preview was still easing to the new zoom (over a face), because nothing on the stage itself changed afterwards. Both bubble layers now look again when a transition on something the stage is inside ends, and when the screen HUD layer says its panels have moved (`HUD_LAYOUT_EVENT`, sent when a panel is drawn somewhere new). For the replies this also starts the count of failed tries afresh, so a miss measured on the way does not leave them as buttons.
+- **Checked** in the Preview at Desktop, Tablet landscape and portrait, Phone landscape and portrait and Fit window, in both layout modes, at seven dialog states of the fixed canvas and six of the responsive layout: no bubble on a button, panel or token, nothing outside the stage, no face covered by the replies or by an earlier line. Exported (one file, AI and reading aloud off) and played through both dialog scenes at 1130×690 and at 500×780: the same, and nothing outside the window.
+- **Seen and left:** an oval bubble's rim may still reach a few pixels into a panel or button (the existing `OVAL_CLEAR` allowance). On a stage this full the fallback buttons themselves cover faces, where the story's layout puts them. Tokens at the characters are still drawn only on the fixed canvas. In the Preview at a Desktop preset on a fixed canvas the panels' reserved places are handed to the bubbles in screen rather than stage coordinates (a phantom obstacle top left; the real panels are still seen).
+- **Files:** `packages/renderer/src/utils/speechBubble.ts`, `components/{SpeechBubbleLayer,ReplyBubbleLayer,ScreenHudLayer}.tsx`, tests `tests/utils/{speechBubble,hudFramesOver}.test.ts`, `tests/components/{ReplyBubbleSettles,ScreenHudLayoutEvent}.test.tsx`
+
+### User Guide
+- Screenshots retaken: "This beat's look" (with the Spoken lines, Bubble width, Replies and Reply width rows) and the Dialog Tree's "Show as" (with the badges on the replies); captions rewritten to match.
+- HTML Export no longer opens with "a single standalone HTML file": it names both formats and says what the folder format needs.
+- The glossary's speech entries use the provider names the app shows.
+- **Files:** `docs/USER_GUIDE.md`, `docs/images/108-this-beats-look.png`, `docs/images/76-dialog-choices-show-as.png`
+
+---
+
 ## 2026-11-21: The read-aloud release: speech in every language, a live OpenAI voice, bubbles you can edit (v0.9.159)
 
 ### Overview

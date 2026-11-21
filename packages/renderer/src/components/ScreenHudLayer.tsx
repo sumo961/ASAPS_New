@@ -41,6 +41,7 @@ import { CharacterInventoryFrame, type InventoryItemData } from './CharacterInve
 import { CharacterMoodFrame, moodCardSize } from './CharacterMoodFrame';
 import { MoodRail, type MoodRailEntry } from './CharacterMoodToken';
 import { HudExplanationLayer } from './HudExplanationLayer';
+import { HUD_LAYOUT_EVENT } from '../utils/speechBubble';
 import {
   layoutScreenHuds,
   placementMap,
@@ -390,6 +391,21 @@ export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 4
     return placementMap(layoutScreenHuds(boxes.map((b) => ((drawnHeights[b.id] ?? 0) > b.height + 1 ? { ...b, height: drawnHeights[b.id] } : b)), stage));
   }, [compact, packed, boxes, drawnHeights, stage.width, stage.height]);
   const offsetFor = (id: string) => cardPlacements.get(id)?.offsetY ?? 0;
+
+  // Speech bubbles keep clear of these panels but can't see them move (they
+  // are outside the stage the bubbles watch): tell them when one has.
+  const drawnAtRef = React.useRef('');
+  React.useLayoutEffect(() => {
+    const root = layerRef.current;
+    if (!root || typeof window === 'undefined') return;
+    const drawnAt = Array.from(root.querySelectorAll<HTMLElement>('[data-hud-frame]')).map((el) => {
+      const r = el.getBoundingClientRect();
+      return `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)},${Math.round(r.height)}`;
+    }).join(';');
+    if (drawnAt === drawnAtRef.current) return;
+    drawnAtRef.current = drawnAt;
+    window.dispatchEvent(new Event(HUD_LAYOUT_EVENT));
+  });
 
   // ---- compact-mode interaction state ----
   const [expandedCorner, setExpandedCorner] = React.useState<HudCorner | null>(null);

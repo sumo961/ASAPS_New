@@ -20,4 +20,12 @@ describe('hudFramesOver', () => {
     const found = hudFramesOver(stage, { left: 0, top: 0, right: 1024, bottom: 768 });
     expect(found.map((r) => r.left)).toEqual([10, 800]);
   });
+
+  it('finds the mood tokens at the characters too', () => {
+    document.body.innerHTML = '<div id="stage"><div data-mood-token="Tomas" id="t"></div><div data-hud-frame="mood" id="m"></div></div>';
+    box(document.getElementById('t')!, 300, 640, 90, 38);
+    box(document.getElementById('m')!, 800, 80, 140, 170);
+    const found = hudFramesOver(document.getElementById('stage')!, { left: 0, top: 0, right: 1024, bottom: 768 });
+    expect(found.map((r) => r.left).sort((a, b) => a - b)).toEqual([300, 800]);
+  });
 });

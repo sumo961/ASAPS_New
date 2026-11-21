@@ -27,6 +27,7 @@ import {
   type BubbleObstacle,
   type BubbleRect,
   hudFramesOver,
+  HUD_LAYOUT_EVENT,
 } from '../utils/speechBubble';
 import { aimAtSpeaker, quoteAttr, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
 
@@ -45,6 +46,8 @@ const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, '');
  */
 /** On the stage root while the replies could not be put in a bubble and stay buttons (the line's bubble then keeps clear of them). */
 export const REPLIES_AS_BUTTONS_ATTR = 'data-replies-as-buttons';
+/** A reply bubble over more of another character's face than this stays buttons: it would hide who the player is answering. */
+export const REPLY_MAX_FACE_COVER = 0.3;
 /** After this many misses the same replies at the same size stay buttons. */
 const MAX_MISSES = 4;
 const HIDDEN: Record<string, string> = { transition: 'none', visibility: 'hidden' };
@@ -242,6 +245,7 @@ const ReplyBubbleLayer: React.FC<{
         obstacles,
         stopShort,
         shape: 'box',
+        maxFaceCover: REPLY_MAX_FACE_COVER,
       });
     } else {
       // The player is not shown: the replies come from this side of the screen.
@@ -288,7 +292,29 @@ const ReplyBubbleLayer: React.FC<{
       if (records.some((r) => !layerRef.current?.contains(r.target))) compute();
     }) : null;
     moves?.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'src', 'disabled'] });
+    // What happens around the stage is a new situation: the misses counted
+    // so far (some of them measured while things were still moving) no
+    // longer say that these replies are no bubble here.
+    const afresh = () => { triesRef.current.misses = 0; schedule(); };
+    // Screen-docked panels are drawn outside the stage: they say when they have moved.
+    window.addEventListener(HUD_LAYOUT_EVENT, afresh);
+    // Something on the stage, or something the stage is inside (a preview
+    // easing to another zoom), has come to rest: what was measured on the
+    // way no longer holds. (Going from Desktop to a tablet in the Preview
+    // left the replies over a face.)
+    const doc = root.ownerDocument;
+    const settled = (e: Event) => {
+      const t = e.target as Node | null;
+      if (!t || layerRef.current?.contains(t)) return;
+      if (t !== root && t.contains(root)) afresh();
+      else if (root.contains(t)) schedule();
+    };
+    doc.addEventListener('animationend', settled);
+    doc.addEventListener('transitionend', settled);
     return () => {
+      doc.removeEventListener('animationend', settled);
+      doc.removeEventListener('transitionend', settled);
+      window.removeEventListener(HUD_LAYOUT_EVENT, afresh);
       if (frame) cancelAnimationFrame(frame);
       resize?.disconnect();
       moves?.disconnect();
