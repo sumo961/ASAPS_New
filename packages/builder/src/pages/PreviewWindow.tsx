@@ -17,7 +17,7 @@ import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, buildLoadingTranslationMap, type UIStringKey } from '@asaps/core';
 import { harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, ConversationHistoryPanel } from '@asaps/renderer';
 import type { ConversationLine } from '@asaps/core';
-import { ReactRenderer, getAudioManager, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, type ScreenHudCharacter } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, computeStageFitScale, type ScreenHudCharacter } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -493,6 +493,19 @@ export const PreviewWindow: React.FC = () => {
     }),
     [previewViewport, designStage],
   );
+  /**
+   * The box the screen HUDs are laid out in, as in the exported player: a
+   * screen painted on the fitted stage (a fixed canvas) has its panels on
+   * that stage, scaled with it; one flowed onto the window (responsive) has
+   * them on the window. With a device preset the panels of a fixed canvas
+   * used to be laid out for the preset's box instead: in the letterbox
+   * beside the stage, where an exported story never shows them, and the
+   * stage was told of them in the wrong coordinates.
+   */
+  const [paintedStage, setPaintedStage] = useState<'stage' | 'window' | undefined>(undefined);
+  const hudOnWindow = (paintedStage ?? (previewData?.settings?.project?.layoutMode === 'responsive' ? 'window' : 'stage')) === 'window';
+  const hudStage = hudOnWindow ? activeStage : designStage;
+  const hudScale = hudOnWindow ? 1 : computeStageFitScale(activeStage, designStage, 'fit');
   // Ref mirror so renderer-setup code (which runs outside React's render
   // cycle) always reads the current preset.
   const previewViewportRef = useRef<null | { id: string; width: number; height: number; label: string }>(null);
@@ -697,14 +710,13 @@ export const PreviewWindow: React.FC = () => {
     return buildScreenHudLayout({
       characters: hudChars,
       hudOverlays: previewDataRef.current?.settings?.hudOverlays,
-      // The stage a device preset actually renders at, not the authored size.
-      // Corner anchoring is relative to the stage box, so computing against
-      // 1024×768 while the box is 1280×800 left a top-right frame 266px from
-      // the edge instead of 10 — the further the preset is from the authored
-      // size, the further the HUD drifts.
-      stage: activeStage,
+      // The box the panels are drawn in (see hudStage): the authored stage
+      // for a fixed canvas, the device preset's box for a flowed screen.
+      // Layout and drawing must use the same one, or a corner panel drifts
+      // from its corner by the difference.
+      stage: hudStage,
     });
-  }, [currentBeat, debugInfo, isRunning, activeStage]);
+  }, [currentBeat, debugInfo, isRunning, hudStage.width, hudStage.height]);
 
   /* HUD explanation — one mechanism, two triggers. The standalone `explanation`
      beat annotates behind its own text screen (its continue button advances, so
@@ -1189,6 +1201,7 @@ export const PreviewWindow: React.FC = () => {
       });
       // Dev-only hook so automated checks can read the live renderer (theme, state).
       if (import.meta.env.DEV) (window as any).__previewRenderer = reactRenderer;
+      reactRenderer.subscribeToPaintedStage((mode) => setPaintedStage(mode));
 
       // Keep the renderer's own fit scaling on. PreviewWindow scales the
       // whole stage box (zoom); the renderer fits a fixed canvas into that
@@ -3465,13 +3478,28 @@ export const PreviewWindow: React.FC = () => {
                   subscribes to characterMoodChanged events, so this layer
                   re-renders whenever mood updates. */}
               {screenHud && (
-                <ScreenHudLayer
-                  layout={screenHud}
-                  stage={activeStage}
-                  palette={previewDataRef.current?.emotionPalette}
-                  explanation={hudExplanation}
-                  collapseKey={currentBeat?.id}
-                />
+                /* Same box, centring and scale as the renderer's fitted stage (the exported player does the same). */
+                <div
+                  data-testid="preview-hud-box"
+                  style={{
+                    position: 'absolute',
+                    left: '50%', top: '50%',
+                    width: hudStage.width, height: hudStage.height,
+                    transform: `translate(-50%, -50%) scale(${hudScale})`,
+                    transformOrigin: 'center center',
+                    pointerEvents: 'none',
+                    zIndex: 40,
+                  }}
+                >
+                  <ScreenHudLayer
+                    layout={screenHud}
+                    stage={hudStage}
+                    palette={previewDataRef.current?.emotionPalette}
+                    explanation={hudExplanation}
+                    collapseKey={currentBeat?.id}
+                    zIndex={0}
+                  />
+                </div>
               )}
               {messagesOpen && (
                 <ConversationHistoryPanel
