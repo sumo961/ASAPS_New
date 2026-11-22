@@ -24,7 +24,7 @@ STT is brought in line with TTS (author's request, 2026-11-22). The switches mea
 ### New: the conversation's microphone uses OpenAI transcription and plain Whisper servers (record, then transcribe)
 - **State before:** the microphone used a configured speech-input service only if it transcribes while one speaks (browser, whisper.cpp, Vosk). With OpenAI (`gpt-transcribe`) or a plain local Whisper server set up, it used the browser's recognition instead and the configured service was never called. (The author's earlier successful tests ran on the streaming recognisers, which are unchanged.)
 - The providers could record and transcribe all along (`startListening` / `stopListening`); the conversation input now uses them: a click starts the recording, a second click ends it, the text arrives in the field and is sent after the usual moment. It does not start by itself (nothing would stop it), the browser's recognition stays out of it, the field shows "..." while the text is on its way, and a recording nobody stops ends after 60 s (`RECORDING_CAP_MS`).
-- Test: `ReactRenderer.test.tsx` (1 new). **Not run in the Preview with a real setup** (the author's STT setup is the browser's); the same path was run for exports, below.
+- Test: `ReactRenderer.test.tsx` (1 new). **Checked against the service (2026-11-22)**, in the dev app without microphone or sound: the builder's OpenAI provider driven as the microphone now drives it (start, a German sentence fed in as if spoken, stop) returned the sentence word for word from `gpt-transcribe`, 1.6 s after the stop. Not seen in a running Preview conversation (the author's STT setup is the browser's).
 
 ### New: voice input through the relay (OpenAI transcription in exported stories)
 - **The relay** takes `target: 'transcribe'` for OpenAI: the recording comes as base64 with its type, is checked (a transcription model, an audio type, at most about 5 MB) and passed to `/v1/audio/transcriptions` as the file it expects; `languages[]` for `gpt-transcribe`, `language` for the older models. A refusal keeps its status and message.
@@ -39,7 +39,10 @@ STT is brought in line with TTS (author's request, 2026-11-22). The switches mea
 
 ### User Guide: the picture cards of Choose Your Character, retaken (author's request, 2026-11-22)
 - `83-choose-your-character-pictures.png` showed one portrait and one initial (the second character had no picture). Retaken with two portraits, on a throwaway copy of the author's Red Riding Hood story given a "Whose story is it?" choice between Red and the Wolf (Preview, fixed canvas, cropped to the question and the cards). Alt text and caption rewritten; that a character without a picture shows their initial stays in the text above.
-- **Seen while taking it:** on this fixed canvas the question and the cards sit right of centre (about 80 px), beside the meter panel in the bottom-left corner. Not looked into.
+- **Seen while taking it:** the question and the cards sit right of centre (about 80 px), beside the meter panel in the bottom-left corner. That is the flow layout's own rule (`computeFlowReserve`): a narrow panel in a corner is stepped around sideways instead of pushing everything below or above it, so the column is indented by the panel's width. By design; on a screen whose content never reaches the panel's height it costs the centring.
+
+### Tests: the renderer tests take the stage down after each test (pushed on its own, 2026-11-22)
+- CI went red on a docs-only push: "window is not defined" from a text animation's timer in `ReactRenderer.test.tsx`, firing after the test environment was gone. The renderer has no `destroy()`, so the tests' teardown called nothing and the tree stayed mounted. Seen once locally before. The tests now unmount the root after each test.
 
 ---
 
