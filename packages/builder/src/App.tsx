@@ -7158,8 +7158,19 @@ function App() {
       }
     }
 
-    // Deduplicate: combine beat speakers + character names
-    const allSpeakers = new Set([...beatSpeakers, ...charNames]);
+    // Deduplicate: combine beat speakers + character names. A beat may name
+    // a character by its internal name or id (an AI Conversation's partner
+    // "karin" for the character shown as "Karin Lindqvist"): that is the
+    // same speaker, listed once, under the name the story shows. It was
+    // listed twice, each with a voice of its own to choose.
+    const shownAs = new Map<string, string>();
+    for (const c of characters) {
+      const shown = c.displayName || c.name;
+      if (!shown) continue;
+      for (const key of [c.name, c.id]) if (key && key !== shown) shownAs.set(key, shown);
+    }
+    const allSpeakers = new Set([...beatSpeakers, ...charNames].map((s) => shownAs.get(s) ?? s));
+    allSpeakers.delete(playerKey);
     return ['Narrator', playerKey, ...allSpeakers];
   }, [state.beats, playerCharacterName, characters]);
   storySpeakersRef.current = storySpeakers;

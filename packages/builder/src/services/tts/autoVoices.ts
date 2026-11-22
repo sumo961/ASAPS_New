@@ -86,6 +86,22 @@ export function autoSpeakerVoices(input: {
   return out;
 }
 
+/**
+ * The author's choices, also under the other names of the same character:
+ * a voice chosen for "Karin Lindqvist" reads a line attributed to "karin".
+ * A name with a choice of its own keeps it.
+ */
+export function voicesUnderAllNames(assigned: Record<string, string> | null | undefined, sameSpeaker: ReadonlyArray<ReadonlyArray<string>>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [speaker, voice] of Object.entries(assigned ?? {})) if (voice) out[speaker] = voice;
+  for (const group of sameSpeaker) {
+    const voice = group.map((n) => out[n]).find(Boolean);
+    if (!voice) continue;
+    for (const name of group) out[name] ??= voice;
+  }
+  return out;
+}
+
 /** The names each character goes by, for `sameSpeaker`. */
 export function speakerNameGroups(characters: ReadonlyArray<{ id?: string; name?: string; displayName?: string }> | null | undefined): string[][] {
   return (characters ?? []).map((c) => [...new Set([c.displayName, c.name, c.id].filter(Boolean) as string[])]).filter((g) => g.length > 1);

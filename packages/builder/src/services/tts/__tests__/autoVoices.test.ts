@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { autoSpeakerVoices, autoVoicesApply, speakerGenders, speakerNameGroups } from '../autoVoices';
+import { autoSpeakerVoices, autoVoicesApply, speakerGenders, speakerNameGroups, voicesUnderAllNames } from '../autoVoices';
 
 const voices = [
   { id: 'alloy', gender: 'neutral' as const }, { id: 'ash', gender: 'male' as const }, { id: 'coral', gender: 'female' as const },
@@ -58,6 +58,15 @@ describe('a voice of their own for speakers nobody chose one for', () => {
     expect(autoSpeakerVoices({ speakers: ['karin', 'Karin Lindqvist'], assigned: { 'Karin Lindqvist': 'coral' }, voices, sameSpeaker })).toEqual({ karin: 'coral' });
     // The player's character under another name stays silent too.
     expect(autoSpeakerVoices({ speakers: ['mara', 'Sven'], voices, playerKeys: ['Mara'], sameSpeaker })).toEqual({ Sven: 'ash' });
+  });
+
+  it('a chosen voice goes for the character\'s other names too, unless one has its own', () => {
+    const groups = [['Karin Lindqvist', 'karin'], ['Mara', 'mara', 'char_mara']];
+    expect(voicesUnderAllNames({ 'Karin Lindqvist': 'laura', Sven: 'roger', Mara: '' }, groups)).toEqual({ 'Karin Lindqvist': 'laura', karin: 'laura', Sven: 'roger' });
+    // A voice once chosen under the internal name still counts, for the shown name as well.
+    expect(voicesUnderAllNames({ karin: 'old' }, groups)).toEqual({ karin: 'old', 'Karin Lindqvist': 'old' });
+    expect(voicesUnderAllNames({ karin: 'old', 'Karin Lindqvist': 'laura' }, groups)).toEqual({ karin: 'old', 'Karin Lindqvist': 'laura' });
+    expect(voicesUnderAllNames(undefined, groups)).toEqual({});
   });
 });
 

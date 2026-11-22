@@ -259,6 +259,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         readPrompts: ttsSettings?.readPrompts !== false,
         relayUrl: speechRelayUrl,
         autoVoices: await exportAutoVoices(ttsSettings?.speakerVoices),
+        sameSpeaker: speakerNameGroups(characters),
       });
 
       const options: HtmlExportOptions = {
@@ -352,6 +353,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         readPrompts: ttsSettings?.readPrompts !== false,
         relayUrl: speechRelayUrl,
         autoVoices: await exportAutoVoices(ttsSettings?.speakerVoices),
+        sameSpeaker: speakerNameGroups(characters),
       });
       const options: HtmlExportOptions = {
         mode,

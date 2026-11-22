@@ -19,7 +19,7 @@
 
 import type { SavedTTSConfig } from '../hooks/useTTS';
 import type { HtmlExportOptions } from './HtmlExporter';
-import { autoVoicesApply } from '../services/tts/autoVoices';
+import { autoVoicesApply, voicesUnderAllNames } from '../services/tts/autoVoices';
 
 export type ExportSpeechSource = 'browser' | 'setup';
 
@@ -75,6 +75,8 @@ export function exportSpeechOptions(input: {
    * menu have them (services/tts/autoVoices). The author's own choices win.
    */
   autoVoices?: Record<string, string>;
+  /** Names that are one speaker (a character's display name, name and id): a chosen voice goes for all of them. */
+  sameSpeaker?: ReadonlyArray<ReadonlyArray<string>>;
 }): SpeechOptions {
   const { readAloud, source, saved, speakerVoices, readPrompts } = input;
   const useSetup = readAloud && source === 'setup' && summarizeSpeechSetup(saved).kind !== 'none';
@@ -84,6 +86,7 @@ export function exportSpeechOptions(input: {
   // The relay knows OpenAI's and ElevenLabs' own addresses only, so a
   // setup pointing elsewhere keeps its key and address.
   const relayed = !!input.relayUrl && speechCanUseRelay(saved);
+  const chosen = voicesUnderAllNames(pickSet(speakerVoices?.[saved.providerType]), input.sameSpeaker ?? []);
   return {
     ttsProvider: saved.providerType,
     ttsApiKey: relayed ? undefined : saved.apiKey,
@@ -93,8 +96,8 @@ export function exportSpeechOptions(input: {
     ttsDefaultVoiceId: saved.defaultVoiceId,
     ttsReadPrompts: readPrompts,
     ttsSpeakerVoices: autoVoicesApply(saved.providerType) && input.autoVoices && Object.keys(input.autoVoices).length > 0
-      ? { ...input.autoVoices, ...pickSet(speakerVoices?.[saved.providerType]) }
-      : speakerVoices?.[saved.providerType],
+      ? { ...input.autoVoices, ...chosen }
+      : (input.sameSpeaker?.length ? chosen : speakerVoices?.[saved.providerType]),
     ttsEnabled: true,
   };
 }

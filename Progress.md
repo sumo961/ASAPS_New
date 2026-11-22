@@ -33,6 +33,15 @@ The relay of an exported story carries reading aloud too, so OpenAI and ElevenLa
 
 **Files modified:** `packages/builder/src/components/Header.tsx`, `packages/builder/src/components/export/HtmlExportDialog.tsx`
 
+### Fixed: a character listed twice under Character Voices (author report, 2026-11-22)
+- The TTS menu showed "Karin Lindqvist" and "karin", each with a voice to choose. The Rehearsal template's AI Conversation names its partner by the character's internal name (`npcName: "karin"`), and the speaker list added that name beside the character's display name.
+- A speaker named by a character's internal name or id is now listed once, under the name the story shows (`storySpeakers` in `App.tsx`).
+- A voice chosen for a character also reads lines attributed to their other names (`voicesUnderAllNames`), in the Preview and in exports, for every speech setup. A voice once chosen under the internal name still counts.
+- **Checked** in the browser on the Rehearsal template: the list is Narrator, Interactor, Karin Lindqvist.
+- Tests: `autoVoices.test.ts` (1 new), `exportSpeech.test.ts` (1 new).
+
+**Files modified:** `packages/builder/src/App.tsx`, `packages/builder/src/services/tts/autoVoices.ts`, `packages/builder/src/pages/PreviewWindow.tsx`, `packages/builder/src/export/exportSpeech.ts`, `packages/builder/src/components/export/HtmlExportDialog.tsx`
+
 ### New: `deploy.sh` in the relay zip (author's request, 2026-11-22)
 - Path B of the relay README (Netlify CLI) as one script, generated with the export (`buildRelayDeployScript`): checks for Node.js and the export's files, logs in (the CLI's `status` ends without an error when logged out, so its JSON answer is read), creates and links the site (`sites:create`) unless the folder already has one, asks for the keys, deploys and opens the story in the browser (`deploy --prod --open`; the opening added after the author's first run, 2026-11-22). Setting the keys before the first deploy saves the second deploy the README asks for.
 - It asks only for the keys this export needs (`relayKeysFor`: the AI's provider when the AI uses the relay, the voices' provider when they do).

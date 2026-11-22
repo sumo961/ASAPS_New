@@ -74,5 +74,10 @@ describe('what an export carries for reading aloud', () => {
     const o = exportSpeechOptions({ readAloud: true, source: 'setup', saved: eleven, speakerVoices: voices, readPrompts: true, autoVoices: { Tomas: 'ash' } });
     expect(o.ttsSpeakerVoices).toEqual({ Ingrid: 'voice-ingrid' });
   });
+
+  it('ElevenLabs: a voice chosen for a character reads their lines under any of their names', () => {
+    const o = exportSpeechOptions({ readAloud: true, source: 'setup', saved: eleven, readPrompts: true, speakerVoices: { elevenlabs: { 'Karin Lindqvist': 'voice-laura' } }, sameSpeaker: [['Karin Lindqvist', 'karin']] });
+    expect(o.ttsSpeakerVoices).toEqual({ 'Karin Lindqvist': 'voice-laura', karin: 'voice-laura' });
+  });
 });
 

@@ -30,7 +30,7 @@ import { InputTextValuesModal } from '../components/preview/InputTextValuesModal
 import { getSavedAIConfig, getRuntimeAIConfig } from '../hooks/useAI';
 import { getTTSService, WebSpeechProvider, OpenAITTSProvider, ElevenLabsProvider, CustomTTSProvider, LocalTTSProvider } from '../services/tts';
 import { getSavedTTSConfig } from '../hooks/useTTS';
-import { autoSpeakerVoices, autoVoicesApply, speakerGenders, speakerNameGroups } from '../services/tts/autoVoices';
+import { autoSpeakerVoices, autoVoicesApply, speakerGenders, speakerNameGroups, voicesUnderAllNames } from '../services/tts/autoVoices';
 import { getSTTService, WebSpeechSTTProvider, WhisperSTTProvider, LocalSTTProvider, VoskSTTProvider, WhisperCppSTTProvider } from '../services/stt';
 import { getSavedSTTConfig } from '../hooks/useSTT';
 import { resolvePortraitUrl } from '../utils/speakerUtils';
@@ -1761,7 +1761,8 @@ export const PreviewWindow: React.FC = () => {
     {
       const allVoices = previewData.settings?.tts?.speakerVoices as Record<string, Record<string, string>> | undefined;
       const providerKey = getSavedTTSConfig()?.providerType || previewData.settings?.tts?.providerType || 'web-speech';
-      const persistedVoices = allVoices?.[providerKey];
+      // Under every name of the character: a line may name them by their internal name.
+      const persistedVoices = voicesUnderAllNames(allVoices?.[providerKey], speakerNameGroups(previewData.characters));
       if (persistedVoices && Object.keys(persistedVoices).length > 0) {
         const ttsService = getTTSService();
         for (const [speaker, voiceId] of Object.entries(persistedVoices)) {
