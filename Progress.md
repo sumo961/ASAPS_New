@@ -3,7 +3,17 @@
 ## Unreleased (since v0.9.163, 2026-11-22)
 
 ### Overview
-The Preview's speech buttons apply to that Preview only.
+STT is being brought in line with TTS (author's request, 2026-11-22). First step: the switches mean what they say. The Preview's speech buttons apply to that Preview only; a conversation has no microphone while STT is switched off; an export carries voice input only with STT switched on in the app.
+
+### Changed: no microphone while STT is switched off, in the Preview and in exports
+- **State before:** a conversation that allows voice input showed its microphone whatever the STT switch said: with the host's speech-input service switched off, the input fell back to the browser's own recognition. An export always offered the microphone (browser recognition), and nothing in the export window but a line of text said so.
+- **Preview:** where the host handed over its speech-input service and it is switched off, the conversation input offers no microphone (`voiceInputOff` in `ReactRenderer.renderConversationInput`). A host without any such service still gets the browser's recognition.
+- **Exports** follow the app's STT switch as they follow the TTS switch: `sttEnabled` in the page's settings (`HtmlExportOptions.sttEnabled`), read by `WebSTTService`. The export window says "Voice input is on…" or "Voice input is off: STT is switched off in the app…".
+- **Behaviour change:** STT is off in the app unless switched on, so a story exported without switching it on no longer has a microphone in its conversations.
+- **Checked** in an isolated browser on the Rehearsal template with voice input enabled on its conversation: exported with STT off the page holds `sttEnabled: false` and its speech-input service starts disabled; with STT on, `true` and enabled; the export window shows the matching line. The microphone itself was not seen in an export (without an AI setup the conversation is skipped); the rule is tested in `ReactRenderer.test.tsx` (3 new).
+- **Still to do (agreed):** record-then-transcribe in the conversation input, so OpenAI transcription and plain Whisper servers are used where configured (today the microphone uses only recognisers that transcribe while one speaks, and quietly the browser's otherwise); OpenAI transcription in exports through the relay.
+
+**Files modified:** `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/player-web/src/WebSTTProvider.ts`, `packages/builder/src/export/HtmlExporter.ts`, `packages/builder/src/components/export/HtmlExportDialog.tsx`, `packages/builder/public/player-web.js`, `docs/USER_GUIDE.md`
 
 ### Changed: the Preview's TTS and STT buttons no longer change the app's switches (author's decision, 2026-11-22)
 - The Preview's TTS button stored the same setting as the header's (`asaps_tts_enabled`). Switched off in a Preview, reading aloud was off in the app too, and since v0.9.163 the next export then carried no speech. The STT button did the same with `asaps_stt_enabled`.

@@ -133,6 +133,11 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     try { return localStorage.getItem('asaps_tts_enabled') !== 'false'; } catch { return true; }
   }, [isOpen]);
   const speechOn = exportSpeech && appTtsOn;
+  // Voice input goes by the app's STT switch in the same way (off unless switched on).
+  const appSttOn = useMemo(() => {
+    if (!isOpen) return false;
+    try { return localStorage.getItem('asaps_stt_enabled') === 'true'; } catch { return false; }
+  }, [isOpen]);
   const speechRelayUrl = speechOn && speechSource === 'setup' && speechAccess === 'relay' && speechRelayPossible
     ? (aiProxyUrl.trim() || DEFAULT_RELAY_PATH)
     : undefined;
@@ -273,6 +278,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         aiBaseUrl: needsAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
         aiModel: needsAIConfig && aiModel ? aiModel : undefined,
         ...speech,
+        sttEnabled: appSttOn,
         existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
         enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
         showSessionLog,
@@ -325,7 +331,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [speechOn, speakers, characters, speechRelayUrl, mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
+  }, [appSttOn, speechOn, speakers, characters, speechRelayUrl, mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
 
   // Called from the size-warning banner's "Continue anyway" button.
   // Reuses the pre-computed zip so the user isn't waiting for it twice.
@@ -366,6 +372,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         aiBaseUrl: needsAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
         aiModel: needsAIConfig && aiModel ? aiModel : undefined,
         ...speech,
+        sttEnabled: appSttOn,
         existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
         enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
         showSessionLog,
@@ -380,7 +387,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [speechOn, speakers, characters, speechRelayUrl, aiAccess, aiProxyUrl, sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
+  }, [appSttOn, speechOn, speakers, characters, speechRelayUrl, aiAccess, aiProxyUrl, sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
 
   const handleSwitchToFolder = useCallback(() => {
     setSizeWarning(null);
@@ -960,8 +967,10 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
               </div>
             )}
 
-            <p className="mt-3 ml-7 text-xs text-gray-500">
-              Voice input (the microphone in conversations) uses the browser's own speech recognition in an exported story. Nothing is exported for it.
+            <p className={`mt-3 ml-7 text-xs ${appSttOn ? 'text-gray-500' : 'text-amber-700'}`} data-testid="export-voice-input">
+              {appSttOn
+                ? "Voice input is on: where a conversation allows it, players get a microphone that uses the browser's own speech recognition. Nothing of your STT setup is exported."
+                : 'Voice input is off: STT is switched off in the app, so this story is exported without a microphone in conversations. Switch it on with the STT button in the header and open this window again.'}
             </p>
           </div>
 

@@ -57,8 +57,11 @@ export class WebSTTService {
         this.config = { provider: 'web-speech' };
       }
     }
+    // A story exported with voice input off (the app's STT switch at export
+    // time): the microphone stays away.
+    try { if ((window as any).ASAPS_CONFIG?.sttEnabled === false) this.enabled = false; } catch { /* as configured */ }
     if (this.config) {
-      console.log(`[WebSTT] Initialized with provider: ${this.config.provider}`);
+      console.log(`[WebSTT] Initialized with provider: ${this.config.provider}, enabled: ${this.enabled}`);
     }
   }
 

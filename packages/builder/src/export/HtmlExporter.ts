@@ -135,6 +135,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
       storyData: '{{STORY_DATA}}',
       aiConfig: {{AI_CONFIG}},
       ttsConfig: {{TTS_CONFIG}},
+      sttEnabled: {{STT_ENABLED}},
       mobileScalingMode: '{{MOBILE_SCALING_MODE}}',
       mobileFontScale: {{MOBILE_FONT_SCALE}},
       ttsLanguage: '{{TTS_LANGUAGE}}',
@@ -326,6 +327,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
       storyData: '{{ORIGINAL_STORY_DATA}}',
       aiConfig: {{AI_CONFIG}},
       ttsConfig: {{TTS_CONFIG}},
+      sttEnabled: {{STT_ENABLED}},
       mobileScalingMode: '{{MOBILE_SCALING_MODE}}',
       mobileFontScale: {{MOBILE_FONT_SCALE}},
       ttsLanguage: '{{TTS_LANGUAGE}}',
@@ -1066,6 +1068,13 @@ export interface HtmlExportOptions {
    */
   ttsEnabled?: boolean;
   /**
+   * Voice input (the microphone in an AI Conversation) in the exported
+   * player: the app's STT switch at export time. False keeps the microphone
+   * away; left out or true, it is offered where the beat allows it and the
+   * browser can listen.
+   */
+  sttEnabled?: boolean;
+  /**
    * Override the starting beat for this export (v0.9.49+). When
    * supplied, the exported metadata.firstBeatId is replaced so the
    * published story always begins at this beat. Picked from a
@@ -1260,6 +1269,7 @@ async function exportAsSingleFile(
     .replace("'{{STORY_DATA}}'", `'${storyBase64}'`)
     .replace('{{AI_CONFIG}}', aiConfig)
     .replace('{{TTS_CONFIG}}', ttsConfig)
+    .replace('{{STT_ENABLED}}', options.sttEnabled === false ? 'false' : 'true')
     .replace('{{TTS_LANGUAGE}}', project.globalSettings?.translation?.sourceLanguage || 'en')
     .replace('{{SHOW_SESSION_LOG}}', String(options.showSessionLog ?? false))
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
@@ -1317,6 +1327,7 @@ async function exportAsFolder(
     .replace("'{{STORY_DATA}}'", "''")  // Empty for folder mode
     .replace('{{AI_CONFIG}}', aiConfig)
     .replace('{{TTS_CONFIG}}', ttsConfig)
+    .replace('{{STT_ENABLED}}', options.sttEnabled === false ? 'false' : 'true')
     .replace('{{TTS_LANGUAGE}}', project.globalSettings?.translation?.sourceLanguage || 'en')
     .replace('{{SHOW_SESSION_LOG}}', String(options.showSessionLog ?? false))
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
@@ -1671,6 +1682,7 @@ export async function downloadHtmlExport(
     .replace("'{{ORIGINAL_STORY_DATA}}'", `'${originalBase64}'`)
     .replace('{{AI_CONFIG}}', aiConfig)
     .replace('{{TTS_CONFIG}}', ttsConfig)
+    .replace('{{STT_ENABLED}}', options.sttEnabled === false ? 'false' : 'true')
     .replace('{{TTS_LANGUAGE}}', project.globalSettings?.translation?.sourceLanguage || 'en')
     .replace('{{TTS_SPEAKER_ALIASES}}', JSON.stringify(ttsSpeakerAliases))
     .replace('{{SHOW_SESSION_LOG}}', String(options.showSessionLog ?? false))

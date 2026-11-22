@@ -510,3 +510,35 @@ describe('ReactRenderer on-demand inventory at a character follows the switch at
     await waitFor(() => expect(count()).toBe(1));
   });
 });
+
+// The microphone appeared with voice input switched off: the conversation
+// fell back to the browser's own recognition whatever the host's switch said.
+describe('the conversation\'s microphone follows the host\'s voice-input switch', () => {
+  const mic = () => container.querySelector('button[title="Start voice input"]');
+  const service = (enabled: boolean) => ({ isEnabled: () => enabled, getActiveProvider: () => undefined, stopListening: () => {} });
+  beforeEach(() => { (window as any).webkitSpeechRecognition = class { start() {} stop() {} abort() {} }; });
+  afterEach(() => { delete (window as any).webkitSpeechRecognition; });
+
+  it('no microphone while the host\'s service is switched off', async () => {
+    renderer.setState('sttService', service(false));
+    void renderer.renderConversationInput({ showMic: true, speaker: 'Karin', npcText: 'Yes?' });
+    await waitFor(() => expect(container.querySelector('input, textarea')).toBeTruthy());
+    expect(mic()).toBeNull();
+  });
+
+  it('a microphone with it on, and where the host has no service at all (the browser listens)', async () => {
+    renderer.setState('sttService', service(true));
+    void renderer.renderConversationInput({ showMic: true, speaker: 'Karin', npcText: 'Yes?' });
+    await waitFor(() => expect(mic()).toBeTruthy());
+    renderer.setState('sttService', undefined);
+    void renderer.renderConversationInput({ showMic: true, speaker: 'Karin', npcText: 'And?' });
+    await waitFor(() => expect(mic()).toBeTruthy());
+  });
+
+  it('none where the beat does not allow voice input', async () => {
+    renderer.setState('sttService', service(true));
+    void renderer.renderConversationInput({ showMic: false, speaker: 'Karin', npcText: 'Yes?' });
+    await waitFor(() => expect(container.querySelector('input, textarea')).toBeTruthy());
+    expect(mic()).toBeNull();
+  });
+});

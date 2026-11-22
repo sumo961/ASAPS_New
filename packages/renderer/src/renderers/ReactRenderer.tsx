@@ -1959,7 +1959,12 @@ export class ReactRenderer extends BaseRenderer {
 
       // Check if browser has native SpeechRecognition (fallback for streaming auto-listen)
       // Only use if voice input is enabled (options.showMic)
-      const SpeechRecognitionClass = options.showMic !== false
+      // Not while voice input is switched off: the host handed over its
+      // speech-input service and it is disabled (the app's STT switch, or a
+      // story exported with it off). The microphone used to appear anyway,
+      // on the browser's own recognition.
+      const voiceInputOff = !!rawSttService && rawSttService.isEnabled?.() === false;
+      const SpeechRecognitionClass = options.showMic !== false && !voiceInputOff
         ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
         : null;
       // Check if the configured STT service supports streaming (Vosk, Whisper.cpp, Web Speech)
