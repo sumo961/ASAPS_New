@@ -346,18 +346,27 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
 
     const { mouth, stopShort } = aimAtSpeaker(speakerEl, speakerRect, speakFrom, flipX, toStage, headFound);
 
-    const placement = placeSpeechBubble({
+    const placeAround = (around: BubbleObstacle[]) => placeSpeechBubble({
       stage: { width: stageW, height: stageH },
       size,
       mouth,
       speaker: speakerRect,
-      obstacles,
+      obstacles: around,
       stopShort,
       // The line before is there for context only: it is left out rather
       // than put over someone's face (on a full stage it landed on the face
       // of whoever was speaking now).
       maxFaceCover: earlier ? EARLIER_MAX_FACE_COVER : undefined,
     });
+    // Where the player's replies have their bubble (ReplyBubbleLayer says
+    // so on the stage root): this line keeps clear of it where it can, and
+    // comes first where it can't. Read from the root, not from the bubble
+    // itself, which is drawn a moment after its place is known.
+    const replyAt = earlier ? null : (root.getAttribute('data-reply-bubble-at') || '').split(',').map(Number);
+    const replyObstacle: BubbleObstacle[] = replyAt && replyAt.length === 4 && replyAt.every((n) => Number.isFinite(n)) && replyAt[2] > 0 && replyAt[3] > 0
+      ? [{ rect: { x: replyAt[0], y: replyAt[1], width: replyAt[2], height: replyAt[3] }, weight: HEAVY }]
+      : [];
+    const placement = (replyObstacle.length > 0 ? placeAround([...obstacles, ...replyObstacle]) : null) ?? placeAround(obstacles);
     if (!placement) return fail();
     const next: BubbleLayout = { ...placement, textWidth, textHeight, lettering };
     if (!sameLayout(layoutRef.current, next)) { layoutRef.current = next; setLayout(next); }
@@ -382,7 +391,7 @@ export const SpeechBubbleLayer: React.FC<SpeechBubbleLayerProps> = ({
     const moves = typeof MutationObserver !== 'undefined' ? new MutationObserver((records) => {
       if (records.some((r) => !layerRef.current?.contains(r.target))) schedule();
     }) : null;
-    moves?.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'src', 'data-replies-as-buttons'] });
+    moves?.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'src', 'data-replies-as-buttons', 'data-reply-bubble-at'] });
     // Buttons that slide or fade in change nothing in the DOM while they
     // move: look again where they come to rest (a bubble placed while the
     // replies were still on their way ended up on the first of them).

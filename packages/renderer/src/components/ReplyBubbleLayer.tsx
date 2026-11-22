@@ -48,6 +48,15 @@ const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, '');
 export const REPLIES_AS_BUTTONS_ATTR = 'data-replies-as-buttons';
 /** A reply bubble over more of another character's face than this stays buttons: it would hide who the player is answering. */
 export const REPLY_MAX_FACE_COVER = 0.3;
+/**
+ * Where the replies' bubble is, or is about to be, in stage pixels
+ * ("x,y,width,height" on the stage root). The line's bubble keeps clear of
+ * it. Without this the line went back to the place it likes best as soon as
+ * the replies stopped being buttons, which is where their bubble has to go:
+ * the two took turns thirty times a second (author report, 2026-11-22, the
+ * wolf in the forest).
+ */
+export const REPLY_BUBBLE_AT_ATTR = 'data-reply-bubble-at';
 /** After this many misses the same replies at the same size stay buttons. */
 const MAX_MISSES = 4;
 const HIDDEN: Record<string, string> = { transition: 'none', visibility: 'hidden' };
@@ -148,7 +157,15 @@ const ReplyBubbleLayer: React.FC<{
     const layer = layerRef.current;
     const measure = measureRef.current;
     const root = layer?.parentElement;
+    const holdPlace = (r: BubbleRect | null) => {
+      const el = layerRef.current?.parentElement;
+      if (!el) return;
+      const at = r ? [r.x, r.y, r.width, r.height].map((n) => Math.round(n)).join(',') : null;
+      if (at === null) { if (el.hasAttribute(REPLY_BUBBLE_AT_ATTR)) el.removeAttribute(REPLY_BUBBLE_AT_ATTR); }
+      else if (el.getAttribute(REPLY_BUBBLE_AT_ATTR) !== at) el.setAttribute(REPLY_BUBBLE_AT_ATTR, at);
+    };
     const fail = () => {
+      holdPlace(null);
       restore();
       buttonsRef.current = [];
       if (layoutRef.current) { layoutRef.current = null; setLayout(null); }
@@ -265,16 +282,25 @@ const ReplyBubbleLayer: React.FC<{
       // the replies were buttons a moment ago: told to keep clear of them, it
       // moved into the one place this bubble has, and so they stayed buttons
       // for good. Take the word back and look again once it has gone back.
-      if (lineBubbles.length > 0 && root.hasAttribute(REPLIES_AS_BUTTONS_ATTR) && place(obstacles)) {
+      const without = lineBubbles.length > 0 && root.hasAttribute(REPLIES_AS_BUTTONS_ATTR) ? place(obstacles) : null;
+      if (without) {
         if (triesRef.current.seen !== situation) { triesRef.current.seen = situation; triesRef.current.misses += 1; }
-        root.removeAttribute(REPLIES_AS_BUTTONS_ATTR);
         fail();
+        // The line is told where this bubble wants to be before it is told
+        // that the buttons are gone, so it doesn't settle there.
+        holdPlace(without.rect);
+        root.removeAttribute(REPLIES_AS_BUTTONS_ATTR);
         againRef.current();
         return;
       }
       return staysButtons(situation);
     }
+    holdPlace(placement.rect);
     if (root.hasAttribute(REPLIES_AS_BUTTONS_ATTR)) root.removeAttribute(REPLIES_AS_BUTTONS_ATTR);
+    // Placed: a miss after this is a new one even where the stage looks the
+    // same as at the last miss. (Counting each situation once let a to-and-fro
+    // between two arrangements go on for ever: it was always the same miss.)
+    triesRef.current.seen = undefined;
 
     buttonsRef.current = buttons;
     const nowDisabled = buttons.map((b) => b.disabled);
@@ -354,7 +380,7 @@ const ReplyBubbleLayer: React.FC<{
   React.useEffect(() => () => restore(), [restore]);
   React.useEffect(() => {
     const root = layerRef.current?.parentElement;
-    return () => root?.removeAttribute(REPLIES_AS_BUTTONS_ATTR);
+    return () => { root?.removeAttribute(REPLIES_AS_BUTTONS_ATTR); root?.removeAttribute(REPLY_BUBBLE_AT_ATTR); };
   }, []);
 
   // The stage lights the player's character while their replies are up.

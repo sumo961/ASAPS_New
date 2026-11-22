@@ -5,6 +5,15 @@
 ### Overview
 The relay of an exported story carries reading aloud too, so OpenAI and ElevenLabs voices work on a public site without the speech key in the page. *Show on demand only* now acts for the character it is ticked on.
 
+### Fixed: the wolf's line and the replies took turns, thirty times a second (author report, 2026-11-22)
+- In the author's story, the wolf's first line in the forest with a knife in the inventory: the line's bubble and the replies' bubble flickered without end and the replies could hardly be clicked. Found while playing the whole story in a copy.
+- The line likes one place best (lower, beside the wolf), and that is where the replies' bubble has to go. With the replies as buttons the line moved up and the replies fitted as a bubble; told that the buttons were gone, the line went back down, the replies' bubble no longer fitted, and so on, every two frames. The count that should end such a to-and-fro (four misses) never advanced: a miss was counted once per arrangement of the stage, and it was the same arrangement every time. (That rule came with the fix for replies that stayed buttons, in v0.9.161.)
+- Now the replies' layer names the place of its bubble on the stage root (`data-reply-bubble-at`), also at the moment it takes back "the replies are buttons", and the line's bubble keeps clear of that place where it can (the line still comes first where it can't). A miss after the bubble was up counts again, so a to-and-fro between two arrangements ends in buttons after four.
+- **Checked** on the copy of the author's story in the Preview (Fit window, fixed canvas): at the wolf's first line the replies settle as a bubble at the girl after one change, and can be clicked. A watch on that marker runs during the whole play-through (below).
+- Tests: `ReplyBubbleSettles.test.tsx` (2 new).
+
+**Files modified:** `packages/renderer/src/components/{ReplyBubbleLayer,SpeechBubbleLayer}.tsx`, `packages/builder/public/player-web.js`
+
 ### New: reading aloud through the relay (author's request, 2026-11-22)
 - A story exported with **Use a relay** kept the AI key on the host, but reading aloud with OpenAI or ElevenLabs voices still wrote the speech key into the page (or fell back to the browser's voice).
 - **The relay function** (`relayKit.ts`) takes a `target` beside `provider`: `realtime-secret` (OpenAI: buys the short-lived Realtime session secret; only `{ session: { type, model } }` of a `gpt-realtime` model is passed on, whatever else the caller sends), `speech` (OpenAI's `/audio/speech`, and ElevenLabs' `/text-to-speech/{voiceId}/stream` with `ELEVENLABS_API_KEY`; the voice id is checked so it cannot steer the address). Sound is piped through as it arrives; a refusal keeps its status and message. Requests without `target` behave as before.
