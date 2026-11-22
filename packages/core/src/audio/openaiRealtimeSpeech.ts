@@ -332,7 +332,14 @@ export class PcmStreamPlayer {
 }
 
 export interface RealtimeSpeechOptions {
-  apiKey: string;
+  /** The author's key. Left out when `mintSecret` fetches the session secret. */
+  apiKey?: string;
+  /**
+   * Fetches the short-lived session secret some other way: an exported
+   * story that reads aloud through a relay asks the relay, which holds the
+   * key. The session itself is still opened with OpenAI directly.
+   */
+  mintSecret?: (model: string) => Promise<string>;
   /** 'https://api.openai.com/v1' unless the setup names another. */
   baseUrl?: string;
   model?: string;
@@ -442,13 +449,18 @@ export class OpenAIRealtimeSpeech {
     const model = this.options.model || OPENAI_REALTIME_SPEECH_MODEL;
     const base = (this.options.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
 
-    const minted = await fetch(`${base}/realtime/client_secrets`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${this.options.apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session: { type: 'realtime', model } }),
-    });
-    if (!minted.ok) throw new Error(`OpenAI speech sign-in failed (${minted.status}): ${redact(await minted.text())}`);
-    const secret = (await minted.json()).value;
+    let secret: string;
+    if (this.options.mintSecret) {
+      secret = await this.options.mintSecret(model);
+    } else {
+      const minted = await fetch(`${base}/realtime/client_secrets`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.options.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session: { type: 'realtime', model } }),
+      });
+      if (!minted.ok) throw new Error(`OpenAI speech sign-in failed (${minted.status}): ${redact(await minted.text())}`);
+      secret = (await minted.json()).value;
+    }
     if (!secret) throw new Error('OpenAI speech sign-in returned no session key');
 
     return new Promise<Session>((resolve, reject) => {

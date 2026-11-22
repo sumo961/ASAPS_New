@@ -3,7 +3,20 @@
 ## Unreleased (since v0.9.162, 2026-11-22)
 
 ### Overview
-*Show on demand only* now acts for the character it is ticked on.
+The relay of an exported story carries reading aloud too, so OpenAI and ElevenLabs voices work on a public site without the speech key in the page. *Show on demand only* now acts for the character it is ticked on.
+
+### New: reading aloud through the relay (author's request, 2026-11-22)
+- A story exported with **Use a relay** kept the AI key on the host, but reading aloud with OpenAI or ElevenLabs voices still wrote the speech key into the page (or fell back to the browser's voice).
+- **The relay function** (`relayKit.ts`) takes a `target` beside `provider`: `realtime-secret` (OpenAI: buys the short-lived Realtime session secret; only `{ session: { type, model } }` of a `gpt-realtime` model is passed on, whatever else the caller sends), `speech` (OpenAI's `/audio/speech`, and ElevenLabs' `/text-to-speech/{voiceId}/stream` with `ELEVENLABS_API_KEY`; the voice id is checked so it cannot steer the address). Sound is piped through as it arrives; a refusal keeps its status and message. Requests without `target` behave as before.
+- **The exported player** (`WebTTSProvider`, `ttsConfig.relayUrl`): no key in the page; ElevenLabs lines and OpenAI's Speech API go through the relay; for Realtime voices the relay hands out the secret (`RealtimeSpeechOptions.mintSecret` in core) and the session is opened with OpenAI directly, so streaming and warm-up work as before.
+- **A relay deployed earlier** answers these requests with an error; the line is then read with the browser's voice, as for any other refusal. The README in the relay zip and the export window say that the relay needs deploying again.
+- **The export window:** under Voices, with OpenAI or ElevenLabs voices chosen: **Key in the page** / **Through the relay (recommended for public hosting)**. It follows the AI's choice until picked here, and can be chosen without AI beats (the Relay URL field is then shown there, and the export is the relay zip). A setup at another address (own server, OpenAI's protocol elsewhere) can't use it (`speechCanUseRelay`).
+- **Checked against the service (2026-11-22)**, in the dev app with sound cut and the key kept in the page's memory: the generated function and the exported player's speech code, two lines in two OpenAI Realtime voices read through relay-bought secrets (96 KB and 115 KB of sound; 4.7 s for the first line of a new session, 0.9 s for the second voice warmed meanwhile); the player sent no key, the page config held none, the sockets went to OpenAI directly. ElevenLabs: player and relay real, ElevenLabs' answer stood in (no ElevenLabs key on this computer); the request reached the right address with the host's key, model and `language_code`. A stand-in for an old relay: the line went to the browser's voice.
+- **Checked in the export window** (isolated browser, made-up key): the choice appears, the key warning goes with the relay chosen, the download is `…-relay.zip` with `index.html`, the function, `netlify.toml` and the README; the page holds `relayUrl` and not the key.
+- **Not checked:** a deployed relay on Netlify (needs the author's account), and ElevenLabs' real answer through it.
+- Tests: `relayFunction.test.ts` (8 new), `exportSpeech.test.ts` (2 new).
+
+**Files modified:** `packages/builder/src/export/{relayKit,exportSpeech,HtmlExporter}.ts`, `packages/builder/src/components/export/HtmlExportDialog.tsx`, `packages/core/src/audio/openaiRealtimeSpeech.ts`, `packages/player-web/src/WebTTSProvider.ts`, `packages/builder/public/player-web.js`, `docs/USER_GUIDE.md`
 
 ### Changed: an inventory's "Show on demand only" is each character's own
 - The box is ticked per character, but the stage had one rule for all panels at characters: all shown from the start unless every one was ticked, and the switch (Ctrl/Cmd+I, the Preview's button) hid or showed them all. Ticking it for one character did nothing while another had it unticked. The author found this confusing (2026-11-22): an individual setting should act as one.

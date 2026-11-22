@@ -171,3 +171,78 @@ describe('relay function — server-side refusal fallbacks', () => {
     }
   });
 });
+
+// Reading aloud through the relay: the speech key stays on the host too.
+describe('relay function — reading aloud', () => {
+  const post = (body: unknown) => handler(req('POST', null, body));
+  const upstream = () => (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+  beforeEach(() => { process.env.ELEVENLABS_API_KEY = 'el-key'; });
+
+  it("hands out OpenAI's short-lived Realtime secret, for a reading session only", async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ value: 'ek_short' }), { status: 200, headers: { 'content-type': 'application/json' } })));
+    const r = await post({ provider: 'openai', target: 'realtime-secret', body: { session: { type: 'realtime', model: 'gpt-realtime-2.1-mini', instructions: 'do something else', tools: [{}] } } });
+    expect(r.status).toBe(200);
+    expect((await r.json()).value).toBe('ek_short');
+    const [url, init] = upstream();
+    expect(url).toBe('https://api.openai.com/v1/realtime/client_secrets');
+    expect((init.headers as Record<string, string>).authorization).toBe('Bearer test-key');
+    // Whatever else the caller put into the session is not passed on.
+    expect(JSON.parse(String(init.body))).toEqual({ session: { type: 'realtime', model: 'gpt-realtime-2.1-mini' } });
+  });
+
+  it('refuses a secret for a model that is not a Realtime one', async () => {
+    const r = await post({ provider: 'openai', target: 'realtime-secret', body: { session: { model: 'gpt-6-astra' } } });
+    expect(r.status).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('pipes an ElevenLabs line through, with the key from the host', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-type': 'audio/mpeg' } })));
+    const r = await post({ provider: 'elevenlabs', target: 'speech', voiceId: 'abcDEF123', latency: 3, body: { text: 'Hello', model_id: 'eleven_flash_v2_5' } });
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toBe('audio/mpeg');
+    expect(new Uint8Array(await r.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+    const [url, init] = upstream();
+    expect(url).toBe('https://api.elevenlabs.io/v1/text-to-speech/abcDEF123/stream?optimize_streaming_latency=3');
+    expect((init.headers as Record<string, string>)['xi-api-key']).toBe('el-key');
+    expect(JSON.parse(String(init.body))).toEqual({ text: 'Hello', model_id: 'eleven_flash_v2_5' });
+  });
+
+  it('a voice id cannot steer the address', async () => {
+    for (const voiceId of ['../../v1/user', 'a/b', 'a?x=1', '']) {
+      expect((await post({ provider: 'elevenlabs', target: 'speech', voiceId, body: { text: 'x' } })).status).toBe(400);
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("pipes OpenAI's Speech API through", async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([9]), { status: 200, headers: { 'content-type': 'audio/mpeg' } })));
+    const r = await post({ provider: 'openai', target: 'speech', body: { model: 'gpt-4o-mini-tts', input: 'Hi', voice: 'alloy' } });
+    expect(r.headers.get('content-type')).toBe('audio/mpeg');
+    expect(upstream()[0]).toBe('https://api.openai.com/v1/audio/speech');
+  });
+
+  it('keeps a refusal\'s status and message, so the player can tell why', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { message: 'model_not_found' } }), { status: 404, headers: { 'content-type': 'application/json' } })));
+    const r = await post({ provider: 'openai', target: 'speech', body: { model: 'tts-1', input: 'Hi', voice: 'alloy' } });
+    expect(r.status).toBe(404);
+    expect(await r.text()).toContain('model_not_found');
+  });
+
+  it('says which key is missing, and refuses what it does not know', async () => {
+    delete process.env.ELEVENLABS_API_KEY;
+    const r = await post({ provider: 'elevenlabs', target: 'speech', voiceId: 'abc', body: { text: 'x' } });
+    expect(r.status).toBe(500);
+    expect((await r.json()).error).toContain('ELEVENLABS_API_KEY');
+    expect((await post({ provider: 'anthropic', target: 'speech', body: {} })).status).toBe(400);
+    expect((await post({ provider: 'elevenlabs', target: 'realtime-secret', body: {} })).status).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('speech answers carry CORS headers for an allowed story site', async () => {
+    process.env.ALLOWED_ORIGINS = 'https://annas-story.netlify.app';
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([1]), { status: 200, headers: { 'content-type': 'audio/mpeg' } })));
+    const r = await handler(req('POST', 'https://annas-story.netlify.app', { provider: 'elevenlabs', target: 'speech', voiceId: 'abc', body: { text: 'x' } }));
+    expect(r.headers.get('access-control-allow-origin')).toBe('https://annas-story.netlify.app');
+  });
+});

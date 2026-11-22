@@ -9,7 +9,7 @@ import { downloadHtmlExport, previewStoryZip, SINGLE_FILE_LIMIT_BYTES, singleFil
 import { DEFAULT_RELAY_PATH } from '../../export/relayKit';
 import { getSavedAIConfig, getRuntimeAIConfig } from '../../hooks/useAI';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
-import { exportSpeechOptions, summarizeSpeechSetup, type ExportSpeechSource } from '../../export/exportSpeech';
+import { exportSpeechOptions, summarizeSpeechSetup, speechCanUseRelay, type ExportSpeechSource } from '../../export/exportSpeech';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { buildManifestEntry, type TranslationResource } from '@asaps/core';
 import { recommendWebExportMode } from '../../export/webExportMode';
@@ -87,6 +87,17 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     try { localStorage.setItem(EXPORT_SPEECH_SOURCE_KEY, source); } catch { /* not remembered */ }
   };
   const speechSetup = summarizeSpeechSetup(isOpen ? getSavedTTSConfig() : null);
+  // The speech key in the page, or held by the story's relay (OpenAI and
+  // ElevenLabs). Follows the AI's choice until the author picks one here.
+  const speechRelayPossible = speechCanUseRelay(isOpen ? getSavedTTSConfig() : null);
+  const [speechAccess, setSpeechAccess] = useState<'embed' | 'relay'>('embed');
+  const speechAccessChosen = useRef(false);
+  useEffect(() => {
+    if (!speechAccessChosen.current) setSpeechAccess(aiAccess);
+  }, [aiAccess]);
+  const speechRelayUrl = exportSpeech && speechSource === 'setup' && speechAccess === 'relay' && speechRelayPossible
+    ? (aiProxyUrl.trim() || DEFAULT_RELAY_PATH)
+    : undefined;
   const [includedTranslations, setIncludedTranslations] = useState<Set<string>>(new Set());
   // Pre-export size-warning gate. When the dialog is in 'single-file'
   // mode AND the story zip exceeds a tier, we stage the warning here
@@ -208,6 +219,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         saved: getSavedTTSConfig(),
         speakerVoices: ttsSettings?.speakerVoices,
         readPrompts: ttsSettings?.readPrompts !== false,
+        relayUrl: speechRelayUrl,
       });
 
       const options: HtmlExportOptions = {
@@ -273,7 +285,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
+  }, [speechRelayUrl, mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
 
   // Called from the size-warning banner's "Continue anyway" button.
   // Reuses the pre-computed zip so the user isn't waiting for it twice.
@@ -299,6 +311,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         saved: getSavedTTSConfig(),
         speakerVoices: ttsSettings?.speakerVoices,
         readPrompts: ttsSettings?.readPrompts !== false,
+        relayUrl: speechRelayUrl,
       });
       const options: HtmlExportOptions = {
         mode,
@@ -325,7 +338,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
+  }, [speechRelayUrl, aiAccess, aiProxyUrl, sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
 
   const handleSwitchToFolder = useCallback(() => {
     setSizeWarning(null);
@@ -830,12 +843,60 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                     For ElevenLabs or OpenAI voices, set them up first with the TTS button in the header.
                   </p>
                 )}
-                {speechSource === 'setup' && speechSetup.kind !== 'none' && speechSetup.embedsKey && (
+                {speechSource === 'setup' && speechRelayPossible && (
+                  <div className="ml-6 space-y-2" data-testid="export-speech-access">
+                    <div className="flex gap-2 text-sm" role="radiogroup" aria-label="Speech key">
+                      {([
+                        ['embed', 'Key in the page', 'The speech key ships inside the HTML — private sharing only'],
+                        ['relay', 'Through the relay (recommended for public hosting)', 'No speech key in the page; the relay you deploy with the story holds it'],
+                      ] as const).map(([kind, label, hint]) => (
+                        <button
+                          key={kind}
+                          type="button"
+                          role="radio"
+                          aria-checked={speechAccess === kind}
+                          title={hint}
+                          onClick={() => { speechAccessChosen.current = true; setSpeechAccess(kind); }}
+                          className={`flex-1 px-3 py-2 rounded-lg border text-left ${
+                            speechAccess === kind
+                              ? 'border-blue-500 bg-blue-50 text-blue-900'
+                              : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {speechAccess === 'relay' && (
+                      <>
+                        {!(enableAI && relayModeUi) && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Relay URL</label>
+                            <input
+                              type="text"
+                              aria-label="Relay URL for speech"
+                              value={aiProxyUrl}
+                              onChange={(e) => setAiProxyUrl(e.target.value)}
+                              placeholder={DEFAULT_RELAY_PATH}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-blue-500 focus:border-blue-500"
+                            />
+                          </div>
+                        )}
+                        <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                          No speech key in the page. The export is one deploy-ready zip with the relay function; on its host, set{' '}
+                          <span className="font-mono">{speechSetup.name === 'ElevenLabs' ? 'ELEVENLABS_API_KEY' : 'OPENAI_API_KEY'}</span>
+                          {' '}(README-RELAY.md says how). A relay deployed with an earlier version needs deploying again, or players hear the browser's own voice.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
+                {speechSource === 'setup' && speechSetup.kind !== 'none' && speechSetup.embedsKey && !speechRelayUrl && (
                   <p className="text-xs text-amber-700" data-testid="export-speech-key-warning">
                     Warning: your {speechSetup.kind === 'cloud' ? speechSetup.name : 'speech server'} key will be visible in the exported HTML source code. Anyone with the file can use it.
                   </p>
                 )}
-                {speechSource === 'setup' && speechSetup.kind !== 'none' && !speechSetup.reachable && (
+                {speechSource === 'setup' && speechSetup.kind !== 'none' && !speechSetup.reachable && !speechRelayUrl && (
                   <p className="text-xs text-amber-700">
                     {speechSetup.kind === 'cloud'
                       ? `No ${speechSetup.name} key is saved, so players will hear the browser's own voice.`

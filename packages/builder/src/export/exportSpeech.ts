@@ -10,6 +10,8 @@
  *  - "the browser's own voice"    → no provider, no key
  *  - "the speech setup's voices"  → provider, model, voices and, for a cloud
  *                                   provider, its key
+ *  - the same, through a relay     → OpenAI or ElevenLabs without the key:
+ *                                   the story's relay holds it (relayKit.ts)
  *
  * Voice input is not among them: an exported story listens with the
  * browser's speech recognition, and nothing is exported for it.
@@ -43,8 +45,15 @@ export function summarizeSpeechSetup(saved: SavedTTSConfig | null | undefined): 
   return { kind: 'own-server', name: 'your speech server', embedsKey: !!saved.apiKey, reachable: !isLocalAddress(saved.baseUrl) };
 }
 
+/** OpenAI (at its own address) and ElevenLabs can be read through the story's relay. */
+export function speechCanUseRelay(saved: SavedTTSConfig | null | undefined): boolean {
+  const type = saved?.providerType;
+  if (type === 'elevenlabs') return true;
+  return type === 'openai' && (!saved?.baseUrl || /^https:\/\/api\.openai\.com(\/|$)/i.test(saved.baseUrl));
+}
+
 type SpeechOptions = Pick<HtmlExportOptions,
-  'ttsProvider' | 'ttsApiKey' | 'ttsModel' | 'ttsBaseUrl' | 'ttsDefaultVoiceId' | 'ttsReadPrompts' | 'ttsSpeakerVoices' | 'ttsEnabled'>;
+  'ttsProvider' | 'ttsApiKey' | 'ttsRelayUrl' | 'ttsModel' | 'ttsBaseUrl' | 'ttsDefaultVoiceId' | 'ttsReadPrompts' | 'ttsSpeakerVoices' | 'ttsEnabled'>;
 
 export function exportSpeechOptions(input: {
   /** "Read text aloud in the exported player" (a project setting). */
@@ -54,17 +63,23 @@ export function exportSpeechOptions(input: {
   /** The project's speaker → voice lists, by provider (globalSettings.tts.speakerVoices). */
   speakerVoices?: Record<string, Record<string, string>>;
   readPrompts: boolean;
+  /** Read through this relay instead of writing the key into the page (cloud providers only). */
+  relayUrl?: string;
 }): SpeechOptions {
   const { readAloud, source, saved, speakerVoices, readPrompts } = input;
   const useSetup = readAloud && source === 'setup' && summarizeSpeechSetup(saved).kind !== 'none';
   if (!useSetup || !saved) {
     return { ttsProvider: 'web-speech', ttsReadPrompts: readPrompts, ttsEnabled: readAloud };
   }
+  // The relay knows OpenAI's and ElevenLabs' own addresses only, so a
+  // setup pointing elsewhere keeps its key and address.
+  const relayed = !!input.relayUrl && speechCanUseRelay(saved);
   return {
     ttsProvider: saved.providerType,
-    ttsApiKey: saved.apiKey,
+    ttsApiKey: relayed ? undefined : saved.apiKey,
+    ttsRelayUrl: relayed ? input.relayUrl : undefined,
     ttsModel: saved.model,
-    ttsBaseUrl: saved.baseUrl,
+    ttsBaseUrl: relayed ? undefined : saved.baseUrl,
     ttsDefaultVoiceId: saved.defaultVoiceId,
     ttsReadPrompts: readPrompts,
     ttsSpeakerVoices: speakerVoices?.[saved.providerType],

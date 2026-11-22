@@ -1042,6 +1042,11 @@ export interface HtmlExportOptions {
   ttsProvider?: string;
   /** TTS API key to embed */
   ttsApiKey?: string;
+  /**
+   * Read aloud through the story's relay (relayKit.ts): the relay holds the
+   * speech key and none is written into the page. OpenAI and ElevenLabs.
+   */
+  ttsRelayUrl?: string;
   /** TTS model */
   ttsModel?: string;
   /** TTS base URL (for custom providers) */
@@ -1228,7 +1233,9 @@ async function exportAsSingleFile(
   const ttsConfig = options.ttsProvider && options.ttsProvider !== 'web-speech'
     ? JSON.stringify({
         provider: options.ttsProvider,
-        apiKey: options.ttsApiKey || undefined,
+        // Through a relay the page carries no speech key.
+        apiKey: options.ttsRelayUrl ? undefined : options.ttsApiKey || undefined,
+        relayUrl: options.ttsRelayUrl || undefined,
         model: options.ttsModel || undefined,
         baseUrl: options.ttsBaseUrl || undefined,
         speakerVoices: options.ttsSpeakerVoices || undefined,
@@ -1283,7 +1290,9 @@ async function exportAsFolder(
   const ttsConfig = options.ttsProvider && options.ttsProvider !== 'web-speech'
     ? JSON.stringify({
         provider: options.ttsProvider,
-        apiKey: options.ttsApiKey || undefined,
+        // Through a relay the page carries no speech key.
+        apiKey: options.ttsRelayUrl ? undefined : options.ttsApiKey || undefined,
+        relayUrl: options.ttsRelayUrl || undefined,
         model: options.ttsModel || undefined,
         baseUrl: options.ttsBaseUrl || undefined,
         speakerVoices: options.ttsSpeakerVoices || undefined,
@@ -1317,7 +1326,7 @@ async function exportAsFolder(
   // Add files to ZIP
   zip.file('index.html', html);
   zip.file('story.asaps.zip', storyZipBlob);
-  if (options.aiProxyUrl) {
+  if (options.aiProxyUrl || options.ttsRelayUrl) {
     for (const f of buildRelayKitFiles()) zip.file(f.path, f.content);
   }
 
@@ -1633,7 +1642,9 @@ export async function downloadHtmlExport(
   const ttsConfig = options.ttsProvider && options.ttsProvider !== 'web-speech'
     ? JSON.stringify({
         provider: options.ttsProvider,
-        apiKey: options.ttsApiKey || undefined,
+        // Through a relay the page carries no speech key.
+        apiKey: options.ttsRelayUrl ? undefined : options.ttsApiKey || undefined,
+        relayUrl: options.ttsRelayUrl || undefined,
         model: options.ttsModel || undefined,
         baseUrl: options.ttsBaseUrl || undefined,
         speakerVoices: options.ttsSpeakerVoices || undefined,
@@ -1681,7 +1692,7 @@ export async function downloadHtmlExport(
     const zip = new JSZip();
     zip.file('index.html', html);
     zip.file('story.asaps.zip', originalZipBlob);
-    if (options.aiProxyUrl) {
+    if (options.aiProxyUrl || options.ttsRelayUrl) {
       for (const f of buildRelayKitFiles()) zip.file(f.path, f.content);
     }
     const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -1703,7 +1714,7 @@ export async function downloadHtmlExport(
  * classic bare .html download.
  */
 async function downloadSingleFile(html: string, safeName: string, options: HtmlExportOptions): Promise<void> {
-  if (options.aiProxyUrl) {
+  if (options.aiProxyUrl || options.ttsRelayUrl) {
     const zip = new JSZip();
     zip.file('index.html', html);
     for (const f of buildRelayKitFiles()) zip.file(f.path, f.content);

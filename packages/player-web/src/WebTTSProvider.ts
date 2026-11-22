@@ -2,7 +2,11 @@
  * WebTTSProvider - Lightweight TTS for HTML export player
  *
  * Supports: ElevenLabs, OpenAI, and browser Web Speech.
- * Calls APIs directly (no proxy needed — runs in browser).
+ * Calls the services directly with the exported key, or, for a story
+ * exported to read aloud through a relay (config.relayUrl), asks the relay,
+ * which holds the key: ElevenLabs lines and OpenAI's Speech API go through
+ * it; for OpenAI's Realtime voices it hands out the short-lived session
+ * secret and the sound comes straight from OpenAI.
  *
  * OpenAI is read through /v1/audio/speech, or through the Realtime API when
  * the story was exported with a gpt-realtime model, and by itself once
@@ -19,6 +23,8 @@ import {
 export interface TTSConfig {
   provider: 'elevenlabs' | 'openai' | 'web-speech' | 'custom' | 'local';
   apiKey?: string;
+  /** The story's relay (relayKit.ts): it holds the speech key, the page has none. */
+  relayUrl?: string;
   model?: string;
   baseUrl?: string;
   /** Speaker → voiceId mapping */
@@ -59,7 +65,7 @@ function getEmbeddedTTSConfig(): TTSConfig | null {
     // key, or a local server that only exists on the author's computer.
     const needsKey = config.provider === 'openai' || config.provider === 'elevenlabs';
     const unreachable = (config.provider === 'local' || config.provider === 'custom') && isLocalAddress(config.baseUrl);
-    if ((needsKey && !config.apiKey) || unreachable) {
+    if ((needsKey && !config.apiKey && !config.relayUrl) || unreachable) {
       return { provider: 'web-speech', enabled: config.enabled, readPrompts: config.readPrompts };
     }
     return config;
@@ -104,12 +110,34 @@ export class WebTTSService {
   /** The Realtime reader, for a story that reads through it. */
   private reader(): OpenAIRealtimeSpeech {
     const model = this.config!.model;
+    const relayed = this.viaRelay();
     this.realtime ??= new OpenAIRealtimeSpeech({
-      apiKey: this.config!.apiKey!,
-      baseUrl: this.config!.baseUrl,
+      apiKey: relayed ? undefined : this.config!.apiKey!,
+      // The relay only knows OpenAI's own address.
+      baseUrl: relayed ? undefined : this.config!.baseUrl,
       model: isRealtimeSpeechModel(model) ? model : undefined,
+      mintSecret: relayed ? async (sessionModel) => {
+        const minted = await this.askRelay({ provider: 'openai', target: 'realtime-secret', body: { session: { type: 'realtime', model: sessionModel } } });
+        if (!minted.ok) throw new Error(`Speech relay refused the sign-in (${minted.status})`);
+        return (await minted.json()).value;
+      } : undefined,
     });
     return this.realtime;
+  }
+
+  /** This story reads aloud through its relay: the page carries no speech key. */
+  private viaRelay(): boolean {
+    const config = this.config;
+    return !!config?.relayUrl && !config.apiKey && (config.provider === 'openai' || config.provider === 'elevenlabs');
+  }
+
+  private askRelay(payload: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {
+    return fetch(this.config!.relayUrl!, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal,
+    });
   }
 
   /**
@@ -119,7 +147,7 @@ export class WebTTSService {
    */
   private warmUp(first?: string): void {
     const config = this.config;
-    if (!config || !this.enabled || this.muted || config.provider !== 'openai' || !config.apiKey) return;
+    if (!config || !this.enabled || this.muted || config.provider !== 'openai' || (!config.apiKey && !this.viaRelay())) return;
     if (!isRealtimeSpeechModel(config.model) && !this.speechApiGone) return;
     const voices = [config.defaultVoiceId, ...Object.values(config.speakerVoices ?? {})];
     this.reader().warm(first ? [first, ...voices] : voices);
@@ -246,7 +274,17 @@ export class WebTTSService {
         const modelId = this.config!.model || 'eleven_v3';
         const supportsLatencyOpt = !modelId.startsWith('eleven_v3');
         const latencyParam = supportsLatencyOpt ? '?optimize_streaming_latency=3' : '';
-        response = await fetch(
+        const line = {
+          text,
+          model_id: modelId,
+          // ElevenLabs takes the bare language code ('de'), not 'de-AT',
+          // 'zh-Hans' or a typed name; left out when it can't be read.
+          // Multilingual v2 doesn't take it and reads the language of the text.
+          ...(speechLanguageCode(this.language) && !/multilingual/i.test(modelId) ? { language_code: speechLanguageCode(this.language) } : {}),
+        };
+        response = this.viaRelay() ? await this.askRelay({
+          provider: 'elevenlabs', target: 'speech', voiceId, latency: supportsLatencyOpt ? 3 : undefined, body: line,
+        }, this.abortController.signal) : await fetch(
           `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream${latencyParam}`,
           {
             method: 'POST',
@@ -254,14 +292,7 @@ export class WebTTSService {
               'Content-Type': 'application/json',
               'xi-api-key': this.config!.apiKey!,
             },
-            body: JSON.stringify({
-              text,
-              model_id: modelId,
-              // ElevenLabs takes the bare language code ('de'), not 'de-AT',
-              // 'zh-Hans' or a typed name; left out when it can't be read.
-              // Multilingual v2 doesn't take it and reads the language of the text.
-              ...(speechLanguageCode(this.language) && !/multilingual/i.test(modelId) ? { language_code: speechLanguageCode(this.language) } : {}),
-            }),
+            body: JSON.stringify(line),
             signal: this.abortController.signal,
           }
         );
@@ -297,17 +328,15 @@ export class WebTTSService {
         }
       } else if (provider === 'openai' || provider === 'custom' || provider === 'local') {
         const baseUrl = (this.config!.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
-        response = await fetch(`${baseUrl}/audio/speech`, {
+        const speechBody = { model: this.config!.model || 'tts-1', input: text, voice: voiceId || 'alloy' };
+        response = this.viaRelay() ? await this.askRelay({ provider: 'openai', target: 'speech', body: speechBody }, this.abortController.signal)
+          : await fetch(`${baseUrl}/audio/speech`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             ...(this.config!.apiKey ? { Authorization: `Bearer ${this.config!.apiKey}` } : {}),
           },
-          body: JSON.stringify({
-            model: this.config!.model || 'tts-1',
-            input: text,
-            voice: voiceId || 'alloy',
-          }),
+          body: JSON.stringify(speechBody),
           signal: this.abortController.signal,
         });
       } else {
