@@ -260,8 +260,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Load available voices when TTS menu opens
   useEffect(() => {
-    // Also with reading aloud switched off here: voices are chosen for exports too.
-    if (!showTTSMenu) return;
+    if (!showTTSMenu || !ttsEnabled) return;
     const loadVoices = async () => {
       try {
         const provider = getTTSService().getActiveProvider();
@@ -555,9 +554,8 @@ export const Header: React.FC<HeaderProps> = ({
                       </button>
 
                       {/* Character Voices section */}
-                      {/* Shown with reading aloud off as well: the header's switch is for the Preview on this
-                          computer, and the voices chosen here also go into exports (they could not be set while it was off). */}
-                      {speakers.length > 0 && (
+                      {/* Only with TTS switched on: voices are chosen, and reading aloud exported, with speech on (author's rule, 2026-11-22; the export window follows it too). */}
+                      {ttsEnabled && speakers.length > 0 && (
                         <>
                           <div className="my-2 border-t border-gray-200" />
                           <div className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">

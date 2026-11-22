@@ -124,7 +124,16 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   useEffect(() => {
     if (!speechAccessChosen.current) setSpeechAccess(aiAccess);
   }, [aiAccess]);
-  const speechRelayUrl = exportSpeech && speechSource === 'setup' && speechAccess === 'relay' && speechRelayPossible
+  // Reading aloud is exported only while TTS is switched on in the app
+  // (the header's TTS button): that is also where the voices are chosen.
+  // With it off the tick is shown off and can't be set; the project's own
+  // setting is left as it is, so it is back once TTS is switched on.
+  const appTtsOn = useMemo(() => {
+    if (!isOpen) return true;
+    try { return localStorage.getItem('asaps_tts_enabled') !== 'false'; } catch { return true; }
+  }, [isOpen]);
+  const speechOn = exportSpeech && appTtsOn;
+  const speechRelayUrl = speechOn && speechSource === 'setup' && speechAccess === 'relay' && speechRelayPossible
     ? (aiProxyUrl.trim() || DEFAULT_RELAY_PATH)
     : undefined;
   const [includedTranslations, setIncludedTranslations] = useState<Set<string>>(new Set());
@@ -243,7 +252,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
       const projResult = await getStorageManager().getProject(projectId);
       const ttsSettings = projResult.data?.globalSettings?.tts;
       const speech = exportSpeechOptions({
-        readAloud: exportSpeech,
+        readAloud: speechOn,
         source: speechSource,
         saved: getSavedTTSConfig(),
         speakerVoices: ttsSettings?.speakerVoices,
@@ -315,7 +324,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [speakers, characters, speechRelayUrl, mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
+  }, [speechOn, speakers, characters, speechRelayUrl, mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
 
   // Called from the size-warning banner's "Continue anyway" button.
   // Reuses the pre-computed zip so the user isn't waiting for it twice.
@@ -336,7 +345,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
       const projResult = await getStorageManager().getProject(projectId);
       const ttsSettings = projResult.data?.globalSettings?.tts;
       const speech = exportSpeechOptions({
-        readAloud: exportSpeech,
+        readAloud: speechOn,
         source: speechSource,
         saved: getSavedTTSConfig(),
         speakerVoices: ttsSettings?.speakerVoices,
@@ -369,7 +378,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [speakers, characters, speechRelayUrl, aiAccess, aiProxyUrl, sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
+  }, [speechOn, speakers, characters, speechRelayUrl, aiAccess, aiProxyUrl, sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
 
   const handleSwitchToFolder = useCallback(() => {
     setSizeWarning(null);
@@ -822,10 +831,11 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
           {/* Read-aloud option — a PROJECT setting (saved with the story),
               so every machine exports the same player. */}
           <div className="border rounded-lg p-3">
-            <label className="flex items-start gap-3 cursor-pointer">
+            <label className={`flex items-start gap-3 ${appTtsOn ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
               <input
                 type="checkbox"
-                checked={exportSpeech}
+                checked={speechOn}
+                disabled={!appTtsOn}
                 onChange={e => onExportSpeechChange?.(e.target.checked)}
                 className="mt-1"
               />
@@ -839,7 +849,13 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
               </div>
             </label>
 
-            {exportSpeech && (
+            {!appTtsOn && (
+              <p className="mt-2 ml-7 text-xs text-amber-700" data-testid="export-speech-needs-tts">
+                TTS is switched off in the app, so this story is exported without reading aloud. Switch it on with the TTS button in the header, choose the voices there, and open this window again.
+              </p>
+            )}
+
+            {speechOn && (
               <div className="mt-3 ml-7 space-y-2" data-testid="export-speech-source">
                 <div className="text-sm font-medium text-gray-700">Voices</div>
                 <label className="flex items-start gap-2 cursor-pointer">
