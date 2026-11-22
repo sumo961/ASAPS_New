@@ -922,6 +922,11 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                     )}
                   </div>
                 )}
+                {speechSource === 'setup' && speechSetup.name === 'ElevenLabs' && !getSavedTTSConfig()?.defaultVoiceId && (
+                  <p className="text-xs text-amber-700" data-testid="export-speech-no-default-voice">
+                    No default ElevenLabs voice is set, so the narrator and every speaker without a voice of their own will be read by the browser's voice. Set one under TTS ▸ Configure Provider, or choose voices under TTS ▸ Character Voices.
+                  </p>
+                )}
                 {speechSource === 'setup' && speechSetup.kind !== 'none' && speechSetup.embedsKey && !speechRelayUrl && (
                   <p className="text-xs text-amber-700" data-testid="export-speech-key-warning">
                     Warning: your {speechSetup.kind === 'cloud' ? speechSetup.name : 'speech server'} key will be visible in the exported HTML source code. Anyone with the file can use it.

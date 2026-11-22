@@ -24,6 +24,15 @@ The relay of an exported story carries reading aloud too, so OpenAI and ElevenLa
 
 **Files modified:** `packages/builder/src/services/tts/{autoVoices,guessGender}.ts` (new), `packages/builder/src/{App.tsx,components/Header.tsx,pages/PreviewWindow.tsx,services/PreviewWindowManager.ts,components/export/HtmlExportDialog.tsx,export/exportSpeech.ts}`, `docs/USER_GUIDE.md`
 
+### ElevenLabs through the relay: the author's field test (2026-11-22)
+- **It works**, in Chrome and in Safari: Karin's lines are read in her ElevenLabs voice through the relay, no key in the page.
+- The narrator was read by the browser's voice: no default ElevenLabs voice was set, and ElevenLabs can't read a line without one of its own voices. **The export window now says so** under Voices when the ElevenLabs setup has no default voice.
+- The header's TTS switch was off in the dev app during the tests (most likely left off by the assistant's own tests there). It governs reading aloud in the Preview on this computer only; an export has its own tick. But **Character Voices were hidden while it was off**, so voices for an export could not be chosen: the list now shows either way.
+- The one difference between the browsers: Safari reads the title screen (in the browser's voice), Chrome does not, because Chrome lets a page speak only after a first click. Not changed.
+- A first reading of the Safari report ("falls back to web voice all the way through") led to a change of how fetched lines are played (one audio element, started on the first click). The author's log showed Safari playing the ElevenLabs lines; the change rested on a wrong guess and was taken out again before it was built.
+
+**Files modified:** `packages/builder/src/components/Header.tsx`, `packages/builder/src/components/export/HtmlExportDialog.tsx`
+
 ### New: `deploy.sh` in the relay zip (author's request, 2026-11-22)
 - Path B of the relay README (Netlify CLI) as one script, generated with the export (`buildRelayDeployScript`): checks for Node.js and the export's files, logs in (the CLI's `status` ends without an error when logged out, so its JSON answer is read), creates and links the site (`sites:create`) unless the folder already has one, asks for the keys, deploys and opens the story in the browser (`deploy --prod --open`; the opening added after the author's first run, 2026-11-22). Setting the keys before the first deploy saves the second deploy the README asks for.
 - It asks only for the keys this export needs (`relayKeysFor`: the AI's provider when the AI uses the relay, the voices' provider when they do).
