@@ -1367,6 +1367,7 @@ export class ReactRenderer extends BaseRenderer {
       inventory: this.characterInventoryResolver || undefined,
       mood: this.characterMoodFrameResolver || undefined,
       inventoryVisible: this.inventoryVisible,
+      onSubscribeInventoryVisible: this.subscribeToInventoryVisible,
       fontScale: this.mobileFontScale,
     };
 
@@ -1628,8 +1629,20 @@ export class ReactRenderer extends BaseRenderer {
    * Set inventory visibility (for Ctrl/Cmd+I toggle)
    */
   setInventoryVisible(visible: boolean): void {
+    if (this.inventoryVisible === visible) return;
     this.inventoryVisible = visible;
+    // The screen that is up follows at once; it used to wait for the next one.
+    for (const listener of this.inventoryVisibleListeners) listener(visible);
   }
+
+  private inventoryVisibleListeners: Set<(visible: boolean) => void> = new Set();
+
+  /** One function for the renderer's lifetime, so a repaint doesn't resubscribe. */
+  subscribeToInventoryVisible = (listener: (visible: boolean) => void): (() => void) => {
+    this.inventoryVisibleListeners.add(listener);
+    listener(this.inventoryVisible);
+    return () => { this.inventoryVisibleListeners.delete(listener); };
+  };
 
   /**
    * Get current inventory visibility

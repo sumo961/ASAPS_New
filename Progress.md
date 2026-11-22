@@ -18,13 +18,19 @@ The checks left open at v0.9.161, run on the released code, and what they turned
 - **Checked** on the four-character story with an item given to an NPC: the frame ends at the stage's edge in the Preview (both layouts) and in the export; it shows from the start in the export; at 390×740 the export shows it as the folded badge.
 - **Files:** `packages/renderer/src/components/{CharacterInventoryFrame,ResponsiveCharacterLayer}.tsx`, `packages/renderer/src/utils/runtimeInventory.ts`, `packages/renderer/src/index.ts`, `packages/player/src/PlayerEngine.ts`, `packages/player-web/src/WebPlayer.tsx`, `packages/builder/src/pages/PreviewWindow.tsx`, tests `tests/components/CharacterInventoryFrame.test.tsx`, `tests/utils/runtimeInventory.test.ts`
 
+### Fixed: the inventory switch waited for the next screen
+- The Preview's inventory button and Ctrl/Cmd+I set a flag the stage read only when a screen was painted, so an inventory at a character appeared or went with the next screen. The renderer now tells the stage: `setInventoryVisible` notifies its listeners, handed down in `CharacterHudContext` (`onSubscribeInventoryVisible`), and both stages read the flag through `useInventoryVisible`. The Visual Editor, which has no renderer, keeps its own value.
+- Tests: through the real renderer on the fixed canvas (`ReactRenderer.test.tsx`) and in the responsive layer (`ResponsiveCharacterHuds.test.tsx`). Not checked in the running Preview: no story with an inventory at a character was at hand.
+
+**Files modified:** `packages/renderer/src/components/CharacterHudContext.ts`, `PositionedBeatView.tsx`, `ResponsiveCharacterLayer.tsx`, `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/builder/public/player-web.js`
+
 ### Checked after v0.9.161 (the sweep and export not re-run after the last reply fix)
 - **Fixed canvas, Preview:** the four-character scene at Desktop, both tablets, both phones and Fit window, at each line and at the replies: nothing overlapping, nothing outside the stage; replies in their bubble.
 - **Responsive, Preview:** the same, plus each phone size played from the start (a phone never changes size mid-scene). Clean at Phone portrait. At Phone landscape a mood token is partly behind the Continue button and the third reply scrolls (now with its hint).
 - **Exports** of both layouts at 1130×690 (scale 0.9) and the responsive one at 390×740: clean. The replies stay buttons in the export where the Preview has a bubble: the language button takes the top-right corner there and the panels move down.
 - **The author's story (copy):** the replies of the first conversation are a bubble at the girl. The walk did not get past the Pick Prop beat to the wolf.
 - **Seen and left, for a decision:** the *current* line's bubble has no limit on covering another character's face (the reply bubble and the earlier line have one). In the exported responsive story at 390×740 it covered 46% of the neighbour's face at the replies step, while the three lines before used the text box. And the earlier line can be placed low, over the characters' bodies, when there is no room above (responsive, Tablet landscape).
-- **Seen and left:** switching the Preview's inventory button takes effect with the next screen, not at once.
+- **Decided (2026-11-22):** the current line's bubble over a neighbour's face and the earlier line placed low are fine as they are.
 
 ### User Guide
 - Mood HUD: says what a token and a disc are, adds the **Display** setting, and marks which settings belong to which.

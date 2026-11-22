@@ -464,3 +464,28 @@ describe('ReactRenderer speech bubble history', () => {
     expect(r().bubbleHistory().earlier).toBeUndefined();
   });
 });
+
+// The inventory switch (Ctrl/Cmd+I, the Preview's button) used to take effect
+// with the next screen only: the flag was read when a screen was painted.
+describe('ReactRenderer inventory at a character follows the switch at once', () => {
+  const pic = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+  const stage = [
+    { id: 'e1', name: 'Stan', kind: 'character', characterId: 'char_stan', characterName: 'Stan', imageUrl: pic, x: 0, y: 0, width: 300, height: 600 },
+    { id: 'e3', name: 'dialog', kind: 'dialog', x: 100, y: 600, width: 800, height: 150 },
+  ] as any[];
+  const shown = () => container.querySelector('[data-hud-frame="inventory"]');
+
+  it('on the fixed canvas, while the same screen stays up', async () => {
+    renderer.setCharacterInventoryResolver((id) => (id === 'char_stan' ? {
+      items: [{ id: 'key', name: 'key', displayName: 'Key', quantity: 1 } as any],
+      config: { dockMode: 'character', anchor: 'right', width: 140, offset: { x: 0, y: 0 }, style: { padding: 6, borderWidth: 1 } } as any,
+    } : null));
+    void renderer.renderDialog('Stan', 'You okay?', undefined, stage);
+    await waitFor(() => expect(container.querySelector('img[alt="Stan"]')).toBeTruthy());
+    expect(shown()).toBeNull();
+    renderer.setInventoryVisible(true);
+    await waitFor(() => expect(shown()).toBeTruthy());
+    renderer.setInventoryVisible(false);
+    await waitFor(() => expect(shown()).toBeNull());
+  });
+});

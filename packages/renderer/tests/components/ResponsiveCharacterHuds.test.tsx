@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, beforeAll } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import { ResponsiveCharacterLayer } from '../../src/components/ResponsiveCharacterLayer';
 import { CharacterHudContext, type CharacterHudLookups } from '../../src/components/CharacterHudContext';
 
@@ -65,5 +65,22 @@ describe('what a character carries, in the responsive layout', () => {
     const off = mood('token'); off.config.enabled = false;
     const { container } = draw({ mood: () => off });
     expect(container.querySelector('[data-mood-token]')).toBeNull();
+  });
+
+  it('its inventory follows the switch while the screen stays up', () => {
+    const inventory = {
+      items: [{ id: 'key', name: 'key', displayName: 'Key', quantity: 1 } as any],
+      config: { dockMode: 'character', anchor: 'right', width: 140, offset: { x: 0, y: 0 }, style: { padding: 6, borderWidth: 1 } } as any,
+    };
+    const listeners = new Set<(v: boolean) => void>();
+    const subscribe = (l: (v: boolean) => void) => { listeners.add(l); l(false); return () => { listeners.delete(l); }; };
+    const { container, unmount } = draw({ inventory: () => inventory, inventoryVisible: false, onSubscribeInventoryVisible: subscribe });
+    expect(container.querySelector('[data-hud-frame="inventory"]')).toBeNull();
+    act(() => listeners.forEach((l) => l(true)));
+    expect(container.querySelector('[data-hud-frame="inventory"]')).toBeTruthy();
+    act(() => listeners.forEach((l) => l(false)));
+    expect(container.querySelector('[data-hud-frame="inventory"]')).toBeNull();
+    unmount();
+    expect(listeners.size).toBe(0);
   });
 });

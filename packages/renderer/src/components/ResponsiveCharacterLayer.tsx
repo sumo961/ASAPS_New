@@ -26,7 +26,7 @@
  *    is the next iteration.
  */
 import React, { forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { CharacterHudContext } from './CharacterHudContext';
+import { CharacterHudContext, useInventoryVisible } from './CharacterHudContext';
 import { CharacterMeterFrame } from './CharacterMeterFrame';
 import { CharacterInventoryFrame } from './CharacterInventoryFrame';
 import { CharacterMoodFrame } from './CharacterMoodFrame';
@@ -127,6 +127,7 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
 }, ref) => {
   // Meters, inventory and mood token set to sit at a character (see CharacterHudContext).
   const huds = useContext(CharacterHudContext);
+  const inventoryVisible = useInventoryVisible(false);
   // Speaker Display → "Dim characters who aren't speaking".
   const silentFilters = useMemo(
     () => silentCharacterFilters(locations, speakingCharacter, dimSettings),
@@ -568,7 +569,7 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
               {meters && meters.counters.length > 0 && (
                 <CharacterMeterFrame counters={meters.counters} config={meters.config} characterName={meters.characterName} characterColor={meters.characterColor} {...at} fontScale={fontScale} />
               )}
-              {inventory && inventory.items.length > 0 && huds.inventoryVisible && (
+              {inventory && inventory.items.length > 0 && inventoryVisible && (
                 <CharacterInventoryFrame items={inventory.items} config={inventory.config} {...at} isVisible={true} fontScale={fontScale} autoMinimize={fontScale > 1.0 || phoneStage} />
               )}
               {mood && mood.config.enabled && ((mood.config.displayStyle ?? 'token') === 'disc' ? (

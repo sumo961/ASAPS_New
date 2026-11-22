@@ -28,6 +28,7 @@ import { DIM_TRANSITION, dimFilter, showsSpeaker, silentCharacterFilters } from 
 import { bubbleSpeakerFor, type BubbleHistory } from '../utils/speechBubble';
 import { StageBubbles, useStageTurn, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
 import { ReplyBubble } from './ReplyBubbleLayer';
+import { useInventoryVisible } from './CharacterHudContext';
 
 /** A frame picture's edge height on a fixed stage: the picture's share of the stage width, never taller than in the picture. */
 const stageFrameBand = (stageWidth: number) => (f: number, naturalPx: number) =>
@@ -1416,7 +1417,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   characterMeterFrameResolver,
   characterInventoryResolver,
   characterMoodFrameResolver,
-  inventoryVisible = false,
+  inventoryVisible: inventoryVisibleAtPaint = false,
   timerState: initialTimerState,
   onSubscribeTimerState,
   beatType,
@@ -1445,6 +1446,9 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   speakingCharacter,
   bubbleHistory,
 }) => {
+  // The player's inventory switch (Ctrl/Cmd+I, the Preview's button) is
+  // followed while this screen stays up, not only from the next one.
+  const inventoryVisible = useInventoryVisible(inventoryVisibleAtPaint);
   // Speaker Display → "Show lines as: speech bubbles": the placed character
   // saying this line, when there is one. Narration keeps the text box.
   const bubbleSpeaker = theme.speakerDisplay?.lineStyle === 'bubble' && !previewMode
