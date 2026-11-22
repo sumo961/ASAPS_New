@@ -65,7 +65,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   const rendererRef = useRef<ReactRenderer | null>(null);
 
   // Ctrl/Cmd+I shows or hides the inventories at the characters, as in the
-  // Preview. It takes effect with the next screen the story paints.
+  // Preview. The renderer tells the stage, so the screen that is up follows.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || (e.key !== 'i' && e.key !== 'I')) return;

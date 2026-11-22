@@ -1,9 +1,9 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.161, 2026-11-22)
+## 2026-11-22: The inventory release: a character's inventory in exports, on phones and at the switch (v0.9.162)
 
 ### Overview
-The checks left open at v0.9.161, run on the released code, and what they turned up: the scroll hint stayed off when replies first appeared, an inventory at a character hung over the stage's edge, never showed in an exported story unless it was the player's own, and stayed open on a phone. Plus the User Guide corrections from the v0.9.161 audit.
+A small fix release from the checks left open at v0.9.161. An inventory set to sit at a character now shows in an exported story whoever carries it, folds to a badge on a phone, no longer hangs over the stage's edge, and follows the inventory switch (the Preview's button, Ctrl/Cmd+I) at once. Exported stories honour Ctrl/Cmd+I. The scroll hint on a list of replies shows when the replies first appear. Plus the User Guide corrections from the v0.9.161 audit.
 
 ### Fixed: the scroll hint stayed off when the replies first appeared
 - On a phone in landscape the third reply was cut off 47 px below the edge and the ▾ hint was not there. It appeared only after something else made it look again (turning the device, scrolling).
@@ -20,7 +20,7 @@ The checks left open at v0.9.161, run on the released code, and what they turned
 
 ### Fixed: the inventory switch waited for the next screen
 - The Preview's inventory button and Ctrl/Cmd+I set a flag the stage read only when a screen was painted, so an inventory at a character appeared or went with the next screen. The renderer now tells the stage: `setInventoryVisible` notifies its listeners, handed down in `CharacterHudContext` (`onSubscribeInventoryVisible`), and both stages read the flag through `useInventoryVisible`. The Visual Editor, which has no renderer, keeps its own value.
-- Tests: through the real renderer on the fixed canvas (`ReactRenderer.test.tsx`) and in the responsive layer (`ResponsiveCharacterHuds.test.tsx`). Not checked in the running Preview: no story with an inventory at a character was at hand.
+- Tests: through the real renderer on the fixed canvas (`ReactRenderer.test.tsx`) and in the responsive layer (`ResponsiveCharacterHuds.test.tsx`). **Checked** live on a throwaway story (The Last Ferry with a character placed and given a notebook): in the Preview on a fixed canvas and in the responsive layout, the button and Cmd+I hide and show the panel on the screen that is up; in the exported file at 1130×690, Ctrl+I and Cmd+I do the same.
 
 **Files modified:** `packages/renderer/src/components/CharacterHudContext.ts`, `PositionedBeatView.tsx`, `ResponsiveCharacterLayer.tsx`, `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/builder/public/player-web.js`
 
@@ -32,6 +32,14 @@ The checks left open at v0.9.161, run on the released code, and what they turned
 - **Seen and left, for a decision:** the *current* line's bubble has no limit on covering another character's face (the reply bubble and the earlier line have one). In the exported responsive story at 390×740 it covered 46% of the neighbour's face at the replies step, while the three lines before used the text box. And the earlier line can be placed low, over the characters' bodies, when there is no room above (responsive, Tablet landscape).
 - **Decided (2026-11-22):** the current line's bubble over a neighbour's face and the earlier line placed low are fine as they are.
 
+### Release checks (v0.9.162)
+- A story played to its ending in the Preview and in the exported file (AI and read-aloud off).
+- The inventory switch on the screen that is up: Preview, both layouts; export at 1130×690 (not 1:1).
+- The device sweep and the exports of the four-character scene are the ones above, run on this code before the last fix; that fix changes only when the panel is drawn, not where.
+- Suites: renderer 850, builder 3,334, core 3,241, player 10; lint 0 errors; type-check clean. CI green on the release commit.
+- **Seen, test story only:** a character location written into the file by hand, without the fields the Visual Editor gives it, is drawn at its raw pixels in an export and can hang off a small window. Not reachable from the app.
+- **For a decision:** *Show on demand only* is ticked per character but acts as one switch (all character panels start shown unless every one is ticked), and the box is offered for Screen Corner panels, where it does nothing.
+
 ### User Guide
 - Mood HUD: says what a token and a disc are, adds the **Display** setting, and marks which settings belong to which.
 - Meter Frame: the Phone toggle's sentence now says the strip is for responsive stories; a fixed canvas keeps its cards.
@@ -40,6 +48,7 @@ The checks left open at v0.9.161, run on the released code, and what they turned
 - "Show lines as" split into sub-points (nothing dropped).
 - Character Inventory: when a panel is shown, and what *Show on demand only* does.
 - **Files:** `docs/USER_GUIDE.md`
+- For v0.9.162: Character Inventory says the switch works at once, in the Preview and in exported stories, and that it is one switch for all panels at characters; Preview Controls names its two bars and the inventory button; the shortcuts table covers exported stories; Meter Frame says *Screen Corner*, as the app does.
 
 ---
 

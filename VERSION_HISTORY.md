@@ -5,7 +5,7 @@ for detailed release notes (including file-level changes and the *why* behind
 decisions) see [`Progress.md`](Progress.md). For the latest published build,
 visit the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
 
-Current release: **v0.9.161**. This is a **beta**: core functionality works,
+Current release: **v0.9.162**. This is a **beta**: core functionality works,
 and new releases arrive often. The release summaries below cover v0.9.88
 onward, newest first. Below them are an archived feature table and deep-dives
 for the releases up to v0.9.89. Detailed notes for every release are in
@@ -16,6 +16,8 @@ for the releases up to v0.9.89. Detailed notes for every release are in
 One paragraph per release, as it appeared on the project's front page. The
 latest release is described in the [README](README.md); when a new version
 comes out, its predecessor's paragraph moves to the top of this list.
+
+**v0.9.161 was the full-stage release**, about a stage full of characters. Speech bubbles now keep clear of the mood tokens as well as of buttons and panels. When the bubble with the player's replies would cover someone's face, the replies stay buttons instead, and the line before is left out rather than put over a face. A mood token, meters or an inventory set to sit at a character now show in the responsive layout too, not only on a fixed canvas, and a token moves off the story's buttons where it can. On a phone, a list of replies that scrolls fades at its bottom edge and shows a ▾ to tap. In the Preview, a fixed-canvas story's corner panels are drawn on the stage at every device size, exactly as an exported story shows them.
 
 **v0.9.159 was the read-aloud release**: it makes stories speak. Reading aloud and voice input now work in exported stories and in languages other than English, and each character keeps their voice in a translation. With an OpenAI key, lines are read by a live voice that starts speaking while the line is still arriving; a speech server that fails falls back to the browser's voice instead of silence. The export window shows which speech a story is exported with and never includes a speech key unless you choose it. In the Visual Editor every reply of a Dialog Tree carries a badge that says where it leads ("Step in →", the next beat's name, or a warning when it leads nowhere), speech bubbles can be selected and made wider or narrower, and lines, replies, names and panels appear in the language you chose. The player's replies can be listed in one bubble even when the player's character is never shown, and bubbles keep clear of buttons, panels and the other characters' faces. A character's mood token can sit at their feet, where bubbles don't go, and can stay a small coloured square until the player clicks it. Every field now has a hint in plain words.
 

@@ -1848,7 +1848,7 @@ Counters are **scoped to the character**, so two characters can each have a `tru
 
 A counter that's only in the data does nothing for your interactor. The **Meter Frame** is the little panel that puts them on screen. Scroll to the bottom of the **Counters** tab, tick **Enable**, and choose:
 
-- **Dock To** — *Character* (the frame floats beside the character's sprite, positioned by **Anchor Position**, on a fixed canvas and in the responsive layout alike) or *Screen* (pinned to one of the four corners, with a small **HUD layout preview** showing how it will stack alongside any other overlays in that corner). The preview has a **Desktop / 📱 Phone** toggle: flip it to Phone to see the same corners packed against a phone-portrait stage. In a responsive story, this character's cards fold into the compact strip described below there. A fixed-canvas story laid out at desktop size keeps its cards on a phone and shrinks them with the rest of the stage.
+- **Dock To** — *Character* (the frame floats beside the character's sprite, positioned by **Anchor Position**, on a fixed canvas and in the responsive layout alike) or *Screen Corner* (pinned to one of the four corners, with a small **HUD layout preview** showing how it will stack alongside any other overlays in that corner). The preview has a **Desktop / 📱 Phone** toggle: flip it to Phone to see the same corners packed against a phone-portrait stage. In a responsive story, this character's cards fold into the compact strip described below there. A fixed-canvas story laid out at desktop size keeps its cards on a phone and shrinks them with the rest of the stage.
 - **Offset X / Y**, and a **Style** block: background, border colour and width, corner radius, padding, opacity.
 - **Show Labels**, plus **Meter Width**, **Meter Height** and **Spacing** for the bars themselves.
 
@@ -2017,7 +2017,7 @@ What can this character carry?
 2. Click **Add Item** for each item the character starts with, and give it an internal name, a display name, a picture (**Add Image**), a description and a quantity. Inventory beats, effects and conditions refer to the item by its internal name.
 3. To show the items on screen, tick **Enable** under **Inventory Frame (HUD Overlay)** and choose where the panel sits and how it looks (item size, columns, style)
 
-A panel docked to a **Screen Corner** is always shown. A panel docked to the **Character** is shown from the start as well, in the Preview and in exported stories, unless you tick **Show on demand only (Ctrl/Cmd+I)**. Then it stays away until the player presses Ctrl+I (⌘I on a Mac) and appears with the next screen of the story; the Preview's inventory button in the bottom bar does the same. A phone has no such key, so leave the box unticked for stories played on phones. Either way a panel is only drawn while its character carries something.
+A panel docked to a **Screen Corner** is always shown. A panel docked to the **Character** is shown from the start as well, in the Preview and in exported stories, unless you tick **Show on demand only (Ctrl/Cmd+I)**. Then it stays away until the player presses Ctrl+I (⌘I on a Mac), in the Preview and in an exported story alike. The panel appears at once, on the screen that is up, and the same key hides it again. In the Preview, the inventory button in the bottom bar (*Show Inventory* / *Hide Inventory*) does the same. The key and the button are one switch for all the panels docked to characters, so they all start shown as long as one of them has the box unticked. A phone has no such key, so leave the box unticked for stories played on phones. Either way a panel is only drawn while its character carries something.
 
 The character has these items from the start of the story; the player's character carries them in the player's inventory, so *player has …* conditions see them. They come back when the story restarts (or when an End Screen resets the inventory). During the story, use Inventory beats (or Add Inventory effects) to give or take items. The inventory panel always shows what the character **carries right now**: an item appears when it is given and disappears when it is taken, and the name and picture come from this list when the item is on it. When the panel is in the way, the player clicks its title (*Inventory ▼*) once to fold it into a small badge at the panel's top-right corner, showing the number of items; it stays folded from beat to beat until they click the badge to open it again. On phones it starts folded. Speech bubbles keep clear of a character's inventory and meter panels. An item that isn't on this character's list takes its record from the story's [Items](#project-items) list, and failing that from another character who lists it.
 
@@ -3397,7 +3397,7 @@ Until you start, the status at the bottom right of the window reads *Ready to pl
 
 ### Preview Controls
 
-The top toolbar provides essential controls:
+The Preview has two bars. The one at the top holds the play controls (start point, Pause / Resume, Stop, Restart, Save play session log). The one along the bottom holds the rest, from Zoom to Debug:
 
 | Control | Function |
 |---------|----------|
@@ -3412,7 +3412,7 @@ The top toolbar provides essential controls:
 | **Text Animation** | Toggle typewriter effect on/off |
 | **Mute** | Silence all audio |
 | **Text-to-Speech / Speech-to-Text** | Toggle voice output and voice input for this run (see [TTS](#text-to-speech-tts) and [STT](#speech-to-text-stt)) |
-| **Inventory** | Show/hide inventory panel (Ctrl/Cmd+I) |
+| **Inventory** (box icon; *Show Inventory* / *Hide Inventory*) | Show or hide the inventory panels docked to characters, at once on the screen that is up (Ctrl/Cmd+I). Panels in a screen corner are always shown. See [Character Inventory](#character-inventory) |
 | **Messages** (speech-bubbles icon) | Open the [message history](#message-history) — only there when Project Settings ▸ Dialogue ▸ Message history is on |
 | **Debug** | Toggle the debug panel (state, variables, visited beats) |
 
@@ -5022,7 +5022,7 @@ Quick reference for all beat types.
 | Ctrl/Cmd + Shift + F | Find & Change (Change with AI tab) |
 | Ctrl/Cmd + Shift + P | Open Preview window |
 | Space | Pause / resume (in preview) |
-| Ctrl/Cmd + I | Toggle inventory (in preview) |
+| Ctrl/Cmd + I | Show or hide the inventory panels docked to characters (in preview and in exported stories) |
 | Delete | Delete selected beat (or all selected beats in the flowchart) |
 | Escape | Deselect / Close panel |
 | Shift + drag | Draw a selection box around beats (flowchart) |
