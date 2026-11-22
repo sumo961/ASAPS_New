@@ -701,7 +701,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               detail: { path: inspectorPathToCanvasPath(path) },
             }));
           } : undefined}
-          className={`flex items-start gap-2 p-2 rounded-lg mb-1 border ${
+          className={`flex flex-wrap items-start gap-x-2 gap-y-1 p-2 rounded-lg mb-1 border ${
           isNPC && speakerColor
             ? `${speakerColor.bg} ${speakerColor.border}`
             : 'bg-gray-50 border-gray-200'
@@ -731,15 +731,20 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               (TextFieldWithVariables) edit inline directly in the
               row. The modal still opens via the pencil but is now
               reserved for the less-common NPC auto-exit target. */}
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
+          {/* The card is two rows: who speaks, with the buttons beside it,
+              and under them the line's text across the whole card. Sharing
+              one row with the buttons left the text a narrow column, and at
+              the Properties panel's narrowest the speaker field and the text
+              kept their own widths and stuck out of the card on the right. */}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               {/* Speaker color indicator */}
               {isNPC && speakerColor && (
                 <div className={`w-1.5 h-4 rounded-full ${speakerColor.accent}`} />
               )}
               {isNPC ? <Users className={`w-4 h-4 ${speakerColor?.text || 'text-blue-600'}`} /> : <User className="w-4 h-4 text-orange-600" />}
               {isNPC ? (
-                <div className="flex-1 max-w-xs">
+                <div className="flex-1 min-w-0 max-w-xs">
                   <CharacterRefField
                     value={{ characterRef: node.characterRef, freeText: node.speaker }}
                     onChange={(next) => {
@@ -778,7 +783,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                   <select
                     value={node.speakerState || ''}
                     onChange={(e) => onChange(updateNodeAtPath(dialogTree, path, { speakerState: e.target.value || undefined }))}
-                    className={`text-xs px-1.5 py-1 border rounded bg-white max-w-[9rem] ${node.speakerState && !states.some((st) => st.id === node.speakerState) ? 'border-red-400 text-red-700' : 'border-gray-300'}`}
+                    className={`text-xs px-1.5 py-1 border rounded bg-white min-w-0 max-w-[min(9rem,100%)] ${node.speakerState && !states.some((st) => st.id === node.speakerState) ? 'border-red-400 text-red-700' : 'border-gray-300'}`}
                     title="How the speaker looks from this line on: one of their character states (Characters → States). Stays until another line changes it or the conversation ends."
                     data-testid="dialog-speaker-state"
                   >
@@ -806,6 +811,9 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                 </span>
               )}
             </div>
+          </div>
+          {/* After the speaker for the keyboard, under the buttons for the eye (order). */}
+          <div className="order-2 basis-full min-w-0">
             {isNPC ? (
               <TextFieldWithVariables
                 value={node.text}
@@ -835,7 +843,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                   detail: { path: canvasPath },
                 }));
               }}
-              className="p-1 hover:bg-blue-100 rounded text-blue-600"
+              className="order-1 p-1 hover:bg-blue-100 rounded text-blue-600"
               title="Walk the canvas preview to this node"
             >
               <ArrowRight className="w-3 h-3" />
@@ -852,7 +860,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                   setEditingNode({ node: actualNode, path });
                 }
               }}
-              className="p-1 hover:bg-gray-200 rounded"
+              className="order-1 p-1 hover:bg-gray-200 rounded"
               title="Edit dialog"
             >
               <Edit3 className="w-3 h-3" />
@@ -863,7 +871,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
           {isNPC && onRemoveSelf && (
             <button
               onClick={onRemoveSelf}
-              className="p-1 text-red-500 hover:bg-red-50 rounded"
+              className="order-1 p-1 text-red-500 hover:bg-red-50 rounded"
               title={chained
                 ? 'Remove this line and everything that follows it.'
                 : 'Remove NPC response and any nested player choices below it. The parent player choice stays — pick a new onward target for it from its dropdown.'}
@@ -925,7 +933,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               const nestedSpeakerColor = choice.dialogNode ? getSpeakerColor(choice.dialogNode.speaker || 'NPC') : null;
 
               return (
-                <div key={choice.id} data-dialog-anchor={choiceId} className="mb-2 min-w-[16rem]">
+                <div key={choice.id} data-dialog-anchor={choiceId} className="mb-2 min-w-[12rem]">
                   {/* For collapsible patterns, show the NPC response above the player's exit choice */}
                   {isCollapsible && choice.dialogNode && nestedSpeakerColor && (
                     <div className={`mb-1 p-2 ${nestedSpeakerColor.bg} border ${nestedSpeakerColor.border} rounded-lg overflow-hidden relative`}>
@@ -1442,7 +1450,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Wraps: in a narrow Properties panel the buttons went off to the right and the panel scrolled sideways. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
           <MessageSquare className="w-4 h-4" />
           Dialog Tree Editor
@@ -1460,7 +1469,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
             ) : null;
           })()}
         </h3>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {aiOn && <button
             onClick={() => setShowAIDialog(true)}
             className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-1 text-xs font-medium"
@@ -1519,7 +1528,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
       
       {/* Dialog Tree — in expanded (modal) mode the box grows to the modal
           body instead of the inspector's 500px cap (finding 10) */}
-      <div className={`border rounded-lg p-3 bg-gray-50 overflow-auto ${expanded ? 'max-h-[calc(83vh-140px)]' : 'max-h-[500px]'}`}>
+      {/* No dropdown or field wider than the row it is in: in a narrow panel they stuck out of their cards or were cut off. */}
+      <div className={`border rounded-lg p-3 bg-gray-50 overflow-auto [&_select]:max-w-full [&_input]:max-w-full [&_textarea]:max-w-full ${expanded ? 'max-h-[calc(83vh-140px)]' : 'max-h-[500px]'}`}>
         {renderDialogNode(dialogTree)}
       </div>
       

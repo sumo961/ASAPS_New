@@ -688,7 +688,7 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
               (e.target as HTMLSelectElement).value = '';
             }
           }}
-          className="text-xs px-2 py-0.5 border rounded bg-white text-gray-600"
+          className="text-xs px-2 py-0.5 border rounded bg-white text-gray-600 min-w-0 max-w-full"
           title="Append a preset bundle of affect effects tuned for a common author intent. Tweak values afterward to taste."
         >
           <option value="">+ apply template…</option>

@@ -359,6 +359,9 @@ const inputRowStyle: React.CSSProperties = {
 };
 const inputStyle: React.CSSProperties = {
   flex: 1,
+  // Without this a text input keeps its built-in width (about 20
+  // characters) and sticks out of a narrow row.
+  minWidth: 0,
   background: 'transparent',
   border: 'none',
   outline: 'none',

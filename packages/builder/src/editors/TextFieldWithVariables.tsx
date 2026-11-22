@@ -74,7 +74,7 @@ export const TextFieldWithVariables: React.FC<TextFieldWithVariablesProps> = ({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder}
-            className={`flex-1 ${className}`}
+            className={`flex-1 min-w-0 ${className}`}
             rows={rows}
           />
         ) : (
@@ -84,7 +84,7 @@ export const TextFieldWithVariables: React.FC<TextFieldWithVariablesProps> = ({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder}
-            className={`flex-1 ${className}`}
+            className={`flex-1 min-w-0 ${className}`}
           />
         )}
         {availableVariables.length > 0 && (

@@ -14,6 +14,13 @@ The relay of an exported story carries reading aloud too, so OpenAI and ElevenLa
 
 **Files modified:** `packages/renderer/src/components/{ReplyBubbleLayer,SpeechBubbleLayer}.tsx`, `packages/builder/public/player-web.js`
 
+### Fixed: the Dialog Tree editor in a narrow Properties panel (author report, 2026-11-22)
+- With the panel dragged to its narrowest (280 px), a line's speaker field and text stuck out of their card on the right, the editor's header buttons ran off to the right (the panel scrolled sideways by 243 px), and effect dropdowns were cut off.
+- A line's card is now two rows: who speaks with the buttons beside it, and under them the text across the whole card (203 of the card's 221 px at the narrowest, where it had about 120). The speaker field no longer keeps a text input's built-in width (`CharacterRefField`), the header's buttons wrap, the reply cards' minimum width is 12rem instead of 16rem, and no dropdown or field inside the tree is wider than its row.
+- **Checked** in the browser on The Last Ferry's dialog at 280, 320 and 400 px: nothing wider than what holds it, nothing scrolling sideways.
+
+**Files modified:** `packages/builder/src/editors/{DialogTreeEditor,TextFieldWithVariables,ChoiceEffectsEditor}.tsx`, `packages/builder/src/components/characters/CharacterRefField.tsx`
+
 ### Checked: the author's whole story, played through (2026-11-22)
 - A read-only copy of "Red's Path through the woods" (93 beats, fixed canvas; no keys in it), in an isolated browser's Preview at Fit window, sound cut. A walker clicked what a player can click, preferring what it had not tried: 27 runs from the start, then the Preview started at each screen those runs had not reached.
 - **Every screen that shows was up at least once** (76 of 76, the 17 condition and set-variable beats pass unseen) and **all six endings were reached**. No screen without something to click, nothing to click outside the stage, no error in the console, and no screen where the replies flipped between buttons and bubble more than the one change described above (watched on every screen).
