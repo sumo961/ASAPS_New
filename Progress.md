@@ -14,6 +14,12 @@ The relay of an exported story carries reading aloud too, so OpenAI and ElevenLa
 
 **Files modified:** `packages/renderer/src/components/{ReplyBubbleLayer,SpeechBubbleLayer}.tsx`, `packages/builder/public/player-web.js`
 
+### Checked: the author's whole story, played through (2026-11-22)
+- A read-only copy of "Red's Path through the woods" (93 beats, fixed canvas; no keys in it), in an isolated browser's Preview at Fit window, sound cut. A walker clicked what a player can click, preferring what it had not tried: 27 runs from the start, then the Preview started at each screen those runs had not reached.
+- **Every screen that shows was up at least once** (76 of 76, the 17 condition and set-variable beats pass unseen) and **all six endings were reached**. No screen without something to click, nothing to click outside the stage, no error in the console, and no screen where the replies flipped between buttons and bubble more than the one change described above (watched on every screen).
+- The Pick Prop beat, where the walk at v0.9.161 had stopped, takes each of its three props.
+- **Limits:** the first full run was at the story's own pace, the others with timed screens eight times faster. Screens started directly have no inventory or counters behind them, so the branches behind "adult > 7" and the huntsman's rescue were seen as screens, not reached by play. One device size; no export; nothing listened to.
+
 ### New: reading aloud through the relay (author's request, 2026-11-22)
 - A story exported with **Use a relay** kept the AI key on the host, but reading aloud with OpenAI or ElevenLabs voices still wrote the speech key into the page (or fell back to the browser's voice).
 - **The relay function** (`relayKit.ts`) takes a `target` beside `provider`: `realtime-secret` (OpenAI: buys the short-lived Realtime session secret; only `{ session: { type, model } }` of a `gpt-realtime` model is passed on, whatever else the caller sends), `speech` (OpenAI's `/audio/speech`, and ElevenLabs' `/text-to-speech/{voiceId}/stream` with `ELEVENLABS_API_KEY`; the voice id is checked so it cannot steer the address). Sound is piped through as it arrives; a refusal keeps its status and message. Requests without `target` behave as before.
