@@ -15,6 +15,7 @@
  * default voice; and the player's own character, who stays silent until the
  * author gives them a voice.
  */
+import { guessSpeakerGenders } from './guessGender';
 
 export interface AutoVoice {
   id: string;
@@ -58,6 +59,7 @@ export function autoSpeakerVoices(input: {
   // When every voice is in use they come round again, the narrator's last.
   const round = voices.filter((v) => v.id !== narrators);
   let turn = 0;
+  let shared = 0;
   const othersOf = (speaker: string) => (input.sameSpeaker ?? []).filter((g) => g.includes(speaker)).flat().filter((n) => n !== speaker);
   for (const speaker of speakers) {
     if (!speaker || silent.has(speaker) || assigned[speaker] || out[speaker]) continue;
@@ -68,9 +70,14 @@ export function autoSpeakerVoices(input: {
     if (theirs) { out[speaker] = theirs; continue; }
     const free = voices.filter((v) => !taken.has(v.id));
     const wanted = input.genders?.[speaker] ?? others.map((n) => input.genders?.[n]).find(Boolean);
+    // A woman gets a woman's voice and a man a man's, also when all of
+    // those are taken (then one is shared) and even if it is the narrator's:
+    // a voice that suits comes before a voice of one's own. (A man's voice
+    // read a woman's lines in the field test.)
+    const suiting = wanted ? voices.filter((v) => v.gender === wanted) : [];
     const pick = (wanted && free.find((v) => v.gender === wanted))
+      || (suiting.length > 0 ? (suiting.filter((v) => v.id !== narrators)[shared++ % Math.max(1, suiting.filter((v) => v.id !== narrators).length)] ?? suiting[0]) : undefined)
       || free[0]
-      || (wanted && round.find((v) => v.gender === wanted))
       || round[turn++ % Math.max(1, round.length)]
       || voices[0];
     out[speaker] = pick.id;
@@ -84,13 +91,14 @@ export function speakerNameGroups(characters: ReadonlyArray<{ id?: string; name?
   return (characters ?? []).map((c) => [...new Set([c.displayName, c.name, c.id].filter(Boolean) as string[])]).filter((g) => g.length > 1);
 }
 
-/** 'she' / 'he' from a character's pronouns; nothing for 'they' or pronouns of their own. */
-export function speakerGenders(characters: ReadonlyArray<{ name?: string; displayName?: string; pronouns?: unknown }> | null | undefined): Record<string, 'male' | 'female' | undefined> {
-  const out: Record<string, 'male' | 'female' | undefined> = {};
-  for (const c of characters ?? []) {
-    const gender = c.pronouns === 'she' ? 'female' : c.pronouns === 'he' ? 'male' : undefined;
-    if (!gender) continue;
-    for (const name of [c.displayName, c.name]) if (name) out[name] = gender;
-  }
-  return out;
+/**
+ * Woman or man for each speaker, as far as the story says (guessGender):
+ * the character's pronouns, what their own texts call them, a role word or
+ * a common first name. Speakers who are no character go by their name.
+ */
+export function speakerGenders(
+  characters: Parameters<typeof guessSpeakerGenders>[0],
+  speakers?: ReadonlyArray<string> | null,
+): Record<string, 'male' | 'female' | undefined> {
+  return guessSpeakerGenders(characters, speakers);
 }

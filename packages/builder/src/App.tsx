@@ -7295,7 +7295,7 @@ function App() {
         triggerNewProject={triggerNewProject}
         speakers={storySpeakers}
         playerCharacterName={playerCharacterName}
-        speakerGenders={speakerGenders(characters)}
+        speakerGenders={speakerGenders(characters, storySpeakers)}
         sameSpeaker={speakerNameGroups(characters)}
         speakerVoices={globalSettings?.tts?.speakerVoices?.[getActiveProviderKey()] ?? {}}
         onSpeakerVoiceChange={handleSpeakerVoiceChange}

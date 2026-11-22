@@ -35,7 +35,7 @@ interface HtmlExportDialogProps {
   mediaBytes?: number;
   /** The story's speakers as the TTS menu lists them, and its characters: for the voices of speakers without one. */
   speakers?: string[];
-  characters?: ReadonlyArray<{ id?: string; name?: string; displayName?: string; role?: string; pronouns?: unknown }>;
+  characters?: ReadonlyArray<{ id?: string; name?: string; displayName?: string; role?: string; pronouns?: unknown; description?: string; variants?: any }>;
 }
 
 /** Remembers, on this computer, which voices the last export used. */
@@ -109,7 +109,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         voices: voices.map((v) => ({ id: v.id, gender: v.gender })),
         defaultVoiceId: saved.defaultVoiceId,
         playerKeys: player ? [player.displayName, player.name].filter(Boolean) as string[] : [],
-        genders: speakerGenders(characters),
+        genders: speakerGenders(characters, speakers),
         sameSpeaker: speakerNameGroups(characters),
       });
     } catch {

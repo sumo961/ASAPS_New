@@ -1788,7 +1788,7 @@ export const PreviewWindow: React.FC = () => {
             voices: voices.map((v) => ({ id: v.id, gender: v.gender })),
             defaultVoiceId: getSavedTTSConfig()?.defaultVoiceId,
             playerKeys: playerChar ? [playerChar.displayName, playerChar.name].filter(Boolean) as string[] : [],
-            genders: speakerGenders(previewData.characters),
+            genders: speakerGenders(previewData.characters, speakers),
             sameSpeaker: speakerNameGroups(previewData.characters),
           });
           for (const [speaker, voiceId] of Object.entries(auto)) ttsService.setSpeakerVoice(speaker, { voiceId });
