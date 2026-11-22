@@ -129,6 +129,7 @@ import { NewGitHubProjectDialog } from './components/vcs/NewGitHubProjectDialog'
 import { useTranslationState, useTranslationActions } from './contexts/TranslationContext';
 import { applyTranslationResource, extractCharacterDisplayNameTranslations } from './export/StoryTranslator';
 import { speakerAliasesBetween } from './utils/speakerAliases';
+import { speakerGenders, speakerNameGroups } from './services/tts/autoVoices';
 import { extractSpeakers } from './utils/speakerUtils';
 import { getTTSService } from './services/tts';
 import { getSavedTTSConfig } from './hooks/useTTS';
@@ -5261,6 +5262,8 @@ function App() {
 
   // Serialize story data for preview window
   const storySpeakerAliasesRef = useRef<Record<string, string>>({});
+  /** The story's speakers as the TTS menu lists them, for the Preview (voices of their own for unassigned speakers). */
+  const storySpeakersRef = useRef<string[]>([]);
   const getSerializedStoryData = useCallback(() => {
     // Serialize beats with all their data
     const serializedBeats = state.beats.map(serializeBeatForStory);
@@ -5328,6 +5331,7 @@ function App() {
         assets: assets,
         characters: translatedChars,
         speakerAliases: { ...storySpeakerAliasesRef.current, ...speakerAliasesBetween(characters, translatedChars) },
+        speakers: storySpeakersRef.current,
         emotionPalette: emotionPalette,
         traitModulations: traitModulations,
         themeAssets: themeAssets,
@@ -5389,6 +5393,7 @@ function App() {
         assets: assets,
         characters: translatedCharacters,
         speakerAliases: { ...storySpeakerAliasesRef.current, ...speakerAliasesBetween(characters, translatedCharacters) },
+        speakers: storySpeakersRef.current,
         emotionPalette: emotionPalette,
         traitModulations: traitModulations,
         themeAssets: themeAssets,
@@ -7157,6 +7162,7 @@ function App() {
     const allSpeakers = new Set([...beatSpeakers, ...charNames]);
     return ['Narrator', playerKey, ...allSpeakers];
   }, [state.beats, playerCharacterName, characters]);
+  storySpeakersRef.current = storySpeakers;
 
   // Populate character.translations from translation resources when translations are generated.
   // Also cleans up any invalid translations (e.g. from prior bug that matched counter displayNames).
@@ -7289,6 +7295,8 @@ function App() {
         triggerNewProject={triggerNewProject}
         speakers={storySpeakers}
         playerCharacterName={playerCharacterName}
+        speakerGenders={speakerGenders(characters)}
+        sameSpeaker={speakerNameGroups(characters)}
         speakerVoices={globalSettings?.tts?.speakerVoices?.[getActiveProviderKey()] ?? {}}
         onSpeakerVoiceChange={handleSpeakerVoiceChange}
         onTTSProviderChanged={(provider, model, baseUrl) => {
@@ -7918,6 +7926,8 @@ function App() {
           availableBeats={state.beats.map((b: any) => ({ id: b.id, name: b.name, type: b.type }))}
           storyStartBeatId={globalSettings?.debug?.firstbeat || undefined}
           exportSpeech={resolveExportSpeech(globalSettings)}
+          speakers={storySpeakers}
+          characters={characters}
           mediaBytes={assets.reduce((sum, a: any) => sum + (typeof a.size === 'number' ? a.size : 0), 0)}
           onExportSpeechChange={(enabled) => {
             const base = globalSettingsRef.current ?? globalSettings;

@@ -14,6 +14,15 @@ The relay of an exported story carries reading aloud too, so OpenAI and ElevenLa
 
 **Files modified:** `packages/renderer/src/components/{ReplyBubbleLayer,SpeechBubbleLayer}.tsx`, `packages/builder/public/player-web.js`
 
+### New: a voice of their own for speakers nobody chose one for (author's decision after the field test, 2026-11-22)
+- In the field test the narrator and Karin were read in the same voice: the Rehearsal template assigns none, and every unassigned speaker got the setup's default. Asked, the author chose distinct voices as the default.
+- One helper decides (`services/tts/autoVoices.ts`), for OpenAI voices only (ElevenLabs voices belong to the account, a local server's to its install, the browser's to the player's device): the narrator keeps the default voice; every other speaker left on Auto gets the next voice nobody has, in the order the TTS menu lists them, a woman's or a man's where the character's pronouns say *she* or *he*; with more speakers than voices they come round again. A character's display name, name and id share one voice (the template lists Karin under two names). The author's own choices win, and the player's character stays silent until given a voice.
+- **The TTS menu** shows the pick beside Auto ("Auto (Alloy)"; the narrator's shows the default voice). **The Preview** sets the same voices (the story's speakers now travel to it), before warming up the Realtime sessions. **Exports** carry them in `ttsSpeakerVoices`, under the author's choices.
+- **Checked** in an isolated browser on the Rehearsal template with a made-up OpenAI setup, reading aloud off (nothing called, nothing heard): the menu shows Narrator on Auto and Karin Lindqvist on "Auto (Alloy)"; the Preview's speech service holds alloy for both of Karin's names and none for the narrator or the player; the exported page's speech setup has `{"Karin Lindqvist":"alloy","karin":"alloy"}` with default marin, no key in the page, and the zip's `deploy.sh` asks for `OPENAI_API_KEY` only. **Not listened to.**
+- Tests: `autoVoices.test.ts` (8), `exportSpeech.test.ts` (2 new).
+
+**Files modified:** `packages/builder/src/services/tts/autoVoices.ts` (new), `packages/builder/src/{App.tsx,components/Header.tsx,pages/PreviewWindow.tsx,services/PreviewWindowManager.ts,components/export/HtmlExportDialog.tsx,export/exportSpeech.ts}`, `docs/USER_GUIDE.md`
+
 ### New: `deploy.sh` in the relay zip (author's request, 2026-11-22)
 - Path B of the relay README (Netlify CLI) as one script, generated with the export (`buildRelayDeployScript`): checks for Node.js and the export's files, logs in (the CLI's `status` ends without an error when logged out, so its JSON answer is read), creates and links the site (`sites:create`) unless the folder already has one, asks for the keys, deploys and opens the story in the browser (`deploy --prod --open`; the opening added after the author's first run, 2026-11-22). Setting the keys before the first deploy saves the second deploy the README asks for.
 - It asks only for the keys this export needs (`relayKeysFor`: the AI's provider when the AI uses the relay, the voices' provider when they do).

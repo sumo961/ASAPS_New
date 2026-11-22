@@ -30,6 +30,7 @@ import { InputTextValuesModal } from '../components/preview/InputTextValuesModal
 import { getSavedAIConfig, getRuntimeAIConfig } from '../hooks/useAI';
 import { getTTSService, WebSpeechProvider, OpenAITTSProvider, ElevenLabsProvider, CustomTTSProvider, LocalTTSProvider } from '../services/tts';
 import { getSavedTTSConfig } from '../hooks/useTTS';
+import { autoSpeakerVoices, autoVoicesApply, speakerGenders, speakerNameGroups } from '../services/tts/autoVoices';
 import { getSTTService, WebSpeechSTTProvider, WhisperSTTProvider, LocalSTTProvider, VoskSTTProvider, WhisperCppSTTProvider } from '../services/stt';
 import { getSavedSTTConfig } from '../hooks/useSTT';
 import { resolvePortraitUrl } from '../utils/speakerUtils';
@@ -249,6 +250,8 @@ interface PreviewData {
   activeLanguage?: string | null;
   /** Translated speaker name → the name its voice is kept under (utils/speakerAliases). */
   speakerAliases?: Record<string, string>;
+  /** The story's speakers as the TTS menu lists them (services/tts/autoVoices). */
+  speakers?: string[];
   /** Staged uiStrings translations for the active language (offline path). */
   uiStrings?: Record<string, string> | null;
   /** The editor's "Preview as" casting (role id → character id). */
@@ -1768,10 +1771,31 @@ export const PreviewWindow: React.FC = () => {
         }
         console.log('[PreviewWindow] Applied persisted speaker voices for', providerKey + ':', Object.keys(persistedVoices).length);
       }
-      // The story's voices are known: get them ready before the first line
-      // (OpenAI's Realtime reader opens its sessions; a no-op elsewhere, and
-      // while "Read text aloud" is off).
-      getTTSService().warmUp();
+      // Speakers nobody chose a voice for get one of their own (the same
+      // ones the TTS menu shows and an export carries), then the story's
+      // voices are known: get them ready before the first line (OpenAI's
+      // Realtime reader opens its sessions; a no-op elsewhere, and while
+      // "Read text aloud" is off).
+      const ttsService = getTTSService();
+      const provider = ttsService.getActiveProvider();
+      if (autoVoicesApply(providerKey) && provider && previewData.speakers?.length) {
+        const speakers = previewData.speakers;
+        const playerChar = previewData.characters?.find((c) => c.role === 'player');
+        void provider.getVoices().then((voices) => {
+          const auto = autoSpeakerVoices({
+            speakers,
+            assigned: persistedVoices,
+            voices: voices.map((v) => ({ id: v.id, gender: v.gender })),
+            defaultVoiceId: getSavedTTSConfig()?.defaultVoiceId,
+            playerKeys: playerChar ? [playerChar.displayName, playerChar.name].filter(Boolean) as string[] : [],
+            genders: speakerGenders(previewData.characters),
+            sameSpeaker: speakerNameGroups(previewData.characters),
+          });
+          for (const [speaker, voiceId] of Object.entries(auto)) ttsService.setSpeakerVoice(speaker, { voiceId });
+        }).catch(() => { /* the default voice reads */ }).finally(() => ttsService.warmUp());
+      } else {
+        ttsService.warmUp();
+      }
     }
 
     // Set up AI service for AI-powered beats (update on every previewData change)

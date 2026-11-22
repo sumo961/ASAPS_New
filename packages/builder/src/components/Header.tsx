@@ -22,7 +22,8 @@ import { VCSStatusBar } from './vcs/VCSStatusBar';
 import { getProjectDataForExport } from '../utils/projectZipManager';
 import { getSavedAIConfig } from '../hooks/useAI';
 import { useAIFeatures } from '../utils/aiFeatures';
-import { useTTS } from '../hooks/useTTS';
+import { useTTS, getSavedTTSConfig } from '../hooks/useTTS';
+import { autoSpeakerVoices, autoVoicesApply } from '../services/tts/autoVoices';
 import { getTTSService } from '../services/tts';
 import { useSTT } from '../hooks/useSTT';
 import { getSTTService } from '../services/stt';
@@ -123,6 +124,10 @@ interface HeaderProps {
   speakers?: string[];
   playerCharacterName?: string;
   speakerVoices?: Record<string, string>;
+  /** 'she' / 'he' per speaker, for the voice a speaker without one gets (services/tts/autoVoices). */
+  speakerGenders?: Record<string, 'male' | 'female' | undefined>;
+  /** Names that are one speaker (a character's display name, name and id). */
+  sameSpeaker?: string[][];
   onSpeakerVoiceChange?: (speaker: string, voiceId: string) => void;
   onTTSProviderChanged?: (provider: string, model?: string, baseUrl?: string) => void;
   /** Phase 1 — resolved project layout mode for the badge. */
@@ -182,6 +187,8 @@ export const Header: React.FC<HeaderProps> = ({
   speakers = [],
   playerCharacterName,
   speakerVoices = {},
+  speakerGenders,
+  sameSpeaker,
   onSpeakerVoiceChange,
   onTTSProviderChanged,
   layoutMode,
@@ -232,7 +239,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
   const [showTTSConfig, setShowTTSConfig] = useState(false);
   const [showTTSMenu, setShowTTSMenu] = useState(false);
-  const [availableVoices, setAvailableVoices] = useState<Array<{ id: string; name: string }>>([]);
+  const [availableVoices, setAvailableVoices] = useState<Array<{ id: string; name: string; gender?: 'male' | 'female' | 'neutral' }>>([]);
   const [activeProviderName, setActiveProviderName] = useState<string>('');
   const [ttsEnabled, setTtsEnabled] = useState(() => {
     try {
@@ -259,7 +266,7 @@ export const Header: React.FC<HeaderProps> = ({
         const provider = getTTSService().getActiveProvider();
         if (provider) {
           const voices = await provider.getVoices();
-          setAvailableVoices(voices.map(v => ({ id: v.id, name: v.name })));
+          setAvailableVoices(voices.map(v => ({ id: v.id, name: v.name, gender: v.gender })));
           setActiveProviderName(provider.name);
         }
       } catch (e) {
@@ -553,7 +560,15 @@ export const Header: React.FC<HeaderProps> = ({
                           <div className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                             Character Voices{activeProviderName ? ` (${activeProviderName})` : ''}
                           </div>
-                          {speakers.map(speaker => {
+                          {(() => {
+                            // The voice each speaker without one is read in (OpenAI voices): shown beside "Auto".
+                            const saved = getSavedTTSConfig();
+                            const auto = autoVoicesApply(saved?.providerType) ? autoSpeakerVoices({
+                              speakers, assigned: speakerVoices, voices: availableVoices, defaultVoiceId: saved?.defaultVoiceId,
+                              playerKeys: playerCharacterName ? [playerCharacterName] : [], genders: speakerGenders, sameSpeaker,
+                            }) : {};
+                            const voiceName = (id?: string) => availableVoices.find((v) => v.id === id)?.name;
+                            return speakers.map(speaker => {
                             const isPlayerCharacter = speaker === 'Interactor' || (playerCharacterName && speaker === playerCharacterName);
                             const displayName = isPlayerCharacter
                               ? (playerCharacterName ? `${playerCharacterName} (Player)` : 'Interactor')
@@ -568,7 +583,9 @@ export const Header: React.FC<HeaderProps> = ({
                                   onChange={(e) => onSpeakerVoiceChange?.(speaker, e.target.value)}
                                   className="flex-1 text-xs px-2 py-1 border rounded bg-white min-w-0"
                                 >
-                                  <option value="">{isPlayerCharacter ? 'Silent' : 'Auto'}</option>
+                                  <option value="">{isPlayerCharacter ? 'Silent' : voiceName(auto[speaker]) ? `Auto (${voiceName(auto[speaker])})`
+                                    // The narrator, and anyone where nothing is picked for them, is read in the setup's own voice.
+                                    : voiceName(saved?.defaultVoiceId) ? `Auto (${voiceName(saved?.defaultVoiceId)})` : 'Auto'}</option>
                                   {availableVoices.map(v => (
                                     <option key={v.id} value={v.id}>{v.name}</option>
                                   ))}
@@ -582,7 +599,8 @@ export const Header: React.FC<HeaderProps> = ({
                                 </button>
                               </div>
                             );
-                          })}
+                          });
+                          })()}
                         </>
                       )}
                     </div>

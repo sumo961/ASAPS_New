@@ -64,6 +64,8 @@ export interface PreviewMessage {
     activeLanguage?: string | null;
     /** Translated speaker name → the name its voice is kept under (utils/speakerAliases). */
     speakerAliases?: Record<string, string>;
+    /** The story's speakers as the TTS menu lists them (services/tts/autoVoices). */
+    speakers?: string[];
     /** Staged renderer-chrome translations (uiStrings catalog) for the
      *  active language — applied via setUIStrings, no AI needed. */
     uiStrings?: Record<string, string> | null;

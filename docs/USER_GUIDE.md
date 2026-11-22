@@ -3768,6 +3768,8 @@ Each character in your story can have a distinct TTS voice:
 
 Built-in speakers like **Narrator** appear automatically. Your player character appears with "(Player)" next to their name. The player character is silent by default — assign a voice to enable speech for the player's text and clicked dialog choices.
 
+**Voices nobody chose.** A speaker left on **Auto** is read in the setup's default voice. With OpenAI voices, each character left on **Auto** gets a voice of their own instead, so a new story sounds like a conversation without any setup: the narrator keeps the default voice, and every other speaker gets a different one, a woman's or a man's where the character's pronouns are *she* or *he*. The dropdown shows which, for example *Auto (Alloy)*, and the Preview and exported stories use the same ones. A voice you choose yourself always wins, and the player's character stays silent until you give them a voice. With ElevenLabs, a speech server of your own or the browser's voices, Auto stays the default voice.
+
 <a id="quoted-speech-voice"></a>
 ### Quoted Speech and Narration
 

@@ -9,6 +9,8 @@ import { downloadHtmlExport, previewStoryZip, SINGLE_FILE_LIMIT_BYTES, singleFil
 import { DEFAULT_RELAY_PATH } from '../../export/relayKit';
 import { getSavedAIConfig, getRuntimeAIConfig } from '../../hooks/useAI';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
+import { autoSpeakerVoices, autoVoicesApply, speakerGenders, speakerNameGroups } from '../../services/tts/autoVoices';
+import { getTTSService } from '../../services/tts/TTSService';
 import { exportSpeechOptions, summarizeSpeechSetup, speechCanUseRelay, type ExportSpeechSource } from '../../export/exportSpeech';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { buildManifestEntry, type TranslationResource } from '@asaps/core';
@@ -31,6 +33,9 @@ interface HtmlExportDialogProps {
   onExportSpeechChange?: (enabled: boolean) => void;
   /** Total size of the project's media in bytes — drives the suggested output. */
   mediaBytes?: number;
+  /** The story's speakers as the TTS menu lists them, and its characters: for the voices of speakers without one. */
+  speakers?: string[];
+  characters?: ReadonlyArray<{ id?: string; name?: string; displayName?: string; role?: string; pronouns?: unknown }>;
 }
 
 /** Remembers, on this computer, which voices the last export used. */
@@ -46,6 +51,8 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   exportSpeech = true,
   onExportSpeechChange,
   mediaBytes,
+  speakers,
+  characters,
 }) => {
   // Suggested output follows the story's media size (UX-Eval B6 reframed):
   // one file for small stories, a folder when phones would struggle.
@@ -87,6 +94,28 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     try { localStorage.setItem(EXPORT_SPEECH_SOURCE_KEY, source); } catch { /* not remembered */ }
   };
   const speechSetup = summarizeSpeechSetup(isOpen ? getSavedTTSConfig() : null);
+  // Speakers without a voice of their own get the ones the Preview and the
+  // TTS menu give them (OpenAI voices only; see services/tts/autoVoices).
+  const exportAutoVoices = async (allVoices: Record<string, Record<string, string>> | undefined): Promise<Record<string, string> | undefined> => {
+    const saved = getSavedTTSConfig();
+    if (!saved || !autoVoicesApply(saved.providerType) || !speakers?.length) return undefined;
+    try {
+      const voices = await getTTSService().getActiveProvider()?.getVoices();
+      if (!voices?.length) return undefined;
+      const player = characters?.find((c) => c.role === 'player');
+      return autoSpeakerVoices({
+        speakers,
+        assigned: allVoices?.[saved.providerType],
+        voices: voices.map((v) => ({ id: v.id, gender: v.gender })),
+        defaultVoiceId: saved.defaultVoiceId,
+        playerKeys: player ? [player.displayName, player.name].filter(Boolean) as string[] : [],
+        genders: speakerGenders(characters),
+        sameSpeaker: speakerNameGroups(characters),
+      });
+    } catch {
+      return undefined; // the default voice reads
+    }
+  };
   // The speech key in the page, or held by the story's relay (OpenAI and
   // ElevenLabs). Follows the AI's choice until the author picks one here.
   const speechRelayPossible = speechCanUseRelay(isOpen ? getSavedTTSConfig() : null);
@@ -220,6 +249,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         speakerVoices: ttsSettings?.speakerVoices,
         readPrompts: ttsSettings?.readPrompts !== false,
         relayUrl: speechRelayUrl,
+        autoVoices: await exportAutoVoices(ttsSettings?.speakerVoices),
       });
 
       const options: HtmlExportOptions = {
@@ -285,7 +315,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [speechRelayUrl, mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
+  }, [speakers, characters, speechRelayUrl, mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
 
   // Called from the size-warning banner's "Continue anyway" button.
   // Reuses the pre-computed zip so the user isn't waiting for it twice.
@@ -312,6 +342,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         speakerVoices: ttsSettings?.speakerVoices,
         readPrompts: ttsSettings?.readPrompts !== false,
         relayUrl: speechRelayUrl,
+        autoVoices: await exportAutoVoices(ttsSettings?.speakerVoices),
       });
       const options: HtmlExportOptions = {
         mode,
@@ -338,7 +369,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [speechRelayUrl, aiAccess, aiProxyUrl, sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
+  }, [speakers, characters, speechRelayUrl, aiAccess, aiProxyUrl, sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
 
   const handleSwitchToFolder = useCallback(() => {
     setSizeWarning(null);

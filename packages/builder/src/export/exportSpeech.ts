@@ -19,6 +19,7 @@
 
 import type { SavedTTSConfig } from '../hooks/useTTS';
 import type { HtmlExportOptions } from './HtmlExporter';
+import { autoVoicesApply } from '../services/tts/autoVoices';
 
 export type ExportSpeechSource = 'browser' | 'setup';
 
@@ -52,6 +53,10 @@ export function speechCanUseRelay(saved: SavedTTSConfig | null | undefined): boo
   return type === 'openai' && (!saved?.baseUrl || /^https:\/\/api\.openai\.com(\/|$)/i.test(saved.baseUrl));
 }
 
+/** Only the speakers a voice was chosen for ("Auto" is stored as an empty choice). */
+const pickSet = (voices: Record<string, string> | undefined): Record<string, string> =>
+  Object.fromEntries(Object.entries(voices ?? {}).filter(([, id]) => !!id));
+
 type SpeechOptions = Pick<HtmlExportOptions,
   'ttsProvider' | 'ttsApiKey' | 'ttsRelayUrl' | 'ttsModel' | 'ttsBaseUrl' | 'ttsDefaultVoiceId' | 'ttsReadPrompts' | 'ttsSpeakerVoices' | 'ttsEnabled'>;
 
@@ -65,6 +70,11 @@ export function exportSpeechOptions(input: {
   readPrompts: boolean;
   /** Read through this relay instead of writing the key into the page (cloud providers only). */
   relayUrl?: string;
+  /**
+   * Voices for the speakers nobody chose one for, as the Preview and the TTS
+   * menu have them (services/tts/autoVoices). The author's own choices win.
+   */
+  autoVoices?: Record<string, string>;
 }): SpeechOptions {
   const { readAloud, source, saved, speakerVoices, readPrompts } = input;
   const useSetup = readAloud && source === 'setup' && summarizeSpeechSetup(saved).kind !== 'none';
@@ -82,7 +92,9 @@ export function exportSpeechOptions(input: {
     ttsBaseUrl: relayed ? undefined : saved.baseUrl,
     ttsDefaultVoiceId: saved.defaultVoiceId,
     ttsReadPrompts: readPrompts,
-    ttsSpeakerVoices: speakerVoices?.[saved.providerType],
+    ttsSpeakerVoices: autoVoicesApply(saved.providerType) && input.autoVoices && Object.keys(input.autoVoices).length > 0
+      ? { ...input.autoVoices, ...pickSet(speakerVoices?.[saved.providerType]) }
+      : speakerVoices?.[saved.providerType],
     ttsEnabled: true,
   };
 }

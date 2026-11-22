@@ -58,4 +58,21 @@ describe('what an export carries for reading aloud', () => {
     expect(speechCanUseRelay({ providerType: 'openai', baseUrl: 'https://my-proxy.example/v1' } as any)).toBe(false);
     expect(speechCanUseRelay(null)).toBe(false);
   });
+
+  it('speakers without a voice get one of their own (OpenAI), under the ones the author chose', () => {
+    const openai = { provider: 'openai', providerType: 'openai', apiKey: 'sk-x', model: 'gpt-realtime-2.1-mini', defaultVoiceId: 'marin' } as any;
+    const o = exportSpeechOptions({
+      readAloud: true, source: 'setup', saved: openai, readPrompts: true,
+      speakerVoices: { openai: { Ingrid: 'marin', Tomas: '' } },
+      autoVoices: { Tomas: 'ash', 'Karin Lindqvist': 'alloy', Ingrid: 'coral' },
+    });
+    // Ingrid keeps the author's voice; Tomas ("Auto", stored empty) and Karin get theirs.
+    expect(o.ttsSpeakerVoices).toEqual({ Ingrid: 'marin', Tomas: 'ash', 'Karin Lindqvist': 'alloy' });
+  });
+
+  it('not for ElevenLabs, whose voices belong to the account', () => {
+    const o = exportSpeechOptions({ readAloud: true, source: 'setup', saved: eleven, speakerVoices: voices, readPrompts: true, autoVoices: { Tomas: 'ash' } });
+    expect(o.ttsSpeakerVoices).toEqual({ Ingrid: 'voice-ingrid' });
+  });
 });
+
