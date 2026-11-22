@@ -11,7 +11,7 @@
  */
 
 import JSZip from 'jszip';
-import { buildRelayKitFiles } from './relayKit';
+import { buildRelayKitFiles, relayKeysFor } from './relayKit';
 import { getStorageManager } from '../storage/StorageManager';
 import type { TranslationResource } from '@asaps/core';
 import { UI_STRING_DEFAULTS } from '@asaps/core';
@@ -1327,11 +1327,11 @@ async function exportAsFolder(
   zip.file('index.html', html);
   zip.file('story.asaps.zip', storyZipBlob);
   if (options.aiProxyUrl || options.ttsRelayUrl) {
-    for (const f of buildRelayKitFiles()) zip.file(f.path, f.content);
+    for (const f of buildRelayKitFiles(relayKeysFor(options))) zip.file(f.path, f.content, f.mode ? { unixPermissions: f.mode } : undefined);
   }
 
   // Generate ZIP
-  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const zipBlob = await zip.generateAsync({ type: 'blob', platform: 'UNIX' });
 
   return { zip: zipBlob, mode: 'folder' };
 }
@@ -1693,9 +1693,9 @@ export async function downloadHtmlExport(
     zip.file('index.html', html);
     zip.file('story.asaps.zip', originalZipBlob);
     if (options.aiProxyUrl || options.ttsRelayUrl) {
-      for (const f of buildRelayKitFiles()) zip.file(f.path, f.content);
+      for (const f of buildRelayKitFiles(relayKeysFor(options))) zip.file(f.path, f.content, f.mode ? { unixPermissions: f.mode } : undefined);
     }
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const zipBlob = await zip.generateAsync({ type: 'blob', platform: 'UNIX' });
     downloadBlob(zipBlob, `${safeName}_html.zip`);
   }
 
@@ -1717,8 +1717,8 @@ async function downloadSingleFile(html: string, safeName: string, options: HtmlE
   if (options.aiProxyUrl || options.ttsRelayUrl) {
     const zip = new JSZip();
     zip.file('index.html', html);
-    for (const f of buildRelayKitFiles()) zip.file(f.path, f.content);
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    for (const f of buildRelayKitFiles(relayKeysFor(options))) zip.file(f.path, f.content, f.mode ? { unixPermissions: f.mode } : undefined);
+    const zipBlob = await zip.generateAsync({ type: 'blob', platform: 'UNIX' });
     downloadBlob(zipBlob, `${safeName}-relay.zip`);
     return;
   }

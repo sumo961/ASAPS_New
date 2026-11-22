@@ -14,6 +14,16 @@ The relay of an exported story carries reading aloud too, so OpenAI and ElevenLa
 
 **Files modified:** `packages/renderer/src/components/{ReplyBubbleLayer,SpeechBubbleLayer}.tsx`, `packages/builder/public/player-web.js`
 
+### New: `deploy.sh` in the relay zip (author's request, 2026-11-22)
+- Path B of the relay README (Netlify CLI) as one script, generated with the export (`buildRelayDeployScript`): checks for Node.js and the export's files, logs in (the CLI's `status` ends without an error when logged out, so its JSON answer is read), creates and links the site (`sites:create`) unless the folder already has one, asks for the keys, deploys (`deploy --prod`). Setting the keys before the first deploy saves the second deploy the README asks for.
+- It asks only for the keys this export needs (`relayKeysFor`: the AI's provider when the AI uses the relay, the voices' provider when they do).
+- Keys are typed unseen, written to a private file outside the folder, handed to `env:import`, the file deleted, and each key then marked secret (`env:set KEY --secret`, no value). A key never appears on a command line or in the script's output.
+- The zip keeps the script runnable (`unixPermissions`, zips written with `platform: 'UNIX'`); the README says `bash deploy.sh` either way.
+- Checked against netlify-cli 27.20.1's own help for each command, and by a test that runs the whole script against a stand-in for the CLI (order of the steps, file mode 600, key in no argument, file gone). **Not run against Netlify itself** (no account on this side): the author's field test is the first real run.
+- Tests: `relayDeployScript.test.ts` (5).
+
+**Files modified:** `packages/builder/src/export/{relayKit,HtmlExporter}.ts`, `docs/USER_GUIDE.md`
+
 ### Fixed: the Dialog Tree editor in a narrow Properties panel (author report, 2026-11-22)
 - With the panel dragged to its narrowest (280 px), a line's speaker field and text stuck out of their card on the right, the editor's header buttons ran off to the right (the panel scrolled sideways by 243 px), and effect dropdowns were cut off.
 - A line's card is now two rows: who speaks with the buttons beside it, and under them the text across the whole card (203 of the card's 221 px at the narrowest, where it had about 120). The speaker field no longer keeps a text input's built-in width (`CharacterRefField`), the header's buttons wrap, the reply cards' minimum width is 12rem instead of 16rem, and no dropdown or field inside the tree is wider than its row.
