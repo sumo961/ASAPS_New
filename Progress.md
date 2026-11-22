@@ -37,6 +37,10 @@ STT is brought in line with TTS (author's request, 2026-11-22). The switches mea
 
 **Files modified:** `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/player-web/src/WebSTTProvider.ts`, `packages/builder/src/export/{relayKit,HtmlExporter}.ts`, `packages/builder/src/components/export/HtmlExportDialog.tsx`, `packages/builder/public/player-web.js`, `docs/USER_GUIDE.md`
 
+### User Guide: the picture cards of Choose Your Character, retaken (author's request, 2026-11-22)
+- `83-choose-your-character-pictures.png` showed one portrait and one initial (the second character had no picture). Retaken with two portraits, on a throwaway copy of the author's Red Riding Hood story given a "Whose story is it?" choice between Red and the Wolf (Preview, fixed canvas, cropped to the question and the cards). Alt text and caption rewritten; that a character without a picture shows their initial stays in the text above.
+- **Seen while taking it:** on this fixed canvas the question and the cards sit right of centre (about 80 px), beside the meter panel in the bottom-left corner. Not looked into.
+
 ---
 
 ## 2026-11-22: The relay voices release: reading aloud through the relay, a deploy script, voices of their own (v0.9.163)
