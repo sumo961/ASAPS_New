@@ -64,7 +64,7 @@ shift 2  # --yes netlify-cli
 echo "$*" | sed -E 's#/[^ ]*tmp[^ ]*#<file>#' >> "${log}"
 case "$1" in
   status) echo '{ "loggedIn": false }' ;;
-  env:import) echo "file: $(stat -f %Lp "$2" 2>/dev/null || stat -c %a "$2") $(grep -c . "$2") lines, has-openai=$(grep -c '^OPENAI_API_KEY=sk-test-123$' "$2")" >> "${log}"; echo "$2" > "${join(dir, 'envfile.path')}" ;;
+  env:import) echo "file: $(stat -c %a "$2" 2>/dev/null || stat -f %Lp "$2") $(grep -c . "$2") lines, has-openai=$(grep -c '^OPENAI_API_KEY=sk-test-123$' "$2")" >> "${log}"; echo "$2" > "${join(dir, 'envfile.path')}" ;;
 esac
 `, { mode: 0o755 });
       // The OpenAI key typed with stray spaces; the ElevenLabs one left empty.
