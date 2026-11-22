@@ -60,19 +60,16 @@ describe('buildRuntimeInventoryItems', () => {
   });
 });
 
-describe('sideInventoriesShownFromStart', () => {
-  it('is on when a character\'s inventory sits at their side and is not on demand', async () => {
-    const { sideInventoriesShownFromStart } = await import('../../src/utils/runtimeInventory');
-    expect(sideInventoriesShownFromStart([{ inventoryFrame: { dockMode: 'character' } }])).toBe(true);
-    // Any character's counts, not only the player's.
-    expect(sideInventoriesShownFromStart([{ inventoryFrame: { dockMode: 'character', showOnDemand: true } }, { inventoryFrame: { dockMode: 'character' } }])).toBe(true);
-  });
-
-  it('is off when each is on demand, docked to a screen corner, or there is none', async () => {
-    const { sideInventoriesShownFromStart } = await import('../../src/utils/runtimeInventory');
-    expect(sideInventoriesShownFromStart([{ inventoryFrame: { dockMode: 'character', showOnDemand: true } }])).toBe(false);
-    expect(sideInventoriesShownFromStart([{ inventoryFrame: { dockMode: 'screen' } }])).toBe(false);
-    expect(sideInventoriesShownFromStart([{}, { inventoryFrame: null }])).toBe(false);
-    expect(sideInventoriesShownFromStart(undefined)).toBe(false);
+describe('sideInventoryShown', () => {
+  it('goes by each character\'s own setting', async () => {
+    const { sideInventoryShown } = await import('../../src/utils/runtimeInventory');
+    // Not on demand: there, whatever the switch says.
+    expect(sideInventoryShown({ showOnDemand: false }, false)).toBe(true);
+    expect(sideInventoryShown({}, undefined)).toBe(true);
+    // On demand: only once the player has asked.
+    expect(sideInventoryShown({ showOnDemand: true }, false)).toBe(false);
+    expect(sideInventoryShown({ showOnDemand: true }, true)).toBe(true);
+    // In a screen corner the setting doesn't apply.
+    expect(sideInventoryShown({ showOnDemand: true, dockMode: 'screen' }, false)).toBe(true);
   });
 });

@@ -67,10 +67,19 @@ describe('what a character carries, in the responsive layout', () => {
     expect(container.querySelector('[data-mood-token]')).toBeNull();
   });
 
-  it('its inventory follows the switch while the screen stays up', () => {
+  it('its inventory is there without the switch, unless set to show on demand', () => {
     const inventory = {
       items: [{ id: 'key', name: 'key', displayName: 'Key', quantity: 1 } as any],
-      config: { dockMode: 'character', anchor: 'right', width: 140, offset: { x: 0, y: 0 }, style: { padding: 6, borderWidth: 1 } } as any,
+      config: { dockMode: 'character', showOnDemand: false, anchor: 'right', width: 140, offset: { x: 0, y: 0 }, style: { padding: 6, borderWidth: 1 } } as any,
+    };
+    const { container } = draw({ inventory: () => inventory, inventoryVisible: false });
+    expect(container.querySelector('[data-hud-frame="inventory"]')).toBeTruthy();
+  });
+
+  it('its on-demand inventory follows the switch while the screen stays up', () => {
+    const inventory = {
+      items: [{ id: 'key', name: 'key', displayName: 'Key', quantity: 1 } as any],
+      config: { dockMode: 'character', showOnDemand: true, anchor: 'right', width: 140, offset: { x: 0, y: 0 }, style: { padding: 6, borderWidth: 1 } } as any,
     };
     const listeners = new Set<(v: boolean) => void>();
     const subscribe = (l: (v: boolean) => void) => { listeners.add(l); l(false); return () => { listeners.delete(l); }; };

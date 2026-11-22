@@ -2017,7 +2017,7 @@ What can this character carry?
 2. Click **Add Item** for each item the character starts with, and give it an internal name, a display name, a picture (**Add Image**), a description and a quantity. Inventory beats, effects and conditions refer to the item by its internal name.
 3. To show the items on screen, tick **Enable** under **Inventory Frame (HUD Overlay)** and choose where the panel sits and how it looks (item size, columns, style)
 
-A panel docked to a **Screen Corner** is always shown. A panel docked to the **Character** is shown from the start as well, in the Preview and in exported stories, unless you tick **Show on demand only (Ctrl/Cmd+I)**. Then it stays away until the player presses Ctrl+I (⌘I on a Mac), in the Preview and in an exported story alike. The panel appears at once, on the screen that is up, and the same key hides it again. In the Preview, the inventory button in the bottom bar (*Show Inventory* / *Hide Inventory*) does the same. The key and the button are one switch for all the panels docked to characters, so they all start shown as long as one of them has the box unticked. A phone has no such key, so leave the box unticked for stories played on phones. Either way a panel is only drawn while its character carries something.
+A panel docked to a **Screen Corner** is always shown. A panel docked to the **Character** is shown as well, in the Preview and in exported stories, unless you tick **Show on demand only (Ctrl/Cmd+I)** for that character (the box is offered when **Dock To** is *Character*). Each character has their own box. A panel with the box ticked stays away until the player presses Ctrl+I (⌘I on a Mac), in the Preview and in an exported story alike. It appears at once, on the screen that is up, and the same key hides it again. In the Preview, the inventory button in the bottom bar (*Show on-demand inventories* / *Hide on-demand inventories*) does the same. The key and the button act on every panel with the box ticked; panels without it stay as they are. A phone has no such key, so leave the box unticked for stories played on phones. Either way a panel is only drawn while its character carries something.
 
 The character has these items from the start of the story; the player's character carries them in the player's inventory, so *player has …* conditions see them. They come back when the story restarts (or when an End Screen resets the inventory). During the story, use Inventory beats (or Add Inventory effects) to give or take items. The inventory panel always shows what the character **carries right now**: an item appears when it is given and disappears when it is taken, and the name and picture come from this list when the item is on it. When the panel is in the way, the player clicks its title (*Inventory ▼*) once to fold it into a small badge at the panel's top-right corner, showing the number of items; it stays folded from beat to beat until they click the badge to open it again. On phones it starts folded. Speech bubbles keep clear of a character's inventory and meter panels. An item that isn't on this character's list takes its record from the story's [Items](#project-items) list, and failing that from another character who lists it.
 
@@ -3412,7 +3412,7 @@ The Preview has two bars. The one at the top holds the play controls (start poin
 | **Text Animation** | Toggle typewriter effect on/off |
 | **Mute** | Silence all audio |
 | **Text-to-Speech / Speech-to-Text** | Toggle voice output and voice input for this run (see [TTS](#text-to-speech-tts) and [STT](#speech-to-text-stt)) |
-| **Inventory** (box icon; *Show Inventory* / *Hide Inventory*) | Show or hide the inventory panels docked to characters, at once on the screen that is up (Ctrl/Cmd+I). Panels in a screen corner are always shown. See [Character Inventory](#character-inventory) |
+| **Inventory** (box icon; *Show on-demand inventories* / *Hide on-demand inventories*) | Show or hide the inventory panels set to **Show on demand only**, at once on the screen that is up (Ctrl/Cmd+I). Other panels are always shown. See [Character Inventory](#character-inventory) |
 | **Messages** (speech-bubbles icon) | Open the [message history](#message-history) — only there when Project Settings ▸ Dialogue ▸ Message history is on |
 | **Debug** | Toggle the debug panel (state, variables, visited beats) |
 
@@ -5022,7 +5022,7 @@ Quick reference for all beat types.
 | Ctrl/Cmd + Shift + F | Find & Change (Change with AI tab) |
 | Ctrl/Cmd + Shift + P | Open Preview window |
 | Space | Pause / resume (in preview) |
-| Ctrl/Cmd + I | Show or hide the inventory panels docked to characters (in preview and in exported stories) |
+| Ctrl/Cmd + I | Show or hide the inventory panels set to show on demand (in preview and in exported stories) |
 | Delete | Delete selected beat (or all selected beats in the flowchart) |
 | Escape | Deselect / Close panel |
 | Shift + drag | Draw a selection box around beats (flowchart) |

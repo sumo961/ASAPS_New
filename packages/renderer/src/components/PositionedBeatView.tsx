@@ -29,6 +29,7 @@ import { bubbleSpeakerFor, type BubbleHistory } from '../utils/speechBubble';
 import { StageBubbles, useStageTurn, type BubbleSpeakerLocation } from './SpeechBubbleLayer';
 import { ReplyBubble } from './ReplyBubbleLayer';
 import { useInventoryVisible } from './CharacterHudContext';
+import { sideInventoryShown } from '../utils/runtimeInventory';
 
 /** A frame picture's edge height on a fixed stage: the picture's share of the stage width, never taller than in the picture. */
 const stageFrameBand = (stageWidth: number) => (f: number, naturalPx: number) =>
@@ -3109,8 +3110,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         ? characterMoodFrameResolver(location.characterId)
         : null;
 
-      // Determine if inventory should be visible (controlled by Ctrl/Cmd+I toggle)
-      const shouldShowInventory = inventoryData && inventoryData.items.length > 0 && inventoryVisible;
+      // Each character's own setting: on demand waits for the switch (Ctrl/Cmd+I).
+      const shouldShowInventory = inventoryData && inventoryData.items.length > 0 && sideInventoryShown(inventoryData.config, inventoryVisible);
 
       // Debug: Log inventory visibility
       if (location.characterId) {

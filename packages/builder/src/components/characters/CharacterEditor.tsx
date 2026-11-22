@@ -1719,20 +1719,23 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                 />
                 <span className="text-gray-600">Show Labels</span>
               </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={editedCharacter.inventoryFrame.showOnDemand}
-                  onChange={(e) => {
-                    setEditedCharacter({
-                      ...editedCharacter,
-                      inventoryFrame: { ...editedCharacter.inventoryFrame!, showOnDemand: e.target.checked }
-                    });
-                  }}
-                  className="rounded border-gray-300"
-                />
-                <span className="text-gray-600">Show on demand only (Ctrl/Cmd+I)</span>
-              </label>
+              {/* A panel in a screen corner is always shown; on demand is for one at the character. */}
+              {editedCharacter.inventoryFrame.dockMode === 'character' && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={editedCharacter.inventoryFrame.showOnDemand}
+                    onChange={(e) => {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        inventoryFrame: { ...editedCharacter.inventoryFrame!, showOnDemand: e.target.checked }
+                      });
+                    }}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="text-gray-600">Show on demand only (Ctrl/Cmd+I)</span>
+                </label>
+              )}
             </div>
 
             {/* Style Settings */}

@@ -181,15 +181,18 @@ export function buildRuntimeInventoryItems(
 }
 
 /**
- * Whether the inventories drawn at a character's side are on when the story
- * starts. They are, unless every one of them is set to show on demand (then
- * Ctrl/Cmd+I, or the Preview's inventory button, brings them up). One rule
- * for the Preview and for exported stories: both used to ask the player's
- * character only, so another character's inventory never came up.
- * Inventories docked to a screen corner are always shown and don't count.
+ * Whether an inventory at a character's side is drawn. Each character's own
+ * setting decides: one set to show on demand waits for the player's switch
+ * (Ctrl/Cmd+I, the Preview's inventory button), any other is always there.
+ * This was one rule for all of them (all shown unless every one was on
+ * demand), so ticking the box for one character did nothing while another
+ * had it unticked.
  */
-export function sideInventoriesShownFromStart(
-  characters: ReadonlyArray<{ inventoryFrame?: { dockMode?: string; showOnDemand?: boolean } | null }> | null | undefined,
+export function sideInventoryShown(
+  config: { showOnDemand?: boolean; dockMode?: string } | null | undefined,
+  switchedOn: boolean | undefined,
 ): boolean {
-  return (characters ?? []).some((c) => !!c.inventoryFrame && c.inventoryFrame.dockMode !== 'screen' && !c.inventoryFrame.showOnDemand);
+  // A panel in a screen corner is always shown; the setting isn't offered there.
+  const onDemand = !!config?.showOnDemand && config.dockMode !== 'screen';
+  return !onDemand || !!switchedOn;
 }

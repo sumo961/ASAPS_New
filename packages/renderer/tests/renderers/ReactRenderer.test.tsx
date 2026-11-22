@@ -467,7 +467,7 @@ describe('ReactRenderer speech bubble history', () => {
 
 // The inventory switch (Ctrl/Cmd+I, the Preview's button) used to take effect
 // with the next screen only: the flag was read when a screen was painted.
-describe('ReactRenderer inventory at a character follows the switch at once', () => {
+describe('ReactRenderer on-demand inventory at a character follows the switch at once', () => {
   const pic = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
   const stage = [
     { id: 'e1', name: 'Stan', kind: 'character', characterId: 'char_stan', characterName: 'Stan', imageUrl: pic, x: 0, y: 0, width: 300, height: 600 },
@@ -478,7 +478,7 @@ describe('ReactRenderer inventory at a character follows the switch at once', ()
   it('on the fixed canvas, while the same screen stays up', async () => {
     renderer.setCharacterInventoryResolver((id) => (id === 'char_stan' ? {
       items: [{ id: 'key', name: 'key', displayName: 'Key', quantity: 1 } as any],
-      config: { dockMode: 'character', anchor: 'right', width: 140, offset: { x: 0, y: 0 }, style: { padding: 6, borderWidth: 1 } } as any,
+      config: { dockMode: 'character', showOnDemand: true, anchor: 'right', width: 140, offset: { x: 0, y: 0 }, style: { padding: 6, borderWidth: 1 } } as any,
     } : null));
     void renderer.renderDialog('Stan', 'You okay?', undefined, stage);
     await waitFor(() => expect(container.querySelector('img[alt="Stan"]')).toBeTruthy());
@@ -487,5 +487,24 @@ describe('ReactRenderer inventory at a character follows the switch at once', ()
     await waitFor(() => expect(shown()).toBeTruthy());
     renderer.setInventoryVisible(false);
     await waitFor(() => expect(shown()).toBeNull());
+  });
+
+  it('one not on demand is there without the switch, beside one that waits for it', async () => {
+    const two = [
+      ...stage,
+      { id: 'e2', name: 'Billie', kind: 'character', characterId: 'char_billie', characterName: 'Billie', imageUrl: pic, x: 600, y: 0, width: 300, height: 600 },
+    ] as any[];
+    const cfg = (showOnDemand: boolean) => ({
+      items: [{ id: 'key', name: 'key', displayName: 'Key', quantity: 1 } as any],
+      config: { dockMode: 'character', showOnDemand, anchor: 'right', width: 140, offset: { x: 0, y: 0 }, style: { padding: 6, borderWidth: 1 } } as any,
+    });
+    renderer.setCharacterInventoryResolver((id) => (id === 'char_stan' ? cfg(false) : id === 'char_billie' ? cfg(true) : null));
+    void renderer.renderDialog('Stan', 'You okay?', undefined, two);
+    const count = () => container.querySelectorAll('[data-hud-frame="inventory"]').length;
+    await waitFor(() => expect(count()).toBe(1));
+    renderer.setInventoryVisible(true);
+    await waitFor(() => expect(count()).toBe(2));
+    renderer.setInventoryVisible(false);
+    await waitFor(() => expect(count()).toBe(1));
   });
 });

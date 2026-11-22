@@ -1,7 +1,7 @@
 import { StoryEngine, Story, SerializedStoryState, ASMLParser, BeatTypeRegistry, findSpeakerCharacter, findSpeakerCharacterId } from '@asaps/core';
 import type { IRenderer, StoryMetadata, BeatConfig, ConversationLine, ConversationRecord } from '@asaps/core';
 import type { RenderThemeSettings } from '@asaps/renderer';
-import { toMeterCounterData, resolveMeterFrame, harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, sideInventoriesShownFromStart, getAudioManager } from '@asaps/renderer';
+import { toMeterCounterData, resolveMeterFrame, harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, getAudioManager } from '@asaps/renderer';
 import { AssetResolver } from './AssetResolver';
 import { fontFamilyFromAssetFilename, registerFontAsset } from './utils/customFonts';
 import { SaveSystem, SaveSlot, ISaveStorageAdapter } from './SaveSystem';
@@ -1136,12 +1136,8 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         };
       });
 
-      // Inventories at a character's side start shown unless each is set to
-      // show on demand: one rule with the Preview. This asked the player's
-      // character only, so another character's inventory never came up.
-      if (characters.some((c: any) => c.inventoryFrame) && 'setInventoryVisible' in renderer) {
-        renderer.setInventoryVisible(sideInventoriesShownFromStart(characters));
-      }
+      // The inventory switch starts off: it brings up the inventories set to
+      // show on demand. The others are drawn regardless (sideInventoryShown).
     }
 
     // Character meter frame resolver - provides counter HUD data for characters

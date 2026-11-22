@@ -1,5 +1,22 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.162, 2026-11-22)
+
+### Overview
+*Show on demand only* now acts for the character it is ticked on.
+
+### Changed: an inventory's "Show on demand only" is each character's own
+- The box is ticked per character, but the stage had one rule for all panels at characters: all shown from the start unless every one was ticked, and the switch (Ctrl/Cmd+I, the Preview's button) hid or showed them all. Ticking it for one character did nothing while another had it unticked. The author found this confusing (2026-11-22): an individual setting should act as one.
+- Now each panel goes by its own setting (`sideInventoryShown`, replacing `sideInventoriesShownFromStart`): not on demand, it is always drawn while its character carries something; on demand, it waits for the switch. The switch starts off and acts on the on-demand panels only.
+- The box is offered only when **Dock To** is *Character*. A panel in a screen corner is always shown, and a stored tick on one is ignored.
+- The Preview's button says what it does: *Show on-demand inventories* / *Hide on-demand inventories*.
+- **Behaviour change for existing stories:** a panel not set to on demand can no longer be hidden with Ctrl/Cmd+I; a story mixing ticked and unticked characters now starts with the ticked ones hidden.
+- User Guide: Character Inventory, Preview Controls and the shortcuts table say the same.
+
+**Files modified:** `packages/renderer/src/utils/runtimeInventory.ts`, `packages/renderer/src/index.ts`, `packages/renderer/src/components/{PositionedBeatView,ResponsiveCharacterLayer}.tsx`, `packages/player/src/PlayerEngine.ts`, `packages/builder/src/pages/PreviewWindow.tsx`, `packages/builder/src/components/characters/CharacterEditor.tsx`, `packages/builder/public/player-web.js`, `docs/USER_GUIDE.md`, tests in `packages/renderer/tests`
+
+---
+
 ## 2026-11-22: The inventory release: a character's inventory in exports, on phones and at the switch (v0.9.162)
 
 ### Overview
@@ -38,7 +55,7 @@ A small fix release from the checks left open at v0.9.161. An inventory set to s
 - The device sweep and the exports of the four-character scene are the ones above, run on this code before the last fix; that fix changes only when the panel is drawn, not where.
 - Suites: renderer 850, builder 3,334, core 3,241, player 10; lint 0 errors; type-check clean. CI green on the release commit.
 - **Seen, test story only:** a character location written into the file by hand, without the fields the Visual Editor gives it, is drawn at its raw pixels in an export and can hang off a small window. Not reachable from the app.
-- **For a decision:** *Show on demand only* is ticked per character but acts as one switch (all character panels start shown unless every one is ticked), and the box is offered for Screen Corner panels, where it does nothing.
+- **For a decision:** *Show on demand only* is ticked per character but acts as one switch (all character panels start shown unless every one is ticked), and the box is offered for Screen Corner panels, where it does nothing. Decided the same day: it should act per character (done after the release, see above).
 
 ### User Guide
 - Mood HUD: says what a token and a disc are, adds the **Display** setting, and marks which settings belong to which.

@@ -27,6 +27,7 @@
  */
 import React, { forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { CharacterHudContext, useInventoryVisible } from './CharacterHudContext';
+import { sideInventoryShown } from '../utils/runtimeInventory';
 import { CharacterMeterFrame } from './CharacterMeterFrame';
 import { CharacterInventoryFrame } from './CharacterInventoryFrame';
 import { CharacterMoodFrame } from './CharacterMoodFrame';
@@ -569,7 +570,7 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
               {meters && meters.counters.length > 0 && (
                 <CharacterMeterFrame counters={meters.counters} config={meters.config} characterName={meters.characterName} characterColor={meters.characterColor} {...at} fontScale={fontScale} />
               )}
-              {inventory && inventory.items.length > 0 && inventoryVisible && (
+              {inventory && inventory.items.length > 0 && sideInventoryShown(inventory.config, inventoryVisible) && (
                 <CharacterInventoryFrame items={inventory.items} config={inventory.config} {...at} isVisible={true} fontScale={fontScale} autoMinimize={fontScale > 1.0 || phoneStage} />
               )}
               {mood && mood.config.enabled && ((mood.config.displayStyle ?? 'token') === 'disc' ? (
