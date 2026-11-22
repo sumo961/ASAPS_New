@@ -1,5 +1,19 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.163, 2026-11-22)
+
+### Overview
+The Preview's speech buttons apply to that Preview only.
+
+### Changed: the Preview's TTS and STT buttons no longer change the app's switches (author's decision, 2026-11-22)
+- The Preview's TTS button stored the same setting as the header's (`asaps_tts_enabled`). Switched off in a Preview, reading aloud was off in the app too, and since v0.9.163 the next export then carried no speech. The STT button did the same with `asaps_stt_enabled`.
+- Both now act on the Preview they are in. A Preview opens with the app's setting; what is switched there ends with it.
+- User Guide: the Preview Controls row says so.
+
+**Files modified:** `packages/builder/src/pages/PreviewWindow.tsx`, `docs/USER_GUIDE.md`
+
+---
+
 ## 2026-11-22: The relay voices release: reading aloud through the relay, a deploy script, voices of their own (v0.9.163)
 
 ### Overview

@@ -2731,8 +2731,11 @@ export const PreviewWindow: React.FC = () => {
     const newEnabled = !ttsEnabled;
     setTtsEnabled(newEnabled);
     try {
+      // For this Preview only. It used to store the app's own TTS switch:
+      // switched off here, the app's was off too, and with it the next
+      // export's reading aloud (author's decision, 2026-11-22). A Preview
+      // opens with the app's setting.
       getTTSService().setEnabled(newEnabled);
-      localStorage.setItem('asaps_tts_enabled', String(newEnabled));
       if (!newEnabled) getTTSService().stop();
       else getTTSService().warmUp();
     } catch (error) {
@@ -2744,8 +2747,8 @@ export const PreviewWindow: React.FC = () => {
     const newEnabled = !sttEnabled;
     setSttEnabled(newEnabled);
     try {
+      // For this Preview only, like the TTS button above.
       getSTTService().setEnabled(newEnabled);
-      localStorage.setItem('asaps_stt_enabled', String(newEnabled));
       if (!newEnabled) getSTTService().stopListening();
     } catch (error) {
       console.warn('[PreviewWindow] Error toggling STT:', error);

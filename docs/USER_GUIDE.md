@@ -3411,7 +3411,7 @@ The Preview has two bars. The one at the top holds the play controls (start poin
 | **Viewport** | Switch the preview container to a device preset (Fit window, Desktop 1280×800, Tablet landscape/portrait, Phone landscape/portrait) — see below |
 | **Text Animation** | Toggle typewriter effect on/off |
 | **Mute** | Silence all audio |
-| **Text-to-Speech / Speech-to-Text** | Toggle voice output and voice input (see [TTS](#text-to-speech-tts) and [STT](#speech-to-text-stt)). These are the same switches as the **TTS** and **STT** buttons in the header: switched off here, TTS is off in the app too, and a story is then exported without reading aloud until you switch it on again |
+| **Text-to-Speech / Speech-to-Text** | Toggle voice output and voice input for this Preview (see [TTS](#text-to-speech-tts) and [STT](#speech-to-text-stt)). A Preview opens with the app's own setting (the **TTS** and **STT** buttons in the header); what you switch here ends with the Preview and changes neither the app's setting nor what an export does |
 | **Inventory** (box icon; *Show on-demand inventories* / *Hide on-demand inventories*) | Show or hide the inventory panels set to **Show on demand only**, at once on the screen that is up (Ctrl/Cmd+I). Other panels are always shown. See [Character Inventory](#character-inventory) |
 | **Messages** (speech-bubbles icon) | Open the [message history](#message-history) — only there when Project Settings ▸ Dialogue ▸ Message history is on |
 | **Debug** | Toggle the debug panel (state, variables, visited beats) |
