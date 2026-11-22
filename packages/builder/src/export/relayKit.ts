@@ -268,7 +268,8 @@ in this folder and run
 
 It logs you in to Netlify (a browser window opens), creates the site,
 asks for the API key(s) this story needs (what you type is not shown, and
-the keys go to Netlify marked secret), and deploys. Requires Node.js. Run
+the keys go to Netlify marked secret), deploys, and opens the story in
+your browser. Requires Node.js. Run
 it again after a new export (copy the new \`index.html\` here first) or to
 change a key.
 
@@ -453,11 +454,12 @@ else
 fi
 
 say "4/4  Deploy"
-$NETLIFY deploy --prod
+# --open: the story opens in the browser when it is up.
+$NETLIFY deploy --prod --open
 
 cat <<'DONE'
 
-Done. Open the "Deployed to production URL" above.
+Done. The story should have opened in your browser; its address is the "Deployed to production URL" above.
 - The output should list the function asaps-ai. If it does not, the netlify folder was not next to index.html.
 - AI beats or voices not working: check that the key for them was entered (run this script again to set it).
 - A new version of the story: export again, copy the new index.html into this folder, run this script again.

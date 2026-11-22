@@ -77,7 +77,7 @@ esac
         'env:import <file>',
         'file: 600 1 lines, has-openai=1',
         'env:set OPENAI_API_KEY --secret --force',
-        'deploy --prod',
+        'deploy --prod --open',
       ]);
       // The key is in no command line and not in what the script prints.
       expect(calls.join(' ')).not.toContain('sk-test-123');
