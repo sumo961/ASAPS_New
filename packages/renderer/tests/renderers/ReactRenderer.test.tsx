@@ -6,7 +6,7 @@
  * and the resolveAction/handleAction loop end-to-end in jsdom.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { waitFor } from '@testing-library/react';
+import { waitFor, act } from '@testing-library/react';
 import { ReactRenderer } from '../../src/renderers/ReactRenderer';
 
 // PositionedBeatView relies on browser observer/media APIs jsdom lacks and the
@@ -63,12 +63,14 @@ beforeEach(() => {
   renderer = new ReactRenderer({ container });
 });
 
-afterEach(() => {
-  try {
-    renderer.destroy?.();
-  } catch {
-    /* ignore */
-  }
+afterEach(async () => {
+  // Take the stage down, so that nothing it started outlives the test. The
+  // renderer has no destroy(): the tree stayed mounted, and a text
+  // animation's timer could fire after the test environment was gone
+  // ("window is not defined", now and then, here and in CI).
+  await act(async () => {
+    try { (container as any).__reactRoot?.unmount?.(); } catch { /* already gone */ }
+  });
   container.remove();
 });
 
