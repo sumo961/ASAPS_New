@@ -11,6 +11,7 @@ import { getSavedAIConfig, getRuntimeAIConfig } from '../../hooks/useAI';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
 import { autoSpeakerVoices, autoVoicesApply, speakerGenders, speakerNameGroups } from '../../services/tts/autoVoices';
 import { getTTSService } from '../../services/tts/TTSService';
+import { getSavedSTTConfig } from '../../hooks/useSTT';
 import { exportSpeechOptions, summarizeSpeechSetup, speechCanUseRelay, type ExportSpeechSource } from '../../export/exportSpeech';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { buildManifestEntry, type TranslationResource } from '@asaps/core';
@@ -40,6 +41,8 @@ interface HtmlExportDialogProps {
 
 /** Remembers, on this computer, which voices the last export used. */
 const EXPORT_SPEECH_SOURCE_KEY = 'asaps_export_speech_source';
+/** And who listened: the browser, or OpenAI through the relay. */
+const EXPORT_VOICE_INPUT_KEY = 'asaps_export_voice_input';
 
 export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   isOpen,
@@ -138,6 +141,23 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     if (!isOpen) return false;
     try { return localStorage.getItem('asaps_stt_enabled') === 'true'; } catch { return false; }
   }, [isOpen]);
+  // Who listens in the exported story: the browser's own recognition, or
+  // OpenAI's transcription through the relay when that is this computer's
+  // STT setup (the relay knows OpenAI's own address only). Remembered here.
+  const savedStt = isOpen ? getSavedSTTConfig() : null;
+  const voiceRelayPossible = savedStt?.providerType === 'whisper'
+    && (!savedStt.baseUrl || /^https:\/\/api\.openai\.com(\/|$)/i.test(savedStt.baseUrl));
+  const [voiceSource, setVoiceSourceState] = useState<'browser' | 'openai'>(() => {
+    try { return localStorage.getItem(EXPORT_VOICE_INPUT_KEY) === 'openai' ? 'openai' : 'browser'; } catch { return 'browser'; }
+  });
+  const setVoiceSource = (source: 'browser' | 'openai') => {
+    setVoiceSourceState(source);
+    try { localStorage.setItem(EXPORT_VOICE_INPUT_KEY, source); } catch { /* not remembered */ }
+  };
+  const voiceRelayUrl = appSttOn && voiceSource === 'openai' && voiceRelayPossible
+    ? (aiProxyUrl.trim() || DEFAULT_RELAY_PATH)
+    : undefined;
+  const voiceModel = voiceRelayUrl ? savedStt?.model : undefined;
   const speechRelayUrl = speechOn && speechSource === 'setup' && speechAccess === 'relay' && speechRelayPossible
     ? (aiProxyUrl.trim() || DEFAULT_RELAY_PATH)
     : undefined;
@@ -279,6 +299,8 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         aiModel: needsAIConfig && aiModel ? aiModel : undefined,
         ...speech,
         sttEnabled: appSttOn,
+        sttRelayUrl: voiceRelayUrl,
+        sttModel: voiceModel,
         existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
         enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
         showSessionLog,
@@ -331,7 +353,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [appSttOn, speechOn, speakers, characters, speechRelayUrl, mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
+  }, [voiceRelayUrl, voiceModel, appSttOn, speechOn, speakers, characters, speechRelayUrl, mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
 
   // Called from the size-warning banner's "Continue anyway" button.
   // Reuses the pre-computed zip so the user isn't waiting for it twice.
@@ -373,6 +395,8 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         aiModel: needsAIConfig && aiModel ? aiModel : undefined,
         ...speech,
         sttEnabled: appSttOn,
+        sttRelayUrl: voiceRelayUrl,
+        sttModel: voiceModel,
         existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
         enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
         showSessionLog,
@@ -387,7 +411,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [appSttOn, speechOn, speakers, characters, speechRelayUrl, aiAccess, aiProxyUrl, sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
+  }, [voiceRelayUrl, voiceModel, appSttOn, speechOn, speakers, characters, speechRelayUrl, aiAccess, aiProxyUrl, sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech, speechSource]);
 
   const handleSwitchToFolder = useCallback(() => {
     setSizeWarning(null);
@@ -967,11 +991,58 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
               </div>
             )}
 
-            <p className={`mt-3 ml-7 text-xs ${appSttOn ? 'text-gray-500' : 'text-amber-700'}`} data-testid="export-voice-input">
-              {appSttOn
-                ? "Voice input is on: where a conversation allows it, players get a microphone that uses the browser's own speech recognition. Nothing of your STT setup is exported."
-                : 'Voice input is off: STT is switched off in the app, so this story is exported without a microphone in conversations. Switch it on with the STT button in the header and open this window again.'}
-            </p>
+            {/* Voice input: goes by the app's STT switch, as reading aloud goes by the TTS switch. */}
+            <div className="mt-3 pt-3 border-t" data-testid="export-voice-input">
+              <div className="text-sm font-medium text-gray-900">Voice input in conversations</div>
+              {!appSttOn ? (
+                <p className="mt-1 text-xs text-amber-700">
+                  Off: STT is switched off in the app, so this story is exported without a microphone in conversations. Switch it on with the STT button in the header and open this window again.
+                </p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input type="radio" name="export-voice-input" className="mt-1" checked={!voiceRelayUrl} onChange={() => setVoiceSource('browser')} />
+                    <span className="text-sm text-gray-800">
+                      The browser's own speech recognition
+                      <span className="block text-xs text-gray-500">Needs no key. Chrome, Edge and Safari have it; in Firefox there is no microphone.</span>
+                    </span>
+                  </label>
+                  {voiceRelayPossible ? (
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="radio" name="export-voice-input" className="mt-1" checked={!!voiceRelayUrl} onChange={() => setVoiceSource('openai')} />
+                      <span className="text-sm text-gray-800">
+                        OpenAI transcription, through the relay
+                        <span className="block text-xs text-gray-500">The player clicks the microphone, speaks, and clicks again; the answer is written down by OpenAI. Works in every browser that can record. No key in the page.</span>
+                      </span>
+                    </label>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      For OpenAI transcription in the exported story, set OpenAI up as the STT provider first (STT button in the header).
+                    </p>
+                  )}
+                  {voiceRelayUrl && (
+                    <>
+                      {!(enableAI && relayModeUi) && !speechRelayUrl && (
+                        <div className="ml-6">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Relay URL</label>
+                          <input
+                            type="text"
+                            aria-label="Relay URL for voice input"
+                            value={aiProxyUrl}
+                            onChange={(e) => setAiProxyUrl(e.target.value)}
+                            placeholder={DEFAULT_RELAY_PATH}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                      )}
+                      <p className="ml-6 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                        The export is one deploy-ready zip with the relay function; on its host, set <span className="font-mono">OPENAI_API_KEY</span>. A relay deployed with an earlier version needs deploying again; until then the player's browser listens by itself, where it can.
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Session Log Option */}

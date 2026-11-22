@@ -10,6 +10,9 @@ describe('the relay kit\'s deploy script', () => {
     expect(relayKeysFor({ aiProxyUrl: '/r', aiProvider: 'anthropic' })).toEqual(['ANTHROPIC_API_KEY']);
     expect(relayKeysFor({ aiProxyUrl: '/r', aiProvider: 'openai', ttsRelayUrl: '/r', ttsProvider: 'openai' })).toEqual(['OPENAI_API_KEY']);
     expect(relayKeysFor({ aiProxyUrl: '/r', aiProvider: 'anthropic', ttsRelayUrl: '/r', ttsProvider: 'elevenlabs' })).toEqual(['ANTHROPIC_API_KEY', 'ELEVENLABS_API_KEY']);
+    // Voice input through the relay is OpenAI's transcription.
+    expect(relayKeysFor({ sttRelayUrl: '/r' })).toEqual(['OPENAI_API_KEY']);
+    expect(relayKeysFor({ aiProxyUrl: '/r', aiProvider: 'anthropic', sttRelayUrl: '/r' })).toEqual(['ANTHROPIC_API_KEY', 'OPENAI_API_KEY']);
     // Voices through the relay in a story without AI beats.
     expect(relayKeysFor({ ttsRelayUrl: '/r', ttsProvider: 'elevenlabs', aiProvider: 'openai' })).toEqual(['ELEVENLABS_API_KEY']);
     const script = buildRelayDeployScript(['ELEVENLABS_API_KEY']);

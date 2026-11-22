@@ -542,3 +542,44 @@ describe('the conversation\'s microphone follows the host\'s voice-input switch'
     expect(mic()).toBeNull();
   });
 });
+
+// A recogniser that takes the whole answer at once (OpenAI's transcription, a
+// plain Whisper server) was never used by the conversation's microphone: the
+// browser's own recognition listened instead.
+describe('the conversation\'s microphone with a record-then-transcribe recogniser', () => {
+  const mic = () => container.querySelector<HTMLButtonElement>('button[title="Start voice input"], button[title="Stop listening"]');
+  const field = () => container.querySelector<HTMLInputElement>('input, textarea')!;
+  let browserListened = 0;
+  beforeEach(() => { browserListened = 0; (window as any).webkitSpeechRecognition = class { constructor() { browserListened += 1; } start() {} stop() {} abort() {} }; });
+  afterEach(() => { delete (window as any).webkitSpeechRecognition; });
+
+  it('records on a click, and the text arrives after the second click', async () => {
+    let options: any = null;
+    const calls: string[] = [];
+    const service = {
+      isEnabled: () => true,
+      getActiveProvider: () => ({ name: 'Whisper STT', supportsStreaming: false }),
+      startListening: (o: any) => { options = o; calls.push('start'); },
+      stopListening: () => { calls.push('stop'); return Promise.resolve(null); },
+    };
+    renderer.setState('sttService', service);
+    void renderer.renderConversationInput({ showMic: true, speaker: 'Karin', npcText: 'Yes?' });
+    await waitFor(() => expect(mic()).toBeTruthy());
+    // It does not start by itself (nothing would stop it), and the browser's recognition stays out of it.
+    await new Promise((r) => setTimeout(r, 900));
+    expect(calls).toEqual([]);
+    expect(browserListened).toBe(0);
+
+    mic()!.click();
+    await waitFor(() => expect(calls).toEqual(['start']));
+    await waitFor(() => expect(mic()!.title).toBe('Stop listening'));
+    mic()!.click();
+    await waitFor(() => expect(calls).toEqual(['start', 'stop']));
+    // The service hands the text over once it has it.
+    options.onResult({ text: 'I can pay on Friday.', isFinal: true });
+    options.onEnd();
+    await waitFor(() => expect(field().value).toBe('I can pay on Friday.'));
+    await waitFor(() => expect(mic()!.title).toBe('Start voice input'));
+    expect(browserListened).toBe(0);
+  });
+});

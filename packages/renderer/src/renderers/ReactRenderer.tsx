@@ -1022,6 +1022,9 @@ export function backfillUnplacedDefaults(
 
 // ============= REACT RENDERER CLASS =============
 
+/** A recording nobody stops ends by itself after this long (the conversation's microphone with a record-then-transcribe recogniser). */
+const RECORDING_CAP_MS = 60_000;
+
 export class ReactRenderer extends BaseRenderer {
   private _root: ReactDOM.Root | null = null;
   /**
@@ -1970,6 +1973,12 @@ export class ReactRenderer extends BaseRenderer {
       // Check if the configured STT service supports streaming (Vosk, Whisper.cpp, Web Speech)
       const activeSTTProvider = sttService?.getActiveProvider?.();
       const sttSupportsStreaming = activeSTTProvider?.supportsStreaming === true;
+      // A recogniser that takes the whole answer at once (OpenAI's
+      // transcription, a plain Whisper server): the microphone records until
+      // it is clicked again, then the text arrives. It was never used here:
+      // the microphone went to the browser's own recognition instead, and
+      // the configured service sat idle.
+      const sttRecords = !!sttService && !!activeSTTProvider && !sttSupportsStreaming;
       console.log(`[ConversationInput] STT service: ${sttService ? 'yes' : 'no'}, provider: ${activeSTTProvider?.name || 'none'}, streaming: ${sttSupportsStreaming}`);
 
       // Inline input component with optional mic button and auto-listen mode.
@@ -1990,6 +1999,8 @@ export class ReactRenderer extends BaseRenderer {
         const recognitionRef = React.useRef<any>(null);
         const unmountedRef = React.useRef(false);
         const stoppingRef = React.useRef(false); // true when stopListening was called intentionally
+        const recordCapRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+        const stopRef = React.useRef<() => void>(() => {});
 
         // Auto-submit after silence: when we get a final result, wait 2s for more speech.
         // If no new speech arrives, auto-submit.
@@ -2019,7 +2030,33 @@ export class ReactRenderer extends BaseRenderer {
           accumulatedTextRef.current = inputText;
           hasSubmittedRef.current = false;
 
-          if (sttSupportsStreaming && sttService) {
+          if (sttRecords && sttService) {
+            console.log(`[ConversationInput] Recording for: ${activeSTTProvider?.name}`);
+            recognitionRef.current = 'stt-service';
+            // An open microphone nobody stops is not left running.
+            recordCapRef.current = setTimeout(() => stopRef.current(), RECORDING_CAP_MS);
+            const done = () => {
+              if (recordCapRef.current) { clearTimeout(recordCapRef.current); recordCapRef.current = null; }
+              recognitionRef.current = null;
+              if (unmountedRef.current) return;
+              setIsListening(false);
+              setInterimText('');
+            };
+            sttService.startListening({
+              language: sttLanguage,
+              onResult: (result: any) => {
+                const heard = String(result?.text ?? '').trim();
+                if (!heard || unmountedRef.current) return;
+                const combined = accumulatedTextRef.current ? accumulatedTextRef.current + ' ' + heard : heard;
+                accumulatedTextRef.current = combined;
+                setInputText(combined);
+                // Sent after a moment, as a spoken answer is elsewhere; typing meanwhile is still possible.
+                scheduleAutoSubmit(combined);
+              },
+              onError: (err: any) => { console.warn('[ConversationInput] Voice input failed:', err?.message || err); done(); },
+              onEnd: done,
+            });
+          } else if (sttSupportsStreaming && sttService) {
             // Use the configured streaming STT service (Vosk, Whisper.cpp, Web Speech STT provider)
             console.log(`[ConversationInput] Starting streaming STT via service: ${activeSTTProvider?.name}`);
             recognitionRef.current = 'stt-service'; // marker
@@ -2133,6 +2170,16 @@ export class ReactRenderer extends BaseRenderer {
         }, [isListening, inputText, scheduleAutoSubmit]);
 
         const stopListening = React.useCallback(() => {
+          if (sttRecords) {
+            // The recording ends here; its text is still to come. The
+            // microphone stays "busy" (and the field says so) until it has.
+            if (recordCapRef.current) { clearTimeout(recordCapRef.current); recordCapRef.current = null; }
+            if (recognitionRef.current === 'stt-service' && sttService) {
+              setInterimText(' '); // the field shows "..." until the text is there
+              void sttService.stopListening();
+            }
+            return;
+          }
           stoppingRef.current = true;
           if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
           if (recognitionRef.current === 'stt-service' && sttService) {
@@ -2150,7 +2197,8 @@ export class ReactRenderer extends BaseRenderer {
         // Auto-start listening when component mounts, but wait for TTS to finish first.
         // This prevents STT from hearing the NPC's TTS playback.
         React.useEffect(() => {
-          if (showMicButton && (sttSupportsStreaming || SpeechRecognitionClass)) {
+          // (Not for a recogniser that records until stopped: nothing would stop it.)
+          if (showMicButton && !sttRecords && (sttSupportsStreaming || SpeechRecognitionClass)) {
             let cancelled = false;
 
             const waitForTTSAndStart = () => {
@@ -2189,6 +2237,7 @@ export class ReactRenderer extends BaseRenderer {
           return () => {
             unmountedRef.current = true;
             if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+            if (recordCapRef.current) clearTimeout(recordCapRef.current);
             if (recognitionRef.current === 'stt-service' && sttService) {
               sttService.stopListening();
             } else if (recognitionRef.current && recognitionRef.current !== 'stt-service') {
@@ -2210,6 +2259,7 @@ export class ReactRenderer extends BaseRenderer {
           handleSubmit(text);
         };
 
+        stopRef.current = stopListening;
         const toggleMic = () => {
           if (isListening) {
             stopListening();

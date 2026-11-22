@@ -3,7 +3,7 @@
 ## Unreleased (since v0.9.163, 2026-11-22)
 
 ### Overview
-STT is being brought in line with TTS (author's request, 2026-11-22). First step: the switches mean what they say. The Preview's speech buttons apply to that Preview only; a conversation has no microphone while STT is switched off; an export carries voice input only with STT switched on in the app.
+STT is brought in line with TTS (author's request, 2026-11-22). The switches mean what they say: the Preview's speech buttons apply to that Preview only, a conversation has no microphone while STT is switched off, and an export carries voice input only with STT switched on in the app. The conversation's microphone now uses OpenAI transcription and plain Whisper servers where they are set up, and an exported story can have OpenAI write the player's spoken answers down through the relay.
 
 ### Changed: no microphone while STT is switched off, in the Preview and in exports
 - **State before:** a conversation that allows voice input showed its microphone whatever the STT switch said: with the host's speech-input service switched off, the input fell back to the browser's own recognition. An export always offered the microphone (browser recognition), and nothing in the export window but a line of text said so.
@@ -11,7 +11,6 @@ STT is being brought in line with TTS (author's request, 2026-11-22). First step
 - **Exports** follow the app's STT switch as they follow the TTS switch: `sttEnabled` in the page's settings (`HtmlExportOptions.sttEnabled`), read by `WebSTTService`. The export window says "Voice input is on…" or "Voice input is off: STT is switched off in the app…".
 - **Behaviour change:** STT is off in the app unless switched on, so a story exported without switching it on no longer has a microphone in its conversations.
 - **Checked** in an isolated browser on the Rehearsal template with voice input enabled on its conversation: exported with STT off the page holds `sttEnabled: false` and its speech-input service starts disabled; with STT on, `true` and enabled; the export window shows the matching line. The microphone itself was not seen in an export (without an AI setup the conversation is skipped); the rule is tested in `ReactRenderer.test.tsx` (3 new).
-- **Still to do (agreed):** record-then-transcribe in the conversation input, so OpenAI transcription and plain Whisper servers are used where configured (today the microphone uses only recognisers that transcribe while one speaks, and quietly the browser's otherwise); OpenAI transcription in exports through the relay.
 
 **Files modified:** `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/player-web/src/WebSTTProvider.ts`, `packages/builder/src/export/HtmlExporter.ts`, `packages/builder/src/components/export/HtmlExportDialog.tsx`, `packages/builder/public/player-web.js`, `docs/USER_GUIDE.md`
 
@@ -21,6 +20,22 @@ STT is being brought in line with TTS (author's request, 2026-11-22). First step
 - User Guide: the Preview Controls row says so.
 
 **Files modified:** `packages/builder/src/pages/PreviewWindow.tsx`, `docs/USER_GUIDE.md`
+
+### New: the conversation's microphone uses OpenAI transcription and plain Whisper servers (record, then transcribe)
+- **State before:** the microphone used a configured speech-input service only if it transcribes while one speaks (browser, whisper.cpp, Vosk). With OpenAI (`gpt-transcribe`) or a plain local Whisper server set up, it used the browser's recognition instead and the configured service was never called. (The author's earlier successful tests ran on the streaming recognisers, which are unchanged.)
+- The providers could record and transcribe all along (`startListening` / `stopListening`); the conversation input now uses them: a click starts the recording, a second click ends it, the text arrives in the field and is sent after the usual moment. It does not start by itself (nothing would stop it), the browser's recognition stays out of it, the field shows "..." while the text is on its way, and a recording nobody stops ends after 60 s (`RECORDING_CAP_MS`).
+- Test: `ReactRenderer.test.tsx` (1 new). **Not run in the Preview with a real setup** (the author's STT setup is the browser's); the same path was run for exports, below.
+
+### New: voice input through the relay (OpenAI transcription in exported stories)
+- **The relay** takes `target: 'transcribe'` for OpenAI: the recording comes as base64 with its type, is checked (a transcription model, an audio type, at most about 5 MB) and passed to `/v1/audio/transcriptions` as the file it expects; `languages[]` for `gpt-transcribe`, `language` for the older models. A refusal keeps its status and message.
+- **The exported player** (`WebSTTService`, `sttConfig.relayUrl`): records with what the browser can (webm, or mp4 in Safari), sends the recording to the relay when the microphone is clicked again, and hands the text to the conversation input, which sees it as a record-then-transcribe recogniser. Where the browser can't record, or the relay refuses (deployed before it knew this, no key on the host), the browser's own recognition takes over.
+- **The export window:** "Voice input in conversations", with STT on: *The browser's own speech recognition* or, when OpenAI is this computer's STT setup, *OpenAI transcription, through the relay* (remembered; Relay URL shown there when nothing else shows it). The export is then the relay zip and `deploy.sh` asks for `OPENAI_API_KEY`.
+- **Checked against the service (2026-11-22)**, in the dev app, no microphone and no sound: a sentence synthesised silently was fed to the exported player's recorder as if spoken (a media stream, not the speakers), sent through the generated relay function, and came back from `gpt-transcribe` word for word ("I can pay the rent on Friday, but not before."), 1.8 s after the recording ended; 3.3 s of speech were 52 KB. The player sent no key and the page held none.
+- **Checked in the export window** (isolated browser, made-up key): both choices appear with STT on; the relay choice exports `…-relay.zip` whose page holds `sttConfig` with the relay address and no key, whose function has the transcription route, and whose `deploy.sh` asks for `OPENAI_API_KEY`.
+- **Not checked:** a real microphone, Safari's mp4 recording, a deployed relay on Netlify (the author's field test), a language other than English.
+- Tests: `relayFunction.test.ts` (4 new), `relayDeployScript.test.ts` (extended).
+
+**Files modified:** `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/player-web/src/WebSTTProvider.ts`, `packages/builder/src/export/{relayKit,HtmlExporter}.ts`, `packages/builder/src/components/export/HtmlExportDialog.tsx`, `packages/builder/public/player-web.js`, `docs/USER_GUIDE.md`
 
 ---
 

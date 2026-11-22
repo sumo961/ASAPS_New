@@ -24,6 +24,11 @@
  * A relay deployed before these existed answers them with an error, and the
  * player reads with the browser's voice.
  *
+ * Voice input (mirrored by player-web WebSTTProvider):
+ *   POST { provider: 'openai', target: 'transcribe', audio: <base64>, mime, model, language? }
+ *   → OpenAI's transcription of the recording ({ text }). An earlier relay
+ *     answers with an error and the player listens with the browser instead.
+ *
  * Security posture (documented in the generated README):
  *   - Upstream URLs are HARDCODED — the client cannot redirect the relay.
  *   - No CORS headers are emitted, so browsers only allow same-origin
@@ -55,22 +60,57 @@ const SPEECH_UPSTREAMS = {
     // session itself, so the sound streams straight from OpenAI.
     'realtime-secret': 'https://api.openai.com/v1/realtime/client_secrets',
     speech: 'https://api.openai.com/v1/audio/speech',
+    // Voice input: a recorded answer, to be written down.
+    transcribe: 'https://api.openai.com/v1/audio/transcriptions',
   },
   elevenlabs: { speech: 'https://api.elevenlabs.io/v1/text-to-speech/' },
 };
 const KEY_NAMES = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY', elevenlabs: 'ELEVENLABS_API_KEY' };
 
+// A recorded answer (base64) goes to OpenAI as the file it expects.
+const TRANSCRIBE_MODELS = /^(gpt-transcribe[a-z0-9.-]*|gpt-4o(-mini)?-transcribe|whisper-1)$/;
+const AUDIO_TYPES = { 'audio/webm': 'webm', 'audio/mp4': 'mp4', 'audio/ogg': 'ogg', 'audio/wav': 'wav', 'audio/mpeg': 'mp3' };
+const MAX_AUDIO_BASE64 = 5 * 1024 * 1024; // about a minute of speech is well under this
+
+async function relayTranscription(payload, url, key, fail, cors) {
+  const model = String(payload.model || 'gpt-transcribe');
+  if (!TRANSCRIBE_MODELS.test(model)) return fail(400, 'Expected a transcription model');
+  const mime = String(payload.mime || '').split(';')[0].trim().toLowerCase();
+  const ext = AUDIO_TYPES[mime];
+  const audio = payload.audio;
+  if (!ext || typeof audio !== 'string' || audio.length === 0) return fail(400, 'Expected { audio: <base64>, mime: <audio type> }');
+  if (audio.length > MAX_AUDIO_BASE64) return fail(413, 'The recording is too long');
+  let bytes;
+  try { bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0)); } catch { return fail(400, 'The recording could not be read'); }
+
+  const form = new FormData();
+  form.append('file', new Blob([bytes], { type: mime }), 'answer.' + ext);
+  form.append('model', model);
+  const language = String(payload.language || '');
+  if (/^[a-z]{2,3}$/i.test(language)) {
+    // gpt-transcribe takes a list and refuses the single field.
+    form.append(/^gpt-transcribe/.test(model) ? 'languages[]' : 'language', language.toLowerCase());
+  }
+  const upstream = await fetch(url, { method: 'POST', headers: { authorization: 'Bearer ' + key }, body: form });
+  return new Response(await upstream.text(), {
+    status: upstream.status,
+    headers: { 'content-type': upstream.headers.get('content-type') || 'application/json', 'cache-control': 'no-store', ...(cors || {}) },
+  });
+}
+
 async function relaySpeech(payload, cors) {
   const { provider, target, body } = payload;
   const fail = (status, error) => Response.json({ error }, { status, headers: cors || {} });
   const base = SPEECH_UPSTREAMS[provider] && SPEECH_UPSTREAMS[provider][target];
-  if (!base || !body || typeof body !== 'object') {
+  if (!base || (target !== 'transcribe' && (!body || typeof body !== 'object'))) {
     return fail(400, "Expected { provider: 'openai' | 'elevenlabs', target: 'speech' | 'realtime-secret', body: {...} }");
   }
   const key = process.env[KEY_NAMES[provider]];
   if (!key) {
     return fail(500, KEY_NAMES[provider] + ' is not set. Add it under Project configuration → Environment variables, then redeploy.');
   }
+
+  if (target === 'transcribe') return relayTranscription(payload, base, key, fail, cors);
 
   let url = base;
   let send = body;
@@ -335,6 +375,16 @@ too. Nothing else to deploy: the same function does it.
   ASAPS Builder v0.9.163, the story is still read, with the browser's own
   voice. Redeploy the relay from a new export to get the voices.
 
+## Voice input through the relay
+
+If you exported with **Voice input → OpenAI transcription, through the
+relay**, a player's spoken answer is recorded in their browser when they
+click the microphone, sent to this relay when they click it again, and
+written down by OpenAI (\`OPENAI_API_KEY\`, the same variable). The
+recording is passed on and not kept here. A relay deployed before ASAPS
+Builder v0.9.164 does not know this: the player's browser then listens by
+itself, where it can. Redeploy the relay from a new export.
+
 ## How it stays safe
 
 - The relay only ever forwards to the official Anthropic / OpenAI /
@@ -369,10 +419,12 @@ export const RELAY_NETLIFY_TOML = `[build]
 export type RelayKeyName = 'ANTHROPIC_API_KEY' | 'OPENAI_API_KEY' | 'ELEVENLABS_API_KEY';
 
 /** Which keys this export's relay needs: the AI's provider, and the voices'. */
-export function relayKeysFor(options: { aiProxyUrl?: string; aiProvider?: string; ttsRelayUrl?: string; ttsProvider?: string }): RelayKeyName[] {
+export function relayKeysFor(options: { aiProxyUrl?: string; aiProvider?: string; ttsRelayUrl?: string; ttsProvider?: string; sttRelayUrl?: string }): RelayKeyName[] {
   const keys = new Set<RelayKeyName>();
   if (options.aiProxyUrl) keys.add(options.aiProvider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY');
   if (options.ttsRelayUrl) keys.add(options.ttsProvider === 'elevenlabs' ? 'ELEVENLABS_API_KEY' : 'OPENAI_API_KEY');
+  // Voice input through the relay is OpenAI's transcription.
+  if (options.sttRelayUrl) keys.add('OPENAI_API_KEY');
   return [...keys];
 }
 

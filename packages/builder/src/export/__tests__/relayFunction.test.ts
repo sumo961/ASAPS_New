@@ -246,3 +246,54 @@ describe('relay function — reading aloud', () => {
     expect(r.headers.get('access-control-allow-origin')).toBe('https://annas-story.netlify.app');
   });
 });
+
+// Voice input through the relay: a recorded answer is written down by OpenAI.
+describe('relay function — voice input', () => {
+  const post = (body: unknown) => handler(req('POST', null, body));
+  const audio = Buffer.from('not really sound').toString('base64');
+
+  it('passes the recording to OpenAI as a file, with the key from the host', async () => {
+    const seen: any = {};
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+      seen.url = url; seen.auth = (init.headers as Record<string, string>).authorization;
+      const form = init.body as FormData;
+      const file = form.get('file') as File;
+      seen.file = { name: file.name, type: file.type, bytes: file.size };
+      seen.model = form.get('model'); seen.languages = form.getAll('languages[]'); seen.language = form.get('language');
+      return new Response(JSON.stringify({ text: 'I can pay on Friday.' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }));
+    const r = await post({ provider: 'openai', target: 'transcribe', audio, mime: 'audio/webm;codecs=opus', model: 'gpt-transcribe', language: 'de' });
+    expect(r.status).toBe(200);
+    expect((await r.json()).text).toBe('I can pay on Friday.');
+    expect(seen).toMatchObject({ url: 'https://api.openai.com/v1/audio/transcriptions', auth: 'Bearer test-key', model: 'gpt-transcribe', languages: ['de'], language: null });
+    // The recording itself, decoded from base64 (16 bytes here).
+    expect(seen.file).toEqual({ name: 'answer.webm', type: 'audio/webm', bytes: 16 });
+  });
+
+  it('an older model takes the single language field; no language is fine too', async () => {
+    const forms: FormData[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => { forms.push(init.body as FormData); return new Response('{"text":"x"}', { status: 200 }); }));
+    await post({ provider: 'openai', target: 'transcribe', audio, mime: 'audio/mp4', model: 'whisper-1', language: 'sv' });
+    await post({ provider: 'openai', target: 'transcribe', audio, mime: 'audio/mp4' });
+    expect(forms[0].get('language')).toBe('sv');
+    expect((forms[0].get('file') as File).name).toBe('answer.mp4');
+    expect(forms[1].get('model')).toBe('gpt-transcribe');
+    expect(forms[1].getAll('languages[]')).toEqual([]);
+  });
+
+  it('refuses what is not a recording for a transcription model', async () => {
+    expect((await post({ provider: 'openai', target: 'transcribe', audio, mime: 'audio/webm', model: 'gpt-6-astra' })).status).toBe(400);
+    expect((await post({ provider: 'openai', target: 'transcribe', audio, mime: 'text/html' })).status).toBe(400);
+    expect((await post({ provider: 'openai', target: 'transcribe', audio: '', mime: 'audio/webm' })).status).toBe(400);
+    expect((await post({ provider: 'openai', target: 'transcribe', audio: 'A'.repeat(5 * 1024 * 1024 + 1), mime: 'audio/webm' })).status).toBe(413);
+    expect((await post({ provider: 'elevenlabs', target: 'transcribe', audio, mime: 'audio/webm' })).status).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps a refusal\'s status and message', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { message: 'Incorrect API key' } }), { status: 401, headers: { 'content-type': 'application/json' } })));
+    const r = await post({ provider: 'openai', target: 'transcribe', audio, mime: 'audio/webm' });
+    expect(r.status).toBe(401);
+    expect(await r.text()).toContain('Incorrect API key');
+  });
+});

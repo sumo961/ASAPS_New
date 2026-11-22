@@ -136,6 +136,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
       aiConfig: {{AI_CONFIG}},
       ttsConfig: {{TTS_CONFIG}},
       sttEnabled: {{STT_ENABLED}},
+      sttConfig: {{STT_CONFIG}},
       mobileScalingMode: '{{MOBILE_SCALING_MODE}}',
       mobileFontScale: {{MOBILE_FONT_SCALE}},
       ttsLanguage: '{{TTS_LANGUAGE}}',
@@ -328,6 +329,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
       aiConfig: {{AI_CONFIG}},
       ttsConfig: {{TTS_CONFIG}},
       sttEnabled: {{STT_ENABLED}},
+      sttConfig: {{STT_CONFIG}},
       mobileScalingMode: '{{MOBILE_SCALING_MODE}}',
       mobileFontScale: {{MOBILE_FONT_SCALE}},
       ttsLanguage: '{{TTS_LANGUAGE}}',
@@ -998,6 +1000,17 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
   </script>`;
 
 
+/** The relay's files go with the export when anything in it goes through the relay. */
+function needsRelayKit(options: HtmlExportOptions): boolean {
+  return !!(options.aiProxyUrl || options.ttsRelayUrl || (options.sttRelayUrl && options.sttEnabled !== false));
+}
+
+/** Voice input for the exported player: nothing (the browser listens), or OpenAI's transcription through the relay. No key either way. */
+function sttConfigJson(options: HtmlExportOptions): string {
+  if (!options.sttRelayUrl || options.sttEnabled === false) return 'null';
+  return JSON.stringify({ provider: 'openai', relayUrl: options.sttRelayUrl, model: options.sttModel || undefined });
+}
+
 /**
  * AI config for the exported player. Relay mode (aiProxyUrl) embeds NO
  * key — the entire point of the relay is that the key never reaches the
@@ -1074,6 +1087,14 @@ export interface HtmlExportOptions {
    * browser can listen.
    */
   sttEnabled?: boolean;
+  /**
+   * Voice input through the story's relay: the player's answer is recorded
+   * and OpenAI writes it down; the relay holds the key (relayKit.ts, target
+   * "transcribe"). Left out, the browser's own speech recognition listens.
+   */
+  sttRelayUrl?: string;
+  /** The transcription model for `sttRelayUrl` (the relay's default when left out). */
+  sttModel?: string;
   /**
    * Override the starting beat for this export (v0.9.49+). When
    * supplied, the exported metadata.firstBeatId is replaced so the
@@ -1270,6 +1291,7 @@ async function exportAsSingleFile(
     .replace('{{AI_CONFIG}}', aiConfig)
     .replace('{{TTS_CONFIG}}', ttsConfig)
     .replace('{{STT_ENABLED}}', options.sttEnabled === false ? 'false' : 'true')
+    .replace('{{STT_CONFIG}}', sttConfigJson(options))
     .replace('{{TTS_LANGUAGE}}', project.globalSettings?.translation?.sourceLanguage || 'en')
     .replace('{{SHOW_SESSION_LOG}}', String(options.showSessionLog ?? false))
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
@@ -1328,6 +1350,7 @@ async function exportAsFolder(
     .replace('{{AI_CONFIG}}', aiConfig)
     .replace('{{TTS_CONFIG}}', ttsConfig)
     .replace('{{STT_ENABLED}}', options.sttEnabled === false ? 'false' : 'true')
+    .replace('{{STT_CONFIG}}', sttConfigJson(options))
     .replace('{{TTS_LANGUAGE}}', project.globalSettings?.translation?.sourceLanguage || 'en')
     .replace('{{SHOW_SESSION_LOG}}', String(options.showSessionLog ?? false))
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
@@ -1337,7 +1360,7 @@ async function exportAsFolder(
   // Add files to ZIP
   zip.file('index.html', html);
   zip.file('story.asaps.zip', storyZipBlob);
-  if (options.aiProxyUrl || options.ttsRelayUrl) {
+  if (needsRelayKit(options)) {
     for (const f of buildRelayKitFiles(relayKeysFor(options))) zip.file(f.path, f.content, f.mode ? { unixPermissions: f.mode } : undefined);
   }
 
@@ -1683,6 +1706,7 @@ export async function downloadHtmlExport(
     .replace('{{AI_CONFIG}}', aiConfig)
     .replace('{{TTS_CONFIG}}', ttsConfig)
     .replace('{{STT_ENABLED}}', options.sttEnabled === false ? 'false' : 'true')
+    .replace('{{STT_CONFIG}}', sttConfigJson(options))
     .replace('{{TTS_LANGUAGE}}', project.globalSettings?.translation?.sourceLanguage || 'en')
     .replace('{{TTS_SPEAKER_ALIASES}}', JSON.stringify(ttsSpeakerAliases))
     .replace('{{SHOW_SESSION_LOG}}', String(options.showSessionLog ?? false))
@@ -1704,7 +1728,7 @@ export async function downloadHtmlExport(
     const zip = new JSZip();
     zip.file('index.html', html);
     zip.file('story.asaps.zip', originalZipBlob);
-    if (options.aiProxyUrl || options.ttsRelayUrl) {
+    if (needsRelayKit(options)) {
       for (const f of buildRelayKitFiles(relayKeysFor(options))) zip.file(f.path, f.content, f.mode ? { unixPermissions: f.mode } : undefined);
     }
     const zipBlob = await zip.generateAsync({ type: 'blob', platform: 'UNIX' });
@@ -1726,7 +1750,7 @@ export async function downloadHtmlExport(
  * classic bare .html download.
  */
 async function downloadSingleFile(html: string, safeName: string, options: HtmlExportOptions): Promise<void> {
-  if (options.aiProxyUrl || options.ttsRelayUrl) {
+  if (needsRelayKit(options)) {
     const zip = new JSZip();
     zip.file('index.html', html);
     for (const f of buildRelayKitFiles(relayKeysFor(options))) zip.file(f.path, f.content, f.mode ? { unixPermissions: f.mode } : undefined);
