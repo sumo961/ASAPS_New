@@ -1,9 +1,17 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.162, 2026-11-22)
+## 2026-11-22: The relay voices release: reading aloud through the relay, a deploy script, voices of their own (v0.9.163)
 
 ### Overview
-The relay of an exported story carries reading aloud too, so OpenAI and ElevenLabs voices work on a public site without the speech key in the page. *Show on demand only* now acts for the character it is ticked on.
+A published story can read aloud in OpenAI or ElevenLabs voices without the speech key in the page: the relay that held the AI key carries speech too, and the relay zip has a `deploy.sh` that does the Netlify deployment in one run. With OpenAI voices, speakers nobody chose a voice for get one of their own, a woman's or a man's as far as the story says. Reading aloud is exported only with TTS switched on in the app. Fixes: the line's bubble and the replies' bubble taking turns for one place (found by playing the author's whole story), the Dialog Tree editor in a narrow Properties panel, *Show on demand only* acting per character, a character listed twice under Character Voices. Field-tested by the author on Netlify with both speech services.
+
+### Release checks (v0.9.163)
+- **The author's story played through** in the Preview (every screen that shows, all six endings; see below), and the Rehearsal template played by the author in two browsers from the deployed export.
+- **Device sweep of the changed surface** (the line's bubble and the replies' bubble; the wolf's first line in the forest, knife in the inventory) on a copy of the author's story, played to that line at each size: **fixed canvas** at Fit window, Desktop, both tablets and both phones: line and replies both bubbles, no change of the replies marker in 1.5 s, the two bubbles not over each other or over a panel, inside the stage, a reply takes the story on. **Responsive** (the copy switched over): the same at Fit window, Desktop and both tablets; on both phones the replies are buttons, steadily, the line a bubble.
+- **Export** of the fixed-canvas copy (one file, AI off; reading aloud off because TTS was off, as the new rule has it) at 1130×690, stage scale 0.898: the same line with both bubbles, no flicker, a reply works; no key in the file.
+- **Suites:** builder 3,368, core 3,241 (78 skipped), renderer 853, player 10; lint 0 errors; type-check clean. CI green on the release commit.
+- **Not checked:** the automatic voices by ear beyond the author's own test; `deploy.sh` on Windows (Git Bash) or Linux.
+- **For a decision (from the User Guide audit):** the Preview's TTS button is the same stored switch as the header's, so switching reading aloud off in a Preview also makes the next export silent. The guide now says so; whether the Preview's button should stop being remembered is open. (This is probably how the switch came to be off during the field test.)
 
 ### Fixed: the wolf's line and the replies took turns, thirty times a second (author report, 2026-11-22)
 - In the author's story, the wolf's first line in the forest with a knife in the inventory: the line's bubble and the replies' bubble flickered without end and the replies could hardly be clicked. Found while playing the whole story in a copy.
@@ -87,6 +95,9 @@ The relay of an exported story carries reading aloud too, so OpenAI and ElevenLa
 - User Guide: Character Inventory, Preview Controls and the shortcuts table say the same.
 
 **Files modified:** `packages/renderer/src/utils/runtimeInventory.ts`, `packages/renderer/src/index.ts`, `packages/renderer/src/components/{PositionedBeatView,ResponsiveCharacterLayer}.tsx`, `packages/player/src/PlayerEngine.ts`, `packages/builder/src/pages/PreviewWindow.tsx`, `packages/builder/src/components/characters/CharacterEditor.tsx`, `packages/builder/public/player-web.js`, `docs/USER_GUIDE.md`, tests in `packages/renderer/tests`
+
+### User Guide
+- Audited against the code for this release: the passages written with each change hold. Added: Character Voices are listed while TTS is on and each character once; voices come round again in a large cast; the export window's greyed-out tick and the ElevenLabs default-voice warning; the relay zip for a story without AI beats; the Preview's speech buttons being the app's switches.
 
 ---
 

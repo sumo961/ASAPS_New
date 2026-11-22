@@ -5,7 +5,7 @@ for detailed release notes (including file-level changes and the *why* behind
 decisions) see [`Progress.md`](Progress.md). For the latest published build,
 visit the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
 
-Current release: **v0.9.162**. This is a **beta**: core functionality works,
+Current release: **v0.9.163**. This is a **beta**: core functionality works,
 and new releases arrive often. The release summaries below cover v0.9.88
 onward, newest first. Below them are an archived feature table and deep-dives
 for the releases up to v0.9.89. Detailed notes for every release are in
@@ -16,6 +16,8 @@ for the releases up to v0.9.89. Detailed notes for every release are in
 One paragraph per release, as it appeared on the project's front page. The
 latest release is described in the [README](README.md); when a new version
 comes out, its predecessor's paragraph moves to the top of this list.
+
+**v0.9.162 was the inventory release**, a small release about the inventory a character carries on the stage. In an exported story it now shows whoever carries it, not only for the player's own character, and Ctrl/Cmd+I shows or hides it there as in the Preview. The switch works at once, on the screen that is up. On a phone the panel folds to a small badge, and it no longer hangs over the stage's bottom edge. On a phone in landscape, the ▾ that says a list of replies goes on now appears as soon as the replies do.
 
 **v0.9.161 was the full-stage release**, about a stage full of characters. Speech bubbles now keep clear of the mood tokens as well as of buttons and panels. When the bubble with the player's replies would cover someone's face, the replies stay buttons instead, and the line before is left out rather than put over a face. A mood token, meters or an inventory set to sit at a character now show in the responsive layout too, not only on a fixed canvas, and a token moves off the story's buttons where it can. On a phone, a list of replies that scrolls fades at its bottom edge and shows a ▾ to tap. In the Preview, a fixed-canvas story's corner panels are drawn on the stage at every device size, exactly as an exported story shows them.
 

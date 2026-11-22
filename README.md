@@ -49,14 +49,15 @@ And this is a story made with it, exported as a web page. **[Play it yourself](h
 
 **Share**
 - **Export** a story as a web page: one file to send, or a folder for a website.
+- **Publish without your keys in the page.** A small relay you deploy with the story holds the AI and voice keys; a script does the deploying.
 - **Desktop apps** for macOS, Windows and Linux (beta) that update themselves.
 - **Work together** with Git built in: commit, push, pull, merge two versions of a story.
 
-## 🆕 Latest release: v0.9.162, the inventory release
+## 🆕 Latest release: v0.9.163, the relay voices release
 
 ASAPS is in **beta**: the core works, and new releases arrive often.
 
-v0.9.162 is a small release about the inventory a character carries on the stage. In an exported story it now shows whoever carries it, not only for the player's own character, and Ctrl/Cmd+I shows or hides it there as in the Preview. The switch works at once, on the screen that is up. On a phone the panel folds to a small badge, and it no longer hangs over the stage's bottom edge. On a phone in landscape, the ▾ that says a list of replies goes on now appears as soon as the replies do.
+v0.9.163 lets a published story speak without giving your key away. The relay that already kept the AI key off the page now carries reading aloud too, for OpenAI and ElevenLabs voices, and the relay download includes a `deploy.sh` that logs in to Netlify, creates the site, asks for the keys and opens the finished story. With OpenAI voices, every character you have not chosen a voice for gets one of their own, a woman's or a man's as far as the story says which, so a new story sounds like a conversation from the start. Reading aloud is exported only while TTS is switched on in the app. Also fixed: a speech bubble and the reply bubble flickering over the same spot, the Dialog Tree editor in a narrow Properties panel, an inventory's *Show on demand only* now acting for its own character, and a character listed twice under Character Voices.
 
 Earlier releases:
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)**: a summary of every release
