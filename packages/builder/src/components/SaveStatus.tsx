@@ -196,7 +196,7 @@ export const SaveStatus: React.FC<SaveStatusProps> = ({
         <button
           onClick={handleSave}
           disabled={status === 'saving'}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
+          className={`flex items-center gap-1.5 px-3 py-2 border border-transparent rounded-lg text-sm font-medium transition-all duration-300 ${
             status === 'saving'
               ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
               : status === 'saved'

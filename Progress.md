@@ -47,9 +47,9 @@ STT is brought in line with TTS (author's request, 2026-11-22). The switches mea
 ### Changed: the header's TTS and STT buttons look like the toolbar's (author's suggestion, 2026-11-23)
 - They were filled buttons (teal, and red for STT) beside outlined neighbours. Now outlined like the language button and the toolbar's buttons, with the colour in the icon: a teal speaker or a rose microphone when on, a grey crossed-out one when off. The AI button keeps its gradient.
 - **Checked** in the browser in light and dark mode: same background, border and text colour as the language button beside them.
-- **One height.** The four buttons of that row were 28 (AI), 30 (TTS, STT) and 34 px (language), with two kinds of corner and padding. All four are now 34 px with the same padding, corners and weight, measured in the browser. In the toolbar below, Preview was 2 px shorter than its outlined neighbours (it has no border); it is 34 px too. Projects, New and Save are larger (38, 36, 40 px) and were left as they are.
+- **One height.** The four buttons of that row were 28 (AI), 30 (TTS, STT) and 34 px (language), with two kinds of corner and padding. All four are now 34 px with the same padding, corners and weight, measured in the browser. In the toolbar below, Preview was 2 px shorter than its outlined neighbours (it has no border); it is 34 px too. Projects, New and Save stay the heavier group but were 38, 36 and 40 px; all three are now 38 px with the same padding and text size (the author: heavier is fine, but the same amongst themselves).
 
-**Files modified:** `packages/builder/src/components/Header.tsx`, `packages/builder/src/components/translation/LanguageSelector.tsx`
+**Files modified:** `packages/builder/src/components/{Header,SaveStatus}.tsx`, `packages/builder/src/components/translation/LanguageSelector.tsx`
 
 ---
 

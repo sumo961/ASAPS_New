@@ -812,7 +812,7 @@ export const Header: React.FC<HeaderProps> = ({
               if (hasUnsavedChanges && onSave && !isUntitledProject) onSave();
               setShowNewProjectPicker(true);
             }}
-            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+            className="flex items-center gap-1.5 px-3 py-2 border border-transparent bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
             title="Start a new project (Empty, Prompt, or Co-write with AI)"
           >
             <Plus size={16} />
