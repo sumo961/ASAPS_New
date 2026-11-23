@@ -44,6 +44,12 @@ STT is brought in line with TTS (author's request, 2026-11-22). The switches mea
 ### Tests: the renderer tests take the stage down after each test (pushed on its own, 2026-11-22)
 - CI went red on a docs-only push: "window is not defined" from a text animation's timer in `ReactRenderer.test.tsx`, firing after the test environment was gone. The renderer has no `destroy()`, so the tests' teardown called nothing and the tree stayed mounted. Seen once locally before. The tests now unmount the root after each test.
 
+### Changed: the header's TTS and STT buttons look like the toolbar's (author's suggestion, 2026-11-23)
+- They were filled buttons (teal, and red for STT) beside outlined neighbours. Now outlined like the language button and the toolbar's buttons, with the colour in the icon: a teal speaker or a rose microphone when on, a grey crossed-out one when off. The AI button keeps its gradient.
+- **Checked** in the browser in light and dark mode: same background, border and text colour as the language button beside them.
+
+**Files modified:** `packages/builder/src/components/Header.tsx`
+
 ---
 
 ## 2026-11-22: The relay voices release: reading aloud through the relay, a deploy script, voices of their own (v0.9.163)

@@ -505,15 +505,17 @@ export const Header: React.FC<HeaderProps> = ({
               {/* TTS Menu Button */}
               <div className="relative">
                 <button
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                    ttsEnabled
-                      ? 'bg-teal-500 text-white hover:bg-teal-600'
-                      : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  // Outlined like the toolbar's buttons, with the colour in the
+                  // icon: on, a teal speaker; off, a grey crossed-out one. (It
+                  // was a filled teal button, and STT a filled red one, beside
+                  // outlined neighbours.)
+                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 ${
+                    ttsEnabled ? 'text-gray-700' : 'text-gray-500'
                   }`}
                   onClick={() => setShowTTSMenu(!showTTSMenu)}
                   title={ttsEnabled ? 'TTS enabled' : 'TTS disabled'}
                 >
-                  {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                  {ttsEnabled ? <Volume2 className="w-4 h-4 text-teal-500" /> : <VolumeX className="w-4 h-4 text-gray-400" />}
                   TTS
                   <ChevronDown className="w-3 h-3" />
                 </button>
@@ -612,15 +614,13 @@ export const Header: React.FC<HeaderProps> = ({
               {/* STT Menu Button */}
               <div className="relative">
                 <button
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                    sttEnabled
-                      ? 'bg-rose-500 text-white hover:bg-rose-600'
-                      : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 ${
+                    sttEnabled ? 'text-gray-700' : 'text-gray-500'
                   }`}
                   onClick={() => setShowSTTMenu(!showSTTMenu)}
                   title={sttEnabled ? 'STT enabled' : 'STT disabled'}
                 >
-                  {sttEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                  {sttEnabled ? <Mic className="w-4 h-4 text-rose-500" /> : <MicOff className="w-4 h-4 text-gray-400" />}
                   STT
                   <ChevronDown className="w-3 h-3" />
                 </button>
