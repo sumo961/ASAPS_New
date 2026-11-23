@@ -159,7 +159,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
       {/* Main selector button */}
       <button
         onClick={() => { setShowDropdown(!showDropdown); setShowAddMenu(false); }}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded border transition-colors ${
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
           activeLanguage
             ? 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'
             : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'

@@ -402,7 +402,7 @@ export const Header: React.FC<HeaderProps> = ({
               {aiOn && (
                 <div className="relative">
                   <button
-                    className="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-1.5"
+                    className="px-3 py-1.5 border border-transparent bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-1.5"
                     onClick={() => setShowAIMenu(!showAIMenu)}
                     title="AI Tools"
                   >
@@ -509,7 +509,7 @@ export const Header: React.FC<HeaderProps> = ({
                   // icon: on, a teal speaker; off, a grey crossed-out one. (It
                   // was a filled teal button, and STT a filled red one, beside
                   // outlined neighbours.)
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 ${
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 ${
                     ttsEnabled ? 'text-gray-700' : 'text-gray-500'
                   }`}
                   onClick={() => setShowTTSMenu(!showTTSMenu)}
@@ -614,7 +614,7 @@ export const Header: React.FC<HeaderProps> = ({
               {/* STT Menu Button */}
               <div className="relative">
                 <button
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 ${
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 ${
                     sttEnabled ? 'text-gray-700' : 'text-gray-500'
                   }`}
                   onClick={() => setShowSTTMenu(!showSTTMenu)}
@@ -1258,7 +1258,8 @@ export const Header: React.FC<HeaderProps> = ({
 
           {onPreview && (
             <button
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              // (An unseen border: the outlined buttons beside it are 2 px taller with theirs.)
+              className={`px-3 py-1.5 border border-transparent rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
                 previewWindowOpen
                   ? 'bg-green-600 text-white ring-2 ring-green-300 hover:bg-green-700'
                   : 'bg-green-500 text-white hover:bg-green-600'
