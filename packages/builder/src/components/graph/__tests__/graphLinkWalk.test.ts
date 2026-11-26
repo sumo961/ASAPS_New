@@ -15,7 +15,7 @@ import { dialogTreeLayout } from '../../../utils/dialogTreeLayout';
 import { buildGraphEdges } from '../graphBuild';
 import { linkStyles, STANDALONE_LINK_KINDS } from '../graphStyle';
 import { deserializeBeats } from '../../../utils/projectDeserializer';
-import { flowchartLinkCount } from '../../../utils/storyLinks';
+import { flowchartLineCount } from '../graphBuild';
 
 const registry = BeatTypeRegistry.getInstance();
 const make = (type: string, id: string, params: Record<string, any> = {}, extra: Record<string, any> = {}): any => {
@@ -244,8 +244,7 @@ describe('the bundled templates, as they load', () => {
     it(`${file}: the header's link count is the number of lines between beats`, () => {
       const beats = deserializeBeats(raw) as any[];
       const ids = new Set(beats.map((b) => b.id));
-      const pairs = new Set(build(beats).filter((e) => ids.has(e.target)).map((e) => `${e.source}>${e.target}`));
-      expect(pairs.size).toBe(flowchartLinkCount(beats));
+      expect(flowchartLineCount(beats)).toBe(build(beats).filter((e) => ids.has(e.target)).length);
     });
   }
 });

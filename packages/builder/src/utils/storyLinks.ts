@@ -18,7 +18,8 @@ import { beatLinks as walkBeatLinks, dedupeLinks as dedupeWalkLinks, defaultTarg
  * exits, hypertext links, an AI conversation's exits). A default target is
  * a link only when it can fire. Serialized beats pass through unchanged.
  *
- * The flowchart draws exactly these, and the header counts them.
+ * The flowchart draws exactly these; the header counts the lines drawn
+ * (flowchartLineCount in components/graph/graphBuild).
  */
 export function liveBeatLinks(
   beat: any,
@@ -40,20 +41,6 @@ export function liveBeatLinks(
     locations,
     parameters,
   }).filter((l) => l.via !== 'default-target' || defaultTargetIsLive(beat));
-}
-
-/**
- * How many links the flowchart shows: every exit the link walk finds (restart,
- * fallback and field links included), one per source→target pair, to other
- * beats that exist — a default target only when it can actually fire, as
- * drawn. The header used to count a separately maintained list that missed
- * the restart link it had just drawn; then it handed live beats to the walk
- * unread and missed the links kept in parameters (2026-11-26).
- */
-export function flowchartLinkCount(beats: ReadonlyArray<any>): number {
-  const ids = new Set(beats.map((b) => b?.id));
-  const links = beats.flatMap((beat) => liveBeatLinks(beat).filter((l) => l.target !== beat.id));
-  return dedupeWalkLinks(links).filter((l) => ids.has(l.target)).length;
 }
 
 /**

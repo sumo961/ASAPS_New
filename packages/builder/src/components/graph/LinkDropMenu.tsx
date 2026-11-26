@@ -12,7 +12,7 @@
  * Typing goes to the search field. Arrow keys move, → opens the types,
  * ← closes them, Enter picks, Escape cancels (or closes the types first).
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, Plus, Search } from 'lucide-react';
 import { beatMatches, type BeatPickerBeat } from '../common/BeatPicker';
@@ -61,7 +61,14 @@ export const LinkDropMenu: React.FC<Props> = ({ x, y, fromName, beats, types, on
   }, [active, activeType, typesOpen]);
 
   const left = Math.max(8, Math.min(x, window.innerWidth - WIDTH - 8));
-  const top = Math.max(8, Math.min(y, window.innerHeight - 420));
+  // Kept inside the window by its real height (it grows with the list), not
+  // by a guess: with a dozen beats it ran past the bottom of a short window.
+  const [top, setTop] = useState(() => Math.max(8, Math.min(y, window.innerHeight - 440)));
+  useLayoutEffect(() => {
+    const panel = ref.current?.firstElementChild as HTMLElement | null;
+    if (!panel) return;
+    setTop(Math.max(8, Math.min(y, window.innerHeight - panel.offsetHeight - 8)));
+  }, [y, found.length]);
   // The types open to the right, or to the left where there is no room.
   const typesLeft = left + WIDTH + TYPES_WIDTH + 8 <= window.innerWidth;
 

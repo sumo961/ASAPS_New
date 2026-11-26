@@ -415,6 +415,19 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
     return allNodes;
 }
 
+/**
+ * The header's "Connections": the lines the flowchart draws between beats,
+ * counted from the lines themselves (clusters open, dialogs collapsed), so
+ * the number cannot differ from the picture. It used to count one per pair
+ * of linked beats, and was one short wherever two lines join the same two
+ * beats (True and False to one beat, a choice beside a scanned code).
+ */
+export function flowchartLineCount(beats: Beat[]): number {
+  const ids = new Set(beats.map((b) => b?.id));
+  return buildGraphEdges({ beats, clusters: [], expandedDialogs: new Set() })
+    .filter((e) => ids.has(e.target)).length;
+}
+
 export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
   const { beats, clusters, expandedDialogs } = input;
 
@@ -474,7 +487,7 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
 
     beats.forEach((beat) => {
       // Get beat parameters for special handling
-      const params = typeof beat.getParameters === 'function' ? beat.getParameters() : {};
+      const params = typeof beat.getParameters === 'function' ? beat.getParameters() : ((beat as any).parameters ?? {});
 
       // B1b — when a dialogTree is expanded AND its expansion is visible
       // (top-level, or inside an EXPANDED cluster), its outgoing edges are

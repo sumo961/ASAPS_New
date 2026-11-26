@@ -1,5 +1,30 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.165, 2026-11-26)
+
+### Overview
+After the release: the header's Connections count made exact, the link-drop menu kept inside a short window, and the User Guide's pictures brought up to v0.9.165.
+
+### Changed: the header's "Connections" is the number of lines drawn (author: "in principle it should be accurate", 2026-11-26)
+The count is shown in one place, the strip above the flowchart (Beats · Clusters · Connections); nothing else reads it. It counted one per pair of linked beats, so it was one short wherever two lines join the same two beats (True and False to one beat, a choice beside a scanned QR code: 29 against 30 lines in the release's test project). It is now counted from the lines the flowchart builds (`flowchartLineCount` in `graphBuild.ts`, clusters open, dialogs collapsed), so it cannot differ from the picture. Collapsing a cluster or expanding a dialog does not change it.
+- **User Guide:** its sentence "one per pair of beats that are linked" is true for v0.9.165 and changes with the next release.
+
+**Files modified:**
+- `packages/builder/src/components/graph/graphBuild.ts`, `packages/builder/src/components/WorkspaceView.tsx`, `packages/builder/src/utils/storyLinks.ts` (`flowchartLinkCount` removed)
+- `packages/builder/src/components/graph/__tests__/flowchartLineCount.test.ts` (moved from utils, 2 tests added), `graphLinkWalk.test.ts`
+
+### Fixed: the link-drop menu ran past the bottom of a short window
+Found while taking its picture at 1280×800: with a dozen beats listed the menu is 425 px tall and was placed by a guessed 420. It is now placed by its measured height.
+
+**Files modified:** `packages/builder/src/components/graph/LinkDropMenu.tsx`
+
+### User Guide: pictures retaken for v0.9.165 (author's request, pushed 2026-11-26)
+- `01-main-interface.png` and `73-restart-link-flowchart.png` (The Oil Lamp: hypertext links cyan, Connections 18, the outlined TTS and STT buttons), `07-ai-menu.png`, `97-draw-link-menu.png`; new `114-link-drop-menu.png` in "Drawing a link".
+- The guide's "Last revised against" line said v0.9.157 although the guide was audited for every release since; it says v0.9.165 now. The release steps should update it each time.
+- **Still showing the old filled TTS/STT buttons:** about two dozen pictures of other windows where the header is only background (the condition forms 26–30, 34, 38–42; 05, 44, 46, 52–55, 68, 69, 72).
+
+---
+
 ## 2026-11-26: The flowchart links release: a menu where a link is dropped, links that show what they are, drawn once (v0.9.165)
 
 ### Overview

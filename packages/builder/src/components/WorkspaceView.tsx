@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { flowchartLinkCount } from '../utils/storyLinks';
+import { flowchartLineCount } from './graph/graphBuild';
 import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { Canvas } from './Canvas';
 import { VisualWorkspace } from './visual/VisualWorkspace';
@@ -180,6 +180,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   }, [shownView, activeView, uiStateReady, setActiveView]);
 
   // Find the cluster containing the selected beat (for shared visuals)
+  // The lines the flowchart draws, counted from the lines.
+  const connectionCount = React.useMemo(() => flowchartLineCount(beats), [beats]);
   const selectedBeatCluster = React.useMemo(() => {
     if (!selectedBeat) return null;
     const position = containerBeatPositions.find(p => p.beatId === selectedBeat.id);
@@ -259,7 +261,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
             <span className="mx-2">•</span>
             <span>Clusters: {clusters.length}</span>
             <span className="mx-2">•</span>
-            <span>Connections: {flowchartLinkCount(beats)}</span>
+            <span>Connections: {connectionCount}</span>
           </div>
         )}
       </div>
