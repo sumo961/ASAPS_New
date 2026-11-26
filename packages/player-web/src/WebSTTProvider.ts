@@ -6,8 +6,8 @@
  *
  * A story exported with "OpenAI transcription, through the relay"
  * (config.relayUrl) records the answer in the browser instead: the
- * microphone is clicked to start and again to stop, the recording goes to
- * the story's relay (relayKit.ts, target "transcribe"), which holds the key,
+ * recording ends when the speaker has finished (core watchSpeech) or at a
+ * click, and goes to the story's relay (relayKit.ts, target "transcribe"), which holds the key,
  * and the text comes back. Where the relay refuses (one deployed before it
  * knew this, no key on the host) or the browser can't record, the browser's
  * own recognition takes over.

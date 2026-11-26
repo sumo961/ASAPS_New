@@ -5,7 +5,7 @@ for detailed release notes (including file-level changes and the *why* behind
 decisions) see [`Progress.md`](Progress.md). For the latest published build,
 visit the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
 
-Current release: **v0.9.163**. This is a **beta**: core functionality works,
+Current release: **v0.9.164**. This is a **beta**: core functionality works,
 and new releases arrive often. The release summaries below cover v0.9.88
 onward, newest first. Below them are an archived feature table and deep-dives
 for the releases up to v0.9.89. Detailed notes for every release are in
@@ -16,6 +16,8 @@ for the releases up to v0.9.89. Detailed notes for every release are in
 One paragraph per release, as it appeared on the project's front page. The
 latest release is described in the [README](README.md); when a new version
 comes out, its predecessor's paragraph moves to the top of this list.
+
+**v0.9.163 was the relay voices release**: it lets a published story speak without giving your key away. The relay that already kept the AI key off the page now carries reading aloud too, for OpenAI and ElevenLabs voices, and the relay download includes a `deploy.sh` that logs in to Netlify, creates the site, asks for the keys and opens the finished story. With OpenAI voices, every character you have not chosen a voice for gets one of their own, a woman's or a man's as far as the story says which, so a new story sounds like a conversation from the start. Reading aloud is exported only while TTS is switched on in the app. Also fixed: a speech bubble and the reply bubble flickering over the same spot, the Dialog Tree editor in a narrow Properties panel, an inventory's *Show on demand only* now acting for its own character, and a character listed twice under Character Voices.
 
 **v0.9.162 was the inventory release**, a small release about the inventory a character carries on the stage. In an exported story it now shows whoever carries it, not only for the player's own character, and Ctrl/Cmd+I shows or hides it there as in the Preview. The switch works at once, on the screen that is up. On a phone the panel folds to a small badge, and it no longer hangs over the stage's bottom edge. On a phone in landscape, the ▾ that says a list of replies goes on now appears as soon as the replies do.
 

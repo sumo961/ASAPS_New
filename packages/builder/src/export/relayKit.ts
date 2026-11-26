@@ -378,10 +378,11 @@ too. Nothing else to deploy: the same function does it.
 ## Voice input through the relay
 
 If you exported with **Voice input → OpenAI transcription, through the
-relay**, a player's spoken answer is recorded in their browser when they
-click the microphone, sent to this relay when they click it again, and
-written down by OpenAI (\`OPENAI_API_KEY\`, the same variable). The
-recording is passed on and not kept here. A relay deployed before ASAPS
+relay**, a player's spoken answer is recorded in their browser (the
+microphone listens when the character has finished speaking, and the
+recording ends when the player stops talking or clicks the microphone),
+sent to this relay, and written down by OpenAI (\`OPENAI_API_KEY\`, the
+same variable). The recording is passed on and not kept here. A relay deployed before ASAPS
 Builder v0.9.164 does not know this: the player's browser then listens by
 itself, where it can. Redeploy the relay from a new export.
 

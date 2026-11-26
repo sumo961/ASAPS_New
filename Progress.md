@@ -1,14 +1,24 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.163, 2026-11-22)
+## 2026-11-26: The voice input release: STT in line with TTS, voice input through the relay, a microphone that listens by itself (v0.9.164)
 
 ### Overview
-STT is brought in line with TTS (author's request, 2026-11-22). The switches mean what they say: the Preview's speech buttons apply to that Preview only, a conversation has no microphone while STT is switched off, and an export carries voice input only with STT switched on in the app. The conversation's microphone now uses OpenAI transcription and plain Whisper servers where they are set up, and an exported story can have OpenAI write the player's spoken answers down through the relay.
+Voice input brought in line with reading aloud (author's request). The switches mean what they say: no microphone while STT is off, voice input exported only with STT on, the Preview's speech buttons for that Preview alone. The conversation's microphone uses OpenAI's transcription and plain Whisper servers, listening by itself and ending the recording when the speaker has finished. An exported story can have OpenAI write spoken answers down through the relay (no key in the page; works in Firefox too). A line of several paragraphs is read aloud paragraph by paragraph. The header's buttons are one style and one height. Field-tested by the author on Netlify in Chrome, Safari and Firefox.
+
+### Release checks (v0.9.164)
+- **A story played to its end:** The Last Ferry in the Preview (random choices, to an ending, no console error) and as an exported file at 1130×690 (to an ending, no button outside the window, no error). The Rehearsal conversation was played by the author from deployed exports in Chrome, Safari and Firefox, with voice input and reading aloud through the relay.
+- **The switches:** exported with STT off, the page holds `sttEnabled: false` and the export window says voice input is off; the Preview's TTS button switched on in a Preview leaves the app's setting as it was.
+- **The header:** AI, TTS, STT 34 px; Projects, New, Save 38 px; Preview and Debug 34 px, measured in the browser.
+- **Against the services** (in the dev app, no microphone, no sound): the checks listed under each change below (transcription through the relay, the recording ending by itself, two paragraphs read).
+- **Device sweep:** not run. What changed in the story's own screens is when the microphone listens and how a line is read aloud, not where anything is drawn; the last full sweep of the stage is v0.9.163's.
+- **Suites:** builder 3,372, core 3,247 (78 skipped), renderer 860, player 10; lint 0 errors; type-check clean. CI green on the release commit.
+- **Not checked:** the start-and-stop detection with a real microphone beyond the author's own test; a noisy room; Safari's recording format beyond the author's test.
+- **User Guide audit** (against the code): the STT section's opening and set-up steps rewritten to the real labels (the STT button, Enable STT, Configure STT), two leftover sentences removed (the answer is sent by itself), voice input in exports moved into the STT section, paragraph-by-paragraph reading added, the header table gives the icon colours. It also found the relay README still describing click-to-start, click-to-send: corrected before tagging. **Left for after the release:** 27 screenshots still show the header's old filled TTS and STT buttons (`01-main-interface.png` and `07-ai-menu.png` matter most).
 
 ### Changed: no microphone while STT is switched off, in the Preview and in exports
 - **State before:** a conversation that allows voice input showed its microphone whatever the STT switch said: with the host's speech-input service switched off, the input fell back to the browser's own recognition. An export always offered the microphone (browser recognition), and nothing in the export window but a line of text said so.
 - **Preview:** where the host handed over its speech-input service and it is switched off, the conversation input offers no microphone (`voiceInputOff` in `ReactRenderer.renderConversationInput`). A host without any such service still gets the browser's recognition.
-- **Exports** follow the app's STT switch as they follow the TTS switch: `sttEnabled` in the page's settings (`HtmlExportOptions.sttEnabled`), read by `WebSTTService`. The export window says "Voice input is on…" or "Voice input is off: STT is switched off in the app…".
+- **Exports** follow the app's STT switch as they follow the TTS switch: `sttEnabled` in the page's settings (`HtmlExportOptions.sttEnabled`), read by `WebSTTService`. The export window has a "Voice input in conversations" section: with STT off, "Off: STT is switched off in the app, so this story is exported without a microphone in conversations…"; with it on, the choice of who listens.
 - **Behaviour change:** STT is off in the app unless switched on, so a story exported without switching it on no longer has a microphone in its conversations.
 - **Checked** in an isolated browser on the Rehearsal template with voice input enabled on its conversation: exported with STT off the page holds `sttEnabled: false` and its speech-input service starts disabled; with STT on, `true` and enabled; the export window shows the matching line. The microphone itself was not seen in an export (without an AI setup the conversation is skipped); the rule is tested in `ReactRenderer.test.tsx` (3 new).
 

@@ -396,8 +396,8 @@ The right side of the same row holds:
 |--------|--------------|
 | **AI** | Dropdown: Ideate with Ideator, Design with Co-Designer, Generate Story, AI changes, Create Beat from Description, Configure AI. Not there? It is hidden when **Show AI features** is off in App Preferences — see [Working without AI](#working-without-ai) |
 | **VCS Status** | Git status, next to the AI button (only visible for directory projects under version control) |
-| **TTS** | Text-to-Speech toggle and configuration (speaker icon) |
-| **STT** | Speech-to-Text toggle and configuration (microphone icon) |
+| **TTS** | Text-to-Speech toggle and configuration (speaker icon: teal while reading aloud is on, grey and crossed out while it is off) |
+| **STT** | Speech-to-Text toggle and configuration (microphone icon: rose while voice input is on, grey and crossed out while it is off) |
 | **Source (English)** | Language selector for translations (far right) |
 
 On a narrow window these buttons wrap onto a line of their own below the title, and their menus still open inside the window.
@@ -1692,7 +1692,7 @@ Unlike AI Dialog Tree (which pre-generates a branching tree), AI Conversation ge
 - **Max Turns** - Conversation length before fallback exit
 - **Fallback Exit Target** - Where the story goes when Max Turns runs out, or when no AI is available (no provider set up, or the request fails), so the player can always leave the conversation. Directions with an **Exit** action can leave earlier. When you link onward from an AI Conversation with the Co-Designer or the Inspector's beat suggestions, ASAPS fills this field for you if it is empty; an exit you have already set is kept. Older projects sometimes carried a plain onward link on an AI Conversation that the Inspector never showed; when you open such a project, that link moves into this field, so you can see it and the story plays exactly as before
 - **Closing line when turns run out** - Optional instruction for the NPC's last line when Max Turns is reached (*"apologise that time is up and suggest meeting again next week"*), so the conversation ends gracefully instead of stopping mid-exchange
-- **Enable Voice Input** - Show a microphone button for speech-to-text input. Off by default — switch it on only after you have configured STT (header **STT** menu); AI-generated stories leave it off
+- **Enable Voice Input** - Show a microphone button for speech-to-text input. Off by default; AI-generated stories leave it off. The microphone is only there while STT is also switched on (header **STT** menu) — see [STT in AI Conversations](#stt-in-ai-conversations)
 - **Context Toggles** - Include variables, inventory, visited beats, choice history
 - **System Instructions** - Additional rules for the AI
 
@@ -3782,6 +3782,7 @@ When a line has a speaker and contains quotation marks, TTS reads it as two voic
 A few practical notes:
 - Give the **Narrator** a voice in the Character Voices list, and link the line to the character who speaks (you can hide the name label with *Show Speaker Name*; see [link, don't label](#link-dont-label)).
 - Moving on, or stopping speech, cancels the rest of the line.
+- A line of several paragraphs (a blank line between them, as an AI character's answer may have) is read paragraph by paragraph, and a conversation's microphone waits until the whole line has been read.
 - The browser's built-in **Web Speech** voice can't report when it has finished a piece, so with that provider the line is read whole in the speaker's voice.
 
 ### TTS Language Awareness
@@ -3795,7 +3796,7 @@ This means you do not need to configure TTS language manually -- it follows your
 
 **Character voices in a translation.** A character keeps their voice when the story is played in another language, even though their name is translated too. With the browser's built-in voices there is one limit: a voice belongs to a language. If the voice you gave a character can't read the language being played (an English voice and a German translation), the best voice for that language reads the line instead, so the text is pronounced properly. The same happens when the story is opened on a computer that doesn't have that voice installed.
 
-**In exported stories.** Reading aloud is exported only while TTS is switched on in the app (the **TTS** button in the header): with it off, the export window shows **Read text aloud in the exported player** switched off, greyed out, and says so, and the story is exported without reading aloud. Switch TTS on, then open the export window again. With TTS on and **Read text aloud in the exported player** ticked, you choose the **Voices** in the export window: *The browser's own voice* (the default: no key, works everywhere) or the voices of your speech setup on this computer, for example *ElevenLabs voices*. The second puts your speech key into the exported file, where anyone with the file can read it, and the window says so; your choice is remembered on this computer. For OpenAI and ElevenLabs voices you can keep the key out of the file: choose **Through the relay** under the voices, and the story's [relay](#html-export) holds the speech key as it holds the AI key. ElevenLabs can only read a line with one of its own voices: if your ElevenLabs setup has no **Default Voice** (TTS ▸ Configure Provider), the narrator and every speaker without a voice of their own are read by the browser's voice, and the window warns you. With reading aloud unticked, nothing of your speech setup is exported. Voice input is exported only while STT is switched on in the app (the **STT** button in the header); the export window says which it is. With it off, the story is exported without a microphone. With it on, you choose under **Voice input in conversations** who listens in the exported story: *The browser's own speech recognition* (no key; Chrome, Edge and Safari have it, Firefox has none, so there is no microphone there), or, when OpenAI is your STT provider, *OpenAI transcription, through the relay*: the microphone listens when the character has finished speaking, the recording ends by itself when the player stops talking (or at a click), and the story's [relay](#html-export) has OpenAI write the answer down. That works in every browser that can record, puts no key in the page, and needs `OPENAI_API_KEY` on the relay's host. Your choice is remembered on this computer. A speech server on your own computer can't be reached by your players, and a cloud setup with no key saved can't read either: those exports use the browser's voice as well, and the window tells you so. The **Sound On / Muted** switch in the player's Settings silences the reading along with music and sounds.
+**In exported stories.** Reading aloud is exported only while TTS is switched on in the app (the **TTS** button in the header): with it off, the export window shows **Read text aloud in the exported player** switched off, greyed out, and says so, and the story is exported without reading aloud. Switch TTS on, then open the export window again. With TTS on and **Read text aloud in the exported player** ticked, you choose the **Voices** in the export window: *The browser's own voice* (the default: no key, works everywhere) or the voices of your speech setup on this computer, for example *ElevenLabs voices*. The second puts your speech key into the exported file, where anyone with the file can read it, and the window says so; your choice is remembered on this computer. For OpenAI and ElevenLabs voices you can keep the key out of the file: choose **Through the relay** under the voices, and the story's [relay](#html-export) holds the speech key as it holds the AI key. ElevenLabs can only read a line with one of its own voices: if your ElevenLabs setup has no **Default Voice** (TTS ▸ Configure Provider), the narrator and every speaker without a voice of their own are read by the browser's voice, and the window warns you. With reading aloud unticked, nothing of your speech setup is exported. A speech server on your own computer can't be reached by your players, and a cloud setup with no key saved can't read either: those exports use the browser's voice as well, and the window tells you so. The **Sound On / Muted** switch in the player's Settings silences the reading along with music and sounds. Voice input goes by the STT switch in the same way: see [STT in exported stories](#stt-in-exported-stories).
 
 ### TTS in Project Settings
 
@@ -3803,12 +3804,12 @@ Your chosen TTS provider type and model are saved with the project, so collabora
 
 ## Speech-to-Text (STT)
 
-ASAPS Modern supports voice input for AI Conversation beats and other text entry scenarios. When STT is configured, a microphone button appears in the header and inside conversation beats.
+ASAPS Modern supports voice input in AI Conversation beats: the player speaks an answer instead of typing it. The **STT** button is always in the header, next to the TTS button; its microphone icon is rose while STT is switched on, and grey and crossed out while it is off. STT is off until you switch it on. A conversation shows its microphone only while STT is on and the beat has **Enable Voice Input** ticked.
 
 ### Setting Up STT
 
-1. Click the **Mic** button in the header toolbar (next to the TTS button)
-2. Configure a **STT provider**:
+1. Click the **STT** button in the header (next to the TTS button), choose **Enable STT** to switch it on, then **Configure STT**
+2. Choose an **STT Provider**:
    - **Built-in** — Free, built into your browser (Web Speech). Real-time streaming, but quality varies.
    - **Whisper** — OpenAI's cloud service, high accuracy. Requires an OpenAI API key. Uses OpenAI's **GPT Transcribe**; Whisper v1 can still be chosen until OpenAI ends it on 26 February 2027.
    - **Local Server** — Self-hosted Whisper server (any OpenAI-compatible endpoint).
@@ -3820,7 +3821,12 @@ ASAPS Modern supports voice input for AI Conversation beats and other text entry
 
 When an AI Conversation beat has **Enable Voice Input** turned on and STT is switched on (the **STT** button in the header, or the Preview's own for that Preview), a microphone button appears next to the text input. With STT switched off there is no microphone.
 
-How the microphone works depends on the STT provider. **Built-in**, **Vosk** and **Whisper.cpp** write down what you say while you say it: the microphone starts by itself when the character has finished speaking, and your answer is sent after a short pause. **Whisper** (OpenAI) and a plain **Local Server** take the whole answer at once, but they listen by themselves too: the microphone starts when the character has finished speaking, the recording ends about a second and a half after you stop talking, and the text appears a moment later and is sent. You can also click the microphone to start, and click it again to end the recording at once. If nobody speaks for twenty seconds the microphone switches itself off without sending anything; click it to listen again. The interactor can click it to speak their response instead of typing. The transcribed text fills the input field, and the interactor can edit it before sending.
+How the microphone works depends on the STT provider. **Built-in**, **Vosk** and **Whisper.cpp** write down what you say while you say it: the microphone starts by itself when the character has finished speaking, and your answer is sent after a short pause. **Whisper** (OpenAI) and a plain **Local Server** take the whole answer at once, but they listen by themselves too: the microphone starts when the character has finished speaking, the recording ends about a second and a half after you stop talking, and the text appears a moment later and is sent. You can also click the microphone to start, and click it again to end the recording at once. With these two, if nobody speaks for twenty seconds the microphone switches itself off without sending anything (click it to listen again), and a recording never runs longer than a minute.
+
+Either way the written-down answer shows in the input field and is sent by itself, so the player doesn't need to press **Send**. To correct an answer first with **Built-in**, **Vosk** or **Whisper.cpp**, click the microphone while it is listening: it stops, the text stays in the field, and you can edit it and press **Send**. Typing an answer works as always.
+
+<a id="stt-in-exported-stories"></a>
+**In exported stories.** Voice input is exported only while STT is switched on in the app (the **STT** button in the header); the export window says which it is under **Voice input in conversations**. With it off, the story is exported without a microphone: switch STT on, then open the export window again. With it on, you choose there who listens in the exported story: *The browser's own speech recognition* (no key; Chrome, Edge and Safari have it, Firefox has none, so there is no microphone there), or, when **Whisper** (OpenAI's own service) is your STT provider, *OpenAI transcription, through the relay*: the microphone listens when the character has finished speaking, the recording ends by itself when the player stops talking (or at a click), and the story's [relay](#html-export) has OpenAI write the answer down. That works in every browser that can record, puts no key in the page, and needs `OPENAI_API_KEY` on the relay's host. Your choice is remembered on this computer. A Local Server, Vosk or Whisper.cpp on your own computer can't be reached by your players and is not exported.
 
 This creates a natural voice-driven conversation flow, especially when combined with TTS -- the NPC speaks, the player responds by voice, and the NPC replies.
 
@@ -3923,7 +3929,7 @@ Exported as *One file*, the HTML file includes the full renderer, all story data
 - **Embed my API key** puts your key inside the HTML. Fine for private sharing with people you trust, but anyone who opens the page source can read it.
 - **Use a relay (recommended for public hosting)** keeps the key out of the page. The export becomes one deploy-ready zip: your story as `index.html`, a small relay function that holds the key on the server, and `README-RELAY.md`, which walks you through deploying it on Netlify (in the browser via GitHub, with the Netlify CLI, or as one shared relay for many stories).
 
-**Voice input through the relay.** The relay can also have a spoken answer written down by OpenAI: choose *OpenAI transcription, through the relay* under **Voice input in conversations** (see [In exported stories](#tts-language-awareness)). The recording is passed on to OpenAI and not kept. A relay deployed from a version before v0.9.164 does not know this; the player's browser then listens by itself, where it can, until you deploy the relay again from a new export.
+**Voice input through the relay.** The relay can also have a spoken answer written down by OpenAI: choose *OpenAI transcription, through the relay* under **Voice input in conversations** (see [STT in exported stories](#stt-in-exported-stories)). The export is then the same relay zip, the window shows the **Relay URL** there when nothing else in the story uses the relay, and the relay's host needs `OPENAI_API_KEY` (the same variable the AI and OpenAI voices use). The recording is passed on to OpenAI and not kept. If the key is missing on the host, or the relay was deployed from a version before v0.9.164, the player's browser listens by itself, where it can, until you deploy the relay again from a new export.
 
 **Deploying with one command.** The relay zip also holds `deploy.sh`. On macOS or Linux (or in Git Bash on Windows), open a terminal in the unzipped folder and run `bash deploy.sh`: it logs you in to Netlify, creates the site, asks for the API key or keys this story needs (what you type is not shown), deploys, and opens the story in your browser. It needs Node.js. Run it again after a new export, with the new `index.html` copied into the folder, or to change a key.
 
@@ -5202,7 +5208,7 @@ Quick reference for all beat types.
 
 **Speaker Portrait** - A small face/head image assigned to a character that appears in or above the text box during dialog. Configured in the Character Editor's Visual tab.
 
-**STT (Speech-to-Text)** - Voice input that converts spoken words to text. Used in AI Conversation beats and other input scenarios. Providers: Built-in (the browser's own recognition), Whisper (OpenAI's cloud service, which uses GPT Transcribe), Local Server, Vosk, and Whisper.cpp.
+**STT (Speech-to-Text)** - Voice input that converts spoken words to text. Used in AI Conversation beats. Providers: Built-in (the browser's own recognition), Whisper (OpenAI's cloud service, which uses GPT Transcribe), Local Server, Vosk, and Whisper.cpp.
 
 **TTS (Text-to-Speech)** - The system that reads story text aloud using synthesized voices. Providers: Built-in Voices (the browser's own), ElevenLabs, OpenAI TTS, Local TTS (Kokoro, Coqui, Piper, Chatterbox), and Custom Server.
 
@@ -5257,7 +5263,7 @@ AI features can work with cloud services (Claude or OpenAI) which require an API
 **AI Dialog Tree** pre-generates a complete branching conversation tree before the player sees it. The player picks from AI-generated choices. **AI Conversation** generates each NPC response in real time based on what the player types. Use AI Dialog Tree for structured conversations with clear branches; use AI Conversation for open-ended, free-form dialog.
 
 ### Can I use voice input and output together?
-Yes! Configure TTS for voice output and STT for voice input. In AI Conversation beats with voice input enabled, the NPC speaks via TTS, the player responds by voice (STT), and the cycle continues naturally. This works with both cloud and local providers.
+Yes! Configure TTS for voice output and STT for voice input, and switch both on in the header. In AI Conversation beats with voice input enabled, the NPC speaks via TTS, the player responds by voice (STT), and the cycle continues naturally. This works with both cloud and local providers.
 
 ### How do I share my story with others?
 Use **Export → Web page (HTML)…** to create a standalone playable file. Recipients just open it in any browser—no ASAPS installation needed.

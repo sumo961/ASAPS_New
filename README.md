@@ -53,11 +53,11 @@ And this is a story made with it, exported as a web page. **[Play it yourself](h
 - **Desktop apps** for macOS, Windows and Linux (beta) that update themselves.
 - **Work together** with Git built in: commit, push, pull, merge two versions of a story.
 
-## 🆕 Latest release: v0.9.163, the relay voices release
+## 🆕 Latest release: v0.9.164, the voice input release
 
 ASAPS is in **beta**: the core works, and new releases arrive often.
 
-v0.9.163 lets a published story speak without giving your key away. The relay that already kept the AI key off the page now carries reading aloud too, for OpenAI and ElevenLabs voices, and the relay download includes a `deploy.sh` that logs in to Netlify, creates the site, asks for the keys and opens the finished story. With OpenAI voices, every character you have not chosen a voice for gets one of their own, a woman's or a man's as far as the story says which, so a new story sounds like a conversation from the start. Reading aloud is exported only while TTS is switched on in the app. Also fixed: a speech bubble and the reply bubble flickering over the same spot, the Dialog Tree editor in a narrow Properties panel, an inventory's *Show on demand only* now acting for its own character, and a character listed twice under Character Voices.
+v0.9.164 brings voice input in line with reading aloud. In a conversation with a character, the microphone now works with OpenAI's transcription and with a Whisper server of your own, not only with the recognisers that write down while you speak: it listens when the character has finished, and the recording ends by itself when you stop talking. A published story can have OpenAI write the player's spoken answers down through the relay, with no key in the page, and that works in Firefox too, which has no speech recognition of its own. The switches now mean what they say: no microphone while STT is off, voice input is exported only with STT switched on, and the Preview's speech buttons apply to that Preview alone. Also: a line with a blank line in it is read aloud to its end, and the header's buttons are one style and one height.
 
 Earlier releases:
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)**: a summary of every release
