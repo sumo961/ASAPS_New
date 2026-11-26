@@ -262,7 +262,7 @@ describe('buildGraphEdges', () => {
 
   it('draws a default target only when it can fire, labelled with its delay', () => {
     const run = (b: any) => buildGraphEdges({ beats: [beat(b), beat({ id: 'b2' }), beat({ id: 'b3' })], clusters: [], expandedDialogs: new Set() })
-      .filter((e) => e.id.startsWith('default-'));
+      .filter((e) => (e.data as any)?.via === 'default-target');
     // inert: a link exists and no timer
     expect(run({ id: 'b1', connections: [{ targetId: 'b2' }], defaultTarget: 'b3' })).toHaveLength(0);
     // timed auto-advance: a second link
@@ -396,8 +396,12 @@ describe('buildGraphEdges', () => {
       clusters: [],
       expandedDialogs: new Set(),
     });
-    expect(edges.length).toBe(2);
-    expect(edges.every(e => e.source === 'd1' && e.target === 'b9')).toBe(true);
+    // both choices lead to b9: one line for the pair, like two choices of a
+    // Multi Choice that lead to the same beat (they were two lines on top of
+    // each other, their labels unreadable)
+    expect(edges.length).toBe(1);
+    expect(edges[0]).toMatchObject({ source: 'd1', target: 'b9' });
+    expect((edges[0].data as any).via).toBe('dialog');
   });
 
   it('routes an expanded dialogTree through per-exit child edges instead', () => {
@@ -416,7 +420,7 @@ describe('buildGraphEdges', () => {
       expect(e.target).toBe('b9');
     }
     // the collapsed-form beat-level dialog edges must be suppressed
-    expect(edges.some(e => e.source === 'd1' && (e.data as any)?.isDialog)).toBe(false);
+    expect(edges.some(e => e.source === 'd1' && (e.data as any)?.via === 'dialog')).toBe(false);
   });
 
   it('routes an expanded CLUSTERED dialogTree through per-exit edges', () => {
@@ -431,7 +435,7 @@ describe('buildGraphEdges', () => {
     const exits = edges.filter(e => e.id.includes('dlgexit-'));
     expect(exits.length).toBeGreaterThan(0);
     for (const e of exits) expect(e.source.startsWith('dlg:d1:')).toBe(true);
-    expect(edges.some(e => (e.data as any)?.isDialog)).toBe(false);
+    expect(edges.some(e => (e.data as any)?.via === 'dialog')).toBe(false);
   });
 
   it('falls back to pill-docked beat edges when the expanded dialog sits in a collapsed cluster', () => {
@@ -446,14 +450,14 @@ describe('buildGraphEdges', () => {
     // no per-exit edges (they'd hang off hidden cards) …
     expect(edges.some(e => e.id.includes('dlgexit-'))).toBe(false);
     // … instead the legacy dialog-choice edges dock at the cluster pill
-    const dialogEdges = edges.filter(e => (e.data as any)?.isDialog);
-    expect(dialogEdges.length).toBe(2);
+    const dialogEdges = edges.filter(e => (e.data as any)?.via === 'dialog');
+    expect(dialogEdges.length).toBe(1);
     for (const e of dialogEdges) expect(e.source).toBe('c1');
   });
 
   // The beat's own link list repeats what the special cases draw; the regular
   // pass drew each of those a second time, on top (found 2026-11-26).
-  describe('one line per link for beats with a special case', () => {
+  describe('one line per link, whatever the beat type', () => {
     const pairs = (edges: any[], from: string) => edges.filter(e => e.source === from).map(e => `${e.target}:${e.label}`).sort();
     const build = (b: Beat, extra: string[] = ['t1', 't2']) =>
       buildGraphEdges({ beats: [b, ...extra.map(id => beat({ id }))], clusters: [], expandedDialogs: new Set() });
@@ -480,7 +484,7 @@ describe('buildGraphEdges', () => {
       const key = edges.find(e => e.target === 't1')!;
       expect((key.data as any).guardSummary).toBeTruthy();
       expect((key.style as any).strokeDasharray).toBe('6 3');
-      expect((edges.find(e => e.target === 't2')!.data as any).guardSummary).toBeUndefined();
+      expect((edges.find(e => e.target === 't2')!.data as any).guardSummary).toBeFalsy();
     });
 
     it('a collapsed Dialog Tree: each choice once', () => {

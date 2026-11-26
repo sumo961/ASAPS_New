@@ -12,10 +12,14 @@
  * the memo-buster) come in as getter callbacks.
  */
 import { Node, Edge, MarkerType, Position } from 'reactflow';
-import { Beat, Cluster, ContainerBeatPosition, DEFAULT_TARGET_TIMEOUT_TYPES, defaultTargetIsLive } from '@asaps/core';
+import { Beat, Cluster, ContainerBeatPosition, DEFAULT_TARGET_TIMEOUT_TYPES, type StoryLink } from '@asaps/core';
+import { liveBeatLinks } from '../../utils/storyLinks';
 import { summarizeConditions } from '../../utils/conditionSummary';
 import { dialogTreeLayout } from '../../utils/dialogTreeLayout';
-import { beatTypeColors, CLUSTER_HEADER_H, MIN_CLUSTER_W, MIN_CLUSTER_H } from './graphStyle';
+import {
+  beatTypeColors, CLUSTER_HEADER_H, MIN_CLUSTER_W, MIN_CLUSTER_H,
+  linkStyles, beatTypeLinkLooks, DEFAULT_LINK_LOOK, GUARD_LINK_LOOK, LEGACY_CONDITION_LINK_LOOK, STANDALONE_LINK_KINDS, type LinkLook,
+} from './graphStyle';
 
 interface Asset {
   id: string;
@@ -483,243 +487,18 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
         beat.type === 'dialogTree' && expandedDialogs.has(beat.id) &&
         (!beatClusterHere || beatClusterHere.isExpanded);
       
-      // A link drawn by one of the special cases below (a Condition Check's
-      // branches, a timer's target, props, hypertext links, a collapsed
-      // Dialog Tree's choices) is also in the beat's own link list. The
-      // regular pass further down used to draw it a second time, on top:
-      // two lines, two labels, the special colour hidden (2026-11-26; the
-      // same doubling randomTarget and movementChoice had). It now leaves
-      // those alone and only hands them a guard to show.
-      const specialEdges = new Map<string, Edge[]>();
-      const addSpecial = (targetId: string, edge: Edge | null) => {
-        if (!edge || edgeIds.has(edge.id)) return;
-        edgeIds.add(edge.id);
-        allEdges.push(edge);
-        specialEdges.set(targetId, [...(specialEdges.get(targetId) ?? []), edge]);
-      };
-
-      // Special handling for setTimer beats - show timer target in red
-      if (beat.type === 'setTimer' && params.timerTarget) {
-        const timerEdgeId = `${beat.id}-timer-${params.timerTarget}`;
-        const edge = createEdge(beat.id, params.timerTarget, {
-            id: timerEdgeId,
-            type: 'custom',
-            animated: false,
-            label: 'Timer Target',
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              width: 20,
-              height: 20,
-            },
-            style: {
-              stroke: '#ef4444', // Red color for timer connections
-              strokeWidth: 2,
-              strokeDasharray: '5 5', // Dashed line
-            },
-            data: {
-              isTimer: true,
-            },
-          });
-        addSpecial(params.timerTarget, edge);
-      }
-      
-      // randomTarget: its branches are ordinary links (RandomTargetBeat
-      // builds one per branch, labelled "Random N"), drawn by the regular
-      // connection pass below. A separate emitter here only ever fired for
-      // object-form branches and doubled every edge once branches could
-      // carry weights/effects.
-
-      // movementChoice: its choices are ordinary links too (MovementChoiceBeat
-      // builds one per choice, labelled with its text), drawn by the regular
-      // connection pass below in the Movement Choice orange. A separate
-      // emitter here drew every choice a second time, without the guard
-      // styling (2026-10-29) — the same doubling randomTarget had.
-
-      // Special handling for dialogTree beats - show all dialog choices
-      // Helper to extract target from various formats
-      const extractTarget = (choice: any): string | null => {
-        if (!choice) return null;
-        // Direct string target
-        if (typeof choice.target === 'string') return choice.target;
-        // Nested object with .next property (Claude Desktop format)
-        if (choice.target && typeof choice.target === 'object' && choice.target.next) {
-          return choice.target.next;
-        }
-        // Nested object with .target property
-        if (choice.target && typeof choice.target === 'object' && choice.target.target) {
-          return choice.target.target;
-        }
-        return null;
-      };
-
-      if (beat.type === 'dialogTree' && params.dialogTree && !dialogExpandedHere) {
-        const addDialogChoiceEdge = (choice: any, index: number, prefix: string) => {
-          const target = extractTarget(choice);
-          if (target) {
-            const choiceEdgeId = `${beat.id}-dialog-${prefix}-${index}-${target}`;
-            const edge = createEdge(beat.id, target, {
-                id: choiceEdgeId,
-                type: 'custom',
-                animated: false,
-                label: choice.text || `Choice ${index + 1}`,
-                markerEnd: {
-                  type: MarkerType.ArrowClosed,
-                  width: 20,
-                  height: 20,
-                },
-                style: {
-                  stroke: '#3b82f6', // Blue for dialog choices
-                  strokeWidth: 2,
-                },
-                data: {
-                  isDialog: true,
-                },
-              });
-            addSpecial(target, edge);
-          }
-        };
-
-        // Handle direct choices array
-        if (params.dialogTree.choices) {
-          params.dialogTree.choices.forEach((choice: any, index: number) => {
-            addDialogChoiceEdge(choice, index, 'choice');
-          });
-        }
-
-        // Handle entries array with nested choices
-        if (params.dialogTree.entries) {
-          params.dialogTree.entries.forEach((entry: any, entryIndex: number) => {
-            if (entry.choices) {
-              entry.choices.forEach((choice: any, choiceIndex: number) => {
-                addDialogChoiceEdge(choice, choiceIndex, `entry${entryIndex}`);
-              });
-            }
-          });
-        }
-      }
-
-      // Special handling for pickProp beats - show all prop choices
-      if (beat.type === 'pickProp' && params.props) {
-        params.props.forEach((prop: any, index: number) => {
-          if (prop.target) {
-            const propEdgeId = `${beat.id}-prop-${index}-${prop.target}`;
-            const edge = createEdge(beat.id, prop.target, {
-                id: propEdgeId,
-                type: 'custom',
-                animated: false,
-                label: prop.name || `Prop ${index + 1}`,
-                markerEnd: {
-                  type: MarkerType.ArrowClosed,
-                  width: 20,
-                  height: 20,
-                },
-                style: {
-                  stroke: '#10b981', // Green for prop choices
-                  strokeWidth: 2,
-                },
-                data: {
-                  isProp: true,
-                },
-              });
-            addSpecial(prop.target, edge);
-          }
-        });
-      }
-
-      // Special handling for conditionBeat - show true/false branches
-      if (beat.type === 'conditionBeat') {
-        if (params.trueTarget) {
-          const trueEdgeId = `${beat.id}-true-${params.trueTarget}`;
-          const edge = createEdge(beat.id, params.trueTarget, {
-              id: trueEdgeId,
-              type: 'custom',
-              animated: false,
-              label: 'True',
-              markerEnd: {
-                type: MarkerType.ArrowClosed,
-                width: 20,
-                height: 20,
-              },
-              style: {
-                stroke: '#22c55e', // Green for true branch
-                strokeWidth: 2,
-              },
-              data: {
-                isCondition: true,
-                branch: 'true',
-              },
-            });
-          addSpecial(params.trueTarget, edge);
-        }
-        if (params.falseTarget) {
-          const falseEdgeId = `${beat.id}-false-${params.falseTarget}`;
-          const edge = createEdge(beat.id, params.falseTarget, {
-              id: falseEdgeId,
-              type: 'custom',
-              animated: false,
-              label: 'False',
-              markerEnd: {
-                type: MarkerType.ArrowClosed,
-                width: 20,
-                height: 20,
-              },
-              style: {
-                stroke: '#ef4444', // Red for false branch
-                strokeWidth: 2,
-              },
-              data: {
-                isCondition: true,
-                branch: 'false',
-              },
-            });
-          addSpecial(params.falseTarget, edge);
-        }
-      }
-
-      // Special handling for hyperText beats - show all hyperlink targets
-      if (beat.type === 'hyperText' && params.hyperlinks) {
-        params.hyperlinks.forEach((link: any, index: number) => {
-          if (link.targetBeatId) {
-            const linkEdgeId = `${beat.id}-hyperlink-${index}-${link.targetBeatId}`;
-            const edge = createEdge(beat.id, link.targetBeatId, {
-                id: linkEdgeId,
-                type: 'custom',
-                animated: false,
-                label: link.word || `Link ${index + 1}`,
-                markerEnd: {
-                  type: MarkerType.ArrowClosed,
-                  width: 20,
-                  height: 20,
-                },
-                style: {
-                  stroke: '#06b6d4', // Cyan for hypertext links
-                  strokeWidth: 2,
-                },
-                data: {
-                  isHyperlink: true,
-                },
-              });
-            addSpecial(link.targetBeatId, edge);
-          }
-        });
-      }
-
-      // Regular connections
-      let connections: any[] = [];
-
-      // Check if beat has getConnections method
-      if (typeof beat.getConnections === 'function') {
-        connections = beat.getConnections();
-      } else if (beat.connections) {
-        // Fallback to direct property access
-        connections = beat.connections;
-      }
+      // The beat's own link list (the engine's: choices, branches, exits,
+      // each with its guard and role).
+      const connections: any[] = typeof beat.getConnections === 'function'
+        ? beat.getConnections()
+        : ((beat as any).connections ?? []);
 
       // B1b — expanded dialogTree: outgoing edges leave from the per-exit
       // handles inside the node (sourceHandle = outline pathId), so each
       // edge visibly originates from the choice that produces it. Only for
       // unclustered beats — a beat resolved into a cluster container has no
       // such handles. Guarded exits keep the ◇ treatment on the edge.
+      const expandedExits = new Set<string>();
       if (dialogExpandedHere) {
         const tree = params.dialogTree ?? (beat as any).dialogTree;
         const layout = dialogTreeLayout(tree);
@@ -755,6 +534,7 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
 
         // Exits — from the child node that produces them to the target beat.
         layout.exitEdges.forEach((ee) => {
+          expandedExits.add(ee.exitTarget!);
           const edge = createEdge(childId(ee.sourcePath), ee.exitTarget!, {
             id: `dlgexit-${beat.id}-${ee.sourcePath}`,
             type: 'custom',
@@ -777,161 +557,122 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
         });
       }
 
-      // Add connections with unique IDs, resolving cluster boundaries
-      if (!dialogExpandedHere) connections.forEach((connection) => {
-        // Guarded choice (B1a): choice.conditions travels on the connection
-        // (MultiChoice/MovementChoice/PickProp getConnections). The guard is
-        // rendered ON the edge it gates — dashed violet + ◇ + summary —
-        // "logic visible where it acts".
-        const guardConds = Array.isArray(connection.condition) && connection.condition.length > 0
-          ? connection.condition
-          : null;
+      // ONE pass for every link of every beat type: the shared link walk
+      // (core utils/storyLinks) says which links a beat has and of what
+      // kind; graphStyle's link table says how each kind looks. This
+      // function used to keep its own list of beat types with their own
+      // link fields beside the walk (Condition Check, Set Timer, Pick Prop,
+      // Hypertext, Dialog Tree, QR scan), and drew those links a second
+      // time from the beat's link list (2026-11-26). A new beat type or
+      // link field belongs in the walk, and is drawn here without a change.
+      const walked = liveBeatLinks(beat, { parameters: params, connections });
+
+      // A link found in the link list AND through its own field (a branch,
+      // a choice, a prop…) is one link: the field's kind wins, one for one.
+      const isListed = (l: StoryLink) => l.via === 'beat-connections';
+      const absorbs = (l: StoryLink) => !isListed(l) && !STANDALONE_LINK_KINDS.has(l.via);
+      const sameText = (x?: string, y?: string) => !!x && !!y && x.trim().toLowerCase() === y.trim().toLowerCase();
+      const dropped = new Set<StoryLink>();
+      for (const target of new Set(walked.map((l) => l.target))) {
+        const own = walked.filter((l) => l.target === target && absorbs(l));
+        const listed = walked.filter((l) => l.target === target && isListed(l));
+        let toDrop = Math.min(own.length, listed.length);
+        const byLabel = listed.filter((g) => own.some((o) => sameText(g.label, o.label) || sameText(g.label, linkStyles[o.via]?.label)));
+        for (const g of [...byLabel, ...listed.filter((g) => !byLabel.includes(g)).reverse()]) {
+          if (toDrop-- <= 0) break;
+          dropped.add(g);
+        }
+      }
+
+      const sharedLines = new Map<string, { edge: Edge; first: string; labels: Set<string> }>();
+
+      // The guard, role and label the link list holds for a link.
+      const listedFor = (l: StoryLink) => {
+        const same = connections.filter((c) => c && c.targetId === l.target);
+        return same.find((c) => sameText(c.label, l.label) || sameText(c.label, linkStyles[l.via]?.label)) ?? (same.length === 1 ? same[0] : undefined);
+      };
+
+      walked.forEach((link) => {
+        if (dropped.has(link)) return;
+        // An expanded Dialog Tree draws its exits from the choices inside it
+        // (above). Its other links stay on the beat: auto-advance and
+        // requirements, and an exit the expanded view has no card for (a long
+        // tree is cut short there) — that link used to vanish on expanding.
+        const fromExpanded = dialogExpandedHere && !STANDALONE_LINK_KINDS.has(link.via);
+        if (fromExpanded && expandedExits.has(link.target)) return;
+
+        const listed = STANDALONE_LINK_KINDS.has(link.via) ? undefined : listedFor(link);
+        const guardConds = Array.isArray(listed?.condition) && listed.condition.length > 0 ? listed.condition : null;
         const guardSummary = guardConds
           ? summarizeConditions(guardConds, (id: string) => beats.find(b => b.id === id)?.name)
           : null;
-        // A restart leads back into the story with state reset — drawn as
-        // its own kind of link (dashed teal, "Restart"), not a way on.
-        // Already drawn by a special case above: no second line. A guard on
-        // the link shows on that line (same label first, else the only one).
-        const drawn = specialEdges.get(connection.targetId);
-        if (drawn?.length) {
-          if (guardSummary) {
-            const same = drawn.filter((e) => String(e.label ?? '').toLowerCase() === String(connection.label ?? '').toLowerCase());
-            const onto = same.length ? same : drawn.length === 1 ? drawn : [];
-            for (const e of onto) {
-              e.style = { ...e.style, stroke: '#8b5cf6', strokeDasharray: '6 3' };
-              e.data = { ...e.data, guardSummary };
-            }
-          }
-          return;
+        // An old-style condition on the link itself (not a list of guards).
+        const legacyCondition = listed?.condition !== undefined && !guardConds ? listed.condition : undefined;
+        // A restart leads back into the story with state reset.
+        const kind = listed?.role === 'restart' ? 'restart' : link.via;
+        const look: LinkLook = {
+          ...DEFAULT_LINK_LOOK,
+          ...(isListed(link) || link.via === 'choice' ? beatTypeLinkLooks[beat.type] : {}),
+          ...linkStyles[kind],
+          ...(legacyCondition ? LEGACY_CONDITION_LINK_LOOK : {}),
+          // A restart keeps its look also when guarded.
+          ...(guardConds && kind !== 'restart' ? GUARD_LINK_LOOK : {}),
+        };
+
+        let label = linkStyles[kind]?.label ?? listed?.label ?? link.label ?? (legacyCondition ? '?' : '');
+        if (link.via === 'default-target') {
+          const timed = DEFAULT_TARGET_TIMEOUT_TYPES.has(beat.type) && ((beat as any).defaultTargetDelay ?? 0) > 0;
+          label = timed ? `after ${(beat as any).defaultTargetDelay} s` : 'default';
+        } else if (link.via === 'requires') {
+          const req = [...(Array.isArray((beat as any).requires) ? (beat as any).requires : []), ...(Array.isArray(params.requires) ? params.requires : [])]
+            .find((r: any) => r?.fallbackTarget === link.target && r.explanation);
+          if (req) label = `requires: ${String(req.explanation).slice(0, 32)}${req.explanation.length > 32 ? '…' : ''}`;
         }
-        const isRestart = connection.role === 'restart';
-        // Movement Choice links keep their own look (orange, dashed).
-        const isMovement = beat.type === 'movementChoice';
-        const edge = createEdge(beat.id, connection.targetId, {
-          id: `conn-${beat.id}-${connection.targetId}`,
+
+        // One line per target and look: kinds without a look of their own
+        // are all plain links, so two choices that lead to the same beat
+        // (or a choice and a field) share a line, as they always did.
+        const group = linkStyles[kind] ? kind : 'link';
+        const edge = createEdge(beat.id, link.target, {
+          id: `${beat.id}-${group}-${link.target}`,
           type: 'custom',
-          animated: connection.condition !== undefined && !guardConds,
-          label: isRestart ? '↺ Restart' : (connection.label || (connection.condition && !guardConds ? '?' : '')),
+          // above the expanded dialog's opaque frame, like its other exits
+          ...(fromExpanded ? { zIndex: 21 } : {}),
+          animated: !!look.animated,
+          label,
           markerEnd: {
             type: MarkerType.ArrowClosed,
             width: 20,
             height: 20,
-            ...(isRestart ? { color: '#0d9488' } : {}),
+            ...(look.markerColor ? { color: look.markerColor } : {}),
           },
           style: {
-            stroke: isRestart ? '#0d9488' : guardConds ? '#8b5cf6' : connection.condition ? '#fbbf24' : isMovement ? '#f59e0b' : '#64748b',
+            stroke: look.stroke,
             strokeWidth: 2,
-            ...(isRestart ? { strokeDasharray: '8 4' } : guardConds ? { strokeDasharray: '6 3' } : isMovement ? { strokeDasharray: '5 5' } : {}),
+            ...(look.dash ? { strokeDasharray: look.dash } : {}),
           },
           data: {
-            condition: guardConds ? undefined : connection.condition,
+            via: kind,
+            condition: legacyCondition,
             guardSummary,
           },
         });
-
-        if (edge && !edgeIds.has(edge.id)) {
+        if (!edge) return;
+        if (!edgeIds.has(edge.id)) {
           edgeIds.add(edge.id);
           allEdges.push(edge);
+          sharedLines.set(edge.id, { edge, first: String(label ?? ''), labels: new Set([String(label ?? '').trim().toLowerCase()]) });
+          return;
+        }
+        // Another choice (prop, exit…) that leads to the same beat: the line
+        // says how many more it stands for, instead of naming only the first.
+        const shared = sharedLines.get(edge.id);
+        const text = String(label ?? '').trim().toLowerCase();
+        if (shared && text && !shared.labels.has(text)) {
+          shared.labels.add(text);
+          shared.edge.label = `${shared.first} (+${shared.labels.size - 1})`;
         }
       });
-
-      // Add default target — only when it can fire: on its timer (timed
-      // beat types with a delay) or as the only exit. A default target that
-      // can never act is not a link.
-      if (beat.defaultTarget && defaultTargetIsLive(beat as any)) {
-        const timed = DEFAULT_TARGET_TIMEOUT_TYPES.has(beat.type) && ((beat as any).defaultTargetDelay ?? 0) > 0;
-        const edge = createEdge(beat.id, beat.defaultTarget, {
-          id: `default-${beat.id}`,
-          type: 'custom',
-          animated: true,
-          label: timed ? `after ${(beat as any).defaultTargetDelay} s` : 'default',
-          style: {
-            stroke: '#22c55e',
-            strokeWidth: 2,
-            strokeDasharray: '5 5',
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 20,
-            height: 20,
-            color: '#22c55e',
-          },
-        });
-
-        if (edge && !edgeIds.has(edge.id)) {
-          edgeIds.add(edge.id);
-          allEdges.push(edge);
-        }
-      }
-
-      // Add state-requirement fallback redirects. These are visual only — the
-      // engine resolves the redirect itself inside Beat.execute(); we draw them
-      // so authors can see where the beat escapes to when a gate fails.
-      const requires: any[] | undefined = (beat as any).requires;
-      if (Array.isArray(requires)) {
-        requires.forEach((req, i) => {
-          if (!req?.fallbackTarget) return;
-          const label = req.explanation
-            ? `requires: ${String(req.explanation).slice(0, 32)}${req.explanation.length > 32 ? '…' : ''}`
-            : 'requires';
-          const edge = createEdge(beat.id, req.fallbackTarget, {
-            id: `requires-${beat.id}-${i}`,
-            type: 'custom',
-            animated: false,
-            label,
-            style: {
-              stroke: '#d97706',
-              strokeWidth: 2,
-              strokeDasharray: '3 3',
-            },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              width: 20,
-              height: 20,
-              color: '#d97706',
-            },
-          });
-          if (edge && !edgeIds.has(edge.id)) {
-            edgeIds.add(edge.id);
-            allEdges.push(edge);
-          }
-        });
-      }
-
-      // qrScan QR-jump targets — printed asaps://beat/<id> codes declared in
-      // the QR generator. These aren't a runtime connection (the scanned code
-      // carries the jump and overrides the Target Beat), so they'd otherwise be
-      // invisible to the flowchart. Draw them as distinct dashed purple edges
-      // labelled "QR" so authors can see where a scanned code can send players.
-      if (beat.type === 'qrScan') {
-        const qrParams = typeof beat.getParameters === 'function' ? beat.getParameters() : ((beat as any).parameters || {});
-        const jumpTargets: any[] = Array.isArray(qrParams?.qrJumpTargets) ? qrParams.qrJumpTargets : [];
-        jumpTargets.forEach((target) => {
-          if (typeof target !== 'string' || !target) return;
-          const edge = createEdge(beat.id, target, {
-            id: `qrjump-${beat.id}-${target}`,
-            type: 'custom',
-            animated: false,
-            label: 'QR',
-            style: {
-              stroke: '#a855f7',
-              strokeWidth: 2,
-              strokeDasharray: '4 4',
-            },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              width: 20,
-              height: 20,
-              color: '#a855f7',
-            },
-          });
-          if (edge && !edgeIds.has(edge.id)) {
-            edgeIds.add(edge.id);
-            allEdges.push(edge);
-          }
-        });
-      }
     });
 
     return allEdges;

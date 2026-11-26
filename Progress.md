@@ -36,6 +36,40 @@ A Condition Check's branches were drawn once by their special case (green "True"
 **Files modified:**
 - `packages/builder/src/components/graph/graphBuild.ts`, `__tests__/graphBuild.test.ts` (6 tests)
 
+### Changed: the flowchart draws from the shared link walk; no beat types of its own (author's decision, 2026-11-26)
+The fix above stopped the doubling but left the cause: the flowchart's edge builder kept its own list of beat types and their link fields (Condition Check, Set Timer, Pick Prop, Hypertext, Dialog Tree, QR scan) beside core's link walk (`utils/storyLinks`), which every other consumer reads. It is now one pass:
+- **Which links a beat has, and of what kind:** the link walk, read from the live beat (`liveBeatLinks` in the builder's `utils/storyLinks`: parameters from `getParameters()`, the link list from `getConnections()`, stage elements from the Map).
+- **How a kind looks:** one table in `graphStyle.ts` (`linkStyles`, by the walk's `via`), plus the guard, old-style-condition and Movement Choice looks. The edge builder names no beat type for links any more (the expanded Dialog Tree's inner cards stay, as that view's own layout).
+- A link found both in the link list and through its own field is one link; the field's kind wins. Guard, role and label come from the link list.
+- A new beat type or link field added to the walk is drawn without touching the flowchart (tested with panorama hotspots and AI Condition categories, which never had a case here).
+
+**What an author sees differently:**
+- Every Dialog Tree exit is blue, also the ones from nested replies (those were grey).
+- Several choices, props or exits that lead to the same beat share one line, and its label says so: "Mara (+1)". Before, props and dialog choices were several lines on top of each other with stacked labels; Multi Choice showed only the first choice's text.
+- Found by the new tests, older faults:
+  - **The header's "Connections" count was too low** on a freshly opened story: it handed live beats to the walk unread and missed every link kept in a parameter (Last Ferry said 9 with 12 lines; The Oil Lamp 15 with 18). It reads the same links the flowchart draws now.
+  - **Expanding a long Dialog Tree made its exit disappear.** The expanded view is cut short for a long tree ("partial view") and has no card for the exits beyond the cut; those links were not drawn at all while expanded (Last Ferry: The argument → On the stairs). They now stay on the beat's frame.
+
+**Checked:**
+- Old against new on every bundled template, core's story fixtures and the example projects (Red's 111 beats among them), dialogs collapsed and expanded, clusters open and closed: every difference is one of the above (a doubled line now single, grey dialog exits now blue, lines to one beat merged, the exit that vanished, and one line to `__self__` that never showed).
+- In the browser, all six templates: the header's count equals the number of lines, no line twice; Last Ferry's branches green and red; The Oil Lamp's hypertext links cyan; Last Ferry's dialog expanded keeps its exit.
+- Tests: `graphLinkWalk.test.ts` (real beats and the templates as they load: every link the walk finds is drawn, nothing else, none twice, the header count equals the lines), the earlier flowchart tests adapted. Builder 3,420.
+- **Not checked in the browser:** a story with clusters (tests and the comparison only), QR jump codes and requirements (tests only), dark mode.
+
+**User Guide:** the flowchart's list of link looks needs True/False, timer, prop, dialog and hypertext colours and the "(+1)" label; with the next release.
+
+**Files modified:**
+- `packages/builder/src/components/graph/graphBuild.ts`, `graphStyle.ts`
+- `packages/builder/src/utils/storyLinks.ts` (`liveBeatLinks`; `flowchartLinkCount` reads through it)
+- `packages/builder/src/components/graph/__tests__/graphLinkWalk.test.ts` (new), `graphBuild.test.ts`
+
+### Looked into: where alternate link shapes are rewritten (author's question, 2026-11-26)
+Eighteen alternate spellings of a link field, each sent through the three ways a story comes in (probe, not kept):
+- **The normalizer** (`core/src/normalize`, only for AI-generated and injected stories, never when a project is opened) rewrites none of them to the form the builder writes. Its one link rule goes the other way: the schema names `trueConnection` / `falseConnection` as the Condition Check's fields with `trueTarget` / `falseTarget` as aliases, so it renames what the builder writes; the beat class renames it back on load.
+- **The beat classes** rewrite seven on load: Condition Check (both `trueConnection` forms), Random Target (`targets[]` in both spellings), Dialog Tree (`target` as an object with `.next`, `next` on a node), requirements inside `parameters`.
+- **The import** (`applyGeneratedStory` step 9) copies every link the walk finds into the beat's stored link list. That is what makes the other eleven work after an import: three become ordinary stored links (`connections[].target`, `parameters.connection.target`, `parameters.target`); eight keep their shape in the parameters and are followed only through the copy (`parameters.defaultTarget`, `choices[].targetId`, Dialog Tree `target` on a node, `choices[].targetId` and `entries[]` in a tree, `categories[].target`, `exitTargets[].targetId` / `.target`). Opened from a file without the import, those eight are not followed at all.
+- **Seen on the way, not fixed:** an imported Random Target has each link twice in its list; an AI Dialog Tree exit spelled `targetId` or `target` leaves the beat's own exit without a target; the import copies a requirement's fallback into the link list as an ordinary link. Whether a choice whose target lives only in the copied link plays correctly was not tried.
+
 ### Housekeeping
 - Five iCloud duplicate images removed from `docs/images` (`60`–`64 … 2.png`): identical to their originals, used nowhere.
 

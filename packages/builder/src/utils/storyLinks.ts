@@ -9,17 +9,50 @@ import { beatLinks as walkBeatLinks, dedupeLinks as dedupeWalkLinks, defaultTarg
 
 
 /**
+ * The links of a beat as the app holds it: the shared walk, read from the
+ * live beat. A live beat keeps its parameters behind getParameters(), its
+ * link list behind getConnections() (for beats that derive their links from
+ * their parameters the stored array can be stale) and its stage elements in
+ * a Map; handed to the walk as it is, the walk saw none of these and missed
+ * every link that lives in a parameter (a freshly loaded Dialog Tree's
+ * exits, hypertext links, an AI conversation's exits). A default target is
+ * a link only when it can fire. Serialized beats pass through unchanged.
+ *
+ * The flowchart draws exactly these, and the header counts them.
+ */
+export function liveBeatLinks(
+  beat: any,
+  known?: { parameters?: Record<string, any>; connections?: any[] },
+): ReturnType<typeof walkBeatLinks> {
+  if (!beat) return [];
+  const parameters = known?.parameters
+    ?? (typeof beat.getParameters === 'function' ? beat.getParameters() : beat.parameters);
+  const connections = known?.connections
+    ?? (typeof beat.getConnections === 'function' ? beat.getConnections() : beat.connections);
+  const locations = beat.locations instanceof Map ? Array.from(beat.locations.values()) : beat.locations;
+  return walkBeatLinks({
+    id: beat.id,
+    type: beat.type,
+    connections,
+    defaultTarget: beat.defaultTarget,
+    defaultTargetDelay: beat.defaultTargetDelay,
+    requires: beat.requires,
+    locations,
+    parameters,
+  }).filter((l) => l.via !== 'default-target' || defaultTargetIsLive(beat));
+}
+
+/**
  * How many links the flowchart shows: every exit the link walk finds (restart,
- * fallback and field links included), one per source→target pair, to beats
- * that exist — a default target only when it can actually fire, as drawn.
- * The header used to count a separately maintained list that missed the
- * restart link it had just drawn.
+ * fallback and field links included), one per source→target pair, to other
+ * beats that exist — a default target only when it can actually fire, as
+ * drawn. The header used to count a separately maintained list that missed
+ * the restart link it had just drawn; then it handed live beats to the walk
+ * unread and missed the links kept in parameters (2026-11-26).
  */
 export function flowchartLinkCount(beats: ReadonlyArray<any>): number {
   const ids = new Set(beats.map((b) => b?.id));
-  const links = beats.flatMap((beat) =>
-    walkBeatLinks(beat).filter((l) => l.via !== 'default-target' || defaultTargetIsLive(beat)),
-  );
+  const links = beats.flatMap((beat) => liveBeatLinks(beat).filter((l) => l.target !== beat.id));
   return dedupeWalkLinks(links).filter((l) => ids.has(l.target)).length;
 }
 
