@@ -26,6 +26,19 @@ Drawing a link from a beat and releasing it anywhere but on a beat did nothing. 
 - `packages/builder/src/components/graph/BeatPalette.tsx` (`beatTypeChoices`)
 - `packages/builder/src/components/Canvas.tsx`, `WorkspaceView.tsx`, `App.tsx` (adding a beat hands the beat back)
 
+### Fixed: Condition Check links were drawn twice in the flowchart (found while testing the menu above, 2026-11-26)
+A Condition Check's branches were drawn once by their special case (green "True", red "False") and again by the regular pass from the beat's own link list (grey "true" / "false"), the second on top. So each branch was two lines and two labels, and the green and red were hidden. The same held for a Set Timer's timer target (red, dashed), Pick Prop's props (green) and the choices of a collapsed Dialog Tree. randomTarget and movementChoice had this doubling before (2026-10-29).
+- The regular pass no longer redraws a link a special case has drawn; a guard on such a link (a prop's or a dialog choice's conditions) is shown on that line.
+- **What an author sees:** a Condition Check's branches are now green "True" and red "False"; a timer's target is red and dashed; props are green. Before, all were grey.
+- Checked in the browser: the Condition Check from the menu test now has one green True and one red False line.
+- Not looked at in the browser: Set Timer, Pick Prop and a collapsed Dialog Tree (covered by tests). Hypertext links go through the same code and were not probed with real data.
+
+**Files modified:**
+- `packages/builder/src/components/graph/graphBuild.ts`, `__tests__/graphBuild.test.ts` (6 tests)
+
+### Housekeeping
+- Five iCloud duplicate images removed from `docs/images` (`60`–`64 … 2.png`): identical to their originals, used nowhere.
+
 ---
 
 ## 2026-11-26: The voice input release: STT in line with TTS, voice input through the relay, a microphone that listens by itself (v0.9.164)

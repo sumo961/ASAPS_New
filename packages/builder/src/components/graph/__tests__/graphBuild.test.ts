@@ -451,6 +451,56 @@ describe('buildGraphEdges', () => {
     for (const e of dialogEdges) expect(e.source).toBe('c1');
   });
 
+  // The beat's own link list repeats what the special cases draw; the regular
+  // pass drew each of those a second time, on top (found 2026-11-26).
+  describe('one line per link for beats with a special case', () => {
+    const pairs = (edges: any[], from: string) => edges.filter(e => e.source === from).map(e => `${e.target}:${e.label}`).sort();
+    const build = (b: Beat, extra: string[] = ['t1', 't2']) =>
+      buildGraphEdges({ beats: [b, ...extra.map(id => beat({ id }))], clusters: [], expandedDialogs: new Set() });
+
+    it('Condition Check: True and False once each, in their colours', () => {
+      const edges = build(beat({ id: 'q', type: 'conditionBeat', params: { trueTarget: 't1', falseTarget: 't2' },
+        connections: [{ targetId: 't1', label: 'true' }, { targetId: 't2', label: 'false' }] }));
+      expect(pairs(edges, 'q')).toEqual(['t1:True', 't2:False']);
+      expect((edges.find(e => e.target === 't1')!.style as any).stroke).toBe('#22c55e');
+      expect((edges.find(e => e.target === 't2')!.style as any).stroke).toBe('#ef4444');
+    });
+
+    it('Set Timer: the timer target once, the way on still drawn', () => {
+      const edges = build(beat({ id: 's', type: 'setTimer', params: { timerTarget: 't1' },
+        connections: [{ targetId: 't1', label: 'Timer Target' }, { targetId: 't2', label: 'Continue' }] }));
+      expect(pairs(edges, 's')).toEqual(['t1:Timer Target', 't2:Continue']);
+    });
+
+    it('Pick Prop: each prop once, and a guard on the link shows on that line', () => {
+      const guard = [{ type: 'variable', variable: 'hasKey', operator: 'equals', value: true }];
+      const edges = build(beat({ id: 'p', type: 'pickProp', params: { props: [{ name: 'Key', target: 't1' }, { name: 'Rope', target: 't2' }] },
+        connections: [{ targetId: 't1', label: 'Key', condition: guard }, { targetId: 't2', label: 'Rope' }] }));
+      expect(pairs(edges, 'p')).toEqual(['t1:Key', 't2:Rope']);
+      const key = edges.find(e => e.target === 't1')!;
+      expect((key.data as any).guardSummary).toBeTruthy();
+      expect((key.style as any).strokeDasharray).toBe('6 3');
+      expect((edges.find(e => e.target === 't2')!.data as any).guardSummary).toBeUndefined();
+    });
+
+    it('a collapsed Dialog Tree: each choice once', () => {
+      const edges = build(beat({ id: 'd', type: 'dialogTree', params: { dialogTree: { text: 'Hi', choices: [{ text: 'A', target: 't1' }] } },
+        connections: [{ targetId: 't1', label: 'A' }] }));
+      expect(edges.filter(e => e.source === 'd' && e.target === 't1').length).toBe(1);
+    });
+
+    it('a link the special case does not draw is still drawn', () => {
+      const edges = build(beat({ id: 'q', type: 'conditionBeat', params: { trueTarget: 't1' },
+        connections: [{ targetId: 't1', label: 'true' }, { targetId: 't2', label: 'legacy' }] }));
+      expect(pairs(edges, 'q')).toEqual(['t1:True', 't2:legacy']);
+    });
+
+    it('beats without a special case are untouched', () => {
+      const edges = build(beat({ id: 'm', type: 'multiChoice', connections: [{ targetId: 't1', label: 'A' }, { targetId: 't2', label: 'B' }] }));
+      expect(pairs(edges, 'm')).toEqual(['t1:A', 't2:B']);
+    });
+  });
+
   it('emits defaultTarget edges', () => {
     const edges = buildGraphEdges({
       beats: [beat({ id: 'b1', defaultTarget: 'b2' }), beat({ id: 'b2' })],

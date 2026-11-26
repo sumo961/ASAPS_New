@@ -483,6 +483,21 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
         beat.type === 'dialogTree' && expandedDialogs.has(beat.id) &&
         (!beatClusterHere || beatClusterHere.isExpanded);
       
+      // A link drawn by one of the special cases below (a Condition Check's
+      // branches, a timer's target, props, hypertext links, a collapsed
+      // Dialog Tree's choices) is also in the beat's own link list. The
+      // regular pass further down used to draw it a second time, on top:
+      // two lines, two labels, the special colour hidden (2026-11-26; the
+      // same doubling randomTarget and movementChoice had). It now leaves
+      // those alone and only hands them a guard to show.
+      const specialEdges = new Map<string, Edge[]>();
+      const addSpecial = (targetId: string, edge: Edge | null) => {
+        if (!edge || edgeIds.has(edge.id)) return;
+        edgeIds.add(edge.id);
+        allEdges.push(edge);
+        specialEdges.set(targetId, [...(specialEdges.get(targetId) ?? []), edge]);
+      };
+
       // Special handling for setTimer beats - show timer target in red
       if (beat.type === 'setTimer' && params.timerTarget) {
         const timerEdgeId = `${beat.id}-timer-${params.timerTarget}`;
@@ -505,10 +520,7 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
               isTimer: true,
             },
           });
-        if (edge && !edgeIds.has(edge.id)) {
-          edgeIds.add(edge.id);
-          allEdges.push(edge);
-        }
+        addSpecial(params.timerTarget, edge);
       }
       
       // randomTarget: its branches are ordinary links (RandomTargetBeat
@@ -563,10 +575,7 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
                   isDialog: true,
                 },
               });
-            if (edge && !edgeIds.has(edge.id)) {
-              edgeIds.add(edge.id);
-              allEdges.push(edge);
-            }
+            addSpecial(target, edge);
           }
         };
 
@@ -612,10 +621,7 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
                   isProp: true,
                 },
               });
-            if (edge && !edgeIds.has(edge.id)) {
-              edgeIds.add(edge.id);
-              allEdges.push(edge);
-            }
+            addSpecial(prop.target, edge);
           }
         });
       }
@@ -643,10 +649,7 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
                 branch: 'true',
               },
             });
-          if (edge && !edgeIds.has(edge.id)) {
-            edgeIds.add(edge.id);
-            allEdges.push(edge);
-          }
+          addSpecial(params.trueTarget, edge);
         }
         if (params.falseTarget) {
           const falseEdgeId = `${beat.id}-false-${params.falseTarget}`;
@@ -669,10 +672,7 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
                 branch: 'false',
               },
             });
-          if (edge && !edgeIds.has(edge.id)) {
-            edgeIds.add(edge.id);
-            allEdges.push(edge);
-          }
+          addSpecial(params.falseTarget, edge);
         }
       }
 
@@ -699,10 +699,7 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
                   isHyperlink: true,
                 },
               });
-            if (edge && !edgeIds.has(edge.id)) {
-              edgeIds.add(edge.id);
-              allEdges.push(edge);
-            }
+            addSpecial(link.targetBeatId, edge);
           }
         });
       }
@@ -794,6 +791,20 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
           : null;
         // A restart leads back into the story with state reset — drawn as
         // its own kind of link (dashed teal, "Restart"), not a way on.
+        // Already drawn by a special case above: no second line. A guard on
+        // the link shows on that line (same label first, else the only one).
+        const drawn = specialEdges.get(connection.targetId);
+        if (drawn?.length) {
+          if (guardSummary) {
+            const same = drawn.filter((e) => String(e.label ?? '').toLowerCase() === String(connection.label ?? '').toLowerCase());
+            const onto = same.length ? same : drawn.length === 1 ? drawn : [];
+            for (const e of onto) {
+              e.style = { ...e.style, stroke: '#8b5cf6', strokeDasharray: '6 3' };
+              e.data = { ...e.data, guardSummary };
+            }
+          }
+          return;
+        }
         const isRestart = connection.role === 'restart';
         // Movement Choice links keep their own look (orange, dashed).
         const isMovement = beat.type === 'movementChoice';
