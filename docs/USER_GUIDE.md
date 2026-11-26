@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.157*
+*Last revised against v0.9.165*
 
 ---
 
@@ -508,6 +508,9 @@ The small count strip above the canvas (**Beats · Clusters · Connections**) co
   With the keyboard: the arrow keys move through the menu, **→** or **Enter** on *New beat* opens the types, **←** or **Escape** closes them again. If the beat you drag from has several ways on, ASAPS then asks which one, just as it does when you drop on a beat. (Cancel at that point and a new beat you just made stays where it is, not linked yet.) A link let go outside the flowchart (over a side panel, say) does nothing.
 - **Every drawn link is one Undo step** (a link to a new beat is two: Undo takes the link back first, then the new beat), and the Properties panel shows it straight away, exactly as if you had picked the target there.
 - A few beat types keep their links in the Properties panel only: AI Condition categories, AR Scene anchors and AI Dialog Tree exits. Drag from one of those and ASAPS tells you so. A beat with nothing to link yet (a Multi Choice without choices, say) asks you to add a choice first.
+
+![A link from "The case" let go over empty space: a menu with New beat (its list of beat types open beside it), a search field, the story's beats and Cancel](images/114-link-drop-menu.png)
+*A link let go over empty space. **New beat** opens the list of beat types; below it, the story's beats to link to, with a search field.*
 
 ![Dragging a link from the Multi Choice "Three ways of seeing" onto "Leaving": a menu asks which of the four choices the link is for, each showing where it leads now](images/97-draw-link-menu.png)
 *Drop a link from a beat with several choices and ASAPS asks which choice it is for. Each row shows where that choice leads now.*
