@@ -1,9 +1,22 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.164, 2026-11-26)
+## 2026-11-26: The flowchart links release: a menu where a link is dropped, links that show what they are, drawn once (v0.9.165)
 
 ### Overview
-A link drawn in the flowchart and let go over empty space now asks where it should go.
+A release about the flowchart's links. A link let go over empty space opens a menu (a new beat of any type made there, an existing beat found by name, or cancel). The flowchart no longer keeps its own list of beat types and their link fields: it draws what core's shared link walk finds, with one table for how each kind of link looks, so each link is drawn once and in its own colour (Condition Check branches green and red, a timer's target red and dashed, props green, dialog exits blue, hypertext cyan), and choices to the same beat share a line that says so. Found on the way and fixed: the header's Connections count was too low on a freshly opened story, and a long Dialog Tree lost its exit when expanded. Five duplicate images removed.
+
+### Release checks (v0.9.165)
+- **A story played to its end:** The Last Ferry (made from its template) in the Preview: Title → Whose night is it? → Boarding → The argument → On the stairs → an ending, random choices, no console error.
+- **Browser checks asked for before the release** (2026-11-26), in a test project made for it and in the Red example (111 beats, 3 clusters):
+  - Looks: a timer's target red dashed with the way on grey beside it; props green, the guarded one dashed violet with its guard; QR codes dashed purple "QR"; a requirement's way out dashed amber with its explanation, beside the beat's own link; Movement Choice dashed orange; restart dashed teal.
+  - Clusters: a Condition Check inside a collapsed cluster draws nothing inside the pill and docks its beats' links at it; expanded, True green and False red. Red with two of three clusters collapsed: 120 lines, none dangling, none from a beat to itself, no console error.
+  - Red: the header says 159 and 159 lines are drawn, none twice in the same look; one shared line ("sweets (+2)").
+  - The link-drop menu: in dark mode (dark panel, light text, types list too); a link dropped inside an open cluster made the new beat a member of that cluster (its count 3 → 4) and linked it; a touch drag opened the menu as a mouse drag does.
+- **Device sweep, export at another window size:** not run; the story's own screens, the renderer and the exporter are untouched (builder only: the flowchart and its header count).
+- **Suites:** builder 3,420, core 3,247 (78 skipped), renderer 860, player 10; lint 0 errors; type-check clean. CI green on the release commit.
+- **User Guide audit** (against the code): the flowchart's "Reading the arrows" list has the new looks and the shared line ("Mara (+1)"); "Drawing a link" describes the menu over empty space; the shortcuts table has its keys. **Left for later:** no screenshot of the new menu yet; flowchart screenshots that show Condition Check, Dialog Tree or prop links (`01-main-interface.png`, possibly `73` and `97`) have the old colours, and the header screenshots from v0.9.164 are still to retake.
+- **Known and left as it is:** the header counts one link per pair of beats, so a story where two lines join the same two beats (True and False to one beat, a choice and a scanned code) shows one fewer than the lines drawn. Cancelling "which one?" after making a new beat from the menu leaves that beat on the flowchart, unlinked (the guide says so).
+
 
 ### New: a link dropped on empty space opens a menu (author's request, 2026-11-26)
 Drawing a link from a beat and releasing it anywhere but on a beat did nothing. It now opens a menu where the link was let go:
@@ -16,9 +29,8 @@ Drawing a link from a beat and releasing it anywhere but on a beat did nothing. 
 - A drop outside the flowchart (the header, a side panel, the overview map) still does nothing.
 
 **Checked in the browser** (starter story): menu opens on a drop on empty space with the search field focused; a new Duration Screen stood at the drop point and was linked; typing "title" + Enter from a Condition Check opened "which one?" and linked If true; Escape closed the types list, then the menu; Cancel left the story unchanged; near the right edge the types open to the left, inside the window; two Undos removed the link, then the beat.
-**Not checked:** touch; a drop inside an open cluster (it shares the palette's code path for that); dark mode by eye.
+**Checked before the release** (see Release checks above): touch, a drop inside an open cluster, dark mode.
 
-**User Guide:** to be added with the next release (the flowchart's "drawing a link" passage).
 
 **Files modified:**
 - `packages/builder/src/components/graph/LinkDropMenu.tsx` (new), `LinkDropMenu.test.tsx` (new, 8 tests)
@@ -31,7 +43,7 @@ A Condition Check's branches were drawn once by their special case (green "True"
 - The regular pass no longer redraws a link a special case has drawn; a guard on such a link (a prop's or a dialog choice's conditions) is shown on that line.
 - **What an author sees:** a Condition Check's branches are now green "True" and red "False"; a timer's target is red and dashed; props are green. Before, all were grey.
 - Checked in the browser: the Condition Check from the menu test now has one green True and one red False line.
-- Not looked at in the browser: Set Timer, Pick Prop and a collapsed Dialog Tree (covered by tests). Hypertext links go through the same code and were not probed with real data.
+- Set Timer, Pick Prop, collapsed Dialog Trees and hypertext links were looked at in the browser with the change below (The Oil Lamp, Red, the release's test project).
 
 **Files modified:**
 - `packages/builder/src/components/graph/graphBuild.ts`, `__tests__/graphBuild.test.ts` (6 tests)
@@ -54,9 +66,8 @@ The fix above stopped the doubling but left the cause: the flowchart's edge buil
 - Old against new on every bundled template, core's story fixtures and the example projects (Red's 111 beats among them), dialogs collapsed and expanded, clusters open and closed: every difference is one of the above (a doubled line now single, grey dialog exits now blue, lines to one beat merged, the exit that vanished, and one line to `__self__` that never showed).
 - In the browser, all six templates: the header's count equals the number of lines, no line twice; Last Ferry's branches green and red; The Oil Lamp's hypertext links cyan; Last Ferry's dialog expanded keeps its exit.
 - Tests: `graphLinkWalk.test.ts` (real beats and the templates as they load: every link the walk finds is drawn, nothing else, none twice, the header count equals the lines), the earlier flowchart tests adapted. Builder 3,420.
-- **Not checked in the browser:** a story with clusters (tests and the comparison only), QR jump codes and requirements (tests only), dark mode.
+- A story with clusters, QR jump codes, requirements and dark mode were checked in the browser before the release (see Release checks above).
 
-**User Guide:** the flowchart's list of link looks needs True/False, timer, prop, dialog and hypertext colours and the "(+1)" label; with the next release.
 
 **Files modified:**
 - `packages/builder/src/components/graph/graphBuild.ts`, `graphStyle.ts`

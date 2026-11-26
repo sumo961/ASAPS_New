@@ -475,10 +475,16 @@ See your entire system structure as a graph. Beats appear as boxes, connections 
 **Reading the arrows.** Every way a player can leave a beat is drawn, and the line tells you what kind of link it is:
 
 - **Solid grey** — an ordinary link or choice. A choice that only appears under certain conditions draws its conditions on the edge (dashed violet).
+- **Green "True" and red "False"** — the two branches of a Condition Check.
+- **Dashed red "Timer Target"** — where a Set Timer leads when its time runs out.
+- **A colour per kind of beat** — a Pick Prop's props are green, a Dialog Tree's exits blue (all of them, also the ones from nested replies), Hypertext links cyan, and a Movement Choice's links dashed orange.
+- **Dashed amber "requires: …"** — the way out a beat's requirement sends the player when it isn't met, with the start of its explanation. **Dashed purple "QR"** — a jump a scanned QR code can make.
 - **Dashed teal "↺ Restart"** — where an End Screen's or AI Summary's **Play Again** button leads. Story state is reset along a restart link (if the beat's reset options say so), so it is treated as a fresh start, not a way on. The debug tools and the "Start as if…" presets count the end screen as an ending; they follow the Replay only to find what a second run can reach, and keep those paths apart (see [Path Analysis](#path-analysis)).
 - **Dashed green "after N s"** — a beat's *default target*, drawn only when it can actually fire: on a timed auto-advance, or as **"default"** when it is the beat's only exit. A default target that could never act is not drawn.
 - **Links a beat derives from one of its settings** — a keypad's **"Wrong code"**, an AI Condition's **"Fallback"**, an AR Scene's **"Skip / no anchor"** — appear as links like any other, even though you set them as fields in the Inspector.
 - **Random Target branches** are labelled *Random 1*, *Random 2*… with their weight when it isn't 1 (for example *Random 2 (×3)*).
+
+Each link is drawn once. When several choices (or props, or dialog exits) lead to the same beat, they share one line, labelled with the first one and how many more it stands for: *Mara (+1)*.
 
 **Where does this beat lead?** In a busy flowchart, rest the pointer on a beat: its outgoing links are drawn thicker, on top, with bold labels, and every other link fades. Move the pointer away and everything goes back. Only the drawing changes, nothing in your story. (To see the links coming *in* to a beat, look at **Reached from** in the [Properties panel](#reached-from).)
 
@@ -494,7 +500,13 @@ The small count strip above the canvas (**Beats · Clusters · Connections**) co
 
 - **A beat with one way on** — an Info Text, a Title Screen, a Duration Screen and the other single-link beats — is linked at once. If it already led somewhere, the new link replaces the old one; any effects you put on that link stay.
 - **A beat with several ways on** asks which one. A small menu opens where you dropped the link — *"Link from Three ways of seeing to Leaving — which one?"* — listing the beat's outputs: its choices (numbered, with their text), a Condition Check's *If true* / *If false*, a timer's *Continue* / *When time runs out*, a keypad's *Right code* / *Too many tries*, a Dialog Tree's lines without a reply. Outputs that aren't linked yet come first, marked *not linked yet*; linked ones show where they lead now, and picking one moves it to the new beat. Use the mouse, or the arrow keys and **Enter**; **Escape** (or a click elsewhere) closes the menu without changing anything.
-- **Every drawn link is one Undo step**, and the Properties panel shows it straight away, exactly as if you had picked the target there.
+- **Let go over empty space** and ASAPS asks where the link should go. A menu opens right there — *"Link from Three ways of seeing to…"* — with three things to pick from:
+  - **New beat ▸** opens a list of beat types: the palette's common ones first, then all the others by name. Pick one and the new beat is made where you dropped the link (inside a cluster, if you dropped it on an open one) and linked.
+  - **Or link to a beat: type its name…** is a search field with your story's beats under it, handy when the beat you mean is out of sight. Typing narrows the list, and **Enter** takes the first beat found.
+  - **Cancel** (or **Escape**, or a click elsewhere) leaves everything as it was.
+
+  With the keyboard: the arrow keys move through the menu, **→** or **Enter** on *New beat* opens the types, **←** or **Escape** closes them again. If the beat you drag from has several ways on, ASAPS then asks which one, just as it does when you drop on a beat. (Cancel at that point and a new beat you just made stays where it is, not linked yet.) A link let go outside the flowchart (over a side panel, say) does nothing.
+- **Every drawn link is one Undo step** (a link to a new beat is two: Undo takes the link back first, then the new beat), and the Properties panel shows it straight away, exactly as if you had picked the target there.
 - A few beat types keep their links in the Properties panel only: AI Condition categories, AR Scene anchors and AI Dialog Tree exits. Drag from one of those and ASAPS tells you so. A beat with nothing to link yet (a Multi Choice without choices, say) asks you to add a choice first.
 
 ![Dragging a link from the Multi Choice "Three ways of seeing" onto "Leaving": a menu asks which of the four choices the link is for, each showing where it leads now](images/97-draw-link-menu.png)
@@ -5045,7 +5057,7 @@ Quick reference for all beat types.
 | Ctrl/Cmd + Click | Add a beat to the selection, or take it out (flowchart) |
 | Ctrl/Cmd + C / V | Copy the selected beats / paste them in the middle of the flowchart; links between the copied beats come along |
 | Ctrl/Cmd + D | Duplicate the selected beats (flowchart) |
-| Drag from a beat's right-edge dot | Draw a link to the beat you drop on (flowchart); in the "which one?" menu, arrow keys + Enter pick, Escape cancels |
+| Drag from a beat's right-edge dot | Draw a link to the beat you drop on (flowchart); in the "which one?" menu, arrow keys + Enter pick, Escape cancels. Dropped on empty space, a menu offers a new beat or a beat by name: arrow keys move, → or Enter opens the beat types, ← or Escape closes them, Escape cancels |
 | Typing on a beat picker | Opens its search; arrow keys move, Enter picks, Escape closes |
 | Escape (Script view) | Put back the text of the field you're editing |
 | Shift + Click | Multi-select elements (Visual Editor) |

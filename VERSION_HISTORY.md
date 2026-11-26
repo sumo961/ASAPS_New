@@ -5,13 +5,15 @@ for detailed release notes (including file-level changes and the *why* behind
 decisions) see [`Progress.md`](Progress.md). For the latest published build,
 visit the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
 
-Current release: **v0.9.164**. This is a **beta**: core functionality works,
+Current release: **v0.9.165**. This is a **beta**: core functionality works,
 and new releases arrive often. The release summaries below cover v0.9.88
 onward, newest first. Below them are an archived feature table and deep-dives
 for the releases up to v0.9.89. Detailed notes for every release are in
 [`Progress.md`](Progress.md).
 
 ## Release Summaries
+
+**v0.9.164 was the voice input release**: it brought voice input in line with reading aloud. In a conversation with a character, the microphone now works with OpenAI's transcription and with a Whisper server of your own, not only with the recognisers that write down while you speak: it listens when the character has finished, and the recording ends by itself when you stop talking. A published story can have OpenAI write the player's spoken answers down through the relay, with no key in the page, and that works in Firefox too, which has no speech recognition of its own. The switches now mean what they say: no microphone while STT is off, voice input is exported only with STT switched on, and the Preview's speech buttons apply to that Preview alone. Also: a line with a blank line in it is read aloud to its end, and the header's buttons are one style and one height.
 
 One paragraph per release, as it appeared on the project's front page. The
 latest release is described in the [README](README.md); when a new version
