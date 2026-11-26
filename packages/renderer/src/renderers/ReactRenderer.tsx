@@ -1024,6 +1024,8 @@ export function backfillUnplacedDefaults(
 
 /** A recording nobody stops ends by itself after this long (the conversation's microphone with a record-then-transcribe recogniser). */
 const RECORDING_CAP_MS = 60_000;
+/** How long a recorded, written-down answer stands in the field before it is sent. */
+const RECORDED_ANSWER_SEND_MS = 700;
 
 export class ReactRenderer extends BaseRenderer {
   private _root: ReactDOM.Root | null = null;
@@ -1499,8 +1501,19 @@ export class ReactRenderer extends BaseRenderer {
     if (!this.ttsSpeakCallback) return;
     // Speak what the reader sees: no **markers**, escaped \* as a plain *.
     text = markdownLiteToPlain(text);
-    const split = speaker && speaker !== 'Narrator' ? splitVoicedSegments(text) : null;
-    const segments = split?.map((seg) => ({ text: seg.text, speaker: seg.quoted ? speaker : 'Narrator' }));
+    const voiced = (part: string) => {
+      const split = speaker && speaker !== 'Narrator' ? splitVoicedSegments(part) : null;
+      return split?.map((seg) => ({ text: seg.text, speaker: seg.quoted ? speaker : 'Narrator' }));
+    };
+    // A line of several paragraphs (an AI's answer with a blank line in it)
+    // is read paragraph by paragraph: each is its own piece for the host's
+    // speech service, so there is a pause at the break and the reading goes
+    // on. Read in one piece, the part after the blank line was once not
+    // spoken at all (author's field test, 2026-11-26).
+    const paragraphs = text.split(/\n[ \t]*\n+/).map((p) => p.trim()).filter(Boolean);
+    const segments = paragraphs.length > 1
+      ? paragraphs.flatMap((p) => voiced(p) ?? [{ text: p, speaker }])
+      : voiced(text);
     this.ttsSpeakCallback(text, speaker, isPrompt, segments);
   }
 
@@ -2004,7 +2017,7 @@ export class ReactRenderer extends BaseRenderer {
 
         // Auto-submit after silence: when we get a final result, wait 2s for more speech.
         // If no new speech arrives, auto-submit.
-        const scheduleAutoSubmit = React.useCallback((text: string) => {
+        const scheduleAutoSubmit = React.useCallback((text: string, afterMs = 2000) => {
           if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
           autoSubmitTimerRef.current = setTimeout(() => {
             if (text.trim() && !hasSubmittedRef.current) {
@@ -2018,7 +2031,7 @@ export class ReactRenderer extends BaseRenderer {
               setInterimText('');
               handleSubmit(text.trim());
             }
-          }, 2000);
+          }, afterMs);
         }, []);
 
         // Start listening — use streaming STT service (Vosk) if available, else browser SpeechRecognition
@@ -2050,8 +2063,9 @@ export class ReactRenderer extends BaseRenderer {
                 const combined = accumulatedTextRef.current ? accumulatedTextRef.current + ' ' + heard : heard;
                 accumulatedTextRef.current = combined;
                 setInputText(combined);
-                // Sent after a moment, as a spoken answer is elsewhere; typing meanwhile is still possible.
-                scheduleAutoSubmit(combined);
+                // Sent after a moment, as a spoken answer is elsewhere. A short
+                // one: the speaker's pause and the writing-down have passed already.
+                scheduleAutoSubmit(combined, RECORDED_ANSWER_SEND_MS);
               },
               onError: (err: any) => { console.warn('[ConversationInput] Voice input failed:', err?.message || err); done(); },
               onEnd: done,
@@ -2197,8 +2211,14 @@ export class ReactRenderer extends BaseRenderer {
         // Auto-start listening when component mounts, but wait for TTS to finish first.
         // This prevents STT from hearing the NPC's TTS playback.
         React.useEffect(() => {
-          // (Not for a recogniser that records until stopped: nothing would stop it.)
-          if (showMicButton && !sttRecords && (sttSupportsStreaming || SpeechRecognitionClass)) {
+          // A recogniser that records the whole answer listens by itself only
+          // where it can tell when the speaker has finished (the recording
+          // then ends by itself); otherwise nothing would stop it, and the
+          // microphone waits for a click.
+          const listensByItself = sttRecords
+            ? activeSTTProvider?.detectsSpeechEnd === true
+            : !!(sttSupportsStreaming || SpeechRecognitionClass);
+          if (showMicButton && listensByItself) {
             let cancelled = false;
 
             const waitForTTSAndStart = () => {

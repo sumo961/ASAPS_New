@@ -6,7 +6,7 @@
  * with MediaRecorder for audio capture.
  */
 
-import { speechLanguageCode } from '@asaps/core';
+import { speechLanguageCode, watchSpeech, canWatchSpeech } from '@asaps/core';
 import type { STTProviderConfig, STTListeningOptions, STTTranscriptionResult } from '../../types/stt';
 import { BaseSTTProvider } from './BaseSTTProvider';
 
@@ -16,6 +16,13 @@ export class LocalSTTProvider extends BaseSTTProvider {
   readonly supportsStreaming = false;
 
   private mediaRecorder: MediaRecorder | null = null;
+  private stopWatching: () => void = () => undefined;
+  private nobodySpoke = false;
+
+  /** The microphone can be left to itself: the recording ends when the speaker has finished (core `watchSpeech`). */
+  get detectsSpeechEnd(): boolean {
+    return canWatchSpeech();
+  }
   private audioChunks: Blob[] = [];
   private _isListening = false;
   private currentOptions: STTListeningOptions | null = null;
@@ -58,9 +65,11 @@ export class LocalSTTProvider extends BaseSTTProvider {
 
       this.mediaRecorder.onstop = async () => {
         this._isListening = false;
+        this.stopWatching();
         stream.getTracks().forEach(t => t.stop());
 
-        if (this.audioChunks.length > 0) {
+        // Nobody spoke: nothing is sent off to be written down.
+        if (this.audioChunks.length > 0 && !this.nobodySpoke) {
           const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
           try {
             const result = await this.transcribe(audioBlob, options.language);
@@ -74,6 +83,7 @@ export class LocalSTTProvider extends BaseSTTProvider {
 
       this.mediaRecorder.onerror = () => {
         this._isListening = false;
+        this.stopWatching();
         stream.getTracks().forEach(t => t.stop());
         options.onError(new Error('MediaRecorder error'));
         options.onEnd();
@@ -81,6 +91,15 @@ export class LocalSTTProvider extends BaseSTTProvider {
 
       this._isListening = true;
       this.mediaRecorder.start(1000);
+      // The recording ends by itself when the speaker has finished, as the
+      // recognisers that listen while one speaks do; it is dropped when
+      // nobody spoke. (Where loudness can't be measured, a click ends it.)
+      const recorder = this.mediaRecorder;
+      this.nobodySpoke = false;
+      this.stopWatching = watchSpeech(stream, {
+        onSpeechEnd: () => { if (recorder.state !== 'inactive') recorder.stop(); },
+        onNoSpeech: () => { this.nobodySpoke = true; if (recorder.state !== 'inactive') recorder.stop(); },
+      });
     } catch (err) {
       options.onError(err instanceof Error ? err : new Error('Microphone access denied'));
       options.onEnd();

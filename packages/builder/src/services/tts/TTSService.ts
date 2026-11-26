@@ -20,6 +20,7 @@ export class TTSService {
   private _speakGeneration: number = 0;
   /** Bumped by speak()/stop(): a running speakSegments() sequence stops. */
   private _sequence: number = 0;
+  private _inSequence: boolean = false;
   private _language: string | null = null;
   private speakerVoices: Map<string, TTSVoiceConfig> = new Map();
   private speakerAliases: Map<string, string> = new Map();
@@ -125,7 +126,9 @@ export class TTSService {
   }
 
   isSpeaking(): boolean {
-    return this._isSpeaking;
+    // Also between the parts of a line read in several (paragraphs, narration
+    // and quoted speech): the microphone waits for the whole line.
+    return this._isSpeaking || this._inSequence;
   }
 
   // ---------------------------------------------------------------------------
@@ -137,6 +140,7 @@ export class TTSService {
    */
   async speak(text: string, speaker?: string): Promise<void> {
     this._sequence++; // a new line cancels a running segment sequence
+    this._inSequence = false;
     return this.speakOne(text, speaker);
   }
 
@@ -150,9 +154,14 @@ export class TTSService {
   async speakSegments(segments: Array<{ text: string; speaker?: string }>, wholeText: string, speaker?: string): Promise<void> {
     const seq = ++this._sequence;
     if (this.activeProvider?.name === 'Web Speech') return this.speakOne(wholeText, speaker);
-    for (const seg of segments) {
-      if (this._sequence !== seq) return;
-      await this.speakOne(seg.text, seg.speaker);
+    this._inSequence = true;
+    try {
+      for (const seg of segments) {
+        if (this._sequence !== seq) return;
+        await this.speakOne(seg.text, seg.speaker);
+      }
+    } finally {
+      if (this._sequence === seq) this._inSequence = false;
     }
   }
 
@@ -299,6 +308,7 @@ export class TTSService {
    */
   stop(): void {
     this._sequence++; // cancel a running segment sequence
+    this._inSequence = false;
     this.halt();
   }
 

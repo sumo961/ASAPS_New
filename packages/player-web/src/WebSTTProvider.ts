@@ -13,7 +13,7 @@
  * own recognition takes over.
  */
 
-import { speechLanguageCode } from '@asaps/core';
+import { speechLanguageCode, watchSpeech, canWatchSpeech } from '@asaps/core';
 
 export interface STTConfig {
   provider: 'web-speech' | 'whisper' | 'local' | 'openai';
@@ -166,8 +166,8 @@ export class WebSTTService {
    * answer at once, like the builder's OpenAI and Whisper providers. Nothing
    * for the browser's own recognition, which the input drives itself.
    */
-  getActiveProvider(): { name: string; supportsStreaming: boolean } | undefined {
-    return this.viaRelay() ? { name: 'OpenAI transcription (relay)', supportsStreaming: false } : undefined;
+  getActiveProvider(): { name: string; supportsStreaming: boolean; detectsSpeechEnd: boolean } | undefined {
+    return this.viaRelay() ? { name: 'OpenAI transcription (relay)', supportsStreaming: false, detectsSpeechEnd: canWatchSpeech() } : undefined;
   }
 
   /** Start recording an answer; `stopListening()` ends it and the text arrives in `onResult`. */
@@ -193,14 +193,21 @@ export class WebSTTService {
       const chunks: Blob[] = [];
       this.recorder = recorder;
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-      recorder.onerror = () => { stream.getTracks().forEach((t) => t.stop()); this._isListening = false; this.recorder = null; options.onError(new Error('Recording failed')); options.onEnd(); };
+      // The recording ends by itself when the speaker has finished; it is dropped when nobody spoke.
+      let nobodySpoke = false;
+      const stopWatching = watchSpeech(stream, {
+        onSpeechEnd: () => { if (recorder.state !== 'inactive') recorder.stop(); },
+        onNoSpeech: () => { nobodySpoke = true; if (recorder.state !== 'inactive') recorder.stop(); },
+      });
+      recorder.onerror = () => { stopWatching(); stream.getTracks().forEach((t) => t.stop()); this._isListening = false; this.recorder = null; options.onError(new Error('Recording failed')); options.onEnd(); };
       recorder.onstop = async () => {
+        stopWatching();
         stream.getTracks().forEach((t) => t.stop());
         this._isListening = false;
         // Dropped by stop() (the screen moved on): nothing is sent.
         const dropped = this.recorder !== recorder;
         if (!dropped) this.recorder = null;
-        if (dropped || chunks.length === 0) { options.onEnd(); return; }
+        if (dropped || nobodySpoke || chunks.length === 0) { options.onEnd(); return; }
         try {
           const blob = new Blob(chunks, { type: recorder.mimeType || type || 'audio/webm' });
           const answer = await fetch(relayUrl, {

@@ -184,11 +184,14 @@ export class WebTTSService {
   }
 
   isSpeaking(): boolean {
-    return this.speaking;
+    // Also between the parts of a line read in several (paragraphs, narration
+    // and quoted speech): the microphone waits for the whole line.
+    return this.speaking || this.inSequence;
   }
 
   stop(): void {
     this.sequence++; // cancel a running segment sequence
+    this.inSequence = false;
     this.halt();
   }
 
@@ -219,9 +222,11 @@ export class WebTTSService {
 
   /** Bumped by speak()/stop(): a running speakSegments() sequence stops. */
   private sequence = 0;
+  private inSequence = false;
 
   async speak(text: string, speaker?: string): Promise<void> {
     this.sequence++;
+    this.inSequence = false;
     return this.speakOne(text, speaker);
   }
 
@@ -232,9 +237,14 @@ export class WebTTSService {
    */
   async speakSegments(segments: Array<{ text: string; speaker?: string }>): Promise<void> {
     const seq = ++this.sequence;
-    for (const seg of segments) {
-      if (this.sequence !== seq) return;
-      await this.speakOne(seg.text, seg.speaker);
+    this.inSequence = true;
+    try {
+      for (const seg of segments) {
+        if (this.sequence !== seq) return;
+        await this.speakOne(seg.text, seg.speaker);
+      }
+    } finally {
+      if (this.sequence === seq) this.inSequence = false;
     }
   }
 

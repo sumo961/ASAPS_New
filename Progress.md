@@ -51,6 +51,21 @@ STT is brought in line with TTS (author's request, 2026-11-22). The switches mea
 
 **Files modified:** `packages/builder/src/components/{Header,SaveStatus}.tsx`, `packages/builder/src/components/translation/LanguageSelector.tsx`
 
+### Changed: a recorded answer starts and ends by itself (author's field test, 2026-11-26)
+- The field test of voice input through the relay worked in Chrome, Safari and Firefox. What was missed: the microphone no longer listened by itself. That was true of the new record-then-transcribe path only: the recognisers that write down while one speaks (browser, whisper.cpp, Vosk) always did, and OpenAI's transcription had not been used by the microphone before.
+- `core/audio/speechActivity.ts`: `createSpeechGate` (the rule, fed with loudness and time: speech once it has lasted 200 ms, its end after 1.4 s of quiet, "nobody spoke" after 20 s; the room's own noise is learnt, so a hum is not a voice) and `watchSpeech` (a microphone stream measured twenty times a second with it).
+- The builder's OpenAI and Local Server providers and the exported player's relay recorder end their recording when the speaker has finished, and drop it unsent when nobody spoke. The conversation's microphone starts by itself for them (after the character's line has been said, as for the others) where the provider says it can tell the end (`detectsSpeechEnd`); a click still starts, and ends at once. The written-down answer is sent after 0.7 s (2 s for the streaming recognisers, whose pause is part of that).
+- **Checked against the service**, in the dev app without microphone or sound: a sentence fed to the exported player's recorder as if spoken, nobody stopping it: the recording ended by itself and the sentence came back word for word through the relay, 2.3 s after the speech ended.
+- Tests: `speechActivity.test.ts` (6), `ReactRenderer.test.tsx` (1 new).
+
+### Fixed: a line with a blank line in it is read to its end (author's field test, 2026-11-26)
+- In the field test (OpenAI's Realtime voices) an answer of Karin's with a blank line was read up to the blank line only. **The cause was not found.** The reader read that same text, blank line included, in full fifteen times out of fifteen (six voices, with and without the language named, as the exported story asks); no code cuts a line at a blank line; the streaming player goes on after a gap in the sound; nothing in the conversation stops a line except a click or a sent answer. If it happens again, the browser console of that moment would say more.
+- Made robust all the same: a line of several paragraphs is handed to the host's speech service paragraph by paragraph (`speakAloud` in the renderer), so each is a request of its own, there is a pause at the break, and the reading goes on. Quoted speech inside a paragraph keeps its two voices. "Speaking" stays true between the pieces of one line (`isSpeaking` in both speech services), so the microphone does not start listening between two paragraphs.
+- **Checked against the service**, silently: two paragraphs through the exported player's speech service were both read (5.9 s and 3.6 s), with "speaking" still true between them.
+- Tests: `ReactRenderer.test.tsx` (2 new).
+
+**Files modified:** `packages/core/src/audio/speechActivity.ts` (new), `packages/core/src/index.ts`, `packages/builder/src/services/stt/{WhisperSTTProvider,LocalSTTProvider}.ts`, `packages/builder/src/services/tts/TTSService.ts`, `packages/player-web/src/{WebSTTProvider,WebTTSProvider}.ts`, `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/builder/src/components/export/HtmlExportDialog.tsx`, `packages/builder/public/player-web.js`, `docs/USER_GUIDE.md`
+
 ---
 
 ## 2026-11-22: The relay voices release: reading aloud through the relay, a deploy script, voices of their own (v0.9.163)

@@ -582,4 +582,57 @@ describe('the conversation\'s microphone with a record-then-transcribe recognise
     await waitFor(() => expect(mic()!.title).toBe('Start voice input'));
     expect(browserListened).toBe(0);
   });
+
+  it('listens by itself where the recogniser can tell when the speaker has finished', async () => {
+    const calls: string[] = [];
+    let options: any = null;
+    renderer.setState('sttService', {
+      isEnabled: () => true,
+      getActiveProvider: () => ({ name: 'Whisper STT', supportsStreaming: false, detectsSpeechEnd: true }),
+      startListening: (o: any) => { options = o; calls.push('start'); },
+      stopListening: () => { calls.push('stop'); return Promise.resolve(null); },
+    });
+    void renderer.renderConversationInput({ showMic: true, speaker: 'Karin', npcText: 'Yes?' });
+    // No click: it starts once the line has been said.
+    await waitFor(() => expect(calls).toEqual(['start']), { timeout: 3000 });
+    // The recogniser ended the recording itself and hands the text over.
+    options.onResult({ text: 'On Friday.', isFinal: true });
+    options.onEnd();
+    await waitFor(() => expect(field().value).toBe('On Friday.'));
+    expect(browserListened).toBe(0);
+    // Nobody spoke (the recogniser ends without a text): the microphone is free again, and stays quiet.
+    expect(calls).toEqual(['start']);
+  });
+});
+
+
+// An AI's answer with a blank line in it: read in one piece, the part after
+// the blank line was once not spoken at all.
+describe('a line of several paragraphs is read paragraph by paragraph', () => {
+  it('each paragraph is its own piece, in the speaker\'s voice', async () => {
+    const said: any[] = [];
+    renderer.setTTSSpeakCallback((text, speaker, isPrompt, segments) => { said.push({ text, speaker, segments }); });
+    void renderer.renderDialog('Karin', 'Responsible for my case, Martin. Not for me.\n\nI’m not starting from scratch again.\n \nHave you read them?');
+    await waitFor(() => expect(said.length).toBe(1));
+    expect(said[0].segments).toEqual([
+      { text: 'Responsible for my case, Martin. Not for me.', speaker: 'Karin' },
+      { text: 'I’m not starting from scratch again.', speaker: 'Karin' },
+      { text: 'Have you read them?', speaker: 'Karin' },
+    ]);
+  });
+
+  it('a line without a blank line is read whole, as before; quoted speech inside a paragraph keeps its voices', async () => {
+    const said: any[] = [];
+    renderer.setTTSSpeakCallback((text, speaker, isPrompt, segments) => { said.push({ text, segments }); });
+    void renderer.renderDialog('Karin', 'One line.\nStill the same paragraph.');
+    await waitFor(() => expect(said.length).toBe(1));
+    expect(said[0].segments).toBeUndefined();
+    void renderer.renderDialog('Karin', 'She sits down. "Why are we here?"\n\nNobody answers.');
+    await waitFor(() => expect(said.length).toBe(2));
+    expect(said[1].segments).toEqual([
+      { text: 'She sits down.', speaker: 'Narrator' },
+      { text: 'Why are we here?', speaker: 'Karin' },
+      { text: 'Nobody answers.', speaker: 'Karin' },
+    ]);
+  });
 });

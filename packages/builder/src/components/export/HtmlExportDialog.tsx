@@ -1012,7 +1012,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                       <input type="radio" name="export-voice-input" className="mt-1" checked={!!voiceRelayUrl} onChange={() => setVoiceSource('openai')} />
                       <span className="text-sm text-gray-800">
                         OpenAI transcription, through the relay
-                        <span className="block text-xs text-gray-500">The player clicks the microphone, speaks, and clicks again; the answer is written down by OpenAI. Works in every browser that can record. No key in the page.</span>
+                        <span className="block text-xs text-gray-500">The player speaks when the character has finished; the recording ends when they stop talking, and OpenAI writes the answer down. Works in every browser that can record. No key in the page.</span>
                       </span>
                     </label>
                   ) : (
