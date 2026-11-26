@@ -22,7 +22,7 @@ interface CanvasProps {
   onBeatSelect: (beat: Beat) => void;
   onBeatMove: (beatId: string, position: { x: number; y: number }) => void;
   onClusterSelect: (cluster: Cluster | null) => void;
-  onBeatAdd?: (type: string, position: { x: number; y: number }, cluster?: { clusterId: string; x: number; y: number }) => void;
+  onBeatAdd?: (type: string, position: { x: number; y: number }, cluster?: { clusterId: string; x: number; y: number }) => { id: string } | void;
   onClusterExpandCollapse?: (clusterId: string) => void;
   onClusterMove?: (clusterId: string, x: number, y: number) => void;
   paletteCollapsed?: boolean;
@@ -117,7 +117,8 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const handleBeatAdd = (type: string, position: { x: number; y: number }, cluster?: { clusterId: string; x: number; y: number }) => {
     if (onBeatAdd) {
-      onBeatAdd(type, position, cluster);
+      // The new beat goes back to the flowchart: a link drawn to it needs its id.
+      return onBeatAdd(type, position, cluster);
     }
   };
 

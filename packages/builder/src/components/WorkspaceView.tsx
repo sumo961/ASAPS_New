@@ -33,7 +33,7 @@ interface WorkspaceViewProps {
   /** For the Script view's Markdown export. */
   storyTitle?: string;
   onClusterSelect: (cluster: Cluster | null) => void;
-  onBeatAdd: (type: string, position: { x: number; y: number }, cluster?: { clusterId: string; x: number; y: number }) => void;
+  onBeatAdd: (type: string, position: { x: number; y: number }, cluster?: { clusterId: string; x: number; y: number }) => { id: string } | void;
   onClusterExpandCollapse: (clusterId: string) => void;
   onClusterMove: (clusterId: string, x: number, y: number) => void;
   onBeatInContainerMove?: (beatId: string, clusterId: string, x: number, y: number) => void;

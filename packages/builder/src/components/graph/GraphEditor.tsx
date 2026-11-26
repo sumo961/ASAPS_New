@@ -32,6 +32,9 @@ import { noteDeletion } from '../../utils/deletedBeats';
 import { linkOutputs, type LinkOutput } from '../../utils/linkOutputs';
 import { notify } from '../../utils/notify';
 import { LinkOutputMenu } from './LinkOutputMenu';
+import { LinkDropMenu } from './LinkDropMenu';
+import { beatTypeChoices } from './BeatPalette';
+import { useAIFeatures } from '../../utils/aiFeatures';
 import { usePersistedState } from '../../utils/persistedState';
 import { useIsDark } from '../../utils/appearance';
 import { useStoryStart } from '../../contexts/StoryStartContext';
@@ -54,7 +57,8 @@ interface GraphEditorProps {
   onBeatSelect: (beat: Beat) => void;
   onBeatMove: (beatId: string, x: number, y: number) => void;
   onClusterSelect: (cluster: Cluster | null) => void;
-  onBeatAdd: (type: string, position: { x: number; y: number }, cluster?: { clusterId: string; x: number; y: number }) => void;
+  /** Returns the new beat where the caller can (a link drawn to a new beat needs its id). */
+  onBeatAdd: (type: string, position: { x: number; y: number }, cluster?: { clusterId: string; x: number; y: number }) => { id: string } | void;
   onClusterExpandCollapse: (clusterId: string) => void;
   onClusterMove: (clusterId: string, x: number, y: number) => void;
   onBeatInContainerMove: (beatId: string, clusterId: string, x: number, y: number) => void;
@@ -222,6 +226,38 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   const onConnectStart = useCallback((_e: unknown, params: { nodeId: string | null }) => {
     linkFromRef.current = params.nodeId;
   }, []);
+  // A link let go over empty space: where should it go? (LinkDropMenu:
+  // a new beat made right there, an existing beat found by name, or nothing.)
+  const [dropMenu, setDropMenu] = useState<{
+    x: number; y: number; fromId: string; outputs: LinkOutput[]; flowPosition: { x: number; y: number };
+  } | null>(null);
+  const aiOn = useAIFeatures();
+  const newBeatTypes = useMemo(() => beatTypeChoices(aiOn), [aiOn]);
+  /** Link `fromId` to `toId`: at once with one output, else the author says which. */
+  const linkTo = useCallback((fromId: string, toId: string, outputs: LinkOutput[], at: { x: number; y: number }) => {
+    if (outputs.length === 1) applyLink(fromId, toId, outputs[0]);
+    else setLinkMenu({ x: at.x, y: at.y, fromId, toId, outputs });
+  }, [applyLink]);
+  const addBeatAt = useCallback((type: string, position: { x: number; y: number }): string | undefined => {
+    // Inside an expanded cluster the beat is born a member, as a beat dropped from the palette is.
+    const snap20 = (v: number) => Math.round(v / 20) * 20;
+    for (const cluster of clusters) {
+      if (!cluster.isExpanded) continue;
+      const cx = cluster.containerPosition?.x ?? 0;
+      const cy = cluster.containerPosition?.y ?? 0;
+      const cw = cluster.containerBounds?.width ?? 0;
+      const ch = cluster.containerBounds?.height ?? 0;
+      if (cw <= 0 || ch <= 0) continue;
+      if (position.x >= cx && position.x <= cx + cw && position.y >= cy && position.y <= cy + ch) {
+        return onBeatAdd(type, position, {
+          clusterId: cluster.id,
+          x: Math.max(0, snap20(position.x - cx)),
+          y: Math.max(0, snap20(position.y - cy - CLUSTER_HEADER_H)),
+        })?.id;
+      }
+    }
+    return onBeatAdd(type, position)?.id;
+  }, [clusters, onBeatAdd]);
   const onConnectEnd = useCallback((event: MouseEvent | TouchEvent) => {
     const fromId = linkFromRef.current;
     linkFromRef.current = null;
@@ -235,8 +271,13 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     const toId = nodeId.startsWith('dlg:') ? nodeId.split(':')[1] : nodeId;
     const from = beatsRef.current.find((b) => b.id === fromId);
     const to = toId ? beatsRef.current.find((b) => b.id === toId) : undefined;
-    if (!from || !to) return;
-    if (to.id === from.id) {
+    if (!from) return;
+    // Over empty space of the flowchart (a cluster's frame counts: the beat
+    // is then made inside it), not over a panel beside it.
+    const under = document.elementFromPoint(point.clientX, point.clientY);
+    const overEmpty = !to && !!under?.closest('.react-flow') && !under.closest('.react-flow__controls, .react-flow__minimap, .react-flow__panel');
+    if (!to && !overEmpty) return;
+    if (to?.id === from.id) {
       notify.info('Drop the link on another beat.');
       return;
     }
@@ -249,12 +290,14 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       notify.info(`"${from.name || from.id}" has nothing to link yet. Add a choice in its Properties panel first.`);
       return;
     }
-    if (outputs.length === 1) {
-      applyLink(from.id, to.id, outputs[0]);
+    if (!to) {
+      const flowPosition = reactFlowInstance?.screenToFlowPosition({ x: point.clientX, y: point.clientY });
+      if (!flowPosition) return;
+      setDropMenu({ x: point.clientX + 8, y: point.clientY + 8, fromId: from.id, outputs, flowPosition });
       return;
     }
-    setLinkMenu({ x: point.clientX + 8, y: point.clientY + 8, fromId: from.id, toId: to.id, outputs });
-  }, [onLinkOutput, applyLink]);
+    linkTo(from.id, to.id, outputs, { x: point.clientX + 8, y: point.clientY + 8 });
+  }, [onLinkOutput, linkTo, reactFlowInstance]);
 
   // Set when a selection comes from a click in the graph itself: the beat is
   // already in view, and re-centring (and re-zooming) under the pointer
@@ -1200,6 +1243,29 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           nameOf={beatName}
           onPick={(o) => applyLink(linkMenu.fromId, linkMenu.toId, o)}
           onCancel={() => setLinkMenu(null)}
+        />
+      )}
+
+      {dropMenu && (
+        <LinkDropMenu
+          x={dropMenu.x}
+          y={dropMenu.y}
+          fromName={beatName(dropMenu.fromId)}
+          beats={beats.filter((b) => b.id !== dropMenu.fromId).map((b) => ({ id: b.id, name: b.name, type: b.type }))}
+          types={newBeatTypes}
+          onNewBeat={(type) => {
+            const menu = dropMenu;
+            setDropMenu(null);
+            // The beat stands where the link was let go, a little up so the line meets its side, not its corner.
+            const newId = addBeatAt(type, { x: menu.flowPosition.x, y: menu.flowPosition.y - 30 });
+            if (newId) linkTo(menu.fromId, newId, menu.outputs, { x: menu.x, y: menu.y });
+          }}
+          onPickBeat={(toId) => {
+            const menu = dropMenu;
+            setDropMenu(null);
+            linkTo(menu.fromId, toId, menu.outputs, { x: menu.x, y: menu.y });
+          }}
+          onCancel={() => setDropMenu(null)}
         />
       )}
 

@@ -1,5 +1,33 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.164, 2026-11-26)
+
+### Overview
+A link drawn in the flowchart and let go over empty space now asks where it should go.
+
+### New: a link dropped on empty space opens a menu (author's request, 2026-11-26)
+Drawing a link from a beat and releasing it anywhere but on a beat did nothing. It now opens a menu where the link was let go:
+- **New beat ▸** a list of beat types (the palette's common ones first, then every other type by name; AI beats only with AI features on). The beat is made where the link was dropped, inside a cluster when dropped on an open one, and linked to.
+- **A search field with the story's beats**, to link to a beat that is out of sight. Typing narrows the list; Enter takes the first one found.
+- **Cancel** (also Escape, or a click elsewhere).
+- A beat with several outputs (choices, If true / If false) then asks which output, as a drop on a beat does. Beats that have nothing to link yet, or are linked in their Properties panel, say so as before.
+- Keyboard: typing goes to the search field; arrows move; → or Enter on "New beat" opens the types, ← or Escape closes them.
+- Undo takes the link back first, then the new beat.
+- A drop outside the flowchart (the header, a side panel, the overview map) still does nothing.
+
+**Checked in the browser** (starter story): menu opens on a drop on empty space with the search field focused; a new Duration Screen stood at the drop point and was linked; typing "title" + Enter from a Condition Check opened "which one?" and linked If true; Escape closed the types list, then the menu; Cancel left the story unchanged; near the right edge the types open to the left, inside the window; two Undos removed the link, then the beat.
+**Not checked:** touch; a drop inside an open cluster (it shares the palette's code path for that); dark mode by eye.
+
+**User Guide:** to be added with the next release (the flowchart's "drawing a link" passage).
+
+**Files modified:**
+- `packages/builder/src/components/graph/LinkDropMenu.tsx` (new), `LinkDropMenu.test.tsx` (new, 8 tests)
+- `packages/builder/src/components/graph/GraphEditor.tsx` (menu on an empty drop, `addBeatAt`, `linkTo`)
+- `packages/builder/src/components/graph/BeatPalette.tsx` (`beatTypeChoices`)
+- `packages/builder/src/components/Canvas.tsx`, `WorkspaceView.tsx`, `App.tsx` (adding a beat hands the beat back)
+
+---
+
 ## 2026-11-26: The voice input release: STT in line with TTS, voice input through the relay, a microphone that listens by itself (v0.9.164)
 
 ### Overview

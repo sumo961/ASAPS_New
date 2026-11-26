@@ -3446,6 +3446,8 @@ function App() {
     }
     setSelectedBeat(newBeat);
     markChanged();
+    // For the flowchart's "link to a new beat": it links to the beat just made.
+    return newBeat;
   }, [actions, markChanged]);
 
   // ---- Generation review: apply / skip / apply-all-safe / dismiss ----------

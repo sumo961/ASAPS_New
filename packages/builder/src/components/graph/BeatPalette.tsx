@@ -211,7 +211,7 @@ function isAi(beatType: string): boolean {
  * Build the per-type metadata from the schema. Returns a Map keyed by
  * beat type so the taxonomy can look up display data efficiently.
  */
-function buildBeatTypeMap(withAi: boolean): Map<string, BeatType> {
+export function buildBeatTypeMap(withAi: boolean): Map<string, BeatType> {
   const schemaBeats = beatDefinitions.beatTypes as Record<string, {
     category: string;
     displayName: string;
@@ -242,6 +242,19 @@ function buildBeatTypeMap(withAi: boolean): Map<string, BeatType> {
   }
   return out;
 }
+
+/**
+ * The beat types to offer where a new beat is made somewhere else than in
+ * the palette (the flowchart's "link to a new beat" menu): the common ones
+ * first, in the palette's order, then every other type by name.
+ */
+export function beatTypeChoices(withAi: boolean): { common: BeatTypeChoice[]; others: BeatTypeChoice[] } {
+  const map = buildBeatTypeMap(withAi);
+  const common = COMMON.map((t) => map.get(t)).filter((b): b is BeatType => !!b);
+  const others = Array.from(map.values()).filter((b) => !COMMON.includes(b.type)).sort((x, y) => x.name.localeCompare(y.name));
+  return { common, others };
+}
+export type BeatTypeChoice = Pick<BeatType, 'type' | 'name' | 'icon' | 'isAi'>;
 
 export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onToggleCollapse }) => {
   const aiOn = useAIFeatures();
