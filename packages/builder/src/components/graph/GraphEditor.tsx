@@ -33,6 +33,7 @@ import { linkOutputs, type LinkOutput } from '../../utils/linkOutputs';
 import { notify } from '../../utils/notify';
 import { LinkOutputMenu } from './LinkOutputMenu';
 import { LinkDropMenu } from './LinkDropMenu';
+import { beatAtDrop, beatBoxesOnScreen, beatIdOfNode, MIN_DRAG } from './linkDropTarget';
 import { beatTypeChoices } from './BeatPalette';
 import { useAIFeatures } from '../../utils/aiFeatures';
 import { usePersistedState } from '../../utils/persistedState';
@@ -223,9 +224,48 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     if (output.target === toId) return;
     onLinkOutput?.(fromId, output.updatesFor(toId));
   }, [onLinkOutput]);
-  const onConnectStart = useCallback((_e: unknown, params: { nodeId: string | null }) => {
-    linkFromRef.current = params.nodeId;
+  // While a link is being drawn, the beat it would land on is outlined, so
+  // the author sees the target before letting go (and that "near" counts).
+  const linkDragRef = useRef<{ start: { x: number; y: number } | null; lit: HTMLElement[]; stop: (() => void) | null }>({ start: null, lit: [], stop: null });
+  const landingBeat = useCallback((x: number, y: number, fromId: string | null): string | null => {
+    const known = new Set(beatsRef.current.map((b) => b.id));
+    return beatAtDrop(beatBoxesOnScreen((id) => known.has(id)), x, y, fromId);
   }, []);
+  const lightLanding = useCallback((beatId: string | null) => {
+    const drag = linkDragRef.current;
+    for (const el of drag.lit) { el.style.outline = ''; el.style.outlineOffset = ''; el.style.borderRadius = ''; }
+    drag.lit = [];
+    if (!beatId) return;
+    document.querySelectorAll<HTMLElement>('.react-flow__node').forEach((el) => {
+      if ((el.getAttribute('data-id') ?? '') !== beatId) return;
+      el.style.outline = '3px solid #3b82f6';
+      el.style.outlineOffset = '3px';
+      el.style.borderRadius = '10px';
+      drag.lit.push(el);
+    });
+  }, []);
+  const onConnectStart = useCallback((e: unknown, params: { nodeId: string | null }) => {
+    linkFromRef.current = params.nodeId;
+    const drag = linkDragRef.current;
+    drag.stop?.();
+    const at = (ev: any) => { const p = ev?.changedTouches?.[0] ?? ev?.touches?.[0] ?? ev; return p && typeof p.clientX === 'number' ? { x: p.clientX, y: p.clientY } : null; };
+    drag.start = at(e);
+    const onMove = (ev: MouseEvent | TouchEvent) => {
+      const p = at(ev);
+      if (!p) return;
+      const id = landingBeat(p.x, p.y, linkFromRef.current);
+      lightLanding(id && id !== linkFromRef.current ? id : null);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('touchmove', onMove);
+    drag.stop = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('touchmove', onMove);
+      lightLanding(null);
+      drag.stop = null;
+    };
+  }, [landingBeat, lightLanding]);
+  useEffect(() => () => linkDragRef.current.stop?.(), []);
   // A link let go over empty space: where should it go? (LinkDropMenu:
   // a new beat made right there, an existing beat found by name, or nothing.)
   const [dropMenu, setDropMenu] = useState<{
@@ -261,22 +301,27 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   const onConnectEnd = useCallback((event: MouseEvent | TouchEvent) => {
     const fromId = linkFromRef.current;
     linkFromRef.current = null;
+    const dragStart = linkDragRef.current.start;
+    linkDragRef.current.start = null;
+    linkDragRef.current.stop?.();
     if (!fromId || !onLinkOutput) return;
     const point = 'changedTouches' in event ? event.changedTouches[0] : event;
     if (!point) return;
-    // Dropped anywhere on a beat — its handle or its body.
-    const el = document.elementFromPoint(point.clientX, point.clientY)?.closest('.react-flow__node');
-    // A line inside an expanded Dialog Tree (dlg:<beat id>:<path>) counts as its beat.
-    const nodeId = el?.getAttribute('data-id') ?? '';
-    const toId = nodeId.startsWith('dlg:') ? nodeId.split(':')[1] : nodeId;
     const from = beatsRef.current.find((b) => b.id === fromId);
-    const to = toId ? beatsRef.current.find((b) => b.id === toId) : undefined;
     if (!from) return;
-    // Over empty space of the flowchart (a cluster's frame counts: the beat
-    // is then made inside it), not over a panel beside it.
     const under = document.elementFromPoint(point.clientX, point.clientY);
-    const overEmpty = !to && !!under?.closest('.react-flow') && !under.closest('.react-flow__controls, .react-flow__minimap, .react-flow__panel');
-    if (!to && !overEmpty) return;
+    // Over a panel beside the flowchart (or its controls, its overview map): nothing.
+    const overFlowchart = !!under?.closest('.react-flow') && !under.closest('.react-flow__controls, .react-flow__minimap, .react-flow__panel');
+    // On a beat or just beside one (linkDropTarget): its box counts, whatever
+    // lies on top of it — the link's own line, another link's label.
+    const directId = beatIdOfNode(under?.closest('.react-flow__node')?.getAttribute('data-id') ?? '');
+    const toId = beatsRef.current.some((b) => b.id === directId) && directId !== fromId
+      ? directId
+      : overFlowchart ? landingBeat(point.clientX, point.clientY, fromId) : null;
+    const to = toId ? beatsRef.current.find((b) => b.id === toId) : undefined;
+    if (!to && !overFlowchart) return;
+    // Let go where it was picked up: a click on the handle, not a question.
+    if (!to && dragStart && Math.hypot(point.clientX - dragStart.x, point.clientY - dragStart.y) < MIN_DRAG) return;
     if (to?.id === from.id) {
       notify.info('Drop the link on another beat.');
       return;
@@ -297,7 +342,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       return;
     }
     linkTo(from.id, to.id, outputs, { x: point.clientX + 8, y: point.clientY + 8 });
-  }, [onLinkOutput, linkTo, reactFlowInstance]);
+  }, [onLinkOutput, linkTo, reactFlowInstance, landingBeat]);
 
   // Set when a selection comes from a click in the graph itself: the beat is
   // already in view, and re-centring (and re-zooming) under the pointer

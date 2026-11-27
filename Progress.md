@@ -13,6 +13,22 @@ The count is shown in one place, the strip above the flowchart (Beats · Cluster
 - `packages/builder/src/components/graph/graphBuild.ts`, `packages/builder/src/components/WorkspaceView.tsx`, `packages/builder/src/utils/storyLinks.ts` (`flowchartLinkCount` removed)
 - `packages/builder/src/components/graph/__tests__/flowchartLineCount.test.ts` (moved from utils, 2 tests added), `graphLinkWalk.test.ts`
 
+### Changed: a drawn link lands on a beat without exact aim (author report, 2026-11-28)
+"One now has to be very careful to hit the target point exactly … else the new popup appears." A drop counted only when the element directly under the pointer belonged to a beat. The link's own line and other links' labels lie on top of beats, and a few pixels outside a beat's border is not the beat; before v0.9.165 such a drop silently did nothing, since then it opened the "where does this link go?" menu.
+- **The beat's box counts**, whatever lies on top of it.
+- **Close is enough:** a drop within 28 px (on screen) of a beat lands on it, the nearest one when two are close. The beat the link starts from takes a drop only on its own box (its handle sits on its edge, so every short drag ends beside it).
+- **The landing beat is outlined while dragging** (blue), so the target is visible before letting go; over empty space nothing is outlined, and that is where the menu opens.
+- **Let go where it was picked up** (less than 12 px from the start): nothing happens, no menu.
+
+**Checked in the browser** (The Oil Lamp): drops 18 px left of, 20 px below and off the corner of "Leaving" landed on it (outlined before, the "which one?" menu after); 60 px below opened the menu, nothing outlined; a 7 px drag did nothing; a drop on the starting beat gave its notice as before; the outline is gone after every drop.
+**Not checked:** a drop under another link's label lying over a beat (none in that layout; the rule is tested), inside an open cluster, on an expanded Dialog Tree, touch.
+
+**User Guide:** "Drawing a link" should say that near a beat is enough and that the landing beat lights up; with the next release.
+
+**Files modified:**
+- `packages/builder/src/components/graph/linkDropTarget.ts` (new), `__tests__/linkDropTarget.test.ts` (new, 9 tests)
+- `packages/builder/src/components/graph/GraphEditor.tsx`
+
 ### Fixed: the link-drop menu ran past the bottom of a short window
 Found while taking its picture at 1280×800: with a dozen beats listed the menu is 425 px tall and was placed by a guessed 420. It is now placed by its measured height.
 
