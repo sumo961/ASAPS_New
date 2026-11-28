@@ -5,13 +5,15 @@ for detailed release notes (including file-level changes and the *why* behind
 decisions) see [`Progress.md`](Progress.md). For the latest published build,
 visit the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
 
-Current release: **v0.9.165**. This is a **beta**: core functionality works,
+Current release: **v0.9.166**. This is a **beta**: core functionality works,
 and new releases arrive often. The release summaries below cover v0.9.88
 onward, newest first. Below them are an archived feature table and deep-dives
 for the releases up to v0.9.89. Detailed notes for every release are in
 [`Progress.md`](Progress.md).
 
 ## Release Summaries
+
+**v0.9.165 was the flowchart links release**: it was about the flowchart's links. A link you draw and let go over empty space is no longer lost: a menu opens there, to make a new beat of any type on the spot, to find an existing beat by name and link to it, or to cancel. Links now show what they are: a Condition Check's branches are green "True" and red "False", a timer's "time runs out" link is red and dashed, props are green, a Dialog Tree's exits blue, hypertext links cyan. Each link is drawn once (many were drawn twice, the colour hidden under a grey line), and choices that lead to the same beat share one line that says so: "Mara (+1)". Also fixed: the header's Connections count was too low on a freshly opened story, and expanding a long Dialog Tree hid its exit.
 
 **v0.9.164 was the voice input release**: it brought voice input in line with reading aloud. In a conversation with a character, the microphone now works with OpenAI's transcription and with a Whisper server of your own, not only with the recognisers that write down while you speak: it listens when the character has finished, and the recording ends by itself when you stop talking. A published story can have OpenAI write the player's spoken answers down through the relay, with no key in the page, and that works in Firefox too, which has no speech recognition of its own. The switches now mean what they say: no microphone while STT is off, voice input is exported only with STT switched on, and the Preview's speech buttons apply to that Preview alone. Also: a line with a blank line in it is read aloud to its end, and the header's buttons are one style and one height.
 

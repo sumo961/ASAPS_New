@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.165*
+*Last revised against v0.9.166*
 
 ---
 
@@ -493,19 +493,19 @@ Each link is drawn once. When several choices (or props, or dialog exits) lead t
 <a id="flowchart-start-mark"></a>
 **Where the story starts.** Each box shows the beat's name and, under it, its type in plain words (*Title Screen*, *Multi Choice*). The beat your story starts at carries a green **▶ Start** tab on its top-left corner. To start somewhere else, right-click a beat and choose **Start the story here**; on the start beat itself the menu says *The story starts here*. It is the same setting as **Story starts at** in [Project Settings ▸ Project](#global-settings), it applies to the Preview and to exported stories, and it is one Undo step.
 
-The small count strip above the canvas (**Beats · Clusters · Connections**) counts exactly these arrows: one per pair of beats that are linked, restart links included.
+The small count strip above the canvas (**Beats · Clusters · Connections**) counts exactly these arrows: one per line the flowchart draws, restart links included. Two lines between the same two beats (a Condition Check's *If true* and *If false* leading to one beat) count as two; several choices that share one line count as one.
 
 <a id="drawing-links"></a>
-**Drawing a link.** You can wire beats right in the flowchart. Every beat has a small dot on its right edge: press on it, drag, and let go anywhere on the beat that should come next (or on a line inside an expanded Dialog Tree).
+**Drawing a link.** You can wire beats right in the flowchart. Every beat has a small dot on its right edge: press on it, drag, and let go anywhere on the beat that should come next (or on a line inside an expanded Dialog Tree). You don't have to aim: the whole box counts, whatever lies on top of it, and close to a beat is enough (between two, the nearer one gets the link). While you drag, the beat the link will land on gets a blue outline, so you see the target before you let go.
 
 - **A beat with one way on** — an Info Text, a Title Screen, a Duration Screen and the other single-link beats — is linked at once. If it already led somewhere, the new link replaces the old one; any effects you put on that link stay.
 - **A beat with several ways on** asks which one. A small menu opens where you dropped the link — *"Link from Three ways of seeing to Leaving — which one?"* — listing the beat's outputs: its choices (numbered, with their text), a Condition Check's *If true* / *If false*, a timer's *Continue* / *When time runs out*, a keypad's *Right code* / *Too many tries*, a Dialog Tree's lines without a reply. Outputs that aren't linked yet come first, marked *not linked yet*; linked ones show where they lead now, and picking one moves it to the new beat. Use the mouse, or the arrow keys and **Enter**; **Escape** (or a click elsewhere) closes the menu without changing anything.
-- **Let go over empty space** and ASAPS asks where the link should go. A menu opens right there — *"Link from Three ways of seeing to…"* — with three things to pick from:
+- **Let go over empty space** (no beat outlined) and ASAPS asks where the link should go. A menu opens right there — *"Link from Three ways of seeing to…"* — with three things to pick from:
   - **New beat ▸** opens a list of beat types: the palette's common ones first, then all the others by name. Pick one and the new beat is made where you dropped the link (inside a cluster, if you dropped it on an open one) and linked.
   - **Or link to a beat: type its name…** is a search field with your story's beats under it, handy when the beat you mean is out of sight. Typing narrows the list, and **Enter** takes the first beat found.
   - **Cancel** (or **Escape**, or a click elsewhere) leaves everything as it was.
 
-  With the keyboard: the arrow keys move through the menu, **→** or **Enter** on *New beat* opens the types, **←** or **Escape** closes them again. If the beat you drag from has several ways on, ASAPS then asks which one, just as it does when you drop on a beat. (Cancel at that point and a new beat you just made stays where it is, not linked yet.) A link let go outside the flowchart (over a side panel, say) does nothing.
+  With the keyboard: the arrow keys move through the menu, **→** or **Enter** on *New beat* opens the types, **←** or **Escape** closes them again. If the beat you drag from has several ways on, ASAPS then asks which one, just as it does when you drop on a beat. (Cancel at that point and a new beat you just made stays where it is, not linked yet.) A link let go outside the flowchart (over a side panel, say) does nothing, and neither does one let go right where you picked it up.
 - **Every drawn link is one Undo step** (a link to a new beat is two: Undo takes the link back first, then the new beat), and the Properties panel shows it straight away, exactly as if you had picked the target there.
 - A few beat types keep their links in the Properties panel only: AI Condition categories, AR Scene anchors and AI Dialog Tree exits. Drag from one of those and ASAPS tells you so. A beat with nothing to link yet (a Multi Choice without choices, say) asks you to add a choice first.
 

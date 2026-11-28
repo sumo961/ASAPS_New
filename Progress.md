@@ -1,13 +1,21 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.165, 2026-11-26)
+## 2026-11-28: The easy aim release: a drawn link lands on a beat without exact aim, an exact Connections count (v0.9.166)
 
 ### Overview
-After the release: the header's Connections count made exact, the link-drop menu kept inside a short window, and the User Guide's pictures brought up to v0.9.165.
+A small release after the author tried v0.9.165's link-drop menu: drawing a link to an existing beat needed exact aim, because any miss now opened the menu. A drop on a beat's box counts whatever lies on top, close to a beat is enough, and the landing beat is outlined while dragging. Also: the header's Connections is counted from the lines drawn, the menu stays inside a short window, and the User Guide's pictures are those of v0.9.165.
+
+### Release checks (v0.9.166)
+- **A story played to its end:** The Last Ferry (from its template) in the Preview, random choices, to an ending, no console error.
+- **Browser checks left open when the change was made**, done before the release (The Last Ferry, its Dialog Tree expanded): a drop on a card inside the expanded dialog and one 16 px below its frame both land on that beat (outlined first); a drop on a link's label lying over "On the stairs" lands on that beat; by touch, a drop 18 px below an ending links to it and one 160 px away opens the menu; the outline is gone after every drop.
+- **Not checked in the browser:** a drop on a beat inside an open cluster (the rule is tested; cluster frames are not beats).
+- **Seen, not part of this release:** in The Last Ferry, a link's label lies over the right-edge dot of "Halfway" at the default arrangement, so that dot cannot be grabbed until the beat is moved. Older than this release.
+- **Device sweep, export at another window size:** not run; builder only (the flowchart).
+- **Suites:** builder 3,431, core 3,247 (78 skipped), renderer 860, player 10; lint 0 errors; type-check clean. CI green on the release commit.
+- **User Guide audit** (against the code): "Drawing a link" says that close to a beat is enough and that the landing beat is outlined; the count strip sentence says one per line drawn; the "Last revised against" line says v0.9.166.
 
 ### Changed: the header's "Connections" is the number of lines drawn (author: "in principle it should be accurate", 2026-11-26)
 The count is shown in one place, the strip above the flowchart (Beats · Clusters · Connections); nothing else reads it. It counted one per pair of linked beats, so it was one short wherever two lines join the same two beats (True and False to one beat, a choice beside a scanned QR code: 29 against 30 lines in the release's test project). It is now counted from the lines the flowchart builds (`flowchartLineCount` in `graphBuild.ts`, clusters open, dialogs collapsed), so it cannot differ from the picture. Collapsing a cluster or expanding a dialog does not change it.
-- **User Guide:** its sentence "one per pair of beats that are linked" is true for v0.9.165 and changes with the next release.
 
 **Files modified:**
 - `packages/builder/src/components/graph/graphBuild.ts`, `packages/builder/src/components/WorkspaceView.tsx`, `packages/builder/src/utils/storyLinks.ts` (`flowchartLinkCount` removed)
@@ -21,9 +29,7 @@ The count is shown in one place, the strip above the flowchart (Beats · Cluster
 - **Let go where it was picked up** (less than 12 px from the start): nothing happens, no menu.
 
 **Checked in the browser** (The Oil Lamp): drops 18 px left of, 20 px below and off the corner of "Leaving" landed on it (outlined before, the "which one?" menu after); 60 px below opened the menu, nothing outlined; a 7 px drag did nothing; a drop on the starting beat gave its notice as before; the outline is gone after every drop.
-**Not checked:** a drop under another link's label lying over a beat (none in that layout; the rule is tested), inside an open cluster, on an expanded Dialog Tree, touch.
-
-**User Guide:** "Drawing a link" should say that near a beat is enough and that the landing beat lights up; with the next release.
+A drop under a link's label, on an expanded Dialog Tree and by touch were checked before the release (see Release checks above).
 
 **Files modified:**
 - `packages/builder/src/components/graph/linkDropTarget.ts` (new), `__tests__/linkDropTarget.test.ts` (new, 9 tests)

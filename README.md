@@ -53,11 +53,11 @@ And this is a story made with it, exported as a web page. **[Play it yourself](h
 - **Desktop apps** for macOS, Windows and Linux (beta) that update themselves.
 - **Work together** with Git built in: commit, push, pull, merge two versions of a story.
 
-## 🆕 Latest release: v0.9.165, the flowchart links release
+## 🆕 Latest release: v0.9.166, the easy aim release
 
 ASAPS is in **beta**: the core works, and new releases arrive often.
 
-v0.9.165 is about the flowchart. A link you draw and let go over empty space is no longer lost: a menu opens there, to make a new beat of any type on the spot, to find an existing beat by name and link to it, or to cancel. Links now show what they are: a Condition Check's branches are green "True" and red "False", a timer's "time runs out" link is red and dashed, props are green, a Dialog Tree's exits blue, hypertext links cyan. Each link is drawn once (many were drawn twice, the colour hidden under a grey line), and choices that lead to the same beat share one line that says so: "Mara (+1)". Also fixed: the header's Connections count was too low on a freshly opened story, and expanding a long Dialog Tree hid its exit.
+v0.9.166 makes drawing a link forgiving. You no longer have to hit a beat exactly: letting go close to a beat is enough, anything lying on top of it (the link's own line, another link's label) no longer gets in the way, and the beat the link will land on is outlined while you drag. Over empty space nothing is outlined, and that is where the menu from v0.9.165 opens (a new beat, an existing beat by name, or cancel). The Connections number above the flowchart is now exactly the number of lines drawn, and the menu stays inside a short window.
 
 Earlier releases:
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)**: a summary of every release
